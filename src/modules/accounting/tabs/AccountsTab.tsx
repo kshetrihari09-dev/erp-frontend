@@ -1,0 +1,131 @@
+import { useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { z } from 'zod'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { Plus } from 'lucide-react'
+import { useAccounts, useCreateAccount } from '@/hooks/useQuery'
+import { Button, Modal, Empty, SkeletonRows } from '@/components/ui'
+import { fmt } from '@/utils'
+import { ACCOUNT_TYPES } from '@/constants'
+import type { Account } from '@/types'
+
+const schema = z.object({
+  name:     z.string().min(1, 'Required'),
+  code:     z.string().min(1, 'Required'),   // backend field: code
+  type:     z.string().min(1, 'Required'),   // backend field: type
+  sub_type: z.string().optional(),
+  is_group: z.boolean().default(false),
+})
+type Form = z.infer<typeof schema>
+
+function AccountForm({ onClose }: { onClose: () => void }) {
+  const create = useCreateAccount()
+  const { register, handleSubmit, setValue, watch, formState: { errors, isSubmitting } } = useForm<Form>({
+    resolver: zodResolver(schema),
+    defaultValues: { type: 'asset', is_group: false },
+  })
+
+  const onSubmit = handleSubmit(async (data) => {
+    await create.mutateAsync(data as any)
+    onClose()
+  })
+
+  return (
+    <>
+      <div className="form-grid">
+        <div style={{ gridColumn: 'span 2' }}>
+          <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">Account Name *</label>
+          <input className="erp-input" placeholder="e.g. Cash in Hand" {...register('name')} />
+          {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name.message}</p>}
+        </div>
+        <div>
+          <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">Account Code *</label>
+          <input className="erp-input" placeholder="e.g. 1001" {...register('code')} />
+          {errors.code && <p className="text-xs text-red-500 mt-1">{errors.code.message}</p>}
+        </div>
+        <div>
+          <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">Account Type *</label>
+          <select className="erp-input" {...register('type')}>
+            {ACCOUNT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">Sub Type</label>
+          <input className="erp-input" placeholder="e.g. cash, receivable, payable…" {...register('sub_type')} />
+        </div>
+        <div>
+          <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">Account Kind</label>
+          {/* FIX: was onChange={() => {} — never updated the form value */}
+          <select
+            className="erp-input"
+            value={watch('is_group') ? 'true' : 'false'}
+            onChange={e => setValue('is_group', e.target.value === 'true')}
+          >
+            <option value="false">Ledger Account (transactions)</option>
+            <option value="true">Group Account (summary only)</option>
+          </select>
+        </div>
+      </div>
+      <div className="flex justify-end gap-2 mt-5 pt-4 border-t border-[var(--border)]">
+        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button variant="primary" loading={isSubmitting} onClick={onSubmit}>Create Account</Button>
+      </div>
+    </>
+  )
+}
+
+export default function AccountsTab() {
+  const [typeFilter, setTypeFilter] = useState('')
+  const [modal, setModal] = useState(false)
+  const { data, isLoading } = useAccounts({ type: typeFilter || undefined })
+  const accounts = (data as Account[]) || []
+
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <select className="erp-input" style={{ width: 160 }} value={typeFilter} onChange={e => setTypeFilter(e.target.value)}>
+          <option value="">All Types</option>
+          {ACCOUNT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+        </select>
+        <Button variant="primary" icon={<Plus size={14}/>} onClick={() => setModal(true)}>New Account</Button>
+      </div>
+      <div className="table-card">
+        <div className="overflow-x-auto">
+          <table className="erp-table">
+            <thead>
+              <tr>
+                <th>Code</th><th>Name</th><th>Type</th><th>Sub Type</th><th>Kind</th>
+                <th className="td-right">Balance</th>
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading
+                ? <SkeletonRows cols={6} />
+                : accounts.length
+                  ? accounts.map(a => (
+                      <tr key={a.id}>
+                        <td className="td-mono text-brand">{a.code}</td>
+                        <td className="font-semibold">{a.name}</td>
+                        <td><span className="badge badge-blue">{a.type}</span></td>
+                        <td className="text-[var(--text-3)]">{a.sub_type || '—'}</td>
+                        <td>
+                          {a.is_group
+                            ? <span className="badge badge-purple">Group</span>
+                            : <span className="badge badge-muted">Ledger</span>
+                          }
+                        </td>
+                        <td className="td-right font-mono">{fmt(a.balance ?? 0)}</td>
+                      </tr>
+                    ))
+                  : <tr><td colSpan={6}><Empty message="No accounts found — create one to get started"/></td></tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <Modal open={modal} onClose={() => setModal(false)} title="New Account" size="lg">
+        <AccountForm onClose={() => setModal(false)} />
+      </Modal>
+    </div>
+  )
+}
