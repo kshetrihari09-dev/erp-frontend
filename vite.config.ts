@@ -53,20 +53,6 @@ export default defineConfig(({ mode }) => {
       sourcemap: mode === 'development',
       minify:    'esbuild',
       chunkSizeWarningLimit: 800,
-      rollupOptions: {
-        output: {
-          // Fixed: use function syntax for Vite 8 / rolldown
-          manualChunks(id) {
-            if (id.includes('node_modules')) {
-              if (id.includes('react') || id.includes('react-dom') || id.includes('react-router-dom')) return 'vendor'
-              if (id.includes('@tanstack/react-query')) return 'query'
-              if (id.includes('recharts')) return 'charts'
-              if (id.includes('framer-motion')) return 'motion'
-              if (id.includes('@radix-ui')) return 'ui'
-            }
-          },
-        },
-      },
     },
 
     define: {
