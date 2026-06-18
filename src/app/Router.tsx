@@ -18,6 +18,7 @@ const ReceivePage  = lazy(() => import('@/modules/inventory/ReceivePage'))
 const CustomersPage= lazy(() => import('@/modules/users/CustomersPage'))
 const SuppliersPage= lazy(() => import('@/modules/users/SuppliersPage'))
 const AccountingPage=lazy(() => import('@/modules/accounting/AccountingPage'))
+const AccountSetupPage=lazy(() => import('@/modules/accounting/AccountSetupPage'))
 const LedgerPage   = lazy(() => import('@/modules/accounting/LedgerPage'))
 const ReportsPage  = lazy(() => import('@/modules/reports/ReportsPage'))
 const SettingsPage = lazy(() => import('@/modules/settings/SettingsPage'))
@@ -71,8 +72,9 @@ export default function Router() {
             <Route path="suppliers"    element={<SuppliersPage />} />
 
             {/* Finance */}
-            <Route path="accounting"   element={<AccountingPage />} />
-            <Route path="ledger"       element={<LedgerPage />} />
+            <Route path="accounting"     element={<AccountingPage />} />
+            <Route path="account-setup"   element={<AccountSetupPage />} />
+            <Route path="ledger"           element={<LedgerPage />} />
 
             {/* Analytics */}
             <Route path="reports"      element={<ReportsPage />} />

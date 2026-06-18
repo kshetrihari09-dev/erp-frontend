@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, ShoppingCart, ShoppingBag, RotateCcw, Package,
-  Download, Users, Truck, BookOpen, BookCopy,
+  Download, Users, Truck, BookOpen, BookCopy, SlidersHorizontal,
   FileBarChart, Settings, LogOut, Building2, CalendarDays, Moon,
   Sun, Menu, X, AlertTriangle, Bell,
 } from 'lucide-react'
@@ -37,8 +37,9 @@ const NAV = [
   { to: PATHS.SUPPLIERS,  label: 'Suppliers',      icon: <Truck           size={17} strokeWidth={1.8}/> },
 
   { section: 'FINANCE' },
-  { to: PATHS.ACCOUNTING, label: 'Accounting',     icon: <BookOpen        size={17} strokeWidth={1.8}/> },
-  { to: PATHS.LEDGER,     label: 'Ledger',         icon: <BookCopy        size={17} strokeWidth={1.8}/> },
+  { to: PATHS.ACCOUNTING,    label: 'Accounting',     icon: <BookOpen           size={17} strokeWidth={1.8}/> },
+  { to: PATHS.ACCOUNT_SETUP, label: 'Account Setup',  icon: <SlidersHorizontal  size={17} strokeWidth={1.8}/> },
+  { to: PATHS.LEDGER,        label: 'Ledger',         icon: <BookCopy           size={17} strokeWidth={1.8}/> },
 
   { section: 'ANALYTICS' },
   { to: PATHS.REPORTS,    label: 'Reports',        icon: <FileBarChart    size={17} strokeWidth={1.8}/> },
@@ -123,7 +124,8 @@ export default function AppLayout() {
     [PATHS.RECEIVES]:   'Receive Stock',
     [PATHS.CUSTOMERS]:  'Customers',
     [PATHS.SUPPLIERS]:  'Suppliers',
-    [PATHS.ACCOUNTING]: 'Accounting',
+    [PATHS.ACCOUNTING]:    'Accounting',
+    [PATHS.ACCOUNT_SETUP]: 'Account Setup',
     [PATHS.LEDGER]:     'Ledger',
     [PATHS.REPORTS]:    'Reports',
     [PATHS.SETTINGS]:   'Settings',

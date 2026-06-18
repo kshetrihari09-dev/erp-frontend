@@ -381,6 +381,21 @@ export function useDeleteAccountDefault() {
   })
 }
 
+export function useUpdatePartyAccount() {
+  const qc = useQueryClient()
+  const { success, error } = useUIStore()
+  return useMutation({
+    mutationFn: ({ id, control_account_id }: { id: string; control_account_id: string | null }) =>
+      partiesAPI.update(id, { control_account_id } as any),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [QK.CUSTOMERS] })
+      qc.invalidateQueries({ queryKey: [QK.SUPPLIERS] })
+      success('Account override saved')
+    },
+    onError: (e: any) => error('Failed to save', e?.response?.data?.message || e?.message || ''),
+  })
+}
+
 export function useVoucherPostings(params?: Record<string, unknown>) {
   return useQuery({
     queryKey: [QK.VOUCHER_POSTINGS, params],

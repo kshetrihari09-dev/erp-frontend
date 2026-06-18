@@ -92,20 +92,23 @@ export interface StockBatch {
 export type PartyType = 'customer' | 'supplier'
 
 export interface Party {
-  id:              string
-  code:            string
-  name:            string
-  type:            PartyType
-  phone?:          string
-  email?:          string
-  address?:        string
-  pan_no?:         string
-  credit_limit?:   number
-  credit_days?:    number
-  opening_balance: number
-  current_balance: number
-  is_active:       boolean
-  created_at:      string
+  id:                   string
+  code:                 string
+  name:                 string
+  type:                 PartyType
+  phone?:               string
+  email?:               string
+  address?:             string
+  pan_no?:              string
+  credit_limit?:        number
+  credit_days?:         number
+  opening_balance:      number
+  current_balance:      number
+  is_active:            boolean
+  created_at:           string
+  control_account_id?:  string
+  control_account_name?: string
+  control_account_code?: string
 }
 
 export interface LedgerEntry {

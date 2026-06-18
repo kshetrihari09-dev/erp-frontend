@@ -7,18 +7,19 @@ import {
   Users, UserCheck, TrendingUp, Activity, Eye, Edit2, BookOpen,
   FileText, Printer, Trash2, MoreVertical, X, UserCircle2,
   Phone, CreditCard, MapPin, ShieldCheck, ArrowUpDown,
-  ArrowUp, ArrowDown, ChevronRight
+  ArrowUp, ArrowDown, ChevronRight, Landmark, CheckCircle2
 } from 'lucide-react'
 import {
   useCustomers, useCreateCustomer, useUpdateParty,
-  useDeleteParty, usePartyLedger
+  useDeleteParty, usePartyLedger, useUpdatePartyAccount,
+  useAccountDefaults, useAccounts,
 } from '@/hooks/useQuery'
 import {
   Button, Modal, Pagination, SkeletonRows, Empty, ConfirmDialog
 } from '@/components/ui'
 import { useDebounce } from '@/hooks/useDebounce'
 import { fmt, fmtDate } from '@/utils'
-import type { Party } from '@/types'
+import type { Party, AccountDefault } from '@/types'
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
 const schema = z.object({
@@ -140,6 +141,8 @@ function CustomerDrawer({ customer, onClose, onEdit, onLedger }: {
   const { data: ledgerData, isLoading } = usePartyLedger(customer.id)
   const recentRows = ((ledgerData as any)?.rows ?? []).slice(0, 5)
   const closing    = (ledgerData as any)?.closingBalance ?? 0
+  const { data: defaults = [] }   = useAccountDefaults()
+  const defaultAR = (defaults as AccountDefault[]).find(d => d.role === 'accounts_receivable')
 
   return (
     <div className="fixed inset-0 z-40 flex justify-end" onClick={onClose}>
@@ -193,6 +196,22 @@ function CustomerDrawer({ customer, onClose, onEdit, onLedger }: {
           {/* Financials */}
           <div className="rounded-xl border border-slate-100 bg-slate-50 p-4 space-y-2">
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-3">Financials</p>
+            {/* Control Account */}
+            <div className="flex items-center justify-between py-1.5 px-2 bg-indigo-50 rounded-lg border border-indigo-100 mb-2">
+              <div className="flex items-center gap-1.5">
+                <Landmark size={11} className="text-indigo-400" />
+                <span className="text-[10px] font-semibold text-indigo-600 uppercase tracking-wide">Control Account</span>
+              </div>
+              <div className="text-right">
+                {customer.control_account_name ? (
+                  <span className="text-xs font-semibold text-indigo-700">{customer.control_account_name}</span>
+                ) : defaultAR ? (
+                  <span className="text-xs text-slate-500">{defaultAR.account_name} <span className="text-[10px] text-slate-400">(default)</span></span>
+                ) : (
+                  <span className="text-xs text-amber-500">Not configured</span>
+                )}
+              </div>
+            </div>
             <div className="flex justify-between text-sm">
               <span className="text-slate-500">Opening Balance</span>
               <span className="font-mono font-semibold text-slate-800">{fmt(customer.opening_balance)}</span>
@@ -258,10 +277,65 @@ function CustomerDrawer({ customer, onClose, onEdit, onLedger }: {
 }
 
 // ─── Customer Form ─────────────────────────────────────────────────────────────
+// ─── Inline account search dropdown (lightweight, no external dep) ─────────────
+function AccountPicker({ value, accounts, onChange }: {
+  value: string | null; accounts: any[]; onChange: (id: string | null) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [q, setQ]       = useState('')
+  const ref             = useRef<HTMLDivElement>(null)
+  const selected        = accounts.find((a: any) => a.id === value)
+  const filtered        = useMemo(() => {
+    const lq = q.toLowerCase()
+    return accounts.filter((a: any) => a.name.toLowerCase().includes(lq) || a.code.toLowerCase().includes(lq)).slice(0, 40)
+  }, [q, accounts])
+  useEffect(() => {
+    if (!open) return
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h)
+  }, [open])
+  return (
+    <div className="relative" ref={ref}>
+      <button type="button" onClick={() => { setOpen(v => !v); setQ('') }}
+        className="w-full flex items-center justify-between h-9 px-3 rounded-lg border border-slate-200 hover:border-indigo-300 bg-white text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500/30">
+        {selected
+          ? <span className="flex items-center gap-2"><span className="font-mono text-[11px] text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">{selected.code}</span><span className="text-slate-800 font-medium truncate">{selected.name}</span></span>
+          : <span className="text-slate-400">Use company default (Sundry Debtors)</span>}
+        <ChevronDown size={13} className="text-slate-400 ml-2 shrink-0" />
+      </button>
+      {open && (
+        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden">
+          <div className="p-2 border-b border-slate-100">
+            <div className="flex items-center gap-2 bg-slate-50 rounded-lg px-2 h-7">
+              <Search size={11} className="text-slate-400" />
+              <input autoFocus value={q} onChange={e => setQ(e.target.value)} placeholder="Search…" className="flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400" />
+            </div>
+          </div>
+          {value && <button type="button" onClick={() => { onChange(null); setOpen(false) }} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-600 hover:bg-red-50 border-b border-slate-100"><X size={11} /> Clear (use company default)</button>}
+          <div className="max-h-44 overflow-y-auto">
+            {filtered.map((a: any) => (
+              <button key={a.id} type="button" onClick={() => { onChange(a.id); setOpen(false) }}
+                className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left transition-colors ${a.id === value ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-slate-50 text-slate-700'}`}>
+                <span className="font-mono text-[10px] text-slate-400 w-12 shrink-0">{a.code}</span>
+                <span className="flex-1 font-medium truncate">{a.name}</span>
+                {a.id === value && <CheckCircle2 size={12} className="text-indigo-500 shrink-0" />}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function CustomerForm({ initial, onClose, onCreate }: {
   initial?: Party | null; onClose: () => void; onCreate: (d: Form) => Promise<void>
 }) {
-  const update = useUpdateParty()
+  const update        = useUpdateParty()
+  const updateAcct    = useUpdatePartyAccount()
+  const { data: allAccounts = [] } = useAccounts({ is_active: true, is_group: false })
+  const [ctrlAcct, setCtrlAcct]   = useState<string | null>(initial?.control_account_id ?? null)
+
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<Form>({
     resolver: zodResolver(schema),
     defaultValues: initial ? {
@@ -273,8 +347,15 @@ function CustomerForm({ initial, onClose, onCreate }: {
   })
 
   const onSubmit = handleSubmit(async (data) => {
-    if (initial) await update.mutateAsync({ id: initial.id, data })
-    else await onCreate(data)
+    if (initial) {
+      await update.mutateAsync({ id: initial.id, data })
+      // Save account override separately if changed
+      if (ctrlAcct !== (initial.control_account_id ?? null)) {
+        await updateAcct.mutateAsync({ id: initial.id, control_account_id: ctrlAcct })
+      }
+    } else {
+      await onCreate(data)
+    }
     onClose()
   })
 
@@ -315,6 +396,26 @@ function CustomerForm({ initial, onClose, onCreate }: {
             {...register('address')}
           />
         </div>
+        {/* Account Override — only shown when editing an existing customer */}
+        {initial && (
+          <div className="col-span-2">
+            <div className="flex items-center gap-2 mb-1.5">
+              <Landmark size={12} className="text-indigo-500" />
+              <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
+                Control Account Override
+              </label>
+              <span className="text-[10px] text-slate-400 ml-1">(optional — overrides company default)</span>
+            </div>
+            <AccountPicker
+              value={ctrlAcct}
+              accounts={allAccounts as any[]}
+              onChange={setCtrlAcct}
+            />
+            <p className="text-[10px] text-slate-400 mt-1">
+              Leave blank to use the company-wide Sundry Debtors account from Account Setup.
+            </p>
+          </div>
+        )}
       </div>
       <div className="flex justify-end gap-2 mt-6 pt-4 border-t border-slate-100">
         <Button variant="secondary" onClick={onClose}>Cancel</Button>
@@ -608,6 +709,7 @@ export default function CustomersPage() {
                   <th className="px-4 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wide">PAN/VAT</th>
                   <ThCol col="credit_limit" label="Credit Limit" right />
                   <ThCol col="balance"      label="Balance"      right />
+                  <th className="px-4 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wide">Control Account</th>
                   <th className="px-4 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wide">Status</th>
                   <ThCol col="created_at" label="Added" />
                   <th className="w-12 px-4 py-3" />
@@ -615,11 +717,11 @@ export default function CustomersPage() {
               </thead>
               <tbody className="divide-y divide-slate-50">
                 {isLoading
-                  ? <SkeletonRows cols={10} />
+                  ? <SkeletonRows cols={11} />
                   : filteredRows.length === 0
                   ? (
                     <tr>
-                      <td colSpan={10}>
+                      <td colSpan={11}>
                         <div className="flex flex-col items-center justify-center py-16 px-6">
                           <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
                             <UserCircle2 size={24} className="text-slate-400" />
@@ -686,6 +788,15 @@ export default function CustomersPage() {
                       </td>
                       <td className="px-4 py-3 text-right">
                         <BalanceChip value={c.current_balance} />
+                      </td>
+                      <td className="px-4 py-3">
+                        {c.control_account_name ? (
+                          <span className="inline-flex items-center gap-1.5 text-xs text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-lg font-medium">
+                            <Landmark size={10} className="text-indigo-400" />{c.control_account_name}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-slate-300 italic">company default</span>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <StatusBadge active={c.is_active} />

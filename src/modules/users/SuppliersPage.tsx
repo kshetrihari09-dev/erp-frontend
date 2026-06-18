@@ -62,6 +62,9 @@ interface SupplierAPI {
   total_purchases?: number;
   joined_date?: string;
   created_at?: string;
+  control_account_id?:   string;
+  control_account_name?: string;
+  control_account_code?: string;
 }
 
 /** Normalised internal shape */
@@ -80,6 +83,9 @@ interface Supplier {
   creditLimit: number;
   totalPurchases: number;
   joinedDate: string;
+  controlAccountId:   string;
+  controlAccountName: string;
+  controlAccountCode: string;
 }
 
 /** Normalise API → internal */
@@ -105,7 +111,10 @@ function normalise(s: SupplierAPI): Supplier {
     city:           s.city ?? s.district ?? s.province ?? "",
     creditLimit:    Number(s.credit_limit ?? 0),
     totalPurchases: Number(s.total_purchases ?? 0),
-    joinedDate:     s.joined_date ?? s.created_at?.slice(0, 10) ?? "",
+    joinedDate:         s.joined_date ?? s.created_at?.slice(0, 10) ?? "",
+    controlAccountId:   s.control_account_id   ?? "",
+    controlAccountName: s.control_account_name ?? "",
+    controlAccountCode: s.control_account_code ?? "",
   };
 }
 
@@ -242,7 +251,8 @@ const SupplierDrawer = memo(({ supplier, onClose, onEdit, onLedger }: {
 }) => {
   if (!supplier) return null;
   const color = avatarColor(supplier.id);
-  const rows: { icon:string; label:string; value:string }[] = [
+  const rows: { icon:string; label:string; value:string; accent?: boolean }[] = [
+    { icon:"🏦", label:"Control Account",  value: supplier.controlAccountName || "Company default (Sundry Creditors)", accent: !!supplier.controlAccountName },
     { icon:"📞", label:"Phone",           value: supplier.phone || "—" },
     { icon:"📧", label:"Email",           value: supplier.email || "—" },
     { icon:"🪪", label:"PAN / VAT",       value: supplier.pan   || "—" },
@@ -292,7 +302,7 @@ const SupplierDrawer = memo(({ supplier, onClose, onEdit, onLedger }: {
               <span style={{ fontSize:15, marginTop:1 }}>{r.icon}</span>
               <div>
                 <div style={{ fontSize:11, color:"#9CA3AF", fontWeight:600, textTransform:"uppercase", letterSpacing:".4px" }}>{r.label}</div>
-                <div style={{ fontSize:14, color:"#1F2937", fontWeight:500, marginTop:2 }}>{r.value}</div>
+                <div style={{ fontSize:14, color: r.accent ? "#1D4ED8" : "#1F2937", fontWeight: r.accent ? 600 : 500, marginTop:2 }}>{r.value}</div>
               </div>
             </div>
           ))}
@@ -421,7 +431,7 @@ export default function SuppliersPage() {
       // Tries the most common party-list endpoint shapes.
       // Adjust the path to match your actual route if different.
       const data = await apiFetch<SupplierAPI[] | { data: SupplierAPI[] } | { parties: SupplierAPI[] } | { suppliers: SupplierAPI[] }>(
-        "/parties?type=supplier&limit=500"
+        "/parties/suppliers?limit=500"
       );
       // Handle various response envelope shapes
       const raw: SupplierAPI[] =
@@ -724,6 +734,7 @@ export default function SuppliersPage() {
                     <th style={S.th}>Phone</th>
                     <th style={S.th}>PAN / VAT</th>
                     <th style={{ ...S.th, textAlign:"right" }} onClick={() => toggleSort("balance")}>Balance <SortIcon col="balance" sortBy={sortBy} sortDir={sortDir} /></th>
+                    <th style={S.th}>Control Account</th>
                     <th style={S.th}>Status</th>
                     <th style={S.th} onClick={() => toggleSort("date")}>Last Transaction <SortIcon col="date" sortBy={sortBy} sortDir={sortDir} /></th>
                     <th style={{ ...S.th, textAlign:"center" }}>Actions</th>
@@ -760,6 +771,12 @@ export default function SuppliersPage() {
                             <td style={S.td}><a href={`tel:${s.phone}`} style={{ color:"#374151", textDecoration:"none" }}>{s.phone}</a></td>
                             <td style={{ ...S.td, fontFamily:"monospace", fontSize:12, color:"#4B5563" }}>{s.pan}</td>
                             <td style={{ ...S.td, textAlign:"right" }}><BalanceCell value={s.balance} /></td>
+                            <td style={S.td}>
+                              {s.controlAccountName
+                                ? <span style={{ display:"inline-flex", alignItems:"center", gap:4, fontSize:12, color:"#1D4ED8", background:"#EFF6FF", border:"1px solid #BFDBFE", padding:"2px 8px", borderRadius:6, fontWeight:600 }}>🏦 {s.controlAccountName}</span>
+                                : <span style={{ fontSize:12, color:"#9CA3AF", fontStyle:"italic" }}>company default</span>
+                              }
+                            </td>
                             <td style={S.td}><StatusBadge status={s.status} /></td>
                             <td style={{ ...S.td, fontSize:12, color:"#6B7280", fontVariantNumeric:"tabular-nums" }}>{s.lastTransaction || "—"}</td>
                             <td style={{ ...S.td, textAlign:"center" }}>

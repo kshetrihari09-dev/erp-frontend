@@ -124,8 +124,9 @@ export const PATHS = {
   RECEIVES:   '/receives',
   CUSTOMERS:  '/customers',
   SUPPLIERS:  '/suppliers',
-  ACCOUNTING: '/accounting',
-  LEDGER:     '/ledger',
+  ACCOUNTING:    '/accounting',
+  ACCOUNT_SETUP: '/account-setup',
+  LEDGER:        '/ledger',
   REPORTS:    '/reports',
   SETTINGS:   '/settings',
 } as const
