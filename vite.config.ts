@@ -48,14 +48,7 @@ export default defineConfig(({ mode }) => {
       },
     },
 
-    build: {
-      outDir:    'dist',
-      sourcemap: mode === 'development',
-      minify:    'esbuild',
-      chunkSizeWarningLimit: 800,
-    },
-
-    define: {
+     define: {
       __APP_VERSION__: JSON.stringify(process.env.npm_package_version || '1.0.0'),
       __BUILD_TIME__:  JSON.stringify(new Date().toISOString()),
     },
