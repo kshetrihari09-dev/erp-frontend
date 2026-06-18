@@ -3,7 +3,7 @@
   "version": "2.0.0",
   "private": true,
   "scripts": {
-    "start":"HOST=0.0.0.0 react-scripts start",
+    "start": "HOST=0.0.0.0 react-scripts start",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
@@ -23,6 +23,7 @@
     "@tanstack/react-query": "^5.28.0",
     "@tanstack/react-table": "^8.14.0",
     "@zxing/browser": "^0.2.0",
+    "@zxing/library": "^0.21.3",
     "axios": "^1.6.7",
     "clsx": "^2.1.0",
     "date-fns": "^3.3.1",
