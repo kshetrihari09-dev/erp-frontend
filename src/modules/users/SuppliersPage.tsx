@@ -9,30 +9,30 @@
 import {
   useState, useMemo, useEffect, useRef, useCallback, memo
 } from "react";
+import http from "@/services/http";
 
-// ─── CONFIG ──────────────────────────────────────────────────────────────────
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "/api/v1";
-
-/** Central fetch wrapper: attaches auth token, handles 401 globally */
-async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  const token = localStorage.getItem("token") ?? sessionStorage.getItem("token") ?? "";
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options?.headers,
-    },
-  });
-  if (res.status === 401) {
-    window.location.href = "/login";
-    throw new Error("Unauthorized");
-  }
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(body?.message ?? `HTTP ${res.status}`);
-  }
-  return res.json();
+/**
+ * apiFetch — thin wrapper around the shared axios `http` client.
+ *
+ * Bug fix: this used to be a hand-rolled `fetch()` that read the auth
+ * token from localStorage key "token" — but the app actually stores it
+ * under RAW_TOKEN_KEY ("erp_raw_token", see store/authStore.ts). Every
+ * request here was sent with NO Authorization header at all, the backend
+ * correctly returned 401, and the old 401 handler hard-redirected to
+ * /login — even for a fully logged-in user. The shared `http` client
+ * already attaches the correct token and handles refresh-on-401 with
+ * retry, so this page should not duplicate that logic at all.
+ */
+async function apiFetch<T>(path: string, options?: { method?: string; body?: any }): Promise<T> {
+  const method = (options?.method ?? "GET").toLowerCase()
+  const res = method === "delete"
+    ? await http.delete(path)
+    : method === "post"
+    ? await http.post(path, options?.body)
+    : method === "put"
+    ? await http.put(path, options?.body)
+    : await http.get(path)
+  return res.data as T
 }
 
 // ─── TYPES ───────────────────────────────────────────────────────────────────
