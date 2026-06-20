@@ -1,828 +1,869 @@
-/**
- * SuppliersPage.tsx
- * Premium ERP Supplier Management Module
- * API: GET /parties?type=supplier  (existing endpoint — no backend changes)
- *
- * Drop-in replacement — preserves all existing CRUD routes & auth.
- */
-
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
+import { useForm } from 'react-hook-form'
+import { z } from 'zod'
+import { zodResolver } from '@hookform/resolvers/zod'
 import {
-  useState, useMemo, useEffect, useRef, useCallback, memo
-} from "react";
-import http from "@/services/http";
+  Plus, Search, RotateCcw, Download, ChevronDown,
+  Truck, UserCheck, TrendingDown, Eye, Edit2, BookOpen,
+  FileText, Printer, Trash2, MoreVertical, X, Building2,
+  Phone, CreditCard, MapPin, ShieldCheck, ArrowUpDown,
+  ArrowUp, ArrowDown, ChevronRight, Landmark, CheckCircle2,
+} from 'lucide-react'
+import {
+  useSuppliers, useCreateSupplier, useUpdateParty,
+  useDeleteParty, usePartyLedger, useUpdatePartyAccount,
+  useAccountDefaults, useAccounts,
+} from '@/hooks/useQuery'
+import {
+  Button, Modal, Pagination, SkeletonRows, Empty, ConfirmDialog
+} from '@/components/ui'
+import { useDebounce } from '@/hooks/useDebounce'
+import { fmt, fmtDate } from '@/utils'
+import type { Party, AccountDefault } from '@/types'
 
-/**
- * apiFetch — thin wrapper around the shared axios `http` client.
- *
- * Bug fix: this used to be a hand-rolled `fetch()` that read the auth
- * token from localStorage key "token" — but the app actually stores it
- * under RAW_TOKEN_KEY ("erp_raw_token", see store/authStore.ts). Every
- * request here was sent with NO Authorization header at all, the backend
- * correctly returned 401, and the old 401 handler hard-redirected to
- * /login — even for a fully logged-in user. The shared `http` client
- * already attaches the correct token and handles refresh-on-401 with
- * retry, so this page should not duplicate that logic at all.
- */
-async function apiFetch<T>(path: string, options?: { method?: string; body?: any }): Promise<T> {
-  const method = (options?.method ?? "GET").toLowerCase()
-  const res = method === "delete"
-    ? await http.delete(path)
-    : method === "post"
-    ? await http.post(path, options?.body)
-    : method === "put"
-    ? await http.put(path, options?.body)
-    : await http.get(path)
-  return res.data as T
-}
+// ─── Schema ───────────────────────────────────────────────────────────────────
+const schema = z.object({
+  name:            z.string().min(1, 'Name is required'),
+  phone:           z.string().optional(),
+  email:           z.string().email('Invalid email').optional().or(z.literal('')),
+  address:         z.string().optional(),
+  pan_no:          z.string().optional(),
+  credit_limit:    z.coerce.number().optional(),
+  credit_days:     z.coerce.number().default(30),
+  opening_balance: z.coerce.number().default(0),
+})
+type Form = z.infer<typeof schema>
 
-// ─── TYPES ───────────────────────────────────────────────────────────────────
-/** Shape returned by GET /parties?type=supplier */
-interface SupplierAPI {
-  id: string;
-  party_code?: string;
-  code?: string;
-  name: string;
-  phone?: string;
-  phone_number?: string;
-  pan_no?: string;
-  pan?: string;
-  vat_no?: string;
-  balance?: number;
-  current_balance?: number;
-  opening_balance?: number;
-  is_active?: boolean;
-  status?: string;
-  last_transaction_date?: string;
-  email?: string;
-  address?: string;
-  city?: string;
-  district?: string;
-  province?: string;
-  credit_limit?: number;
-  total_purchases?: number;
-  joined_date?: string;
-  created_at?: string;
-  control_account_id?:   string;
-  control_account_name?: string;
-  control_account_code?: string;
-}
-
-/** Normalised internal shape */
-interface Supplier {
-  id: string;
-  code: string;
-  name: string;
-  phone: string;
-  pan: string;
-  balance: number;
-  status: "active" | "inactive" | "blocked" | "pending";
-  lastTransaction: string;
-  email: string;
-  address: string;
-  city: string;
-  creditLimit: number;
-  totalPurchases: number;
-  joinedDate: string;
-  controlAccountId:   string;
-  controlAccountName: string;
-  controlAccountCode: string;
-}
-
-/** Normalise API → internal */
-function normalise(s: SupplierAPI): Supplier {
-  const rawStatus = s.status ?? (s.is_active === false ? "inactive" : "active");
-  const statusMap: Record<string, Supplier["status"]> = {
-    active: "active", ACTIVE: "active",
-    inactive: "inactive", INACTIVE: "inactive",
-    blocked: "blocked", BLOCKED: "blocked",
-    pending: "pending", PENDING: "pending",
-  };
-  return {
-    id:             s.id,
-    code:           s.party_code ?? s.code ?? "—",
-    name:           s.name,
-    phone:          s.phone ?? s.phone_number ?? "—",
-    pan:            s.pan_no ?? s.pan ?? s.vat_no ?? "—",
-    balance:        Number(s.balance ?? s.current_balance ?? s.opening_balance ?? 0),
-    status:         statusMap[rawStatus] ?? "active",
-    lastTransaction:s.last_transaction_date ?? "",
-    email:          s.email ?? "",
-    address:        s.address ?? "",
-    city:           s.city ?? s.district ?? s.province ?? "",
-    creditLimit:    Number(s.credit_limit ?? 0),
-    totalPurchases: Number(s.total_purchases ?? 0),
-    joinedDate:         s.joined_date ?? s.created_at?.slice(0, 10) ?? "",
-    controlAccountId:   s.control_account_id   ?? "",
-    controlAccountName: s.control_account_name ?? "",
-    controlAccountCode: s.control_account_code ?? "",
-  };
-}
-
-// ─── HELPERS ─────────────────────────────────────────────────────────────────
-const fmtCurrency = (n: number) =>
-  (n < 0 ? "− " : "") + "₨ " + Math.abs(n).toLocaleString("en-IN", { minimumFractionDigits: 2 });
-
-const initials = (name: string) =>
-  name.split(/\s+/).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
-
-const AVATAR_COLORS = [
-  "#2563EB","#7C3AED","#DB2777","#D97706",
-  "#16A34A","#0891B2","#9333EA","#EA580C",
-];
-const avatarColor = (id: string) => {
-  const n = id.replace(/\D/g, "").slice(-4);
-  return AVATAR_COLORS[(parseInt(n || "0") % AVATAR_COLORS.length)];
-};
-
-// ─── SUB-COMPONENTS ──────────────────────────────────────────────────────────
-
-const StatusBadge = memo(({ status }: { status: Supplier["status"] }) => {
-  const cfg = {
-    active:   { bg: "#F0FDF4", color: "#15803D", dot: "#16A34A", label: "Active" },
-    inactive: { bg: "#F3F4F6", color: "#4B5563", dot: "#9CA3AF", label: "Inactive" },
-    blocked:  { bg: "#FEF2F2", color: "#B91C1C", dot: "#DC2626", label: "Blocked" },
-    pending:  { bg: "#FFFBEB", color: "#B45309", dot: "#F59E0B", label: "Pending" },
-  }[status];
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function BalanceChip({ value }: { value: number | string }) {
+  const n = Number(value)
+  const cls = n > 0
+    ? 'text-amber-700 bg-amber-50 border-amber-200'
+    : n < 0
+    ? 'text-red-700 bg-red-50 border-red-200'
+    : 'text-green-700 bg-green-50 border-green-200'
   return (
-    <span style={{ display:"inline-flex", alignItems:"center", gap:5, background:cfg.bg, color:cfg.color, padding:"3px 10px", borderRadius:999, fontSize:12, fontWeight:600, letterSpacing:".2px" }}>
-      <span style={{ width:6, height:6, borderRadius:"50%", background:cfg.dot, flexShrink:0 }} />
-      {cfg.label}
+    <span className={`inline-block font-mono text-xs font-semibold px-2 py-0.5 rounded border ${cls}`}>
+      {fmt(n)}
     </span>
-  );
-});
+  )
+}
 
-const BalanceCell = memo(({ value }: { value: number }) => {
-  const color = value > 0 ? "#D97706" : value < 0 ? "#DC2626" : "#16A34A";
-  const bg    = value > 0 ? "#FFFBEB" : value < 0 ? "#FEF2F2" : "#F0FDF4";
-  return (
-    <span style={{ display:"inline-block", background:bg, color, padding:"2px 8px", borderRadius:6, fontSize:13, fontWeight:700, fontVariantNumeric:"tabular-nums", whiteSpace:"nowrap" }}>
-      {value === 0 ? "₨ 0.00" : fmtCurrency(value)}
-    </span>
-  );
-});
+function StatusBadge({ active }: { active: boolean }) {
+  return active
+    ? <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-200">
+        <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />Active
+      </span>
+    : <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200">
+        <span className="w-1.5 h-1.5 rounded-full bg-slate-400 inline-block" />Inactive
+      </span>
+}
 
-// ─── KPI CARD ────────────────────────────────────────────────────────────────
-const KPICard = memo(({ icon, label, value, sub, bg }: {
-  icon: string; label: string; value: string | number; sub: string; bg: string;
-}) => {
-  const [hov, setHov] = useState(false);
+// ─── KPI Card ─────────────────────────────────────────────────────────────────
+function KpiCard({ label, value, sub, icon, color, loading }: {
+  label: string; value: string | number; sub?: string
+  icon: React.ReactNode; color: string; loading?: boolean
+}) {
   return (
-    <div onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
-      style={{ background:"#fff", border:"1px solid #E5E7EB", borderRadius:16, padding:"20px 22px", boxShadow: hov ? "0 8px 28px rgba(0,0,0,.10)" : "0 1px 4px rgba(0,0,0,.07)", transition:"transform .18s,box-shadow .18s", transform: hov ? "translateY(-3px)" : "none", cursor:"pointer" }}>
-      <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between" }}>
-        <div style={{ flex:1, minWidth:0 }}>
-          <p style={{ fontSize:11, fontWeight:600, color:"#6B7280", textTransform:"uppercase", letterSpacing:".6px", marginBottom:8 }}>{label}</p>
-          <p style={{ fontSize:24, fontWeight:700, color:"#111827", letterSpacing:"-.5px", marginBottom:4 }}>{value}</p>
-          <p style={{ fontSize:12, color:"#9CA3AF" }}>{sub}</p>
-        </div>
-        <div style={{ width:44, height:44, borderRadius:12, background:bg, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, marginLeft:12 }}>
-          <span style={{ fontSize:22 }}>{icon}</span>
-        </div>
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex items-start gap-4 hover:shadow-md transition-shadow duration-200">
+      <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${color}`}>
+        {icon}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">{label}</p>
+        {loading
+          ? <div className="h-7 w-20 bg-slate-100 animate-pulse rounded-md" />
+          : <p className="text-2xl font-bold text-slate-900 leading-none">{value}</p>
+        }
+        {sub && !loading && <p className="text-xs text-slate-400 mt-1">{sub}</p>}
       </div>
     </div>
-  );
-});
+  )
+}
 
-// ─── SKELETON ROW ────────────────────────────────────────────────────────────
-const SkeletonRow = () => (
-  <tr>
-    {[44,80,220,140,120,110,90,120,70].map((w, i) => (
-      <td key={i} style={{ padding:"14px", borderBottom:"1px solid #F3F4F6" }}>
-        <div style={{ width:w, height:14, background:"#F3F4F6", borderRadius:6, animation:"pulse 1.4s ease-in-out infinite" }} />
-      </td>
-    ))}
-  </tr>
-);
+// ─── Actions Dropdown ─────────────────────────────────────────────────────────
+function ActionsMenu({ onView, onEdit, onLedger, onDelete }: {
+  onView: () => void; onEdit: () => void; onLedger: () => void; onDelete: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
 
-// ─── ACTION MENU ─────────────────────────────────────────────────────────────
-const ActionMenu = memo(({ supplier, onView, onEdit, onLedger, onDelete }: {
-  supplier: Supplier;
-  onView:   (s: Supplier) => void;
-  onEdit:   (s: Supplier) => void;
-  onLedger: (s: Supplier) => void;
-  onDelete: (s: Supplier) => void;
-}) => {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
-  }, []);
-  const items: Array<{ icon:string; label:string; action:()=>void; danger?:boolean } | { divider:true }> = [
-    { icon:"👁",  label:"View Supplier",     action:() => { onView(supplier);   setOpen(false); } },
-    { icon:"✏️", label:"Edit Supplier",     action:() => { onEdit(supplier);   setOpen(false); } },
-    { icon:"📊", label:"Open Ledger",       action:() => { onLedger(supplier); setOpen(false); } },
-    { icon:"📋", label:"View Transactions", action:() => { onView(supplier);   setOpen(false); } },
-    { icon:"🖨",  label:"Print Statement",  action:() => { window.print();     setOpen(false); } },
-    { divider: true },
-    { icon:"🗑",  label:"Delete Supplier",  action:() => { onDelete(supplier); setOpen(false); }, danger:true },
-  ];
+    if (!open) return
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [open])
+
+  const items = [
+    { icon: <Eye size={13} />,      label: 'View Supplier',     action: onView,   cls: '' },
+    { icon: <Edit2 size={13} />,    label: 'Edit Supplier',     action: onEdit,   cls: '' },
+    { icon: <BookOpen size={13} />, label: 'Open Ledger',       action: onLedger, cls: '' },
+    { icon: <FileText size={13} />, label: 'View Transactions', action: () => {},  cls: '' },
+    { icon: <Printer size={13} />,  label: 'Print Statement',   action: () => {},  cls: '' },
+    null,
+    { icon: <Trash2 size={13} />,   label: 'Delete Supplier',   action: onDelete, cls: 'text-red-600 hover:bg-red-50' },
+  ]
+
   return (
-    <div ref={ref} style={{ position:"relative", display:"inline-block" }}>
-      <button onClick={() => setOpen(o => !o)}
-        style={{ width:32, height:32, borderRadius:7, border:"1px solid #E5E7EB", background: open ? "#F3F4F6" : "#fff", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, color:"#6B7280", transition:".12s" }}>⋮</button>
+    <div className="relative" ref={ref}>
+      <button
+        onClick={e => { e.stopPropagation(); setOpen(v => !v) }}
+        className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+      >
+        <MoreVertical size={15} />
+      </button>
       {open && (
-        <div style={{ position:"absolute", right:0, top:"calc(100% + 4px)", background:"#fff", border:"1px solid #E5E7EB", borderRadius:12, boxShadow:"0 8px 32px rgba(0,0,0,.12)", minWidth:200, zIndex:200, padding:6 }}>
+        <div className="absolute right-0 top-8 z-50 w-44 bg-white rounded-xl border border-slate-200 shadow-lg py-1 overflow-hidden">
           {items.map((item, i) =>
-            "divider" in item ? (
-              <div key={i} style={{ height:1, background:"#F3F4F6", margin:"4px 0" }} />
-            ) : (
-              <button key={i} onClick={item.action}
-                style={{ width:"100%", display:"flex", alignItems:"center", gap:10, padding:"8px 12px", borderRadius:7, border:"none", background:"transparent", cursor:"pointer", fontSize:13, color: item.danger ? "#DC2626" : "#374151", textAlign:"left", transition:".1s", fontFamily:"inherit" }}
-                onMouseEnter={e => (e.currentTarget.style.background = item.danger ? "#FEF2F2" : "#F8FAFC")}
-                onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-                <span style={{ fontSize:15 }}>{item.icon}</span>{item.label}
-              </button>
-            )
+            item === null
+              ? <div key={i} className="border-t border-slate-100 my-1" />
+              : (
+                <button
+                  key={item.label}
+                  onClick={e => { e.stopPropagation(); item.action(); setOpen(false) }}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors ${item.cls}`}
+                >
+                  {item.icon}{item.label}
+                </button>
+              )
           )}
         </div>
       )}
     </div>
-  );
-});
+  )
+}
 
-// ─── SUPPLIER DRAWER ─────────────────────────────────────────────────────────
-const SupplierDrawer = memo(({ supplier, onClose, onEdit, onLedger }: {
-  supplier: Supplier | null;
-  onClose:  () => void;
-  onEdit:   (s: Supplier) => void;
-  onLedger: (s: Supplier) => void;
-}) => {
-  if (!supplier) return null;
-  const color = avatarColor(supplier.id);
-  const rows: { icon:string; label:string; value:string; accent?: boolean }[] = [
-    { icon:"🏦", label:"Control Account",  value: supplier.controlAccountName || "Company default (Sundry Creditors)", accent: !!supplier.controlAccountName },
-    { icon:"📞", label:"Phone",           value: supplier.phone || "—" },
-    { icon:"📧", label:"Email",           value: supplier.email || "—" },
-    { icon:"🪪", label:"PAN / VAT",       value: supplier.pan   || "—" },
-    { icon:"📍", label:"Address",         value: [supplier.address, supplier.city].filter(Boolean).join(", ") || "—" },
-    { icon:"📅", label:"Joined Date",     value: supplier.joinedDate || "—" },
-    { icon:"💳", label:"Credit Limit",    value: supplier.creditLimit ? fmtCurrency(supplier.creditLimit) : "—" },
-    { icon:"🛒", label:"Total Purchases", value: supplier.totalPurchases ? fmtCurrency(supplier.totalPurchases) : "—" },
-    { icon:"🕐", label:"Last Transaction",value: supplier.lastTransaction || "—" },
-  ];
+// ─── Side Drawer ──────────────────────────────────────────────────────────────
+function SupplierDrawer({ supplier, onClose, onEdit, onLedger }: {
+  supplier: Party; onClose: () => void; onEdit: () => void; onLedger: () => void
+}) {
+  const { data: ledgerData, isLoading } = usePartyLedger(supplier.id)
+  const recentRows = ((ledgerData as any)?.rows ?? []).slice(0, 5)
+  const closing    = (ledgerData as any)?.closingBalance ?? 0
+  const { data: defaults = [] }   = useAccountDefaults()
+  const defaultAP = (defaults as AccountDefault[]).find(d => d.role === 'accounts_payable')
+
   return (
-    <>
-      <div onClick={onClose} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.35)", zIndex:300 }} />
-      <div style={{ position:"fixed", top:0, right:0, height:"100%", width:420, background:"#fff", zIndex:400, boxShadow:"-4px 0 32px rgba(0,0,0,.12)", display:"flex", flexDirection:"column", overflowY:"auto" }}>
+    <div className="fixed inset-0 z-40 flex justify-end" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/20 backdrop-blur-[1px]" />
+      <div
+        className="relative w-full max-w-sm bg-white h-full shadow-2xl flex flex-col overflow-hidden"
+        onClick={e => e.stopPropagation()}
+      >
         {/* Header */}
-        <div style={{ padding:"24px 24px 20px", borderBottom:"1px solid #F3F4F6", background:"#FAFAFA" }}>
-          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16 }}>
-            <span style={{ fontSize:12, color:"#9CA3AF", fontWeight:600, textTransform:"uppercase", letterSpacing:".6px" }}>Supplier Profile</span>
-            <button onClick={onClose} style={{ width:32, height:32, borderRadius:8, border:"1px solid #E5E7EB", background:"#fff", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", fontSize:18, color:"#6B7280" }}>×</button>
-          </div>
-          <div style={{ display:"flex", alignItems:"center", gap:16 }}>
-            <div style={{ width:60, height:60, borderRadius:16, background:color, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:700, fontSize:22, color:"#fff", flexShrink:0, boxShadow:`0 4px 14px ${color}55` }}>
-              {initials(supplier.name)}
+        <div className="flex items-start justify-between p-5 border-b border-slate-100">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-teal-600 flex items-center justify-center text-white font-bold text-sm">
+              {supplier.name.charAt(0).toUpperCase()}
             </div>
             <div>
-              <div style={{ fontSize:17, fontWeight:700, color:"#111827", lineHeight:1.3 }}>{supplier.name}</div>
-              <div style={{ fontSize:12, color:"#6B7280", marginTop:3 }}>{supplier.code}</div>
-              <div style={{ marginTop:6 }}><StatusBadge status={supplier.status} /></div>
+              <p className="font-bold text-slate-900 text-sm leading-tight">{supplier.name}</p>
+              <p className="text-xs text-teal-600 font-mono font-medium">{supplier.code}</p>
             </div>
           </div>
+          <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 transition-colors">
+            <X size={15} />
+          </button>
         </div>
 
-        {/* Balance card */}
-        <div style={{ padding:"20px 24px 0" }}>
-          <div style={{ background: supplier.balance > 0 ? "#FFFBEB" : supplier.balance < 0 ? "#FEF2F2" : "#F0FDF4", border:`1px solid ${supplier.balance > 0 ? "#FDE68A" : supplier.balance < 0 ? "#FECACA" : "#BBF7D0"}`, borderRadius:12, padding:"16px 20px", marginBottom:20 }}>
-            <div style={{ fontSize:11, fontWeight:600, color:"#6B7280", textTransform:"uppercase", letterSpacing:".5px", marginBottom:4 }}>Current Balance</div>
-            <div style={{ fontSize:26, fontWeight:700, color: supplier.balance > 0 ? "#B45309" : supplier.balance < 0 ? "#B91C1C" : "#15803D", letterSpacing:"-.5px" }}>
-              {supplier.balance === 0 ? "₨ 0.00" : fmtCurrency(supplier.balance)}
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto p-5 space-y-5">
+          <div className="flex gap-3 flex-wrap">
+            <StatusBadge active={supplier.is_active} />
+            <BalanceChip value={closing} />
+          </div>
+
+          {/* Info */}
+          <div className="space-y-3">
+            {[
+              { icon: <Phone size={13} />,      label: 'Phone',       value: supplier.phone   || '—' },
+              { icon: <CreditCard size={13} />,  label: 'PAN/VAT',     value: supplier.pan_no  || '—' },
+              { icon: <MapPin size={13} />,      label: 'Address',     value: supplier.address || '—' },
+            ].map(row => (
+              <div key={row.label} className="flex items-start gap-3">
+                <span className="mt-0.5 w-6 h-6 rounded-md bg-slate-100 flex items-center justify-center text-slate-400 flex-shrink-0">
+                  {row.icon}
+                </span>
+                <div>
+                  <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wide">{row.label}</p>
+                  <p className="text-sm text-slate-700 font-medium">{row.value}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Financials */}
+          <div className="rounded-xl border border-slate-100 bg-slate-50 p-4 space-y-2">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-3">Financials</p>
+            {/* Control Account */}
+            <div className="flex items-center justify-between py-1.5 px-2 bg-teal-50 rounded-lg border border-teal-100 mb-2">
+              <div className="flex items-center gap-1.5">
+                <Landmark size={11} className="text-teal-400" />
+                <span className="text-[10px] font-semibold text-teal-600 uppercase tracking-wide">Control Account</span>
+              </div>
+              <div className="text-right">
+                {supplier.control_account_name ? (
+                  <span className="text-xs font-semibold text-teal-700">{supplier.control_account_name}</span>
+                ) : defaultAP ? (
+                  <span className="text-xs text-slate-500">{defaultAP.account_name} <span className="text-[10px] text-slate-400">(default)</span></span>
+                ) : (
+                  <span className="text-xs text-amber-500">Not configured</span>
+                )}
+              </div>
             </div>
-            <div style={{ fontSize:12, color:"#9CA3AF", marginTop:4 }}>
-              {supplier.balance > 0 ? "Outstanding payable" : supplier.balance < 0 ? "Advance / overpaid" : "Settled — no outstanding"}
+            <div className="flex justify-between text-sm">
+              <span className="text-slate-500">Opening Balance</span>
+              <span className="font-mono font-semibold text-slate-800">{fmt(supplier.opening_balance)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-slate-500">Current Balance</span>
+              <span className={`font-mono font-semibold ${Number(supplier.current_balance) > 0 ? 'text-amber-700' : 'text-green-700'}`}>
+                {fmt(supplier.current_balance)}
+              </span>
+            </div>
+            {supplier.credit_limit != null && (
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500">Credit Limit</span>
+                <span className="font-mono font-semibold text-slate-800">{fmt(supplier.credit_limit)}</span>
+              </div>
+            )}
+            <div className="flex justify-between text-sm">
+              <span className="text-slate-500">Credit Days</span>
+              <span className="font-mono font-semibold text-slate-800">{supplier.credit_days ?? 30}</span>
             </div>
           </div>
 
-          {/* Details */}
-          {rows.map(r => (
-            <div key={r.label} style={{ display:"flex", alignItems:"flex-start", gap:12, padding:"10px 0", borderBottom:"1px solid #F3F4F6" }}>
-              <span style={{ fontSize:15, marginTop:1 }}>{r.icon}</span>
-              <div>
-                <div style={{ fontSize:11, color:"#9CA3AF", fontWeight:600, textTransform:"uppercase", letterSpacing:".4px" }}>{r.label}</div>
-                <div style={{ fontSize:14, color: r.accent ? "#1D4ED8" : "#1F2937", fontWeight: r.accent ? 600 : 500, marginTop:2 }}>{r.value}</div>
+          {/* Recent activity */}
+          <div>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-3">Recent Activity</p>
+            {isLoading ? (
+              <div className="space-y-2">
+                {[1,2,3].map(i => <div key={i} className="h-10 bg-slate-100 animate-pulse rounded-lg" />)}
               </div>
-            </div>
-          ))}
+            ) : recentRows.length === 0 ? (
+              <p className="text-xs text-slate-400 italic">No transactions yet</p>
+            ) : (
+              <div className="space-y-2">
+                {recentRows.map((row: any, i: number) => (
+                  <div key={i} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
+                    <div>
+                      <p className="text-xs font-medium text-slate-700">{row.description || row.reference || '—'}</p>
+                      <p className="text-[10px] text-slate-400">{row.date ? fmtDate(row.date_ad || row.date) : '—'}</p>
+                    </div>
+                    <span className={`text-xs font-mono font-semibold ${Number(row.debit) > 0 ? 'text-red-600' : 'text-green-700'}`}>
+                      {Number(row.debit) > 0 ? `-${fmt(row.debit)}` : `+${fmt(row.credit)}`}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Footer */}
-        <div style={{ padding:"16px 24px", borderTop:"1px solid #F3F4F6", display:"flex", gap:8, marginTop:"auto" }}>
-          <button onClick={() => onLedger(supplier)} style={{ flex:1, height:38, background:"#2563EB", color:"#fff", border:"none", borderRadius:9, fontWeight:600, fontSize:13, cursor:"pointer", fontFamily:"inherit" }}>
-            Open Ledger
-          </button>
-          <button onClick={() => onEdit(supplier)} style={{ flex:1, height:38, background:"#fff", color:"#374151", border:"1px solid #E5E7EB", borderRadius:9, fontWeight:500, fontSize:13, cursor:"pointer", fontFamily:"inherit" }}>
-            Edit Details
-          </button>
+        <div className="p-4 border-t border-slate-100 flex gap-2">
+          <Button variant="outline" size="sm" className="flex-1" onClick={onEdit}>
+            <Edit2 size={13} /> Edit
+          </Button>
+          <Button variant="primary" size="sm" onClick={onLedger}
+            className="flex-1 bg-teal-600 hover:bg-teal-700">
+            <BookOpen size={13} /> Ledger
+          </Button>
         </div>
       </div>
-    </>
-  );
-});
-
-// ─── ANALYTICS BAR ───────────────────────────────────────────────────────────
-const AnalyticsBar = memo(({ suppliers }: { suppliers: Supplier[] }) => {
-  const top5 = useMemo(() =>
-    [...suppliers].filter(s => s.totalPurchases > 0)
-      .sort((a, b) => b.totalPurchases - a.totalPurchases).slice(0, 5),
-    [suppliers]
-  );
-  const max = top5[0]?.totalPurchases || 1;
-  if (top5.length === 0) return (
-    <div style={{ background:"#fff", border:"1px solid #E5E7EB", borderRadius:16, padding:"22px 24px", display:"flex", alignItems:"center", justifyContent:"center", color:"#9CA3AF", fontSize:13 }}>
-      No purchase data available
     </div>
-  );
-  return (
-    <div style={{ background:"#fff", border:"1px solid #E5E7EB", borderRadius:16, padding:"22px 24px", boxShadow:"0 1px 4px rgba(0,0,0,.07)" }}>
-      <div style={{ marginBottom:18 }}>
-        <div style={{ fontSize:14, fontWeight:600, color:"#111827" }}>Top Suppliers by Purchase</div>
-        <div style={{ fontSize:12, color:"#9CA3AF", marginTop:2 }}>Ranked by total purchase volume</div>
-      </div>
-      <div style={{ display:"flex", flexDirection:"column", gap:13 }}>
-        {top5.map(s => {
-          const pct = (s.totalPurchases / max) * 100;
-          const color = avatarColor(s.id);
-          return (
-            <div key={s.id}>
-              <div style={{ display:"flex", justifyContent:"space-between", marginBottom:5 }}>
-                <span style={{ fontSize:12, fontWeight:500, color:"#374151" }}>{s.name.split(" ").slice(0, 3).join(" ")}</span>
-                <span style={{ fontSize:12, fontWeight:700, color:"#111827" }}>
-                  ₨ {(s.totalPurchases / 1000).toFixed(0)}K
-                </span>
-              </div>
-              <div style={{ height:8, background:"#F3F4F6", borderRadius:99, overflow:"hidden" }}>
-                <div style={{ height:"100%", width:`${pct}%`, background:color, borderRadius:99, transition:"width .8s ease" }} />
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-});
+  )
+}
 
-// ─── DELETE MODAL ────────────────────────────────────────────────────────────
-const DeleteModal = ({ supplier, onCancel, onConfirm, deleting }: {
-  supplier: Supplier; onCancel:()=>void; onConfirm:()=>void; deleting:boolean;
-}) => (
-  <>
-    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.45)", zIndex:500 }} />
-    <div style={{ position:"fixed", top:"50%", left:"50%", transform:"translate(-50%,-50%)", background:"#fff", borderRadius:16, padding:28, width:380, zIndex:600, boxShadow:"0 20px 60px rgba(0,0,0,.2)" }}>
-      <div style={{ fontSize:36, marginBottom:12, textAlign:"center" }}>⚠️</div>
-      <h3 style={{ fontSize:16, fontWeight:700, color:"#111827", marginBottom:8, textAlign:"center" }}>Delete Supplier?</h3>
-      <p style={{ fontSize:13, color:"#6B7280", textAlign:"center", lineHeight:1.6, marginBottom:20 }}>
-        Are you sure you want to delete <strong>{supplier.name}</strong>? This action cannot be undone.
-      </p>
-      <div style={{ display:"flex", gap:10 }}>
-        <button onClick={onCancel} disabled={deleting} style={{ flex:1, height:38, background:"#fff", color:"#374151", border:"1px solid #E5E7EB", borderRadius:9, fontWeight:500, fontSize:13, cursor:"pointer", fontFamily:"inherit" }}>Cancel</button>
-        <button onClick={onConfirm} disabled={deleting} style={{ flex:1, height:38, background:"#DC2626", color:"#fff", border:"none", borderRadius:9, fontWeight:600, fontSize:13, cursor: deleting ? "not-allowed" : "pointer", opacity: deleting ? .7 : 1, fontFamily:"inherit" }}>
-          {deleting ? "Deleting…" : "Delete"}
-        </button>
-      </div>
-    </div>
-  </>
-);
-
-// ─── TOAST ────────────────────────────────────────────────────────────────────
-const Toast = ({ msg, type, onClose }: { msg:string; type:"success"|"error"; onClose:()=>void }) => (
-  <div style={{ position:"fixed", bottom:28, right:28, zIndex:700, background: type === "success" ? "#15803D" : "#B91C1C", color:"#fff", padding:"12px 20px", borderRadius:10, fontSize:13, fontWeight:500, boxShadow:"0 8px 24px rgba(0,0,0,.2)", display:"flex", alignItems:"center", gap:10, maxWidth:340 }}>
-    <span style={{ fontSize:16 }}>{type === "success" ? "✓" : "✕"}</span>
-    {msg}
-    <button onClick={onClose} style={{ background:"transparent", border:"none", color:"rgba(255,255,255,.8)", cursor:"pointer", fontSize:16, padding:0, marginLeft:4 }}>×</button>
-  </div>
-);
-
-// ─── SORT ICON ────────────────────────────────────────────────────────────────
-const SortIcon = ({ col, sortBy, sortDir }: { col:string; sortBy:string; sortDir:"asc"|"desc" }) => (
-  <span style={{ fontSize:10, marginLeft:4, opacity: sortBy === col ? 1 : .3, color: sortBy === col ? "#2563EB" : "#9CA3AF" }}>
-    {sortBy === col ? (sortDir === "asc" ? "▲" : "▼") : "⇅"}
-  </span>
-);
-
-// ─── MAIN PAGE ────────────────────────────────────────────────────────────────
-export default function SuppliersPage() {
-  // ── API state ──
-  const [suppliers, setSuppliers]       = useState<Supplier[]>([]);
-  const [loading, setLoading]           = useState(true);
-  const [error, setError]               = useState<string | null>(null);
-  const [deleting, setDeleting]         = useState(false);
-  const [toast, setToast]               = useState<{ msg:string; type:"success"|"error" } | null>(null);
-
-  // ── UI state ──
-  const [search, setSearch]             = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [balanceFilter, setBalanceFilter] = useState("");
-  const [sortBy, setSortBy]             = useState("name");
-  const [sortDir, setSortDir]           = useState<"asc"|"desc">("asc");
-  const [page, setPage]                 = useState(1);
-  const [selected, setSelected]         = useState<Set<string>>(new Set());
-  const [drawer, setDrawer]             = useState<Supplier | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<Supplier | null>(null);
-  const perPage = 15;
-
-  // ── Fetch suppliers ────────────────────────────────────────────────────────
-  const fetchSuppliers = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      // Tries the most common party-list endpoint shapes.
-      // Adjust the path to match your actual route if different.
-      const data = await apiFetch<SupplierAPI[] | { data: SupplierAPI[] } | { parties: SupplierAPI[] } | { suppliers: SupplierAPI[] }>(
-        "/parties/suppliers?limit=500"
-      );
-      // Handle various response envelope shapes
-      const raw: SupplierAPI[] =
-        Array.isArray(data)           ? data :
-        "data"      in data           ? (data as any).data :
-        "parties"   in data           ? (data as any).parties :
-        "suppliers" in data           ? (data as any).suppliers :
-        [];
-      setSuppliers(raw.map(normalise));
-    } catch (err: any) {
-      setError(err.message ?? "Failed to load suppliers");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { fetchSuppliers(); }, [fetchSuppliers]);
-
-  // Auto-dismiss toast
+// ─── Inline account search dropdown (lightweight, no external dep) ─────────────
+function AccountPicker({ value, accounts, onChange }: {
+  value: string | null; accounts: any[]; onChange: (id: string | null) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [q, setQ]       = useState('')
+  const ref             = useRef<HTMLDivElement>(null)
+  const selected        = accounts.find((a: any) => a.id === value)
+  const filtered        = useMemo(() => {
+    const lq = q.toLowerCase()
+    return accounts.filter((a: any) => a.name.toLowerCase().includes(lq) || a.code.toLowerCase().includes(lq)).slice(0, 40)
+  }, [q, accounts])
   useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(() => setToast(null), 3500);
-    return () => clearTimeout(t);
-  }, [toast]);
-
-  // ── Delete ─────────────────────────────────────────────────────────────────
-  const handleDelete = useCallback(async () => {
-    if (!deleteTarget) return;
-    setDeleting(true);
-    try {
-      await apiFetch(`/parties/${deleteTarget.id}`, { method: "DELETE" });
-      setSuppliers(prev => prev.filter(s => s.id !== deleteTarget.id));
-      setToast({ msg: `${deleteTarget.name} deleted successfully.`, type: "success" });
-    } catch (err: any) {
-      setToast({ msg: err.message ?? "Delete failed. Please try again.", type: "error" });
-    } finally {
-      setDeleting(false);
-      setDeleteTarget(null);
-    }
-  }, [deleteTarget]);
-
-  // ── Navigate to ledger / edit (adapt paths to your router) ────────────────
-  const handleLedger = useCallback((s: Supplier) => {
-    window.location.href = `/finance/ledger?party=${s.id}`;
-  }, []);
-  const handleEdit = useCallback((s: Supplier) => {
-    window.location.href = `/parties/suppliers/${s.id}/edit`;
-  }, []);
-
-  // ── KPIs ───────────────────────────────────────────────────────────────────
-  const kpi = useMemo(() => ({
-    total:    suppliers.length,
-    active:   suppliers.filter(s => s.status === "active").length,
-    payables: suppliers.filter(s => s.balance > 0).reduce((sum, s) => sum + s.balance, 0),
-    recent:   suppliers.filter(s => s.lastTransaction >= new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10)).length,
-  }), [suppliers]);
-
-  // ── Filter + sort ──────────────────────────────────────────────────────────
-  const filtered = useMemo(() => {
-    const q = search.toLowerCase();
-    let data = suppliers.filter(s => {
-      if (q && ![s.name, s.code, s.phone, s.pan, s.email].some(v => v.toLowerCase().includes(q))) return false;
-      if (statusFilter && s.status !== statusFilter) return false;
-      if (balanceFilter === "outstanding" && s.balance <= 0) return false;
-      if (balanceFilter === "settled"     && s.balance !== 0) return false;
-      if (balanceFilter === "overpaid"    && s.balance >= 0) return false;
-      return true;
-    });
-    return [...data].sort((a, b) => {
-      const cmp =
-        sortBy === "name"    ? a.name.localeCompare(b.name) :
-        sortBy === "code"    ? a.code.localeCompare(b.code) :
-        sortBy === "balance" ? a.balance - b.balance :
-        sortBy === "date"    ? a.lastTransaction.localeCompare(b.lastTransaction) : 0;
-      return sortDir === "asc" ? cmp : -cmp;
-    });
-  }, [suppliers, search, statusFilter, balanceFilter, sortBy, sortDir]);
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
-  const paged = filtered.slice((page - 1) * perPage, page * perPage);
-
-  const toggleSort = useCallback((col: string) => {
-    if (sortBy === col) setSortDir(d => d === "asc" ? "desc" : "asc");
-    else { setSortBy(col); setSortDir("asc"); }
-    setPage(1);
-  }, [sortBy]);
-
-  const toggleSelect = useCallback((id: string) => {
-    setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
-  }, []);
-  const toggleAll = useCallback(() => {
-    setSelected(prev => prev.size === paged.length ? new Set() : new Set(paged.map(s => s.id)));
-  }, [paged]);
-
-  // ── Export CSV ─────────────────────────────────────────────────────────────
-  const exportCSV = useCallback(() => {
-    const rows = [
-      ["Code","Name","Phone","PAN/VAT","Balance","Status","Last Transaction"],
-      ...filtered.map(s => [s.code, s.name, s.phone, s.pan, s.balance.toString(), s.status, s.lastTransaction]),
-    ];
-    const csv = rows.map(r => r.map(v => `"${v}"`).join(",")).join("\n");
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([csv], { type:"text/csv" }));
-    a.download = `suppliers_${new Date().toISOString().slice(0,10)}.csv`;
-    a.click();
-  }, [filtered]);
-
-  // ── Styles ─────────────────────────────────────────────────────────────────
-  const S = {
-    page:       { minHeight:"100vh", background:"#F8FAFC", fontFamily:"'Inter',-apple-system,sans-serif", color:"#111827", fontSize:14, lineHeight:"1.5" } as React.CSSProperties,
-    card:       { background:"#fff", border:"1px solid #E5E7EB", borderRadius:16, boxShadow:"0 1px 4px rgba(0,0,0,.07)" } as React.CSSProperties,
-    th:         { padding:"11px 14px", fontSize:11, fontWeight:600, color:"#6B7280", textTransform:"uppercase" as const, letterSpacing:".5px", textAlign:"left" as const, whiteSpace:"nowrap" as const, background:"#FAFAFA", userSelect:"none" as const, cursor:"pointer", borderBottom:"1px solid #E5E7EB" },
-    td:         { padding:"13px 14px", fontSize:13, color:"#374151", borderBottom:"1px solid #F3F4F6", whiteSpace:"nowrap" as const, verticalAlign:"middle" as const },
-    input:      { height:38, borderRadius:9, border:"1px solid #D1D5DB", padding:"0 12px", fontSize:13, fontFamily:"inherit", color:"#111827", background:"#fff", outline:"none", boxSizing:"border-box" as const, transition:".15s" },
-    btnPrimary: { height:38, padding:"0 20px", background:"linear-gradient(135deg,#2563EB,#1D4ED8)", color:"#fff", border:"none", borderRadius:9, fontWeight:600, fontSize:13, cursor:"pointer", display:"inline-flex", alignItems:"center", gap:7, boxShadow:"0 2px 8px rgba(37,99,235,.3)", transition:".15s", fontFamily:"inherit" } as React.CSSProperties,
-    btnOutline: { height:38, padding:"0 16px", background:"#fff", color:"#374151", border:"1px solid #D1D5DB", borderRadius:9, fontWeight:500, fontSize:13, cursor:"pointer", display:"inline-flex", alignItems:"center", gap:6, transition:".15s", fontFamily:"inherit" } as React.CSSProperties,
-  };
-
-  const selectStyle = { ...S.input, paddingRight:32, backgroundImage:`url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat:"no-repeat", backgroundPosition:"right 10px center", appearance:"none" as const };
-
+    if (!open) return
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h)
+  }, [open])
   return (
-    <div style={S.page}>
-      <style>{`
-        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
-        @keyframes spin  { to{transform:rotate(360deg)} }
-      `}</style>
-
-      {/* TOP BAR */}
-      <header style={{ height:56, background:"#fff", borderBottom:"1px solid #E5E7EB", display:"flex", alignItems:"center", justifyContent:"space-between", padding:"0 28px", position:"sticky", top:0, zIndex:50, boxShadow:"0 1px 4px rgba(0,0,0,.05)" }}>
-        <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-          <div style={{ width:32, height:32, background:"#2563EB", borderRadius:9, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:700, fontSize:14, color:"#fff" }}>M</div>
-          <span style={{ fontWeight:700, fontSize:15, color:"#111827", letterSpacing:"-.2px" }}>MediERP</span>
-          <span style={{ color:"#E5E7EB", fontSize:18 }}>|</span>
-          <span style={{ fontSize:13, color:"#6B7280" }}>Supplier Management</span>
-        </div>
-        <div style={{ display:"flex", gap:10, alignItems:"center" }}>
-          <button onClick={fetchSuppliers} disabled={loading}
-            style={{ width:34, height:34, borderRadius:8, border:"1px solid #E5E7EB", background:"#fff", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, color:"#6B7280" }}
-            title="Refresh">
-            <span style={{ display:"inline-block", animation: loading ? "spin 1s linear infinite" : "none" }}>↻</span>
-          </button>
-          <div style={{ width:34, height:34, borderRadius:"50%", background:"linear-gradient(135deg,#7C3AED,#2563EB)", display:"flex", alignItems:"center", justifyContent:"center", fontWeight:700, fontSize:12, color:"#fff" }}>AM</div>
-        </div>
-      </header>
-
-      <main style={{ maxWidth:1400, margin:"0 auto", padding:"0 28px 40px" }}>
-
-        {/* BREADCRUMB + HEADER */}
-        <div style={{ padding:"24px 0 20px" }}>
-          <nav style={{ display:"flex", alignItems:"center", gap:6, fontSize:12, color:"#9CA3AF", marginBottom:8 }}>
-            <a href="/parties" style={{ color:"#9CA3AF", textDecoration:"none" }}>Parties</a>
-            <span>›</span>
-            <span style={{ color:"#374151", fontWeight:500 }}>Suppliers</span>
-          </nav>
-          <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", flexWrap:"wrap", gap:12 }}>
-            <div>
-              <h1 style={{ fontSize:26, fontWeight:800, color:"#0F172A", letterSpacing:"-.4px", margin:0 }}>Suppliers</h1>
-              <p style={{ fontSize:13, color:"#6B7280", marginTop:4 }}>Manage supplier information, balances, and transactions.</p>
-            </div>
-            <div style={{ display:"flex", gap:8, alignItems:"center" }}>
-              {selected.size > 0 && (
-                <span style={{ fontSize:12, color:"#2563EB", fontWeight:600, background:"#EFF6FF", padding:"4px 12px", borderRadius:7, border:"1px solid #BFDBFE" }}>
-                  {selected.size} selected
-                </span>
-              )}
-              <button onClick={exportCSV} style={S.btnOutline}>📥 Export CSV</button>
-              <button onClick={() => window.location.href = "/parties/suppliers/new"} style={S.btnPrimary}>
-                <span style={{ fontSize:16, lineHeight:1 }}>+</span> New Supplier
-              </button>
+    <div className="relative" ref={ref}>
+      <button type="button" onClick={() => { setOpen(v => !v); setQ('') }}
+        className="w-full flex items-center justify-between h-9 px-3 rounded-lg border border-slate-200 hover:border-teal-300 bg-white text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-teal-500/30">
+        {selected
+          ? <span className="flex items-center gap-2"><span className="font-mono text-[11px] text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded">{selected.code}</span><span className="text-slate-800 font-medium truncate">{selected.name}</span></span>
+          : <span className="text-slate-400">Use company default (Sundry Creditors)</span>}
+        <ChevronDown size={13} className="text-slate-400 ml-2 shrink-0" />
+      </button>
+      {open && (
+        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden">
+          <div className="p-2 border-b border-slate-100">
+            <div className="flex items-center gap-2 bg-slate-50 rounded-lg px-2 h-7">
+              <Search size={11} className="text-slate-400" />
+              <input autoFocus value={q} onChange={e => setQ(e.target.value)} placeholder="Search…" className="flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400" />
             </div>
           </div>
+          {value && <button type="button" onClick={() => { onChange(null); setOpen(false) }} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-600 hover:bg-red-50 border-b border-slate-100"><X size={11} /> Clear (use company default)</button>}
+          <div className="max-h-44 overflow-y-auto">
+            {filtered.map((a: any) => (
+              <button key={a.id} type="button" onClick={() => { onChange(a.id); setOpen(false) }}
+                className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left transition-colors ${a.id === value ? 'bg-teal-50 text-teal-700' : 'hover:bg-slate-50 text-slate-700'}`}>
+                <span className="font-mono text-[10px] text-slate-400 w-12 shrink-0">{a.code}</span>
+                <span className="flex-1 font-medium truncate">{a.name}</span>
+                {a.id === value && <CheckCircle2 size={12} className="text-teal-500 shrink-0" />}
+              </button>
+            ))}
+          </div>
         </div>
+      )}
+    </div>
+  )
+}
 
-        {/* ERROR BANNER */}
-        {error && (
-          <div style={{ background:"#FEF2F2", border:"1px solid #FECACA", borderRadius:12, padding:"14px 20px", marginBottom:20, display:"flex", alignItems:"center", justifyContent:"space-between", gap:12 }}>
-            <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-              <span style={{ fontSize:18 }}>⚠️</span>
-              <div>
-                <div style={{ fontSize:13, fontWeight:600, color:"#B91C1C" }}>Failed to load suppliers</div>
-                <div style={{ fontSize:12, color:"#DC2626", marginTop:2 }}>{error}</div>
-              </div>
+// ─── Supplier Form ─────────────────────────────────────────────────────────────
+function SupplierForm({ initial, onClose, onCreate }: {
+  initial?: Party | null; onClose: () => void; onCreate: (d: Form) => Promise<void>
+}) {
+  const update      = useUpdateParty()
+  const updateAcct  = useUpdatePartyAccount()
+  const { data: allAccounts = [] } = useAccounts({ is_active: true, is_group: false })
+  const [ctrlAcct, setCtrlAcct]   = useState<string | null>(initial?.control_account_id ?? null)
+
+  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<Form>({
+    resolver: zodResolver(schema),
+    defaultValues: initial ? {
+      name: initial.name, phone: initial.phone || '', email: initial.email || '',
+      address: initial.address || '', pan_no: initial.pan_no || '',
+      credit_limit: initial.credit_limit, credit_days: initial.credit_days || 30,
+      opening_balance: initial.opening_balance,
+    } : { credit_days: 30, opening_balance: 0 },
+  })
+
+  const onSubmit = handleSubmit(async (data) => {
+    if (initial) {
+      await update.mutateAsync({ id: initial.id, data })
+      if (ctrlAcct !== (initial.control_account_id ?? null)) {
+        await updateAcct.mutateAsync({ id: initial.id, control_account_id: ctrlAcct })
+      }
+    } else {
+      await onCreate(data)
+    }
+    onClose()
+  })
+
+  return (
+    <>
+      <div className="grid grid-cols-2 gap-4 p-1">
+        <div className="col-span-2">
+          <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Supplier Name *</label>
+          <input
+            className={`w-full h-9 px-3 rounded-lg border text-sm bg-white transition-colors focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 ${errors.name ? 'border-red-300 bg-red-50' : 'border-slate-200 hover:border-slate-300'}`}
+            placeholder="e.g. Himal Distributors Pvt. Ltd."
+            {...register('name')}
+          />
+          {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name.message}</p>}
+        </div>
+        {([
+          ['Phone', 'phone', 'text'],
+          ['Email', 'email', 'email'],
+          ['PAN / VAT No', 'pan_no', 'text'],
+          ['Credit Limit', 'credit_limit', 'number'],
+          ['Credit Days', 'credit_days', 'number'],
+          ['Opening Balance', 'opening_balance', 'number'],
+        ] as [string, keyof Form, string][]).map(([label, name, type]) => (
+          <div key={name as string}>
+            <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1.5">{label}</label>
+            <input
+              type={type}
+              className={`w-full h-9 px-3 rounded-lg border text-sm bg-white transition-colors focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 ${(errors as any)[name] ? 'border-red-300 bg-red-50' : 'border-slate-200 hover:border-slate-300'}`}
+              {...register(name)}
+            />
+            {(errors as any)[name] && <p className="text-xs text-red-500 mt-1">{(errors as any)[name]?.message}</p>}
+          </div>
+        ))}
+        <div className="col-span-2">
+          <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Address</label>
+          <input
+            className="w-full h-9 px-3 rounded-lg border border-slate-200 text-sm bg-white hover:border-slate-300 transition-colors focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500"
+            {...register('address')}
+          />
+        </div>
+        {/* Account Override — only shown when editing an existing supplier */}
+        {initial && (
+          <div className="col-span-2">
+            <div className="flex items-center gap-2 mb-1.5">
+              <Landmark size={12} className="text-teal-500" />
+              <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
+                Control Account Override
+              </label>
+              <span className="text-[10px] text-slate-400 ml-1">(optional — overrides company default)</span>
             </div>
-            <button onClick={fetchSuppliers} style={{ ...S.btnOutline, borderColor:"#FECACA", color:"#B91C1C", height:32, fontSize:12 }}>Retry</button>
+            <AccountPicker
+              value={ctrlAcct}
+              accounts={allAccounts as any[]}
+              onChange={setCtrlAcct}
+            />
+            <p className="text-[10px] text-slate-400 mt-1">
+              Leave blank to use the company-wide Sundry Creditors account from Account Setup.
+            </p>
           </div>
         )}
+      </div>
+      <div className="flex justify-end gap-2 mt-6 pt-4 border-t border-slate-100">
+        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button variant="primary" loading={isSubmitting} onClick={onSubmit}
+          className="bg-teal-600 hover:bg-teal-700">
+          {initial ? 'Save Changes' : 'Create Supplier'}
+        </Button>
+      </div>
+    </>
+  )
+}
 
-        {/* KPI CARDS */}
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))", gap:16, marginBottom:24 }}>
-          <KPICard icon="🏢" label="Total Suppliers"     value={loading ? "…" : kpi.total}                                  sub={loading ? "Loading…" : `${kpi.active} active, ${kpi.total - kpi.active} others`}                  bg="#EFF6FF" />
-          <KPICard icon="✅" label="Active Suppliers"    value={loading ? "…" : kpi.active}                                 sub={loading ? "" : `${kpi.total ? Math.round((kpi.active/kpi.total)*100) : 0}% of total suppliers`}  bg="#F0FDF4" />
-          <KPICard icon="💰" label="Outstanding Payables" value={loading ? "…" : `₨ ${(kpi.payables/1000).toFixed(0)}K`}   sub={loading ? "" : `${suppliers.filter(s=>s.balance>0).length} suppliers with open balance`}            bg="#FFFBEB" />
-          <KPICard icon="🔄" label="Recent Transactions"  value={loading ? "…" : kpi.recent}                                sub="Transactions in last 30 days"                                                                    bg="#F5F3FF" />
+// ─── Ledger Table ──────────────────────────────────────────────────────────────
+function LedgerTable({ partyId }: { partyId: string }) {
+  const { data, isLoading } = usePartyLedger(partyId)
+  const rows           = (data as any)?.rows           ?? []
+  const closingBalance = (data as any)?.closingBalance ?? 0
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4 p-3 bg-slate-50 rounded-xl border border-slate-100">
+        <span className="text-sm text-slate-500 font-medium">Closing Balance</span>
+        <span className={`font-bold font-mono text-base ${Number(closingBalance) > 0 ? 'text-amber-700' : 'text-green-700'}`}>
+          {fmt(closingBalance)}
+        </span>
+      </div>
+      <div className="overflow-x-auto rounded-xl border border-slate-100">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-slate-50 border-b border-slate-100">
+              {['Date','Reference','Description','Debit','Credit','Balance'].map(h => (
+                <th key={h} className={`px-3 py-2.5 text-[11px] font-bold text-slate-400 uppercase tracking-wide ${['Debit','Credit','Balance'].includes(h) ? 'text-right' : 'text-left'}`}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {isLoading
+              ? <tr><td colSpan={6} className="text-center py-6 text-slate-400">Loading…</td></tr>
+              : rows.length === 0
+              ? <tr><td colSpan={6}><Empty message="No ledger entries" /></td></tr>
+              : rows.map((e: any, i: number) => (
+                <tr key={i} className={`border-b border-slate-50 hover:bg-slate-50/50 transition-colors ${e.type === 'opening' ? 'bg-teal-50/30' : ''}`}>
+                  <td className="px-3 py-2.5 font-mono text-xs text-slate-500">{e.date ? fmtDate(e.date_ad || e.date) : '—'}</td>
+                  <td className="px-3 py-2.5 font-mono text-xs text-teal-600 font-semibold">{e.reference || '—'}</td>
+                  <td className="px-3 py-2.5 text-slate-700">{e.description || '—'}</td>
+                  <td className="px-3 py-2.5 text-right font-mono text-red-600 font-medium">{Number(e.debit)  > 0 ? fmt(e.debit)  : '—'}</td>
+                  <td className="px-3 py-2.5 text-right font-mono text-green-700 font-medium">{Number(e.credit) > 0 ? fmt(e.credit) : '—'}</td>
+                  <td className="px-3 py-2.5 text-right font-mono font-bold text-slate-800">{fmt(e.running_balance ?? e.balance ?? 0)}</td>
+                </tr>
+              ))
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+// ─── Sort helpers ─────────────────────────────────────────────────────────────
+type SortKey = 'name' | 'code' | 'balance' | 'credit_limit' | 'created_at'
+type SortDir = 'asc' | 'desc'
+
+function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; sortDir: SortDir }) {
+  if (col !== sortKey) return <ArrowUpDown size={12} className="opacity-30 ml-1" />
+  return sortDir === 'asc'
+    ? <ArrowUp size={12} className="ml-1 text-teal-600" />
+    : <ArrowDown size={12} className="ml-1 text-teal-600" />
+}
+
+// ─── Main Page ─────────────────────────────────────────────────────────────────
+export default function SuppliersPage() {
+  const [page,         setPage]      = useState(1)
+  const [searchRaw,    setSearch]    = useState('')
+  const [statusFilter, setStatus]    = useState<'all' | 'active' | 'inactive'>('all')
+  const [balFilter,    setBalFilter] = useState<'all' | 'positive' | 'zero'>('all')
+  const [sortKey,      setSortKey]   = useState<SortKey>('name')
+  const [sortDir,      setSortDir]   = useState<SortDir>('asc')
+  const [modal,        setModal]     = useState(false)
+  const [editing,      setEditing]   = useState<Party | null>(null)
+  const [delId,        setDelId]     = useState<string | null>(null)
+  const [ledger,       setLedger]    = useState<Party | null>(null)
+  const [preview,      setPreview]   = useState<Party | null>(null)
+  const [selected,     setSelected]  = useState<Set<string>>(new Set())
+
+  const search = useDebounce(searchRaw, 400)
+  const create = useCreateSupplier()
+  const del    = useDeleteParty()
+
+  const { data, isLoading } = useSuppliers({ page, limit: 20, search: search || undefined })
+  const rows  = useMemo(() => (data?.data as Party[]) || [], [data])
+  const total = (data?.pagination as any)?.total || 0
+
+  // KPI derived from current page
+  const activeCount      = useMemo(() => rows.filter(r => r.is_active).length, [rows])
+  const totalPayable     = useMemo(() => rows.reduce((s, r) => s + Number(r.current_balance), 0), [rows])
+  const totalCreditLimit = useMemo(() => rows.reduce((s, r) => s + Number(r.credit_limit ?? 0), 0), [rows])
+
+  // Client-side filter + sort
+  const filteredRows = useMemo(() => {
+    let r = [...rows]
+    if (statusFilter === 'active')   r = r.filter(c => c.is_active)
+    if (statusFilter === 'inactive') r = r.filter(c => !c.is_active)
+    if (balFilter === 'positive')    r = r.filter(c => Number(c.current_balance) > 0)
+    if (balFilter === 'zero')        r = r.filter(c => Number(c.current_balance) === 0)
+    r.sort((a, b) => {
+      let va: any, vb: any
+      if      (sortKey === 'balance')      { va = Number(a.current_balance); vb = Number(b.current_balance) }
+      else if (sortKey === 'credit_limit') { va = Number(a.credit_limit ?? 0); vb = Number(b.credit_limit ?? 0) }
+      else if (sortKey === 'code')         { va = a.code; vb = b.code }
+      else if (sortKey === 'created_at')   { va = a.created_at; vb = b.created_at }
+      else                                 { va = a.name.toLowerCase(); vb = b.name.toLowerCase() }
+      if (va < vb) return sortDir === 'asc' ? -1 : 1
+      if (va > vb) return sortDir === 'asc' ?  1 : -1
+      return 0
+    })
+    return r
+  }, [rows, statusFilter, balFilter, sortKey, sortDir])
+
+  const toggleSort = useCallback((key: SortKey) => {
+    setSortKey(prev => {
+      if (prev === key) { setSortDir(d => d === 'asc' ? 'desc' : 'asc'); return key }
+      setSortDir('asc'); return key
+    })
+  }, [])
+
+  const handleReset = () => {
+    setSearch(''); setStatus('all'); setBalFilter('all')
+    setSortKey('name'); setSortDir('asc')
+  }
+
+  const allSelected = filteredRows.length > 0 && filteredRows.every(r => selected.has(r.id))
+  const toggleAll   = () => setSelected(allSelected ? new Set() : new Set(filteredRows.map(r => r.id)))
+  const toggleRow   = (id: string) => setSelected(prev => {
+    const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n
+  })
+
+  const ThCol = ({ col, label, right = false }: { col: SortKey; label: string; right?: boolean }) => (
+    <th
+      className={`px-4 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wide cursor-pointer hover:text-slate-600 select-none whitespace-nowrap ${right ? 'text-right' : 'text-left'}`}
+      onClick={() => toggleSort(col)}
+    >
+      <span className="inline-flex items-center gap-0.5">
+        {label}
+        <SortIcon col={col} sortKey={sortKey} sortDir={sortDir} />
+      </span>
+    </th>
+  )
+
+  return (
+    <div className="min-h-screen bg-[#F8FAFC]">
+      {/* ── Page Header ── */}
+      <div className="bg-white border-b border-slate-100 px-6 py-4 sticky top-0 z-30">
+        <div className="flex items-center justify-between">
+          <div>
+            <nav className="flex items-center gap-1 text-xs text-slate-400 mb-1">
+              <span>Parties</span>
+              <ChevronRight size={11} />
+              <span className="text-teal-600 font-semibold">Suppliers</span>
+            </nav>
+            <h1 className="text-xl font-bold text-slate-900 leading-tight">Suppliers</h1>
+            <p className="text-xs text-slate-400 mt-0.5">Manage supplier information, balances, and transactions</p>
+          </div>
+          <Button
+            variant="primary"
+            size="md"
+            icon={<Plus size={14} />}
+            onClick={() => { setEditing(null); setModal(true) }}
+            className="bg-teal-600 hover:bg-teal-700 rounded-xl shadow-sm shadow-teal-200"
+          >
+            New Supplier
+          </Button>
+        </div>
+      </div>
+
+      <div className="px-6 py-5 space-y-5">
+        {/* ── KPI Cards ── */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <KpiCard
+            label="Total Suppliers"
+            value={isLoading ? '—' : total}
+            sub="Across all pages"
+            icon={<Truck size={20} className="text-teal-600" />}
+            color="bg-teal-50"
+            loading={isLoading}
+          />
+          <KpiCard
+            label="Active Suppliers"
+            value={isLoading ? '—' : activeCount}
+            sub="On this page"
+            icon={<UserCheck size={20} className="text-green-600" />}
+            color="bg-green-50"
+            loading={isLoading}
+          />
+          <KpiCard
+            label="Total Payable"
+            value={isLoading ? '—' : fmt(totalPayable)}
+            sub="Outstanding balance"
+            icon={<TrendingDown size={20} className="text-amber-600" />}
+            color="bg-amber-50"
+            loading={isLoading}
+          />
+          <KpiCard
+            label="Total Credit Limit"
+            value={isLoading ? '—' : fmt(totalCreditLimit)}
+            sub="Combined credit lines"
+            icon={<ShieldCheck size={20} className="text-purple-600" />}
+            color="bg-purple-50"
+            loading={isLoading}
+          />
         </div>
 
-        {/* ANALYTICS + FILTER */}
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 340px", gap:20, marginBottom:24 }}>
-          {/* FILTER CARD */}
-          <div style={{ ...S.card, padding:"20px 24px" }}>
-            <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:16 }}>
-              <span>🔍</span>
-              <span style={{ fontSize:14, fontWeight:600, color:"#111827" }}>Search & Filter</span>
+        {/* ── Filter Toolbar ── */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative flex-1 min-w-[200px] max-w-xs">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <input
+                className="w-full h-9 pl-9 pr-3 rounded-xl border border-slate-200 text-sm bg-slate-50 focus:bg-white focus:border-teal-400 focus:ring-2 focus:ring-teal-500/20 focus:outline-none transition-all placeholder:text-slate-400"
+                placeholder="Search suppliers…"
+                value={searchRaw}
+                onChange={e => { setSearch(e.target.value); setPage(1) }}
+              />
             </div>
-            <div style={{ display:"grid", gridTemplateColumns:"1fr auto auto auto", gap:10, marginBottom:14 }}>
-              <div style={{ position:"relative" }}>
-                <span style={{ position:"absolute", left:11, top:"50%", transform:"translateY(-50%)", fontSize:14, color:"#9CA3AF" }}>🔍</span>
-                <input type="text" placeholder="Search by name, code, phone, PAN…" value={search}
-                  onChange={e => { setSearch(e.target.value); setPage(1); }}
-                  style={{ ...S.input, width:"100%", paddingLeft:34 }} />
-              </div>
-              <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1); }} style={{ ...selectStyle, width:150 }}>
-                <option value="">All Status</option>
+
+            <div className="relative">
+              <select
+                value={statusFilter}
+                onChange={e => setStatus(e.target.value as any)}
+                className="h-9 pl-3 pr-8 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-500/20 text-slate-700 appearance-none cursor-pointer"
+              >
+                <option value="all">All Status</option>
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
-                <option value="blocked">Blocked</option>
-                <option value="pending">Pending</option>
               </select>
-              <select value={balanceFilter} onChange={e => { setBalanceFilter(e.target.value); setPage(1); }} style={{ ...selectStyle, width:165 }}>
-                <option value="">All Balances</option>
-                <option value="outstanding">Outstanding (Dr)</option>
-                <option value="settled">Settled (Zero)</option>
-                <option value="overpaid">Overpaid (Cr)</option>
-              </select>
-              <select value={sortBy} onChange={e => setSortBy(e.target.value)} style={{ ...selectStyle, width:145 }}>
-                <option value="name">Sort: Name</option>
-                <option value="code">Sort: Code</option>
-                <option value="balance">Sort: Balance</option>
-                <option value="date">Sort: Last Txn</option>
-              </select>
+              <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             </div>
-            <div style={{ display:"flex", gap:6, alignItems:"center", flexWrap:"wrap" }}>
-              <div style={{ display:"flex", gap:6 }}>
-                {(["all","active","inactive","blocked","pending"] as const).map(f => {
-                  const val = f === "all" ? "" : f;
-                  const active = statusFilter === val;
-                  return (
-                    <button key={f} onClick={() => { setStatusFilter(val); setPage(1); }}
-                      style={{ height:28, padding:"0 12px", borderRadius:6, border:`1px solid ${active ? "#2563EB" : "#E5E7EB"}`, background: active ? "#EFF6FF" : "#fff", color: active ? "#2563EB" : "#6B7280", fontSize:12, fontWeight:500, cursor:"pointer", textTransform:"capitalize", fontFamily:"inherit", transition:".1s" }}>
-                      {f === "all" ? "All" : f.charAt(0).toUpperCase()+f.slice(1)}
-                    </button>
-                  );
-                })}
-              </div>
-              <div style={{ marginLeft:"auto", display:"flex", gap:8 }}>
-                <button onClick={() => { setSearch(""); setStatusFilter(""); setBalanceFilter(""); setSortBy("name"); setSortDir("asc"); setPage(1); }}
-                  style={{ ...S.btnOutline, height:32, padding:"0 12px", fontSize:12 }}>↺ Reset</button>
-                <button onClick={exportCSV} style={{ ...S.btnOutline, height:32, padding:"0 12px", fontSize:12 }}>📥 Export</button>
-              </div>
+
+            <div className="relative">
+              <select
+                value={balFilter}
+                onChange={e => setBalFilter(e.target.value as any)}
+                className="h-9 pl-3 pr-8 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-500/20 text-slate-700 appearance-none cursor-pointer"
+              >
+                <option value="all">All Balances</option>
+                <option value="positive">Has Balance</option>
+                <option value="zero">Zero Balance</option>
+              </select>
+              <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            </div>
+
+            <div className="flex items-center gap-2 ml-auto">
+              <Button variant="ghost" size="sm" onClick={handleReset} className="text-slate-500">
+                <RotateCcw size={13} /> Reset
+              </Button>
+              <Button variant="outline" size="sm">
+                <Download size={13} /> Export
+              </Button>
             </div>
           </div>
-
-          {/* ANALYTICS */}
-          <AnalyticsBar suppliers={suppliers} />
         </div>
 
-        {/* TABLE */}
-        <div style={S.card}>
-          {/* Toolbar */}
-          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"14px 20px", borderBottom:"1px solid #F3F4F6", flexWrap:"wrap", gap:10 }}>
-            <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-              <span style={{ fontSize:15, fontWeight:700, color:"#111827" }}>Supplier Directory</span>
-              <span style={{ background:"#EFF6FF", color:"#2563EB", padding:"2px 9px", borderRadius:7, fontSize:12, fontWeight:600 }}>
-                {loading ? "…" : `${filtered.length} results`}
-              </span>
-              {loading && <span style={{ fontSize:12, color:"#9CA3AF", display:"flex", alignItems:"center", gap:5 }}><span style={{ display:"inline-block", animation:"spin 1s linear infinite" }}>⟳</span> Loading…</span>}
-            </div>
-            <div style={{ display:"flex", gap:8 }}>
-              <button onClick={fetchSuppliers} style={{ ...S.btnOutline, height:32, padding:"0 12px", fontSize:12 }}>🔃 Refresh</button>
-            </div>
-          </div>
-
-          <div style={{ overflowX:"auto" }}>
-            {!loading && filtered.length === 0 ? (
-              /* EMPTY STATE */
-              <div style={{ padding:"60px 20px", textAlign:"center" }}>
-                <div style={{ fontSize:52, marginBottom:12 }}>🏢</div>
-                <div style={{ fontSize:16, fontWeight:600, color:"#374151", marginBottom:6 }}>
-                  {search || statusFilter || balanceFilter ? "No suppliers match your filters" : "No suppliers found"}
-                </div>
-                <div style={{ fontSize:13, color:"#9CA3AF", marginBottom:20 }}>
-                  {search || statusFilter || balanceFilter ? "Try adjusting your search or filter criteria" : "Get started by adding your first supplier"}
-                </div>
-                {search || statusFilter || balanceFilter ? (
-                  <button onClick={() => { setSearch(""); setStatusFilter(""); setBalanceFilter(""); }} style={{ ...S.btnOutline }}>Clear Filters</button>
-                ) : (
-                  <button onClick={() => window.location.href = "/parties/suppliers/new"} style={S.btnPrimary}>
-                    + Create First Supplier
-                  </button>
-                )}
-              </div>
-            ) : (
-              <table style={{ width:"100%", borderCollapse:"collapse" }}>
-                <thead>
-                  <tr>
-                    <th style={{ ...S.th, width:44 }}>
-                      <input type="checkbox" checked={!loading && selected.size === paged.length && paged.length > 0} onChange={toggleAll} style={{ cursor:"pointer" }} />
-                    </th>
-                    <th style={S.th} onClick={() => toggleSort("code")}>Code <SortIcon col="code" sortBy={sortBy} sortDir={sortDir} /></th>
-                    <th style={S.th} onClick={() => toggleSort("name")}>Supplier Name <SortIcon col="name" sortBy={sortBy} sortDir={sortDir} /></th>
-                    <th style={S.th}>Phone</th>
-                    <th style={S.th}>PAN / VAT</th>
-                    <th style={{ ...S.th, textAlign:"right" }} onClick={() => toggleSort("balance")}>Balance <SortIcon col="balance" sortBy={sortBy} sortDir={sortDir} /></th>
-                    <th style={S.th}>Control Account</th>
-                    <th style={S.th}>Status</th>
-                    <th style={S.th} onClick={() => toggleSort("date")}>Last Transaction <SortIcon col="date" sortBy={sortBy} sortDir={sortDir} /></th>
-                    <th style={{ ...S.th, textAlign:"center" }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {loading
-                    ? Array.from({ length: 8 }).map((_, i) => <SkeletonRow key={i} />)
-                    : paged.map((s, i) => {
-                        const isSelected = selected.has(s.id);
-                        const color = avatarColor(s.id);
-                        return (
-                          <tr key={s.id}
-                            style={{ background: isSelected ? "#EFF6FF" : i % 2 === 1 ? "#FAFAFA" : "#fff", transition:".1s" }}
-                            onMouseEnter={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = "#F1F5FF"; }}
-                            onMouseLeave={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = i % 2 === 1 ? "#FAFAFA" : "#fff"; }}>
-                            <td style={{ ...S.td, width:44 }}>
-                              <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(s.id)} onClick={e => e.stopPropagation()} style={{ cursor:"pointer" }} />
-                            </td>
-                            <td style={S.td}>
-                              <span style={{ fontFamily:"monospace", fontSize:12, fontWeight:700, color:"#2563EB", background:"#EFF6FF", padding:"2px 8px", borderRadius:5 }}>{s.code}</span>
-                            </td>
-                            <td style={{ ...S.td, cursor:"pointer" }} onClick={() => setDrawer(s)}>
-                              <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                                <div style={{ width:36, height:36, borderRadius:10, background:color, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:700, fontSize:12, color:"#fff", flexShrink:0 }}>
-                                  {initials(s.name)}
-                                </div>
-                                <div>
-                                  <div style={{ fontWeight:700, color:"#111827", fontSize:13 }}>{s.name}</div>
-                                  <div style={{ fontSize:11, color:"#9CA3AF", marginTop:1 }}>{s.city || s.code}</div>
-                                </div>
-                              </div>
-                            </td>
-                            <td style={S.td}><a href={`tel:${s.phone}`} style={{ color:"#374151", textDecoration:"none" }}>{s.phone}</a></td>
-                            <td style={{ ...S.td, fontFamily:"monospace", fontSize:12, color:"#4B5563" }}>{s.pan}</td>
-                            <td style={{ ...S.td, textAlign:"right" }}><BalanceCell value={s.balance} /></td>
-                            <td style={S.td}>
-                              {s.controlAccountName
-                                ? <span style={{ display:"inline-flex", alignItems:"center", gap:4, fontSize:12, color:"#1D4ED8", background:"#EFF6FF", border:"1px solid #BFDBFE", padding:"2px 8px", borderRadius:6, fontWeight:600 }}>🏦 {s.controlAccountName}</span>
-                                : <span style={{ fontSize:12, color:"#9CA3AF", fontStyle:"italic" }}>company default</span>
-                              }
-                            </td>
-                            <td style={S.td}><StatusBadge status={s.status} /></td>
-                            <td style={{ ...S.td, fontSize:12, color:"#6B7280", fontVariantNumeric:"tabular-nums" }}>{s.lastTransaction || "—"}</td>
-                            <td style={{ ...S.td, textAlign:"center" }}>
-                              <ActionMenu supplier={s} onView={setDrawer} onEdit={handleEdit} onLedger={handleLedger} onDelete={setDeleteTarget} />
-                            </td>
-                          </tr>
-                        );
-                      })
-                  }
-                </tbody>
-              </table>
-            )}
-          </div>
-
-          {/* PAGINATION */}
-          {!loading && filtered.length > 0 && (
-            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"14px 20px", borderTop:"1px solid #F3F4F6", flexWrap:"wrap", gap:10 }}>
-              <div style={{ fontSize:12, color:"#6B7280" }}>
-                Showing <strong>{(page-1)*perPage+1}</strong>–<strong>{Math.min(page*perPage, filtered.length)}</strong> of <strong>{filtered.length}</strong> suppliers
-              </div>
-              <div style={{ display:"flex", gap:4 }}>
-                <button disabled={page===1} onClick={() => setPage(p=>p-1)}
-                  style={{ width:32, height:32, borderRadius:7, border:"1px solid #E5E7EB", background: page===1 ? "#F9FAFB" : "#fff", color: page===1 ? "#9CA3AF":"#374151", cursor: page===1 ? "not-allowed":"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>‹</button>
-                {Array.from({ length: Math.min(totalPages, 7) }, (_, k) => k + 1).map(p => (
-                  <button key={p} onClick={() => setPage(p)}
-                    style={{ width:32, height:32, borderRadius:7, border:`1px solid ${page===p ? "#2563EB":"#E5E7EB"}`, background: page===p ? "#2563EB":"#fff", color: page===p ? "#fff":"#374151", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, fontWeight: page===p ? 600:400 }}>
-                    {p}
-                  </button>
-                ))}
-                {totalPages > 7 && <span style={{ display:"flex", alignItems:"center", padding:"0 4px", color:"#9CA3AF" }}>…</span>}
-                <button disabled={page===totalPages} onClick={() => setPage(p=>p+1)}
-                  style={{ width:32, height:32, borderRadius:7, border:"1px solid #E5E7EB", background: page===totalPages ? "#F9FAFB":"#fff", color: page===totalPages ? "#9CA3AF":"#374151", cursor: page===totalPages ? "not-allowed":"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>›</button>
-              </div>
+        {/* ── Table ── */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          {selected.size > 0 && (
+            <div className="flex items-center gap-3 px-4 py-2.5 bg-teal-50 border-b border-teal-100">
+              <span className="text-sm font-semibold text-teal-700">{selected.size} selected</span>
+              <Button variant="ghost" size="sm" className="text-red-600 hover:bg-red-50">
+                <Trash2 size={13} /> Delete Selected
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setSelected(new Set())}>
+                <X size={13} /> Clear
+              </Button>
             </div>
           )}
+
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-slate-50/80 border-b border-slate-100">
+                  <th className="w-10 px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={allSelected}
+                      onChange={toggleAll}
+                      className="w-3.5 h-3.5 rounded border-slate-300 accent-teal-600 cursor-pointer"
+                    />
+                  </th>
+                  <ThCol col="code"  label="Code" />
+                  <ThCol col="name"  label="Supplier" />
+                  <th className="px-4 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wide">Phone</th>
+                  <th className="px-4 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wide">PAN/VAT</th>
+                  <ThCol col="credit_limit" label="Credit Limit" right />
+                  <ThCol col="balance"      label="Balance"      right />
+                  <th className="px-4 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wide">Control Account</th>
+                  <th className="px-4 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wide">Status</th>
+                  <ThCol col="created_at" label="Added" />
+                  <th className="w-12 px-4 py-3" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {isLoading
+                  ? <SkeletonRows cols={11} />
+                  : filteredRows.length === 0
+                  ? (
+                    <tr>
+                      <td colSpan={11}>
+                        <div className="flex flex-col items-center justify-center py-16 px-6">
+                          <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
+                            <Building2 size={24} className="text-slate-400" />
+                          </div>
+                          <p className="text-slate-700 font-semibold text-sm mb-1">No suppliers found</p>
+                          <p className="text-slate-400 text-xs text-center mb-4">
+                            {searchRaw || statusFilter !== 'all' || balFilter !== 'all'
+                              ? 'Try adjusting your filters or search query'
+                              : 'Add your first supplier to get started'}
+                          </p>
+                          {!(searchRaw || statusFilter !== 'all' || balFilter !== 'all') && (
+                            <Button variant="primary" size="sm" icon={<Plus size={13} />}
+                              className="bg-teal-600 hover:bg-teal-700"
+                              onClick={() => { setEditing(null); setModal(true) }}>
+                              Create Supplier
+                            </Button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                  : filteredRows.map(s => (
+                    <tr
+                      key={s.id}
+                      className="hover:bg-slate-50/60 transition-colors cursor-pointer"
+                      onClick={() => setPreview(s)}
+                    >
+                      <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={selected.has(s.id)}
+                          onChange={() => toggleRow(s.id)}
+                          className="w-3.5 h-3.5 rounded border-slate-300 accent-teal-600 cursor-pointer"
+                        />
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="font-mono text-xs font-bold text-teal-600 bg-teal-50 px-2 py-0.5 rounded-md">
+                          {s.code}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-teal-500 to-teal-700 flex items-center justify-center text-white text-xs font-bold flex-shrink-0 shadow-sm shadow-teal-200">
+                            {s.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="font-semibold text-slate-900 text-sm leading-tight">{s.name}</p>
+                            {s.email && <p className="text-xs text-slate-400">{s.email}</p>}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-slate-600">{s.phone || '—'}</td>
+                      <td className="px-4 py-3">
+                        {s.pan_no
+                          ? <span className="font-mono text-xs text-slate-700 bg-slate-100 px-2 py-0.5 rounded">{s.pan_no}</span>
+                          : <span className="text-slate-300">—</span>
+                        }
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {s.credit_limit
+                          ? <span className="font-mono text-xs text-slate-700">{fmt(s.credit_limit)}</span>
+                          : <span className="text-slate-300">—</span>
+                        }
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <BalanceChip value={s.current_balance} />
+                      </td>
+                      <td className="px-4 py-3">
+                        {s.control_account_name ? (
+                          <span className="inline-flex items-center gap-1.5 text-xs text-teal-700 bg-teal-50 border border-teal-100 px-2 py-0.5 rounded-lg font-medium">
+                            <Landmark size={10} className="text-teal-400" />{s.control_account_name}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-slate-300 italic">company default</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <StatusBadge active={s.is_active} />
+                      </td>
+                      <td className="px-4 py-3 text-xs text-slate-400 font-mono">
+                        {s.created_at ? fmtDate(s.created_at) : '—'}
+                      </td>
+                      <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                        <ActionsMenu
+                          onView={()   => setPreview(s)}
+                          onEdit={()   => { setEditing(s); setModal(true) }}
+                          onLedger={()  => setLedger(s)}
+                          onDelete={() => setDelId(s.id)}
+                        />
+                      </td>
+                    </tr>
+                  ))
+                }
+              </tbody>
+            </table>
+          </div>
+
+          <div className="px-4 py-3 border-t border-slate-100">
+            <Pagination page={page} total={total} limit={20} onChange={setPage} />
+          </div>
         </div>
-      </main>
+      </div>
 
-      {/* DRAWER */}
-      <SupplierDrawer supplier={drawer} onClose={() => setDrawer(null)} onEdit={handleEdit} onLedger={handleLedger} />
+      {/* ── Side Drawer ── */}
+      {preview && (
+        <SupplierDrawer
+          supplier={preview}
+          onClose={() => setPreview(null)}
+          onEdit={() => { setEditing(preview); setPreview(null); setModal(true) }}
+          onLedger={() => { setLedger(preview); setPreview(null) }}
+        />
+      )}
 
-      {/* DELETE MODAL */}
-      {deleteTarget && <DeleteModal supplier={deleteTarget} onCancel={() => setDeleteTarget(null)} onConfirm={handleDelete} deleting={deleting} />}
+      {/* ── Create / Edit Modal ── */}
+      <Modal
+        open={modal}
+        onClose={() => { setModal(false); setEditing(null) }}
+        title={editing ? 'Edit Supplier' : 'New Supplier'}
+        size="lg"
+      >
+        <SupplierForm
+          initial={editing}
+          onClose={() => { setModal(false); setEditing(null) }}
+          onCreate={(d) => create.mutateAsync(d)}
+        />
+      </Modal>
 
-      {/* TOAST */}
-      {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
+      {/* ── Ledger Modal ── */}
+      {ledger && (
+        <Modal open onClose={() => setLedger(null)} title={`Ledger — ${ledger.name}`} size="xl">
+          <LedgerTable partyId={ledger.id} />
+        </Modal>
+      )}
+
+      {/* ── Confirm Delete ── */}
+      <ConfirmDialog
+        open={!!delId}
+        onClose={() => setDelId(null)}
+        onConfirm={() => del.mutate(delId!)}
+        title="Delete Supplier"
+        message="This will permanently delete the supplier and cannot be undone."
+        danger
+      />
     </div>
-  );
+  )
 }
