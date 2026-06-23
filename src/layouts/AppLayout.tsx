@@ -1,11 +1,12 @@
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, ShoppingCart, ShoppingBag, RotateCcw, Package,
   Download, Users, Truck, BookOpen, BookCopy, SlidersHorizontal,
   FileBarChart, Settings, LogOut, Building2, CalendarDays, Moon,
-  Sun, Menu, X, AlertTriangle, Bell,
+  Sun, Menu, X, AlertTriangle, Bell, Search, ChevronRight, Home,
+  PackageX, CalendarClock,
 } from 'lucide-react'
 import useAuthStore from '@/store/authStore'
 import useUIStore from '@/store/uiStore'
@@ -50,6 +51,18 @@ const NAV = [
 
 type NavEntry = { section: string } | { to: string; label: string; icon: React.ReactNode; alertKey?: string }
 
+// Single safe cast point — NAV's `as const` literal tuple doesn't structurally
+// overlap with the wider NavEntry union, so TS wants the `unknown` bridge.
+// Cast once here and reuse everywhere below instead of repeating the cast.
+const NAV_TYPED = NAV as unknown as NavEntry[]
+
+// Flattened, searchable version of NAV (section headers excluded) — used by
+// the topbar quick-search. Purely a client-side filter over existing routes;
+// it does not call any new API or change any existing nav/route behavior.
+const SEARCHABLE_NAV = NAV_TYPED.filter(
+  (item): item is { to: string; label: string; icon: React.ReactNode; alertKey?: string } => 'to' in item
+)
+
 // ─── Main layout ──────────────────────────────────────────────────────────────
 export default function AppLayout() {
   const { user, company, logout } = useAuthStore()
@@ -62,6 +75,37 @@ export default function AppLayout() {
   const [todayBS, setTodayBS]     = useState('')
   const [alerts, setAlerts]       = useState({ lowStock: 0, expiry: 0 })
   const [hoveredNav, setHoveredNav] = useState<string | null>(null)
+
+  // Topbar search (client-side quick-nav over existing routes — no new data)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchFocused, setSearchFocused] = useState(false)
+  const searchBoxRef = useRef<HTMLDivElement>(null)
+
+  // Notifications dropdown (renders the alerts already fetched below)
+  const [notifOpen, setNotifOpen] = useState(false)
+  const notifBoxRef = useRef<HTMLDivElement>(null)
+
+  const searchResults = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase()
+    if (!q) return []
+    return SEARCHABLE_NAV.filter((item) => item.label.toLowerCase().includes(q)).slice(0, 6)
+  }, [searchQuery])
+
+  const unreadCount = alerts.lowStock + alerts.expiry
+
+  // Close search/notification dropdowns on outside click
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (searchBoxRef.current && !searchBoxRef.current.contains(e.target as Node)) {
+        setSearchFocused(false)
+      }
+      if (notifBoxRef.current && !notifBoxRef.current.contains(e.target as Node)) {
+        setNotifOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onClick)
+    return () => document.removeEventListener('mousedown', onClick)
+  }, [])
 
   // Responsive
   useEffect(() => {
@@ -130,6 +174,24 @@ export default function AppLayout() {
     [PATHS.REPORTS]:    'Reports',
     [PATHS.SETTINGS]:   'Settings',
   }).find(([path]) => location.pathname.startsWith(path))?.[1] || ''
+
+  // Section label for the current route (e.g. "FINANCE" above "Ledger") —
+  // purely derived from the existing NAV structure for breadcrumb display.
+  const currentSection = (() => {
+    let section = ''
+    for (const item of NAV_TYPED) {
+      if ('section' in item) { section = item.section; continue }
+      if (location.pathname.startsWith(item.to)) return section
+    }
+    return ''
+  })()
+
+  const handleSearchSelect = useCallback((to: string) => {
+    navigate(to)
+    setSearchQuery('')
+    setSearchFocused(false)
+    if (isMobile) setMobileOpen(false)
+  }, [navigate, isMobile])
 
   return (
     <div className="app-layout">
@@ -200,7 +262,7 @@ export default function AppLayout() {
 
         {/* Nav */}
         <nav className="sidebar-nav flex-1">
-          {(NAV as NavEntry[]).map((item, i) => {
+          {NAV_TYPED.map((item, i) => {
             if ('section' in item) {
               return null
             }
@@ -288,15 +350,137 @@ export default function AppLayout() {
               <Menu size={20}/>
             </button>
           )}
-          <div>
-            <h1 className="font-bold text-base text-[var(--text)] leading-none">{pageTitle}</h1>
+
+          {/* Breadcrumb + title */}
+          <div className="min-w-0">
+            {!isMobile && (
+              <div className="page-breadcrumb" style={{ marginBottom: 1 }}>
+                <Home size={10} className="page-breadcrumb-home"/>
+                {currentSection && (
+                  <>
+                    <ChevronRight size={10} className="page-breadcrumb-sep"/>
+                    <span>{currentSection}</span>
+                  </>
+                )}
+                <ChevronRight size={10} className="page-breadcrumb-sep"/>
+                <span style={{ color: 'var(--text-3)' }}>{pageTitle}</span>
+              </div>
+            )}
+            <h1 className="font-bold text-base text-[var(--text)] leading-none truncate">{pageTitle}</h1>
           </div>
+
+          {/* Quick search — client-side filter over existing nav routes */}
+          {!isMobile && (
+            <div ref={searchBoxRef} className="relative ml-4" style={{ flexShrink: 0 }}>
+              <div className="topbar-search">
+                <Search size={14} style={{ color: 'var(--text-4)', flexShrink: 0 }}/>
+                <input
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onFocus={() => setSearchFocused(true)}
+                  placeholder="Search pages…"
+                  aria-label="Search pages"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="flex-shrink-0 text-[var(--text-4)] hover:text-[var(--text)]"
+                    aria-label="Clear search"
+                  >
+                    <X size={13}/>
+                  </button>
+                )}
+              </div>
+              {searchFocused && searchQuery && (
+                <div className="topbar-search-results">
+                  {searchResults.length > 0 ? (
+                    <>
+                      <div className="topbar-search-section-label">Pages</div>
+                      {searchResults.map((item) => (
+                        <div
+                          key={item.to}
+                          className="topbar-search-item"
+                          onClick={() => handleSearchSelect(item.to)}
+                        >
+                          <span className="flex items-center text-[var(--text-4)]">{item.icon}</span>
+                          {item.label}
+                        </div>
+                      ))}
+                    </>
+                  ) : (
+                    <div className="topbar-dropdown-empty">No matching pages</div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="ml-auto flex items-center gap-2">
+            {/* Notifications */}
+            <div ref={notifBoxRef} className="relative">
+              <button
+                onClick={() => setNotifOpen((v) => !v)}
+                className="topbar-btn"
+                title="Notifications"
+                aria-label="Notifications"
+              >
+                <Bell size={16}/>
+                {unreadCount > 0 && <span className="topbar-btn-dot"/>}
+              </button>
+              {notifOpen && (
+                <div className="topbar-dropdown">
+                  <div className="topbar-dropdown-header">
+                    <span className="topbar-dropdown-title">Notifications</span>
+                    {unreadCount > 0 && (
+                      <span className="badge badge-blue">{unreadCount}</span>
+                    )}
+                  </div>
+                  <div className="topbar-dropdown-list">
+                    {unreadCount === 0 ? (
+                      <div className="topbar-dropdown-empty">You're all caught up 🎉</div>
+                    ) : (
+                      <>
+                        {alerts.lowStock > 0 && (
+                          <div
+                            className="topbar-notif-item"
+                            onClick={() => { setNotifOpen(false); navigate(PATHS.PRODUCTS) }}
+                          >
+                            <span className="topbar-notif-icon" style={{ background: 'var(--amber-50)', color: 'var(--amber)' }}>
+                              <PackageX size={14}/>
+                            </span>
+                            <div className="min-w-0">
+                              <div className="topbar-notif-title">{alerts.lowStock} product{alerts.lowStock > 1 ? 's' : ''} low on stock</div>
+                              <div className="topbar-notif-sub">Review inventory levels</div>
+                            </div>
+                          </div>
+                        )}
+                        {alerts.expiry > 0 && (
+                          <div
+                            className="topbar-notif-item"
+                            onClick={() => { setNotifOpen(false); navigate(PATHS.PRODUCTS) }}
+                          >
+                            <span className="topbar-notif-icon" style={{ background: 'var(--red-50)', color: 'var(--red)' }}>
+                              <CalendarClock size={14}/>
+                            </span>
+                            <div className="min-w-0">
+                              <div className="topbar-notif-title">{alerts.expiry} item{alerts.expiry > 1 ? 's' : ''} near expiry</div>
+                              <div className="topbar-notif-sub">Check batch expiry dates</div>
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* Theme toggle */}
             <button
               onClick={toggleTheme}
-              className="w-8 h-8 flex items-center justify-center rounded-lg text-[var(--text-3)] hover:text-[var(--text)] hover:bg-[var(--surface-3)] transition-colors"
+              className="topbar-btn"
               title="Toggle theme"
+              aria-label="Toggle theme"
             >
               {theme === 'dark' ? <Sun size={16}/> : <Moon size={16}/>}
             </button>

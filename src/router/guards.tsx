@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
+import { ShieldAlert } from 'lucide-react'
 import useAuthStore, { RAW_TOKEN_KEY } from '@/store/authStore'
 import { authAPI } from '@/services/api'
 import { PATHS } from '@/constants'
@@ -41,10 +42,10 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
 
   if (checking) {
     return (
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'100vh' }}>
-        <div style={{ textAlign:'center' }}>
-          <div style={{ width:32, height:32, border:'3px solid #e2e8f0', borderTopColor:'#6366f1', borderRadius:'50%', animation:'spin 0.8s linear infinite', margin:'0 auto 12px' }}/>
-          <p style={{ fontSize:13, color:'#94a3b8' }}>Verifying session…</p>
+      <div className="page-loader">
+        <div>
+          <div className="page-loader-ring"/>
+          <p className="page-loader-text">Verifying session…</p>
         </div>
       </div>
     )
@@ -87,8 +88,13 @@ export function RequireRole({
     return fallback ? <>{fallback}</> : (
       <div className="flex items-center justify-center h-64 text-[var(--text-3)]">
         <div className="text-center">
-          <div className="text-4xl mb-3">🔒</div>
-          <p className="font-semibold text-[var(--text-2)]">Access Denied</p>
+          <div
+            className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-3"
+            style={{ background: 'var(--red-50)', color: 'var(--red)' }}
+          >
+            <ShieldAlert size={22}/>
+          </div>
+          <p className="font-semibold text-[var(--text-2)]">Access denied</p>
           <p className="text-sm mt-1">You don't have permission to view this page.</p>
         </div>
       </div>
