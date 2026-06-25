@@ -366,7 +366,7 @@ export default function AppLayout() {
                 <span style={{ color: 'var(--text-3)' }}>{pageTitle}</span>
               </div>
             )}
-            <h1 className="font-bold text-base text-[var(--text)] leading-none truncate">{pageTitle}</h1>
+           
           </div>
 
           {/* Quick search — client-side filter over existing nav routes */}

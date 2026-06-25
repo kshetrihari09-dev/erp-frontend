@@ -92,8 +92,8 @@ function QuickVoucherForm({ type, accounts, parties, onClose }: {
   )
 }
 
-function VoucherListTab({ apiCall, type, title }: {
-  apiCall: (p: any) => Promise<any>; type: 'RECEIPT' | 'PAYMENT'; title: string
+function VoucherListTab({ apiCall, type, title, onCount }: {
+  apiCall: (p: any) => Promise<any>; type: 'RECEIPT' | 'PAYMENT'; title: string; onCount?: (count: number) => void
 }) {
   const { error } = useUIStore()
   const [rows,    setRows]    = useState<any[]>([])
@@ -117,6 +117,9 @@ function VoucherListTab({ apiCall, type, title }: {
   }, [page])
 
   useEffect(() => { load() }, [load])
+
+  // Report the current row count up to the parent (purely informational — no fetch/logic change).
+  useEffect(() => { onCount?.(total) }, [total, onCount])
 
   useEffect(() => {
     accountingAPI.accounts().then(r => setAccounts(r.data.data || [])).catch(() => {})
@@ -180,12 +183,12 @@ function VoucherListTab({ apiCall, type, title }: {
   )
 }
 
-export function ReceiptsTab() {
-  return <VoucherListTab apiCall={accountingAPI.receipts} type="RECEIPT" title="Receipt" />
+export function ReceiptsTab({ onCount }: { onCount?: (count: number) => void } = {}) {
+  return <VoucherListTab apiCall={accountingAPI.receipts} type="RECEIPT" title="Receipt" onCount={onCount} />
 }
 
-export function PaymentsTab() {
-  return <VoucherListTab apiCall={accountingAPI.payments} type="PAYMENT" title="Payment" />
+export function PaymentsTab({ onCount }: { onCount?: (count: number) => void } = {}) {
+  return <VoucherListTab apiCall={accountingAPI.payments} type="PAYMENT" title="Payment" onCount={onCount} />
 }
 
 export default ReceiptsTab

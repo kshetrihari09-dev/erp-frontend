@@ -77,7 +77,7 @@ function PeriodForm({ onClose, onCreated }: { onClose: () => void; onCreated: ()
   )
 }
 
-export default function PeriodsTab() {
+export default function PeriodsTab({ onCount }: { onCount?: (count: number) => void } = {}) {
   const { success, error } = useUIStore()
   const [periods, setPeriods] = useState<any[]>([])
   const [modal,   setModal]   = useState(false)
@@ -93,6 +93,9 @@ export default function PeriodsTab() {
   }
 
   useEffect(() => { load() }, [])
+
+  // Report the current row count up to the parent (purely informational — no fetch/logic change).
+  useEffect(() => { onCount?.(periods.length) }, [periods.length, onCount])
 
   async function toggleLock(id: string, locked: boolean) {
     try {

@@ -12,7 +12,14 @@ import type { Voucher, Account, Party } from '@/types'
 
 const LIMIT = 20
 
-export default function VouchersTab() {
+interface VouchersTabProps {
+  /** Optional: lets the parent surface the live row count (e.g. a tab badge) without altering data-fetch logic. */
+  onCount?: (count: number) => void
+  /** Optional: bump this number from the parent to open the "New Voucher" modal externally (e.g. a top-bar button). */
+  openSignal?: number
+}
+
+export default function VouchersTab({ onCount, openSignal }: VouchersTabProps = {}) {
   const { success, error } = useUIStore()
   const [vouchers, setVouchers] = useState<Voucher[]>([])
   const [total,    setTotal]    = useState(0)
@@ -40,6 +47,12 @@ export default function VouchersTab() {
 
   useEffect(() => { load() }, [load])
 
+  // Report the current row count up to the parent (purely informational — no fetch/logic change).
+  useEffect(() => { onCount?.(total) }, [total, onCount])
+
+  // External trigger (e.g. top-bar "+ New Voucher") opens the same existing modal.
+  useEffect(() => { if (openSignal) setModal(true) }, [openSignal])
+
   async function postVoucher(id: string) {
     try { await accountingAPI.postVoucher(id); success('Voucher posted'); load() }
     catch (e: any) { error('Cannot post', e.message) }
@@ -53,21 +66,16 @@ export default function VouchersTab() {
 
   return (
     <div>
-      <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
-        <div className="flex items-center gap-2">
-          <SearchInput value={search} onChange={setSearch} className="w-52" />
-          <select className="erp-input" style={{ width: 150 }} value={typeFilter} onChange={e => { setTypeFilter(e.target.value); setPage(1) }}>
-            <option value="">All Types</option>
-            {VOUCHER_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-          </select>
-          <select className="erp-input" style={{ width: 130 }} value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1) }}>
-            <option value="">All Status</option>
-            {['draft','posted','cancelled','reversed'].map(s => <option key={s}>{s}</option>)}
-          </select>
-        </div>
-        <Button variant="primary" icon={<Plus size={14}/>} onClick={() => setModal(true)}>
-          New Voucher
-        </Button>
+      <div className="flex items-center gap-2 mb-3 flex-wrap">
+        <SearchInput value={search} onChange={setSearch} className="w-52" />
+        <select className="erp-input" style={{ width: 150 }} value={typeFilter} onChange={e => { setTypeFilter(e.target.value); setPage(1) }}>
+          <option value="">All Types</option>
+          {VOUCHER_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+        </select>
+        <select className="erp-input" style={{ width: 130 }} value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1) }}>
+          <option value="">All Status</option>
+          {['draft','posted','cancelled','reversed'].map(s => <option key={s}>{s}</option>)}
+        </select>
       </div>
 
       <div className="table-card">

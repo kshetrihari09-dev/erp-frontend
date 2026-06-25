@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -74,11 +74,14 @@ function AccountForm({ onClose }: { onClose: () => void }) {
   )
 }
 
-export default function AccountsTab() {
+export default function AccountsTab({ onCount }: { onCount?: (count: number) => void } = {}) {
   const [typeFilter, setTypeFilter] = useState('')
   const [modal, setModal] = useState(false)
   const { data, isLoading } = useAccounts({ type: typeFilter || undefined })
   const accounts = (data as Account[]) || []
+
+  // Report the current row count up to the parent (purely informational — no fetch/logic change).
+  useEffect(() => { onCount?.(accounts.length) }, [accounts.length, onCount])
 
   return (
     <div>

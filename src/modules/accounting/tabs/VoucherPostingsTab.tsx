@@ -11,7 +11,7 @@
  * Filterable by source_type.
  * Clicking a row opens the voucher detail modal (reuses VouchersTab logic).
  */
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ExternalLink, CheckCircle, Clock, XCircle } from 'lucide-react'
 import { useVoucherPostings } from '@/hooks/useQuery'
 import { Empty, SkeletonRows } from '@/components/ui'
@@ -47,7 +47,7 @@ function VoucherStatusIcon({ status }: { status: string }) {
   return <Clock size={13} className="text-amber-400 shrink-0" />
 }
 
-export default function VoucherPostingsTab() {
+export default function VoucherPostingsTab({ onCount }: { onCount?: (count: number) => void } = {}) {
   const [sourceType, setSourceType] = useState('')
   const [page, setPage]             = useState(1)
 
@@ -59,6 +59,9 @@ export default function VoucherPostingsTab() {
 
   const postings: VoucherPosting[] = (data as any)?.data ?? []
   const pagination = (data as any)?.pagination
+
+  // Report the current row count up to the parent (purely informational — no fetch/logic change).
+  useEffect(() => { onCount?.(pagination?.total ?? 0) }, [pagination?.total, onCount])
 
   return (
     <div>
