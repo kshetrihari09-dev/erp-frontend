@@ -218,7 +218,7 @@ export default function AppLayout() {
           </div>
           {!collapsed && (
             <div className="min-w-0">
-              <div className="sidebar-logo-name truncate">{company?.name || 'MediERP'}</div>
+              <div className="sidebar-logo-name truncate">{'MediERP'}</div>
               <div className="sidebar-logo-sub">Billing</div>
             </div>
           )}
