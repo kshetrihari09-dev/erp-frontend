@@ -48,8 +48,8 @@ function QRCanvas({ url }: { url: string }) {
   return (
     <canvas
       ref={ref}
-      className="rounded-xl border"
-      style={{ width: 220, height: 220, borderColor: 'var(--border)', boxShadow: 'var(--shadow)' }}
+      className="rounded-xl border border-slate-200 shadow-md"
+      style={{ width: 220, height: 220 }}
     />
   )
 }
@@ -84,7 +84,7 @@ function StatusBanner({ state }: { state: ScannerState }) {
 
   if (status === 'creating') {
     return (
-      <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text-3)' }}>
+      <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-500">
         <Loader2 size={13} className="animate-spin flex-shrink-0" />
         Starting session…
       </div>
@@ -159,25 +159,24 @@ export default function ScannerModal({ state, context, onClose, onRetry }: Props
             onClick={onClose}
           />
           <motion.div
-            className="relative w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden z-10"
-            style={{ background: 'var(--surface)' }}
+            className="relative w-full max-w-sm bg-white rounded-2xl shadow-2xl overflow-hidden z-10"
             initial={{ opacity: 0, scale: 0.95, y: 10 }}
             animate={{ opacity: 1, scale: 1,    y: 0  }}
             exit={  { opacity: 0, scale: 0.95, y: 10  }}
             transition={{ duration: 0.2, ease: [0.22, 0.68, 0, 1.2] }}
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-5 pt-5 pb-4" style={{ borderBottom: '1px solid var(--border)' }}>
+            <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-slate-100">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-brand flex items-center justify-center">
+                <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center">
                   <ScanLine size={16} className="text-white" />
                 </div>
                 <div>
-                  <p className="font-bold text-[var(--text)] text-sm leading-tight">Scan Medicine</p>
-                  <p className="text-xs text-[var(--text-4)]">{context === 'sales' ? 'Sales Invoice' : 'Purchase Invoice'}</p>
+                  <p className="font-bold text-slate-900 text-sm leading-tight">Scan Medicine</p>
+                  <p className="text-xs text-slate-400">{context === 'sales' ? 'Sales Invoice' : 'Purchase Invoice'}</p>
                 </div>
               </div>
-              <button onClick={onClose} className="w-7 h-7 rounded-lg text-[var(--text-4)] hover:bg-[var(--surface-3)] hover:text-[var(--text)] flex items-center justify-center transition-colors">
+              <button onClick={onClose} className="w-7 h-7 rounded-lg text-slate-400 hover:bg-slate-100 flex items-center justify-center transition-colors">
                 <X size={14} />
               </button>
             </div>
@@ -190,20 +189,17 @@ export default function ScannerModal({ state, context, onClose, onRetry }: Props
                 <div className="relative">
                   {qrUrl
                     ? <QRCanvas url={qrUrl} />
-                    : <div className="w-[220px] h-[220px] rounded-xl flex items-center justify-center" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
-                        <Loader2 size={26} className="text-[var(--text-4)] animate-spin" />
+                    : <div className="w-[220px] h-[220px] rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center">
+                        <Loader2 size={26} className="text-slate-400 animate-spin" />
                       </div>
                   }
                   {status === 'connected' && (
-                    <div
-                      className="absolute -top-2 -right-2 w-7 h-7 bg-green-500 rounded-full flex items-center justify-center"
-                      style={{ boxShadow: `0 2px 8px rgba(0,0,0,.15), 0 0 0 2px var(--surface)` }}
-                    >
+                    <div className="absolute -top-2 -right-2 w-7 h-7 bg-green-500 rounded-full flex items-center justify-center shadow-md ring-2 ring-white">
                       <Smartphone size={13} className="text-white" />
                     </div>
                   )}
                   {status === 'done' && (
-                    <div className="absolute inset-0 rounded-xl flex items-center justify-center" style={{ background: 'var(--surface)' }}>
+                    <div className="absolute inset-0 bg-white/90 rounded-xl flex items-center justify-center">
                       <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', duration: 0.4 }}>
                         <CheckCircle2 size={48} className="text-green-500" />
                       </motion.div>
@@ -211,15 +207,15 @@ export default function ScannerModal({ state, context, onClose, onRetry }: Props
                   )}
                 </div>
               ) : status === 'creating' ? (
-                <div className="w-[220px] h-[220px] rounded-xl flex flex-col items-center justify-center gap-3" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
-                  <Loader2 size={28} className="text-brand animate-spin" />
-                  <p className="text-xs text-[var(--text-4)]">Setting up scanner…</p>
+                <div className="w-[220px] h-[220px] rounded-xl bg-slate-50 border border-slate-200 flex flex-col items-center justify-center gap-3">
+                  <Loader2 size={28} className="text-blue-400 animate-spin" />
+                  <p className="text-xs text-slate-400">Setting up scanner…</p>
                 </div>
               ) : (
                 /* error or expired */
                 <div className="w-[220px] h-[220px] rounded-xl bg-red-50 border border-red-100 flex flex-col items-center justify-center gap-3">
                   <AlertTriangle size={28} className={status === 'expired' ? 'text-amber-400' : 'text-red-400'} />
-                  <p className="text-xs text-[var(--text-4)] px-6 text-center">
+                  <p className="text-xs text-slate-400 px-6 text-center">
                     {status === 'expired' ? 'QR code expired' : 'Could not start scanner'}
                   </p>
                 </div>
@@ -228,8 +224,8 @@ export default function ScannerModal({ state, context, onClose, onRetry }: Props
               {/* Instructions */}
               {showQr && (
                 <div className="text-center">
-                  <p className="text-sm font-semibold text-[var(--text-2)]">Open phone camera → scan QR</p>
-                  <p className="text-xs text-[var(--text-4)] mt-0.5">Phone must be on the same WiFi network</p>
+                  <p className="text-sm font-semibold text-slate-700">Open phone camera → scan QR</p>
+                  <p className="text-xs text-slate-400 mt-0.5">Phone must be on the same WiFi network</p>
                 </div>
               )}
 
@@ -268,16 +264,15 @@ export default function ScannerModal({ state, context, onClose, onRetry }: Props
               {lastResult && (
                 <motion.div
                   initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }}
-                  className="w-full flex items-start gap-3 p-3 rounded-xl"
-                  style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}
+                  className="w-full flex items-start gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl"
                 >
-                  <div className="w-7 h-7 rounded-lg bg-[var(--brand-light)] flex items-center justify-center flex-shrink-0">
-                    <Zap size={12} className="text-brand" />
+                  <div className="w-7 h-7 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
+                    <Zap size={12} className="text-blue-600" />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-[10px] font-bold text-[var(--text-4)] uppercase tracking-wide">Added to invoice</p>
-                    <p className="text-sm font-bold text-[var(--text)] truncate">{lastResult.product?.name}</p>
-                    <p className="text-[10px] text-[var(--text-4)]">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Added to invoice</p>
+                    <p className="text-sm font-bold text-slate-900 truncate">{lastResult.product?.name}</p>
+                    <p className="text-[10px] text-slate-400">
                       via {lastResult.scanMethod === 'barcode' ? '📷 Barcode' : lastResult.scanMethod === 'ocr' ? '🔤 OCR' : '👆 Manual'}
                     </p>
                   </div>
@@ -292,8 +287,8 @@ export default function ScannerModal({ state, context, onClose, onRetry }: Props
                     ['2', 'Scanner opens in phone browser'],
                     ['3', 'Scan barcode or point at medicine package'],
                   ].map(([n, txt]) => (
-                    <div key={n} className="flex items-center gap-2.5 text-xs text-[var(--text-3)]">
-                      <span className="w-5 h-5 rounded-full bg-[var(--brand-light)] text-brand text-[10px] font-bold flex items-center justify-center flex-shrink-0" style={{ border: '1px solid var(--border)' }}>{n}</span>
+                    <div key={n} className="flex items-center gap-2.5 text-xs text-slate-500">
+                      <span className="w-5 h-5 rounded-full bg-blue-50 border border-blue-200 text-blue-600 text-[10px] font-bold flex items-center justify-center flex-shrink-0">{n}</span>
                       {txt}
                     </div>
                   ))}
@@ -306,7 +301,7 @@ export default function ScannerModal({ state, context, onClose, onRetry }: Props
               {showRetry && (
                 <button
                   onClick={onRetry}
-                  className="flex-1 h-9 rounded-xl bg-brand text-white text-sm font-semibold hover:bg-brand-dark flex items-center justify-center gap-2 transition-colors"
+                  className="flex-1 h-9 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 flex items-center justify-center gap-2 transition-colors"
                 >
                   <RotateCcw size={12} />
                   {status === 'expired' ? 'New QR Code' : 'Try Again'}
@@ -314,8 +309,7 @@ export default function ScannerModal({ state, context, onClose, onRetry }: Props
               )}
               <button
                 onClick={onClose}
-                className={`h-9 rounded-xl text-sm font-semibold text-[var(--text-3)] hover:bg-[var(--surface-3)] hover:text-[var(--text)] flex items-center justify-center gap-2 transition-colors ${showRetry ? 'px-4' : 'flex-1'}`}
-                style={{ border: '1px solid var(--border-2)' }}
+                className={`h-9 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 flex items-center justify-center gap-2 transition-colors ${showRetry ? 'px-4' : 'flex-1'}`}
               >
                 {!showRetry && <RotateCcw size={12} />}
                 {status === 'done' ? 'Close' : showRetry ? 'Cancel' : 'Cancel'}

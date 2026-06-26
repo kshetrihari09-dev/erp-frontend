@@ -1,5 +1,4 @@
 import { forwardRef, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from 'react'
-import { Inbox, X as XIcon, CheckCircle2, AlertTriangle, Info, XCircle, Search as SearchIcon, ChevronLeft, ChevronRight } from 'lucide-react'
 import { cn, statusColor } from '@/utils'
 
 // ─── Button ───────────────────────────────────────────────────────────────────
@@ -148,16 +147,9 @@ export function Spinner({ size = 16, className }: { size?: number; className?: s
 }
 
 // ─── Card ─────────────────────────────────────────────────────────────────────
-export function Card({ children, className, padding = true, onClick }: { children: ReactNode; className?: string; padding?: boolean; onClick?: () => void }) {
+export function Card({ children, className, padding = true }: { children: ReactNode; className?: string; padding?: boolean }) {
   return (
-    <div
-      className={cn(
-        'bg-[var(--surface)] border border-[var(--border)] rounded-xl shadow-card transition-all duration-200',
-        onClick && 'cursor-pointer hover:-translate-y-0.5 hover:shadow-md hover:border-[var(--border-2)]',
-        padding && 'p-5', className
-      )}
-      onClick={onClick}
-    >
+    <div className={cn('bg-[var(--surface)] border border-[var(--border)] rounded-xl shadow-card', padding && 'p-5', className)}>
       {children}
     </div>
   )
@@ -189,19 +181,11 @@ export function StatCard({ label, value, sub, color = 'var(--brand)', icon, onCl
 }
 
 // ─── Empty state ──────────────────────────────────────────────────────────────
-export function Empty({ message = 'No data found', icon, hint }: { message?: string; icon?: ReactNode; hint?: string }) {
+export function Empty({ message = 'No data found', icon }: { message?: string; icon?: ReactNode }) {
   return (
     <div className="flex flex-col items-center justify-center py-14 gap-3 text-[var(--text-4)]">
-      <div
-        className="w-12 h-12 rounded-xl flex items-center justify-center"
-        style={{ background: 'var(--surface-3)' }}
-      >
-        {icon || <Inbox size={20} opacity={.5}/>}
-      </div>
-      <div className="text-center">
-        <p className="text-sm font-medium text-[var(--text-3)]">{message}</p>
-        {hint && <p className="text-xs mt-1 text-[var(--text-4)]">{hint}</p>}
-      </div>
+      <div className="text-3xl opacity-30">{icon || '📭'}</div>
+      <p className="text-sm">{message}</p>
     </div>
   )
 }
@@ -235,22 +219,12 @@ export function SkeletonRows({ cols = 6, rows = 5 }: { cols?: number; rows?: num
 // ─── Alert / Flash ────────────────────────────────────────────────────────────
 type AlertType = 'success' | 'danger' | 'warning' | 'info'
 
-const alertIcons: Record<AlertType, ReactNode> = {
-  success: <CheckCircle2 size={16}/>,
-  danger:  <XCircle size={16}/>,
-  warning: <AlertTriangle size={16}/>,
-  info:    <Info size={16}/>,
-}
-
 export function Alert({ type, message, onClose }: { type: AlertType; message: string; onClose?: () => void }) {
   return (
-    <div className={`alert alert-${type} flex items-center gap-2.5`}>
-      <span className="flex-shrink-0 flex items-center opacity-90">{alertIcons[type]}</span>
+    <div className={`alert alert-${type} flex items-center gap-2`}>
       <span className="flex-1 text-sm">{message}</span>
       {onClose && (
-        <button onClick={onClose} className="flex-shrink-0 opacity-60 hover:opacity-100 transition-opacity p-0.5 flex items-center">
-          <XIcon size={14}/>
-        </button>
+        <button onClick={onClose} className="ml-auto opacity-60 hover:opacity-100 text-inherit leading-none p-0.5">✕</button>
       )}
     </div>
   )
@@ -287,17 +261,16 @@ export function Modal({ open, onClose, title, children, size = 'md', footer }: M
           'max-h-[90vh]',
           modalSizes[size]
         )}
-        style={{ animation: 'slideUp .22s cubic-bezier(.22,.68,0,1.2)' }}
+        style={{ animation: 'slideUp .2s ease' }}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
           <h2 className="font-bold text-[15px] text-[var(--text)]">{title}</h2>
           <button
             onClick={onClose}
-            aria-label="Close dialog"
-            className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--text-4)] hover:text-[var(--text)] hover:bg-[var(--surface-3)] transition-colors flex-shrink-0"
+            className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--text-4)] hover:text-[var(--text)] hover:bg-[var(--surface-3)] transition-colors text-[16px] leading-none"
           >
-            <XIcon size={15}/>
+            ✕
           </button>
         </div>
         {/* Body */}
@@ -355,9 +328,7 @@ export function Pagination({ page, total, limit = 20, onChange }: PaginationProp
     <div className="flex items-center justify-between px-4 py-2.5 border-t border-[var(--border)]">
       <span className="text-xs text-[var(--text-4)] font-mono">{total} records</span>
       <div className="flex items-center gap-1">
-        <button className="page-btn" disabled={page <= 1} onClick={() => onChange(page - 1)} aria-label="Previous page">
-          <ChevronLeft size={13}/>
-        </button>
+        <button className="page-btn" disabled={page <= 1} onClick={() => onChange(page - 1)}>‹</button>
         {pageNums.map((p) => (
           <button
             key={p}
@@ -365,9 +336,7 @@ export function Pagination({ page, total, limit = 20, onChange }: PaginationProp
             onClick={() => onChange(p)}
           >{p}</button>
         ))}
-        <button className="page-btn" disabled={page >= pages} onClick={() => onChange(page + 1)} aria-label="Next page">
-          <ChevronRight size={13}/>
-        </button>
+        <button className="page-btn" disabled={page >= pages} onClick={() => onChange(page + 1)}>›</button>
       </div>
     </div>
   )
@@ -419,7 +388,7 @@ export function ToggleSwitch({ checked, onChange, label }: { checked: boolean; o
 export function SearchInput({ value, onChange, placeholder = 'Search…', className }: { value: string; onChange: (v: string) => void; placeholder?: string; className?: string }) {
   return (
     <div className={cn('relative', className)}>
-      <SearchIcon size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-4)] pointer-events-none"/>
+      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-4)] text-sm pointer-events-none">⌕</span>
       <input
         className="erp-input pl-8 pr-3"
         value={value}

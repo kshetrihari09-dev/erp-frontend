@@ -355,14 +355,7 @@ export default function AppLayout() {
           <div className="min-w-0">
             {!isMobile && (
               <div className="page-breadcrumb" style={{ marginBottom: 1 }}>
-                <Home size={10} className="page-breadcrumb-home"/>
-                {currentSection && (
-                  <>
-                    <ChevronRight size={10} className="page-breadcrumb-sep"/>
-                    <span>{currentSection}</span>
-                  </>
-                )}
-                <ChevronRight size={10} className="page-breadcrumb-sep"/>
+                 <ChevronRight size={10} className="page-breadcrumb-sep"/>
                 <span style={{ color: 'var(--text-3)' }}>{pageTitle}</span>
               </div>
             )}

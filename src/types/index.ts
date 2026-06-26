@@ -151,6 +151,7 @@ export interface Sale {
   subtotal:     number
   discount_pct: number
   discount_amt: number
+  cc_amount?:   number
   net_total:    number
   paid_amount:  number
   due_amount:   number

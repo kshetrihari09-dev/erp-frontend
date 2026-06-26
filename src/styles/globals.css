@@ -104,31 +104,6 @@ input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 99px; }
 
-/* ── Accessible keyboard focus ───────────────────────────────────────────
-   Visible only for keyboard navigation (not mouse clicks), applied
-   consistently across interactive elements for WCAG-friendly UX. */
-:focus-visible {
-  outline: 2px solid var(--brand);
-  outline-offset: 2px;
-  border-radius: 4px;
-}
-button:focus-visible, a:focus-visible, [role="button"]:focus-visible {
-  outline-offset: 1px;
-}
-
-/* ── Respect reduced-motion preference ───────────────────────────────── */
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    animation-duration: .001ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: .001ms !important;
-    scroll-behavior: auto !important;
-  }
-}
-
-/* ── Selection color ──────────────────────────────────────────────────── */
-::selection { background: rgba(37,99,235,.22); color: var(--text); }
-
 /* ─────────────────────────────────────────────
    LAYOUT
 ───────────────────────────────────────────── */
@@ -282,10 +257,6 @@ button:focus-visible, a:focus-visible, [role="button"]:focus-visible {
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
 }
-.topbar > div:first-of-type { min-width: 0; flex-shrink: 1; }
-@media (max-width: 1100px) {
-  .topbar-search { width: 180px; }
-}
 .dark .topbar {
   background: rgba(17,24,39,.8);
   border-bottom: 1px solid rgba(255,255,255,.05);
@@ -335,84 +306,6 @@ button:focus-visible, a:focus-visible, [role="button"]:focus-visible {
   background: rgba(255,255,255,.06);
   border-color: rgba(255,255,255,.08);
 }
-.topbar-btn { position: relative; }
-
-/* Notification dot on bell icon */
-.topbar-btn-dot {
-  position: absolute; top: 6px; right: 6px;
-  width: 7px; height: 7px; border-radius: 50%;
-  background: var(--red);
-  box-shadow: 0 0 0 2px var(--surface);
-}
-.dark .topbar-btn-dot { box-shadow: 0 0 0 2px #111827; }
-
-/* ── Topbar dropdown panel (notifications / user menu) ──────────────────── */
-.topbar-dropdown {
-  position: absolute; top: calc(100% + 8px); right: 0;
-  width: 320px; max-width: calc(100vw - 24px);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-lg);
-  overflow: hidden;
-  z-index: 300;
-  animation: dropdownPop .16s cubic-bezier(.22,.68,0,1.2);
-}
-@keyframes dropdownPop {
-  from { opacity: 0; transform: translateY(-6px) scale(.98); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
-}
-.topbar-dropdown-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 12px 16px; border-bottom: 1px solid var(--border);
-}
-.topbar-dropdown-title { font-size: 13px; font-weight: 700; color: var(--text); }
-.topbar-dropdown-action {
-  font-size: 11px; font-weight: 600; color: var(--brand);
-  background: none; border: none; cursor: pointer;
-}
-.topbar-dropdown-action:hover { text-decoration: underline; }
-.topbar-dropdown-list { max-height: 340px; overflow-y: auto; }
-.topbar-dropdown-empty {
-  padding: 28px 16px; text-align: center;
-  color: var(--text-4); font-size: 12.5px;
-}
-.topbar-notif-item {
-  display: flex; align-items: flex-start; gap: 10px;
-  padding: 11px 16px; border-bottom: 1px solid var(--border);
-  cursor: pointer; transition: background var(--transition);
-}
-.topbar-notif-item:last-child { border-bottom: none; }
-.topbar-notif-item:hover { background: var(--surface-2); }
-.topbar-notif-icon {
-  width: 30px; height: 30px; border-radius: 9px; flex-shrink: 0;
-  display: flex; align-items: center; justify-content: center;
-}
-.topbar-notif-title { font-size: 12.5px; font-weight: 600; color: var(--text-2); line-height: 1.4; }
-.topbar-notif-sub { font-size: 11px; color: var(--text-4); margin-top: 2px; }
-
-/* ── Topbar global search results dropdown ──────────────────────────────── */
-.topbar-search-results {
-  position: absolute; top: calc(100% + 8px); left: 0;
-  width: 100%; min-width: 280px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-lg);
-  overflow: hidden;
-  z-index: 300;
-  animation: dropdownPop .14s ease;
-}
-.topbar-search-section-label {
-  font-size: 9.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
-  color: var(--text-4); padding: 9px 14px 5px;
-}
-.topbar-search-item {
-  display: flex; align-items: center; gap: 9px;
-  padding: 8px 14px; cursor: pointer; font-size: 13px; color: var(--text-2);
-  transition: background var(--transition);
-}
-.topbar-search-item:hover, .topbar-search-item--active { background: var(--surface-2); }
 
 .page-content { flex: 1; padding: 24px 28px; min-height: calc(100vh - var(--topbar-h)); }
 
@@ -425,10 +318,7 @@ button:focus-visible, a:focus-visible, [role="button"]:focus-visible {
   font-size: 10.5px; color: var(--text-4);
   font-family: var(--font-mono); letter-spacing: .08em; margin-bottom: 3px;
   text-transform: uppercase;
-  display: flex; align-items: center; gap: 6px;
 }
-.page-breadcrumb-sep { opacity: .5; }
-.page-breadcrumb-home { color: var(--text-4); display: inline-flex; align-items: center; }
 .page-title {
   font-size: 20px; font-weight: 700; letter-spacing: -.03em;
   color: var(--text); font-family: var(--font-display);
@@ -502,9 +392,8 @@ button:focus-visible, a:focus-visible, [role="button"]:focus-visible {
   color: var(--text);
   font-family: var(--font); font-size: 13px;
   outline: none;
-  transition: border-color var(--transition), box-shadow var(--transition), background var(--transition);
+  transition: border-color var(--transition), box-shadow var(--transition);
 }
-.erp-input:hover:not(:disabled):not(:focus) { border-color: var(--text-4); }
 .erp-input:focus { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
 .erp-input::placeholder { color: var(--text-4); }
 .erp-input[disabled]    { opacity: .55; cursor: not-allowed; }
@@ -514,40 +403,6 @@ select.erp-input option { background: var(--surface); color: var(--text); }
 .form-grid.col1 { grid-template-columns: 1fr; }
 .form-grid.col3 { grid-template-columns: 1fr 1fr 1fr; }
 .form-grid.span2 { grid-column: span 2; }
-
-/* ── Floating-label field ─────────────────────────────────────────────────
-   Opt-in wrapper: <div class="field-float"><input placeholder=" " .../><label>...</label></div>
-   The label rests inside the field until the input has focus or content
-   (via :placeholder-shown), then floats above the border — a common
-   pattern in premium SaaS forms. Purely presentational; no markup in
-   existing forms is required to change for this to be available. */
-.field-float { position: relative; }
-.field-float .erp-input { padding-top: 14px; padding-bottom: 4px; }
-.field-float-label {
-  position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
-  font-size: 13px; color: var(--text-4);
-  pointer-events: none; transition: all var(--transition);
-  background: var(--surface); padding: 0 3px; margin-left: -3px;
-}
-.field-float .erp-input:focus + .field-float-label,
-.field-float .erp-input:not(:placeholder-shown) + .field-float-label {
-  top: 0; transform: translateY(-50%) scale(.82);
-  color: var(--brand); font-weight: 600;
-}
-.field-float .erp-input:not(:focus):not(:placeholder-shown) + .field-float-label {
-  color: var(--text-3);
-}
-
-/* ── Field hint / helper text ─────────────────────────────────────────── */
-.field-hint { font-size: 11.5px; color: var(--text-4); margin-top: 4px; }
-.field-error-text {
-  font-size: 11.5px; color: var(--red); margin-top: 4px;
-  display: flex; align-items: center; gap: 4px;
-}
-.erp-input.has-error, .erp-input.has-error:focus {
-  border-color: var(--red); box-shadow: 0 0 0 3px rgba(239,68,68,.1);
-}
-
 
 /* ─────────────────────────────────────────────
    TABLES
@@ -560,7 +415,6 @@ select.erp-input option { background: var(--surface); color: var(--text); }
   white-space: nowrap; font-family: var(--font-mono);
   background: var(--surface-2);
   position: sticky; top: 0; z-index: 1;
-  box-shadow: 0 1px 0 var(--border);
 }
 .erp-table td {
   padding: 10px 14px; border-bottom: 1px solid var(--border);
@@ -573,25 +427,6 @@ select.erp-input option { background: var(--surface); color: var(--text); }
 .erp-table tbody tr.clickable { cursor: pointer; }
 .td-mono { font-family: var(--font-mono); font-size: 12px; }
 .td-right { text-align: right; font-family: var(--font-mono); }
-
-/* ── Optional subtle zebra striping ──────────────────────────────────────
-   Opt-in via .erp-table--striped on the <table> element; off by default so
-   existing tables render exactly as before unless this class is added. */
-.erp-table--striped tbody tr:nth-child(even) td { background: var(--surface-2); }
-.erp-table--striped tbody tr:hover td { background: var(--border); }
-.dark .erp-table--striped tbody tr:nth-child(even) td { background: rgba(255,255,255,.02); }
-.dark .erp-table--striped tbody tr:hover td { background: rgba(255,255,255,.05); }
-
-/* ── Mobile: signal horizontal scroll is available ───────────────────────
-   A soft right-edge fade hints there's more content off-screen, common in
-   premium SaaS tables on small viewports. */
-@media (max-width: 768px) {
-  .table-card { position: relative; }
-  .table-card .overflow-x-auto {
-    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 18px), transparent 100%);
-    mask-image: linear-gradient(to right, #000 calc(100% - 18px), transparent 100%);
-  }
-}
 
 /* ─────────────────────────────────────────────
    BADGES
@@ -621,9 +456,8 @@ select.erp-input option { background: var(--surface); color: var(--text); }
   white-space: nowrap;
 }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
-.btn:active:not(:disabled) { transform: translateY(0.5px) scale(.99); }
 .btn-primary   { background: var(--brand); color: #fff; box-shadow: var(--shadow-sm); }
-.btn-primary:hover:not(:disabled) { background: var(--brand-dark); box-shadow: 0 4px 12px rgba(37,99,235,.25); }
+.btn-primary:hover:not(:disabled) { background: var(--brand-dark); }
 .btn-secondary { background: var(--surface-3); color: var(--text-2); border: 1px solid var(--border); }
 .btn-secondary:hover:not(:disabled) { background: var(--border); }
 .btn-danger    { background: var(--red-50); color: var(--red); border: 1px solid rgba(220,38,38,.2); }
@@ -675,8 +509,6 @@ select.erp-input option { background: var(--surface); color: var(--text); }
   cursor: pointer; border: 1px solid var(--border);
   background: var(--surface); color: var(--text-3);
   transition: all var(--transition);
-  display: inline-flex; align-items: center; justify-content: center;
-  min-width: 26px; min-height: 26px;
 }
 .page-btn:hover:not(:disabled) { border-color: var(--brand); color: var(--brand); }
 .page-btn.active { background: var(--brand); color: #fff; border-color: var(--brand); }
@@ -693,21 +525,6 @@ select.erp-input option { background: var(--surface); color: var(--text); }
 ───────────────────────────────────────────── */
 @keyframes fadeIn  { from { opacity: 0; } to { opacity: 1; } }
 @keyframes slideUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes spin    { to { transform: rotate(360deg); } }
-
-/* ── Full-page loading state (session checks, route-level suspense) ─────── */
-.page-loader {
-  display: flex; align-items: center; justify-content: center;
-  min-height: 100vh; background: var(--bg);
-}
-.page-loader-ring {
-  width: 32px; height: 32px; border-radius: 50%;
-  border: 3px solid var(--border-2);
-  border-top-color: var(--brand);
-  animation: spin .8s linear infinite;
-  margin: 0 auto 12px;
-}
-.page-loader-text { font-size: 13px; color: var(--text-4); text-align: center; }
 
 /* ─────────────────────────────────────────────
    PRINT STYLES
@@ -785,6 +602,7 @@ select.erp-input option { background: var(--surface); color: var(--text); }
   font-weight:   700;
   color:         var(--text);
   letter-spacing: -.01em;
+  z-index:-999;
 }
 
 /* ── Total payable card ─────────────────────────────────────────────────── */
@@ -876,7 +694,6 @@ select.erp-input option { background: var(--surface); color: var(--text); }
 .pos-table-wrap {
   border:        1px solid var(--border);
   border-radius: 12px;
-  overflow:      hidden;
   overflow-x:    auto;
 }
 
@@ -1177,18 +994,17 @@ td.psc-cell {
 
 /* ── Dropdown panel ─────────────────────────────────────────────────────── */
 .psc-dropdown {
-  position:     absolute;
+  
   top:          calc(100% + 4px);
   left:         0;
   z-index:      9999;
   width:        max(100%, 280px);
   background:   var(--surface);
   border:       1.5px solid var(--border);
-  border-radius:10px;
   box-shadow:   0 8px 24px rgba(16,24,40,.12), 0 2px 8px rgba(16,24,40,.06);
-  overflow:     hidden;
+  overflow:     auto;
   animation:    psc-pop .12s ease;
-}
+  }
 @keyframes psc-pop {
   from { opacity: 0; transform: translateY(-4px) scale(.98); }
   to   { opacity: 1; transform: translateY(0)    scale(1);   }
@@ -1196,6 +1012,7 @@ td.psc-cell {
 
 /* ── Option list ────────────────────────────────────────────────────────── */
 .psc-list {
+  z-index:9999;
   list-style:  none;
   margin:      0;
   padding:     4px;
@@ -1204,7 +1021,7 @@ td.psc-cell {
   overscroll-behavior: contain;
 }
 .psc-list::-webkit-scrollbar       { width: 4px; }
-.psc-list::-webkit-scrollbar-track { background: transparent; }
+.psc-list::-webkit-scrollbar-track { background:transparent; z-index:9000; }
 .psc-list::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 4px; }
 
 /* ── Single option ──────────────────────────────────────────────────────── */
@@ -1262,6 +1079,7 @@ td.psc-cell {
   color:          var(--text-4);
   justify-content:center;
   font-style:     italic;
+  
 }
 .psc-empty--hint { color: var(--text-4); font-style: italic; }
 .psc-empty-icon  { color: var(--text-4); opacity: .55; flex-shrink: 0; }
@@ -2100,294 +1918,716 @@ td.psc-cell {
 }
 
 /* ══════════════════════════════════════════════════════════════════════════════
-   ACCOUNTING MODULE — Adaptive Theme (light + dark)
-   Uses CSS vars throughout; dark-only overrides only where inline styles can't reach
+   POS THEME — scoped to the Sales/POS screen only
+   ────────────────────────────────────────────────────────────────────────────
+   Follows the app's actual light/dark toggle (useUIStore) instead of being
+   locked to one mode. `.pos-theme` defines the light-mode palette and all
+   shared structural rules (layout, spacing, radius); `.pos-theme.dark`
+   overrides just the color variables for dark mode. Every rule is scoped
+   under .pos-theme so it never leaks into other pages — all existing
+   .pos-*, .psc-*, .erp-input, .erp-table, .tabs/.tab, .page-header rules
+   used elsewhere are untouched.
 ══════════════════════════════════════════════════════════════════════════════ */
 
-/* ── Spin animation for loading icons ───────────────────────────────────── */
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(360deg); }
+.pos-theme {
+  /* Light mode (default) palette */
+  --pdt-bg:         #F8FAFC;
+  --pdt-surface:    #FFFFFF;
+  --pdt-surface-2:  #F1F5F9;
+  --pdt-surface-3:  #E2E8F0;
+  --pdt-border:     rgba(15,23,42,.08);
+  --pdt-border-2:   rgba(15,23,42,.14);
+  --pdt-text:       #0F172A;
+  --pdt-text-2:     #334155;
+  --pdt-text-3:     #64748B;
+  --pdt-text-4:     #94A3B8;
+  --pdt-accent:     #2563EB;
+  --pdt-accent-dim: rgba(37,99,235,.10);
+  --pdt-accent-glow:rgba(37,99,235,.25);
+  --pdt-success:    #059669;
+  --pdt-success-dim:rgba(5,150,105,.10);
+  --pdt-warning:    #D97706;
+  --pdt-warning-dim:rgba(217,119,6,.10);
+  --pdt-danger:     #DC2626;
+  --pdt-danger-dim: rgba(220,38,38,.10);
+  --pdt-radius:     16px;
+  --pdt-radius-sm:  10px;
+  /* Subtle dark-tinted overlays for light mode (hover states, chips,
+     skeleton shimmer) — slightly stronger than dark mode's white
+     overlays since they need to read against a white surface. */
+  --pdt-overlay-015: rgba(15,23,42,.025);
+  --pdt-overlay-025: rgba(15,23,42,.04);
+  --pdt-overlay-03:  rgba(15,23,42,.045);
+  --pdt-overlay-035: rgba(15,23,42,.05);
+  --pdt-overlay-04:  rgba(15,23,42,.055);
+  --pdt-overlay-05:  rgba(15,23,42,.07);
+  --pdt-overlay-06:  rgba(15,23,42,.08);
+  --pdt-overlay-08:  rgba(15,23,42,.10);
+  --pdt-overlay-09:  rgba(15,23,42,.11);
+  --pdt-overlay-14:  rgba(15,23,42,.16);
+  --pdt-glass:       rgba(255,255,255,.82);
+  --pdt-shadow:      0 1px 0 var(--pdt-overlay-04) inset, 0 4px 16px rgba(15,23,42,.06);
+  --pdt-shadow-lg:   0 1px 0 var(--pdt-overlay-04) inset, 0 8px 24px rgba(15,23,42,.08);
+  --pdt-shadow-pop:  0 16px 40px rgba(15,23,42,.14), 0 4px 12px rgba(15,23,42,.08);
+
+  background: var(--pdt-bg);
+  color: var(--pdt-text);
+  min-height: 100%;
+  margin: -24px -28px;
+  padding: 20px 24px 100px;
+  border-radius: 0;
+}
+@media (max-width: 768px) {
+  .pos-theme { margin: -12px -10px; padding: 0 0 96px; }
 }
 
-/* ── Shimmer skeleton ───────────────────────────────────────────────────── */
-@keyframes shimmer {
-  0%   { opacity: 0.35; }
-  50%  { opacity: 0.65; }
-  100% { opacity: 0.35; }
+.pos-theme.dark {
+  /* Dark mode palette — overrides the light values above when .dark
+     is present (i.e. the user's actual global theme toggle is dark) */
+  --pdt-bg:         #0F172A;
+  --pdt-surface:    #1E293B;
+  --pdt-surface-2:  #182536;
+  --pdt-surface-3:  #233248;
+  --pdt-border:     rgba(255,255,255,.08);
+  --pdt-border-2:   rgba(255,255,255,.14);
+  --pdt-text:       #F1F5F9;
+  --pdt-text-2:     #CBD5E1;
+  --pdt-text-3:     #94A3B8;
+  --pdt-text-4:     #5B6B82;
+  --pdt-accent:     #3B82F6;
+  --pdt-accent-dim: rgba(59,130,246,.16);
+  --pdt-accent-glow:rgba(59,130,246,.35);
+  --pdt-success:    #10B981;
+  --pdt-success-dim:rgba(16,185,129,.14);
+  --pdt-warning:    #F59E0B;
+  --pdt-warning-dim:rgba(245,158,11,.14);
+  --pdt-danger:     #EF4444;
+  --pdt-danger-dim: rgba(239,68,68,.14);
+  /* White-tinted overlays for dark mode (lighten the dark surface) */
+  --pdt-overlay-015: rgba(255,255,255,.015);
+  --pdt-overlay-025: rgba(255,255,255,.025);
+  --pdt-overlay-03:  rgba(255,255,255,.03);
+  --pdt-overlay-035: rgba(255,255,255,.035);
+  --pdt-overlay-04:  rgba(255,255,255,.04);
+  --pdt-overlay-05:  rgba(255,255,255,.05);
+  --pdt-overlay-06:  rgba(255,255,255,.06);
+  --pdt-overlay-08:  rgba(255,255,255,.08);
+  --pdt-overlay-09:  rgba(255,255,255,.09);
+  --pdt-overlay-14:  rgba(255,255,255,.14);
+  --pdt-glass:       rgba(15,23,42,.82);
+  --pdt-shadow:      0 1px 0 var(--pdt-overlay-04) inset, 0 8px 24px rgba(0,0,0,.24);
+  --pdt-shadow-lg:   0 1px 0 var(--pdt-overlay-04) inset, 0 8px 28px rgba(0,0,0,.3);
+  --pdt-shadow-pop:  0 16px 40px rgba(0,0,0,.5), 0 4px 12px rgba(0,0,0,.3);
 }
 
-/* ── Tab bar scroll hide ─────────────────────────────────────────────────── */
-.acct-tab-bar::-webkit-scrollbar { display: none; }
-
-/* ══ BADGE colour helpers — translucent tints work on both light & dark ═══ */
-.badge-green  { background: rgba(16,185,129,0.1);  color: #059669; border: 1px solid rgba(16,185,129,0.25); }
-.badge-red    { background: rgba(239,68,68,0.1);   color: #dc2626; border: 1px solid rgba(239,68,68,0.25); }
-.badge-amber  { background: rgba(245,158,11,0.1);  color: #b45309; border: 1px solid rgba(245,158,11,0.25); }
-.badge-blue   { background: rgba(59,130,246,0.1);  color: #1d4ed8; border: 1px solid rgba(59,130,246,0.25); }
-.badge-purple { background: rgba(139,92,246,0.1);  color: #6d28d9; border: 1px solid rgba(139,92,246,0.25); }
-.badge-teal   { background: rgba(20,184,166,0.1);  color: #0f766e; border: 1px solid rgba(20,184,166,0.25); }
-.badge-muted  { background: rgba(0,0,0,0.05);      color: var(--text-3); border: 1px solid var(--border); }
-
-/* dark: shift badge text to lighter tints */
-.dark .badge-green  { color: #34d399; }
-.dark .badge-red    { color: #f87171; }
-.dark .badge-amber  { color: #fbbf24; }
-.dark .badge-blue   { color: #60a5fa; }
-.dark .badge-purple { color: #a78bfa; }
-.dark .badge-teal   { color: #2dd4bf; }
-.dark .badge-muted  { background: rgba(255,255,255,0.05); color: rgba(148,163,184,0.7); border-color: rgba(255,255,255,0.08); }
-
-/* ══ erp-table adaptive ═══════════════════════════════════════════════════ */
-.erp-table th {
-  background: var(--surface-2);
-  color: var(--text-3);
-  border-bottom: 1px solid var(--border);
-}
-.erp-table td {
-  border-bottom: 1px solid var(--border);
-  color: var(--text-2);
-}
-.erp-table tbody tr:hover td {
-  background: rgba(37,99,235,0.04);
-}
-.dark .erp-table th {
-  background: rgba(255,255,255,0.04);
-  color: rgba(148,163,184,0.55);
-  border-bottom-color: rgba(255,255,255,0.07);
-}
-.dark .erp-table td {
-  border-bottom-color: rgba(255,255,255,0.04);
-  color: rgba(226,232,240,0.85);
-}
-.dark .erp-table tbody tr:hover td {
-  background: rgba(59,130,246,0.06);
+/* ── Page header (scoped override) ──────────────────────────────────────── */
+.pos-theme .page-header { margin-bottom: 18px; padding: 0 2px; }
+.pos-theme .page-breadcrumb { color: var(--pdt-text-4); }
+.pos-theme .page-title { color: var(--pdt-text); }
+@media (max-width: 768px) {
+  .pos-theme .page-header { padding: 14px 16px 0; margin-bottom: 12px; }
 }
 
-/* ══ table-card adaptive ══════════════════════════════════════════════════ */
-.table-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-sm);
+/* ── Tabs (scoped override) ──────────────────────────────────────────────── */
+.pos-theme .tabs {
+  background: var(--pdt-surface);
+  border: 1px solid var(--pdt-border);
+  border-radius: 12px;
+  padding: 4px;
+  display: inline-flex;
+  gap: 2px;
+  margin-bottom: 18px;
 }
-.dark .table-card {
-  background: rgba(15,23,42,0.75);
-  border-color: rgba(255,255,255,0.08);
-  box-shadow: none;
-  backdrop-filter: blur(14px);
-}
-
-/* ══ btn-secondary adaptive ═══════════════════════════════════════════════ */
-.dark .btn-secondary {
-  background: rgba(255,255,255,0.06);
-  border-color: rgba(255,255,255,0.1);
-  color: rgba(226,232,240,0.85);
-}
-.dark .btn-secondary:hover:not(:disabled) { background: rgba(255,255,255,0.1); }
-.dark .btn-danger  { background: rgba(239,68,68,0.1); color: #f87171; border-color: rgba(239,68,68,0.25); }
-.dark .btn-ghost:hover:not(:disabled) { background: rgba(255,255,255,0.06); color: #e2e8f0; }
-
-/* ══ Modal / panel dark overrides ════════════════════════════════════════ */
-.dark .qam-panel,
-.dark .modal-panel { background: #0f172a; border-color: rgba(255,255,255,0.1); }
-.dark .qam-header,
-.dark .qam-footer  { border-color: rgba(255,255,255,0.07); }
-
-/* ══════════════════════════════════════════════════════════════════════════════
-   ACCOUNTING WORKSPACE — sticky module nav, pill tabs, compact KPIs
-   Frontend-only layout upgrade. Reuses existing tokens/components (.erp-table,
-   .table-card, .badge-*) — no new design system, no backend/business changes.
-══════════════════════════════════════════════════════════════════════════════ */
-
-/* ── Whole-page width guard ──────────────────────────────────────────────
-   Accounting page must always fit within the available content area
-   (full window width minus the fixed sidebar) — never wider, with any
-   internal overflow (wide tables, many tabs) contained and scrollable
-   inside its own element rather than pushing the page itself wider. */
-.acct-page {
-  width: 100%;
-  max-width: 100%;
-  overflow-x: hidden;
-  box-sizing: border-box;
-}
-
-
-.acct-nav {
-  position: sticky;
-  top: var(--topbar-h);
-  z-index: 90;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-sm);
-  margin-bottom: 16px;
-  max-width: 100%;
-  overflow: hidden;
-}
-.dark .acct-nav {
-  background: rgba(15,23,42,0.92);
-  border-color: rgba(255,255,255,0.08);
-  box-shadow: none;
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-}
-.acct-nav-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.acct-nav-row::-webkit-scrollbar { display: none; }
-
-/* ── Pill tab bar ────────────────────────────────────────────────────────── */
-.acct-tab-bar {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-}
-
-.acct-pill {
+.pos-theme .tab {
+  color: var(--pdt-text-3);
+  border-radius: 9px;
+  padding: 7px 16px;
+  font-size: 13px;
+  font-weight: 600;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 7px 13px;
-  border-radius: 999px;
-  font-size: 12.5px;
-  font-weight: 600;
-  white-space: nowrap;
-  border: 1px solid transparent;
+  transition: all .15s ease;
+  border: none;
   background: transparent;
-  color: var(--text-3);
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: background .16s cubic-bezier(.4,0,.2,1),
-              color .16s cubic-bezier(.4,0,.2,1),
-              border-color .16s cubic-bezier(.4,0,.2,1),
-              transform .12s ease;
 }
-.acct-pill:hover {
-  background: var(--surface-2);
-  color: var(--text-2);
-}
-.acct-pill:active { transform: scale(0.97); }
-.acct-pill.is-active {
-  background: var(--brand);
+.pos-theme .tab:hover { color: var(--pdt-text); background: var(--pdt-overlay-04); }
+.pos-theme .tab.active {
+  background: var(--pdt-accent);
   color: #fff;
-  border-color: var(--brand);
-  box-shadow: 0 2px 8px rgba(37,99,235,0.28);
+  box-shadow: 0 2px 8px rgba(59,130,246,.35);
 }
-.dark .acct-pill:hover { background: rgba(255,255,255,0.06); color: rgba(226,232,240,0.9); }
-.dark .acct-pill.is-active { box-shadow: 0 2px 10px rgba(59,130,246,0.35); }
+@media (max-width: 768px) {
+  .pos-theme .tabs { margin: 0 16px 14px; display: flex; }
+  .pos-theme .tab  { flex: 1; justify-content: center; }
+}
 
-.acct-pill-count {
-  font-size: 10.5px;
+/* ── Card shell (glassmorphism) ─────────────────────────────────────────── */
+.pos-theme .pos-card {
+  background: linear-gradient(180deg, var(--pdt-surface) 0%, var(--pdt-surface-2) 100%);
+  border: 1px solid var(--pdt-border);
+  border-radius: var(--pdt-radius);
+  padding: 20px 22px;
+  box-shadow: var(--pdt-shadow-lg);
+  backdrop-filter: blur(12px);
+}
+.pos-theme .pos-card-title {
+  color: var(--pdt-text);
+  font-size: 13px;
   font-weight: 700;
-  padding: 1px 6px;
-  border-radius: 999px;
-  background: rgba(0,0,0,0.06);
-  color: inherit;
-  line-height: 1.5;
 }
-.acct-pill.is-active .acct-pill-count { background: rgba(255,255,255,0.25); }
-.dark .acct-pill-count { background: rgba(255,255,255,0.08); }
-
-.acct-nav-divider {
-  width: 1px;
-  height: 22px;
-  background: var(--border);
-  flex-shrink: 0;
-  margin: 0 2px;
-}
-.dark .acct-nav-divider { background: rgba(255,255,255,0.1); }
-
-/* Pin "+ New Voucher" to the right edge of the (now horizontally-scrollable)
-   nav row, so it's always fully visible no matter how many tabs there are
-   or how narrow the window is — it can never end up clipped off-screen. */
-.acct-nav-row > .acct-nav-divider,
-.acct-nav-row > button:last-child {
-  position: sticky;
-  right: 0;
-  z-index: 2;
-}
-.acct-nav-row > button:last-child {
-  background: var(--brand);
+.pos-theme .pos-card-title svg { color: var(--pdt-accent) !important; }
+@media (max-width: 768px) {
+  .pos-theme .pos-card { border-radius: 0; border-left: none; border-right: none; padding: 16px; }
 }
 
-/* ── Compact KPI strip (secondary, below the workspace) ─────────────────── */
-.acct-kpi-strip {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
+/* ── Total payable card (signature element) ─────────────────────────────── */
+.pos-theme .pos-total-card {
+  background:
+    radial-gradient(120% 140% at 100% 0%, rgba(59,130,246,.18) 0%, transparent 55%),
+    linear-gradient(180deg, var(--pdt-surface) 0%, var(--pdt-surface-2) 100%);
+  border: 1px solid var(--pdt-border);
+  border-top: none;
+  border-radius: var(--pdt-radius);
+  padding: 24px 22px 20px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--pdt-shadow-lg);
+}
+/* animated gradient hairline along the top edge — the signature touch */
+.pos-theme .pos-total-card::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--pdt-accent) 35%, #60A5FA 50%, var(--pdt-accent) 65%, transparent);
+  background-size: 200% 100%;
+  animation: pdt-shimmer 3.5s linear infinite;
+}
+@keyframes pdt-shimmer { to { background-position: -200% 0; } }
+.pos-theme .pos-total-amount { color: var(--pdt-text); }
+.pos-theme .pos-total-amount { text-shadow: 0 0 24px rgba(59,130,246,.4); }
+.pos-theme .pos-total-card .text-brand\/80 { color: var(--pdt-accent) !important; opacity: .85; }
+.pos-theme.dark .pos-total-card .text-brand\/80 { color: rgba(96,165,250,.85) !important; opacity: 1; }
+
+/* ── Field labels & readonly fields ──────────────────────────────────────── */
+.pos-theme label,
+.pos-theme .text-\[var\(--text-3\)\] { color: var(--pdt-text-3) !important; }
+.pos-theme .text-\[var\(--text-4\)\] { color: var(--pdt-text-4) !important; }
+.pos-theme .pos-readonly {
+  background: var(--pdt-overlay-03) !important;
+  color: var(--pdt-text-2) !important;
+  border: 1px solid var(--pdt-border);
+  border-radius: var(--pdt-radius-sm);
+}
+
+/* ── Inputs & selects inside the POS theme ──────────────────────────────── */
+.pos-theme .erp-input {
+  background: var(--pdt-overlay-03);
+  border: 1px solid var(--pdt-border-2);
+  color: var(--pdt-text);
+  border-radius: var(--pdt-radius-sm);
+}
+.pos-theme .erp-input::placeholder { color: var(--pdt-text-4); }
+.pos-theme .erp-input:focus {
+  border-color: var(--pdt-accent);
+  box-shadow: 0 0 0 3px var(--pdt-accent-dim);
+  background: var(--pdt-overlay-05);
+}
+.pos-theme select.erp-input option { background: var(--pdt-surface); color: var(--pdt-text); }
+
+/* ── Payment mode pills ──────────────────────────────────────────────────── */
+.pos-theme .pos-mode-pill {
+  background: var(--pdt-overlay-03);
+  border: 1.5px solid var(--pdt-border-2);
+  color: var(--pdt-text-3);
+  border-radius: 10px;
+  min-height: 38px;
+}
+.pos-theme .pos-mode-pill:hover {
+  border-color: var(--pdt-accent);
+  color: #fff;
+  background: var(--pdt-accent-dim);
+}
+.pos-theme .pos-mode-pill--active {
+  border-color: var(--pdt-accent) !important;
+  color: #fff !important;
+  background: var(--pdt-accent) !important;
+  box-shadow: 0 2px 10px rgba(59,130,246,.4);
+}
+@media (max-width: 768px) {
+  .pos-theme .pos-mode-pill { flex: 1 1 calc(50% - 4px); justify-content: center; min-height: 44px; font-size: 13px; }
+}
+
+/* ── Billing summary blocks ──────────────────────────────────────────────── */
+.pos-theme .pos-summary-block {
+  background: var(--pdt-overlay-025);
+  border: 1px solid var(--pdt-border);
+  border-radius: 14px;
+}
+.pos-theme .pos-summary-block .text-\[var\(--text-4\)\] { color: var(--pdt-text-4) !important; }
+/* Icon chips: the original pale yellow/green (#fef3c7 / #f0fdf4) read as
+   washed-out glare against #0F172A — recolor to a dim tinted glass chip
+   instead of trying to keep the original pastel hex values dark-safe. */
+.pos-theme .pos-summary-block-icon[style*="fef3c7"] {
+  background: var(--pdt-warning-dim) !important;
+}
+.pos-theme .pos-summary-block-icon[style*="f0fdf4"] {
+  background: var(--pdt-success-dim) !important;
+}
+.pos-theme.dark .pos-summary-block-icon svg path[stroke="#d97706"],
+.pos-theme.dark .pos-summary-block-icon svg circle[fill="#d97706"] { stroke: #FBBF24 !important; fill: #FBBF24 !important; }
+.pos-theme.dark .pos-summary-block-icon svg path[stroke="#16a34a"],
+.pos-theme.dark .pos-summary-block-icon svg circle[stroke="#16a34a"] { stroke: #34D399 !important; }
+.pos-theme .text-amber-600 { color: var(--pdt-warning) !important; }
+.pos-theme.dark .text-amber-600 { color: #FBBF24 !important; }
+.pos-theme .text-green-600 { color: var(--pdt-success) !important; }
+.pos-theme.dark .text-green-600 { color: #34D399 !important; }
+
+/* ── Invoice items table (desktop) ───────────────────────────────────────── */
+.pos-theme .pos-table-wrap {
+  border: 1px solid var(--pdt-border);
+  border-radius: 14px;
+  background: var(--pdt-overlay-015);
+}
+.pos-theme .pos-table thead tr {
+  background: var(--pdt-overlay-035);
+  border-bottom: 1.5px solid var(--pdt-border);
+}
+.pos-theme .pos-table thead th { color: var(--pdt-text-3); }
+.pos-theme .pos-table tbody tr { border-bottom: 1px solid var(--pdt-border); }
+.pos-theme .pos-table tbody tr:hover { background: var(--pdt-overlay-025); }
+.pos-theme .pos-cell-input { color: var(--pdt-text); }
+.pos-theme .pos-cell-input:hover { border-color: var(--pdt-border-2); background: var(--pdt-overlay-03); }
+.pos-theme .pos-cell-input:focus {
+  border-color: var(--pdt-accent);
+  background: var(--pdt-overlay-05);
+  box-shadow: 0 0 0 3px var(--pdt-accent-dim);
+}
+.pos-theme .pos-cell-display { color: var(--pdt-text-2); }
+.pos-theme .pos-cell-display--bold { color: var(--pdt-text); }
+.pos-theme .pos-row-delete { color: var(--pdt-text-4); }
+.pos-theme .pos-row-delete:hover { color: var(--pdt-danger); background: var(--pdt-danger-dim); }
+.pos-theme .pos-add-row-btn {
+  border: 1.5px dashed var(--pdt-border-2);
+  color: var(--pdt-text-3);
+}
+.pos-theme .pos-add-row-btn:hover {
+  border-color: var(--pdt-accent);
+  color: var(--pdt-accent);
+  background: var(--pdt-accent-dim);
+}
+.pos-theme .pos-subtotal-label { color: var(--pdt-text-4); }
+.pos-theme .pos-subtotal-value { color: var(--pdt-text); }
+.pos-theme .pos-kbd {
+  border: 1px solid var(--pdt-border-2);
+  color: var(--pdt-text-3);
+  background: var(--pdt-overlay-04);
+  box-shadow: 0 1px 0 var(--pdt-border-2);
+}
+
+/* ── ProductSearchCell dropdown (dark) ───────────────────────────────────── */
+.pos-theme .psc-input,
+.pos-theme .psc-trigger { color: var(--pdt-text); }
+.pos-theme .psc-trigger--empty { color: var(--pdt-text-4); }
+.pos-theme .psc-input:hover,
+.pos-theme .psc-trigger:hover { border-color: var(--pdt-border-2); background: var(--pdt-overlay-03); }
+.pos-theme .psc-input:focus {
+  border-color: var(--pdt-accent);
+  background: var(--pdt-overlay-05);
+  box-shadow: 0 0 0 3px var(--pdt-accent-dim);
+}
+.pos-theme .psc-dropdown {
+  background: var(--pdt-surface-3);
+  border: 1.5px solid var(--pdt-border-2);
+  box-shadow: var(--pdt-shadow-pop);
+}
+.pos-theme .psc-option:not(.psc-option--hl):hover { background: var(--pdt-overlay-05); }
+.pos-theme .psc-option--hl { background: var(--pdt-accent-dim); }
+.pos-theme .psc-option-name { color: var(--pdt-text); }
+.pos-theme .psc-option-meta { color: var(--pdt-text-4); }
+.pos-theme .psc-option-code {
+  background: var(--pdt-overlay-05);
+  border: 1px solid var(--pdt-border);
+  color: var(--pdt-text-3);
+}
+.pos-theme .psc-match { background: var(--pdt-accent-dim); color: var(--pdt-accent); font-weight: 700; }
+.pos-theme .psc-empty,
+.pos-theme .psc-empty--hint,
+.pos-theme .psc-empty-icon { color: var(--pdt-text-4); }
+.pos-theme .psc-create-row { border-top: 1px solid var(--pdt-border); }
+.pos-theme .psc-create-row:hover,
+.pos-theme .psc-create-row--hl { background: var(--pdt-accent-dim); }
+.pos-theme .psc-create-icon { background: var(--pdt-accent); }
+.pos-theme .psc-create-label { color: var(--pdt-accent); }
+.pos-theme .psc-create-name { color: var(--pdt-text); }
+
+/* ── Action buttons ──────────────────────────────────────────────────────── */
+.pos-theme .pos-action-btn--clear {
+  background: var(--pdt-danger-dim);
+  color: var(--pdt-danger);
+  border: 1.5px solid rgba(239,68,68,.3);
+}
+.pos-theme .pos-action-btn--clear:hover { background: var(--pdt-danger-dim); filter: brightness(1.3); }
+.pos-theme .pos-action-btn--draft {
+  background: var(--pdt-overlay-05);
+  color: var(--pdt-text-2);
+  border: 1.5px solid var(--pdt-border-2);
+}
+.pos-theme .pos-action-btn--draft:hover { background: var(--pdt-overlay-09); }
+.pos-theme .pos-action-btn--post {
+  background: var(--pdt-accent);
+  border: 1.5px solid var(--pdt-accent);
+  box-shadow: 0 4px 16px rgba(59,130,246,.4);
+}
+.pos-theme .pos-action-btn--post:hover:not(:disabled) {
+  background: #2563EB;
+  box-shadow: 0 6px 22px rgba(59,130,246,.5);
+}
+
+/* ── Table list view (Invoice list tab) ──────────────────────────────────── */
+.pos-theme .table-card {
+  background: var(--pdt-surface);
+  border: 1px solid var(--pdt-border);
+  border-radius: var(--pdt-radius);
+}
+.pos-theme .erp-table th {
+  background: var(--pdt-overlay-035);
+  color: var(--pdt-text-3);
+  border-bottom: 1px solid var(--pdt-border);
+}
+.pos-theme .erp-table td {
+  color: var(--pdt-text-2);
+  border-bottom: 1px solid var(--pdt-border);
+}
+.pos-theme .erp-table tbody tr:hover td { background: var(--pdt-overlay-03); }
+.pos-theme .text-brand { color: var(--pdt-accent) !important; }
+
+/* ── Flash / alert banners ───────────────────────────────────────────────── */
+.pos-theme .bg-green-50 { background: var(--pdt-success-dim) !important; border-color: rgba(16,185,129,.3) !important; }
+.pos-theme .bg-red-50   { background: var(--pdt-danger-dim)  !important; border-color: rgba(239,68,68,.3)  !important; }
+.pos-theme .text-green-800 { color: #047857 !important; }
+.pos-theme.dark .text-green-800 { color: #6EE7B7 !important; }
+.pos-theme .text-red-800   { color: #B91C1C !important; }
+.pos-theme.dark .text-red-800   { color: #FCA5A5 !important; }
+.pos-theme .text-green-200 { border-color: rgba(16,185,129,.3) !important; }
+.pos-theme .text-red-200   { border-color: rgba(239,68,68,.3)  !important; }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   POS MOBILE LAYOUT (< 768px)
+   ────────────────────────────────────────────────────────────────────────────
+   - Sticky Total Payable bar pinned to top
+   - Customer Information becomes a collapsible accordion, auto-collapses
+     after a customer is chosen, shows a compact summary line when closed
+   - Invoice items render as cards (.pos-theme .pos-mobile-item-card) instead of a table
+   - Payment Mode & Billing Summary become collapsible accordions
+   - Sticky bottom action bar with large Post Invoice + Save Draft
+══════════════════════════════════════════════════════════════════════════════ */
+
+/* Sticky mobile total bar */
+.pos-theme .pos-mobile-total-bar {
+  display: none;
+}
+@media (max-width: 768px) {
+  .pos-theme .pos-mobile-total-bar {
+    display: flex;
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 16px;
+    margin: 0 0 12px;
+    background: var(--pdt-glass);
+    backdrop-filter: blur(16px) saturate(160%);
+    border-bottom: 1px solid var(--pdt-border);
+  }
+  .pos-theme .pos-mobile-total-bar .pmb-label {
+    font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--pdt-text-4);
+  }
+  .pos-theme .pos-mobile-total-bar .pmb-amount {
+    font-size: 24px; font-weight: 800; color: var(--pdt-text); letter-spacing: -.5px;
+    font-variant-numeric: tabular-nums;
+  }
+  .pos-theme .pos-mobile-total-bar .pmb-meta {
+    font-size: 11px; color: var(--pdt-text-3);
+  }
+}
+
+/* Accordion sections (customer info, payment mode, billing summary) */
+.pos-theme .pos-accordion {
+  border-radius: var(--pdt-radius);
+  overflow: hidden;
+}
+.pos-theme .pos-accordion-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 10px;
-  margin-bottom: 16px;
-  max-width: 100%;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
-.acct-kpi-chip {
+.pos-theme .pos-accordion-chevron {
+  transition: transform .25s cubic-bezier(.4,0,.2,1);
+  color: var(--pdt-text-4);
+  flex-shrink: 0;
+}
+.pos-accordion-chevron--open { transform: rotate(180deg); }
+.pos-theme .pos-accordion-body {
+  overflow: hidden;
+  transition: max-height .28s cubic-bezier(.4,0,.2,1), opacity .2s ease;
+}
+
+/* Compact summary shown when customer accordion is collapsed */
+.pos-theme .pos-customer-summary {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 12px 14px;
-  border-radius: 12px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  min-height: 56px;
+  padding: 2px 0;
 }
-.dark .acct-kpi-chip {
-  background: rgba(15,23,42,0.75);
-  border-color: rgba(255,255,255,0.08);
-}
-.acct-kpi-chip-icon {
-  width: 32px; height: 32px; border-radius: 9px;
+.pos-theme .pos-customer-summary-avatar {
+  width: 32px; height: 32px; border-radius: 10px; flex-shrink: 0;
+  background: var(--pdt-accent-dim);
+  color: var(--pdt-accent);
   display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
+  font-weight: 700; font-size: 13px;
 }
-.acct-kpi-chip-label {
-  font-size: 9.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
-  color: var(--text-4); margin-bottom: 2px;
-}
-.acct-kpi-chip-value {
-  font-size: 15px; font-weight: 800; color: var(--text); font-family: var(--font-mono);
-  letter-spacing: -0.02em;
+.pos-theme .pos-customer-summary-name { font-size: 13px; font-weight: 600; color: var(--pdt-text); line-height: 1.2; }
+.pos-theme .pos-customer-summary-meta { font-size: 11px; color: var(--pdt-text-4); }
+
+/* Mobile product cards (replace table) */
+.pos-theme .pos-mobile-items { display: none; }
+@media (max-width: 768px) {
+  .pos-table-wrap.pos-desktop-only { display: none; }
+  .pos-theme .pos-mobile-items { display: flex; flex-direction: column; gap: 10px; }
 }
 
-/* ── Workspace table area ───────────────────────────────────────────────── */
-.acct-workspace {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-sm);
-  overflow: hidden;
-  margin-bottom: 20px;
-  max-width: 100%;
+.pos-theme .pos-mobile-item-card {
+  background: var(--pdt-overlay-03);
+  border: 1px solid var(--pdt-border);
+  border-radius: 14px;
+  padding: 14px;
 }
-.dark .acct-workspace {
-  background: rgba(15,23,42,0.75);
-  border-color: rgba(255,255,255,0.08);
-  box-shadow: none;
-  backdrop-filter: blur(14px);
+.pos-theme .pos-mobile-item-card-row1 {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
 }
-.acct-workspace-body {
-  padding: 18px 20px;
+.pos-theme .pos-mobile-item-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--pdt-text);
+  flex: 1;
 }
+.pos-theme .pos-mobile-item-amount {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--pdt-text);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}
+.pos-theme .pos-mobile-item-core {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.pos-theme .pos-mobile-item-field label {
+  font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--pdt-text-4); display: block; margin-bottom: 3px;
+}
+.pos-theme .pos-mobile-item-field input {
+  width: 100%; height: 38px; border-radius: 9px;
+  background: var(--pdt-overlay-04);
+  border: 1px solid var(--pdt-border-2);
+  color: var(--pdt-text);
+  font-size: 13px;
+  padding: 0 8px;
+  text-align: center;
+  font-family: var(--font-mono);
+}
+.pos-theme .pos-mobile-item-field input:focus {
+  outline: none;
+  border-color: var(--pdt-accent);
+  box-shadow: 0 0 0 3px var(--pdt-accent-dim);
+}
+.pos-theme .pos-mobile-more-toggle {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 11.5px; font-weight: 600; color: var(--pdt-accent);
+  padding: 6px 0 2px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.pos-theme .pos-mobile-more-fields {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--pdt-border);
+}
+.pos-theme .pos-mobile-item-remove {
+  display: flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; border-radius: 9px; flex-shrink: 0;
+  color: var(--pdt-text-4);
+  background: transparent;
+  border: none;
+}
+.pos-theme .pos-mobile-item-remove:active { background: var(--pdt-danger-dim); color: var(--pdt-danger); }
 
-/* NOTE: an earlier version of this rule made the table area internally
-   scrollable with a sticky header. That combination (position:sticky on
-   table cells + border-collapse) overlapped the header row on top of the
-   first data row in some Chromium/Electron builds. Rather than risk further
-   rendering differences across environments, the table is left at its
-   natural height here — same scrolling behavior as before this redesign,
-   just inside the new workspace card. */
-
-/* ── Responsive: tablet/mobile scrollable tab row ───────────────────────── */
-@media (max-width: 1024px) {
-  .acct-kpi-strip { grid-template-columns: repeat(2, 1fr); }
+/* Floating Add Product button (mobile) */
+.pos-theme .pos-fab {
+  display: none;
 }
 @media (max-width: 768px) {
-  .acct-nav-row { padding: 8px 10px; flex-wrap: nowrap; }
-  .acct-pill { padding: 6px 11px; font-size: 12px; }
-  .acct-kpi-strip { grid-template-columns: repeat(2, 1fr); gap: 8px; }
-  .acct-kpi-chip { padding: 10px; min-height: 50px; }
-  .acct-workspace-body { padding: 14px; }
+  .pos-theme .pos-fab {
+    display: flex;
+    position: fixed;
+    right: 16px;
+    bottom: 92px;
+    z-index: 45;
+    width: 52px; height: 52px;
+    border-radius: 16px;
+    background: var(--pdt-accent);
+    color: #fff;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 8px 24px rgba(59,130,246,.5), 0 2px 8px rgba(0,0,0,.3);
+    border: none;
+  }
+  .pos-theme .pos-fab:active { transform: scale(.94); }
 }
+
+/* Sticky bottom action bar (mobile) */
+.pos-theme .pos-mobile-actionbar {
+  display: none;
+}
+@media (max-width: 768px) {
+  .pos-theme .pos-mobile-actionbar {
+    display: flex;
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    z-index: 50;
+    gap: 10px;
+    padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
+    background: var(--pdt-glass);
+    backdrop-filter: blur(16px) saturate(160%);
+    border-top: 1px solid var(--pdt-border);
+  }
+  .pos-theme .pos-mobile-actionbar .pma-draft {
+    flex: 0 0 auto;
+    width: 52px; height: 52px;
+    border-radius: 14px;
+    background: var(--pdt-overlay-06);
+    border: 1.5px solid var(--pdt-border-2);
+    color: var(--pdt-text-2);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .pos-theme .pos-mobile-actionbar .pma-post {
+    flex: 1;
+    height: 52px;
+    border-radius: 14px;
+    background: var(--pdt-accent);
+    border: none;
+    color: #fff;
+    font-size: 15px;
+    font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    gap: 8px;
+    box-shadow: 0 6px 20px rgba(59,130,246,.45);
+  }
+  .pos-theme .pos-mobile-actionbar .pma-post:active { transform: scale(.98); }
+  .pos-theme .pos-mobile-actionbar .pma-post:disabled { opacity: .6; }
+}
+
+/* Hide desktop-only action row & desktop grid on mobile */
+@media (max-width: 768px) {
+  .pos-desktop-actions { display: none !important; }
+  .pos-desktop-grid     { display: flex !important; flex-direction: column; gap: 12px; }
+  .pos-desktop-grid > *  { width: 100% !important; }
+}
+@media (min-width: 769px) {
+  .pos-theme .pos-mobile-total-bar,
+  .pos-theme .pos-fab,
+  .pos-theme .pos-mobile-actionbar,
+  .pos-theme .pos-mobile-items { display: none !important; }
+}
+
+/* Skeleton loaders */
+.pos-theme .pos-skel {
+  background: linear-gradient(90deg, var(--pdt-overlay-04) 25%, var(--pdt-overlay-08) 37%, var(--pdt-overlay-04) 63%);
+  background-size: 400% 100%;
+  animation: pdt-skel 1.4s ease infinite;
+  border-radius: 8px;
+}
+@keyframes pdt-skel { 0% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+
+/* Touch target floor on mobile */
+@media (max-width: 768px) {
+  .pos-theme button,
+  .pos-theme .erp-input,
+  .pos-theme select { min-height: 40px; }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   POS accordion visibility helpers
+   ────────────────────────────────────────────────────────────────────────────
+   Desktop (≥769px): all accordions render fully open, headers are not
+   clickable-looking, chevrons and mobile-only summary rows are hidden —
+   the desktop layout is visually identical to the pre-upgrade page.
+   Mobile (≤768px): accordion bodies collapse via max-height, chevrons
+   rotate, and the compact summary row appears when collapsed.
+══════════════════════════════════════════════════════════════════════════════ */
+
+/* Elements that should only ever be visible on mobile */
+@media (min-width: 769px) {
+  .pos-mobile-only,
+  .pos-mobile-only-chevron { display: none !important; }
+  .pos-mobile-only-header { cursor: default; }
+  .pos-theme .pos-accordion-header { cursor: default; }
+}
+
+/* Elements that should only ever be visible on desktop */
+@media (max-width: 768px) {
+  .pos-desktop-only-label { display: none !important; }
+}
+
+/* Accordion body collapse behaviour — mobile only.
+   Desktop ignores these classes entirely (full height, always visible). */
+@media (max-width: 768px) {
+  .pos-theme .pos-accordion-header { cursor: pointer; padding: 2px 0; }
+  .pos-accordion-body--closed {
+    max-height: 0;
+    opacity: 0;
+    margin: 0;
+    pointer-events: none;
+  }
+  .pos-accordion-body--open {
+    max-height: 1200px; /* generous ceiling so content never clips */
+    opacity: 1;
+    margin-top: 14px;
+  }
+  .pos-customer-body.pos-accordion-body--closed,
+  .pos-payment-body.pos-accordion-body--closed { margin-top: 0; }
+
+  /* Payment Mode sits inside the Customer card on desktop; give it its
+     own breathing room and a divider on mobile so it reads as a
+     distinct, separately-collapsible section. */
+  .pos-payment-accordion {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--pdt-border, var(--border));
+  }
+  .pos-payment-accordion .pos-card-title { font-size: 12px; }
+}
+@media (min-width: 769px) {
+  /* On desktop, Payment Mode's own mini-header is invisible (handled by
+     pos-mobile-only-header above) and its body is just normal flow —
+     no extra divider, matching the original single-card layout exactly. */
+  .pos-payment-accordion { margin-top: 14px; }
+}
+
+/* Compact "Change" link color matches accent in both contexts */
+.pos-theme .pos-customer-summary button { color: var(--pdt-accent); }

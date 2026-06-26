@@ -1,25 +1,3 @@
-/**
- * PurchaseReturnPage.tsx — Dedicated Purchase Return Module
- *
- * Route: /purchase-returns
- *
- * Tabs:
- *   - New Return  → form to create a purchase return
- *   - All Returns → paginated list of all DEBIT_NOTE vouchers
- *
- * Workflow:
- *   1. Select original purchase bill (search by bill_no or supplier)
- *   2. System auto-loads: supplier, products, quantities, rates
- *   3. User enters return quantities (≤ purchased quantity, validated)
- *   4. System calculates line amounts and total
- *   5. Save → POST /returns/purchase → creates DEBIT_NOTE voucher + inventory deduct + journal entry
- *   6. Print the Purchase Return Note
- *
- * Voucher numbering: handled by backend (PR-XXXXXX sequence)
- * Accounting: DR Accounts Payable / CR Inventory (via PostingEngine)
- * Inventory: stock quantity reduced on save
- */
-
 import { useState, useEffect, useCallback } from 'react'
 import {
   RotateCcw, FilePlus, List, Search, X,
