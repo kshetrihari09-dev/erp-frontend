@@ -355,7 +355,7 @@ export default function AppLayout() {
           <div className="min-w-0">
             {!isMobile && (
               <div className="page-breadcrumb" style={{ marginBottom: 1 }}>
-                 <ChevronRight size={10} className="page-breadcrumb-sep"/>
+           
                 <span style={{ color: 'var(--text-3)' }}>{pageTitle}</span>
               </div>
             )}
