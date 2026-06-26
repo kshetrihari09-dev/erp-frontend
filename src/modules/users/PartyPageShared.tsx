@@ -1,9 +1,4 @@
-/**
- * PartyPageShared.tsx
- * Shared theme-aware components for CustomersPage and SuppliersPage.
- * All surfaces use CSS custom properties so they adapt to light/dark automatically.
- * Accent colour is passed as a prop (indigo for customers, teal for suppliers).
- */
+
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
@@ -401,9 +396,9 @@ export function SideDrawer({ party, label, defaultRole, accent, onClose, onEdit,
   const defaultAcct = (defaults as AccountDefault[]).find(d => d.role === defaultRole)
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 40, display: 'flex', justifyContent: 'flex-end' }} onClick={onClose}>
+    <div style={{ width:'100%', position: 'fixed', inset: 0, zIndex: 999, display: 'flex', justifyContent: 'flex-end' }} onClick={onClose}>
       <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(1px)' }} />
-      <div style={{ position: 'relative', width: '100%', maxWidth: 360, background: 'var(--surface)', height: '100%', boxShadow: '-8px 0 40px rgba(0,0,0,0.18)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+      <div style={{ position: 'relative', width: '100%', maxWidth: 360, background: 'var(--surface)', height: '100%', boxShadow: '-8px 0 40px rgba(0,0,0,0.18)', display: 'flex', flexDirection: 'column', overflow: 'hidden', }}
         onClick={e => e.stopPropagation()}>
 
         {/* Header */}
@@ -617,7 +612,7 @@ export function PartyPage({
       <div style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)', padding: '16px 0 16px', marginBottom: 20, marginLeft: -28, marginRight: -28, paddingLeft: 28, paddingRight: 28, position: 'sticky', top: 0, zIndex: 30 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <nav style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--text-4)', marginBottom: 4 }}>
+            <nav style={{ display: 'flex',alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--text-4)', marginBottom: 4,}}>
               <span>Parties</span>
               <ChevronRight size={11} />
               <span style={{ color: accent.solid, fontWeight: 600 }}>{label}s</span>
