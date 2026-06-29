@@ -2336,13 +2336,11 @@ td.psc-cell {
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    padding: 12px 16px;
-    margin: 0 0 0;
+    padding: 14px 16px;
+    margin: 0 0 12px;
     background: var(--pdt-glass);
     backdrop-filter: blur(16px) saturate(160%);
     border-bottom: 1px solid var(--pdt-border);
-    box-sizing: border-box;
-    width: 100%;
   }
   .pos-theme .pos-mobile-total-bar .pmb-label {
     font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
@@ -2778,7 +2776,16 @@ td.psc-cell {
   }
 }
 
-/* 7. Mobile total bar: handled in original block above */
+/* 7. Mobile total bar: ensure it sits at top with proper z */
+@media (max-width: 768px) {
+  .pos-theme .pos-mobile-total-bar {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    margin: 0 -16px 12px;  /* bleed to page edges */
+    width: calc(100% + 32px);
+  }
+}
 
 /* 8. Bottom padding so content clears the sticky action bar */
 @media (max-width: 768px) {

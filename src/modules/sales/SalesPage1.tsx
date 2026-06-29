@@ -313,7 +313,7 @@ export default function SalesPage() {
               DESKTOP: "1fr 280px" grid — pixel-perfect to original
               MOBILE:  pos-grid-main collapses to 1fr; pos-total-card-desktop hidden
           ════════════════════════════════════════════════════════════ */}
-          <div className="pos-grid-main">
+          <div className="pos-grid-main grid gap-4" style={{ gridTemplateColumns: '1fr 280px' }}>
 
             {/* ── Customer info card ──────────────────────────────────── */}
             <div className="pos-card">
@@ -349,10 +349,10 @@ export default function SalesPage() {
 
               {/* Body — always visible on desktop; collapses on mobile */}
               <div className={`pos-accordion-body ${customerOpen ? 'pos-accordion-body--open' : 'pos-accordion-body--closed'}`}>
-                <div className="pos-customer-grid">
+                <div className="grid gap-4" style={{ gridTemplateColumns: '1fr 1fr' }}>
 
                   {/* Party selector — IDENTICAL to original */}
-                  <div className="pos-span2">
+                  <div style={{ gridColumn: 'span 2' }}>
                     <FieldLabel icon={<User size={11}/>}>Party</FieldLabel>
                     <div className="relative">
                       <select className="erp-input pos-select" {...register('customer_id')}>
@@ -402,7 +402,7 @@ export default function SalesPage() {
                   </div>
 
                   {/* Payment mode — IDENTICAL to original */}
-                  <div className="pos-span2">
+                  <div style={{ gridColumn: 'span 2' }}>
                     <FieldLabel icon={<CreditCard size={11}/>}>Payment Mode</FieldLabel>
                     <div className="flex gap-2 flex-wrap">
                       {PAYMENT_MODES.map(m => (
@@ -487,105 +487,86 @@ export default function SalesPage() {
                 const updateRow = (patch: Partial<InvoiceRow>) =>
                   setRows(prev => prev.map((r, i) => i === idx ? { ...r, ...patch } : r))
 
-                const reCalc = (overrides: Partial<{qty:number;rate:number;bonus:number;cc_pct:number}>) => {
-                  const { amount, cc_amount } = calcRowAmount({
-                    qty:          Number(overrides.qty   ?? row.qty),
-                    rate:         Number(overrides.rate  ?? row.rate),
-                    bonus:        Number(overrides.bonus ?? row.bonus) || 0,
-                    discount_pct: Number(row.discount_pct) || 0,
-                    cc_pct:       Number(overrides.cc_pct ?? row.cc_pct) || 0,
-                  })
-                  return { amount, cc_amount }
-                }
-
                 return (
-                  <div key={idx} className="pmic">
-
-                    {/* ── Row 1: Product search + remove button ── */}
-                    <div className="pmic-header">
-                      <div className="pmic-product-label">Product</div>
-                      <button
-                        type="button"
-                        className="pmic-remove"
-                        onClick={() => setRows(prev => prev.filter((_, i) => i !== idx))}
-                        aria-label="Remove item"
-                      >
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                          <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-                        </svg>
-                      </button>
-                    </div>
-                    <div className="pmic-psc-wrap">
+                  <div key={idx} className="pos-mobile-item-card">
+                    {/* Product search — full ProductSearchCell, same as desktop */}
+                    <div style={{ marginBottom: 10 }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--pdt-text-4, var(--text-4))', marginBottom: 5 }}>Product</div>
                       <ProductSearchCell
                         value={row.product_id}
                         products={products}
                         onChange={p => {
-                          const { amount, cc_amount } = reCalc({ rate: Number(p.sales_rate) })
+                          const { amount, cc_amount } = calcRowAmount({
+                            qty: Number(row.qty), rate: Number(p.sales_rate),
+                            bonus: Number(row.bonus) || 0, discount_pct: Number(row.discount_pct) || 0,
+                            cc_pct: Number(row.cc_pct) || 0,
+                          })
                           updateRow({ product_id: p.id, product_name: p.name, rate: p.sales_rate, amount, cc_amount })
                         }}
                         onCreated={p => setProducts(prev => prev.some(x => x.id === p.id) ? prev : [...prev, p])}
                       />
                     </div>
 
-                    {/* ── Row 2: Qty · Rate · Bonus ── */}
-                    <div className="pmic-fields-3">
-                      <div className="pmic-field">
-                        <label>Qty</label>
-                        <input
-                          type="number" inputMode="numeric" min={0} step="1"
-                          value={row.qty === 0 ? '' : row.qty}
-                          placeholder="0"
-                          onChange={e => {
-                            const qty = e.target.value === '' ? 0 : Number(e.target.value)
-                            updateRow({ qty, ...reCalc({ qty }) })
-                          }}
-                        />
-                      </div>
-                      <div className="pmic-field">
-                        <label>Rate</label>
-                        <input
-                          type="number" inputMode="decimal" min={0} step="0.01"
-                          value={row.rate === 0 ? '' : row.rate}
-                          placeholder="0.00"
-                          onChange={e => {
-                            const rate = e.target.value === '' ? 0 : Number(e.target.value)
-                            updateRow({ rate, ...reCalc({ rate }) })
-                          }}
-                        />
-                      </div>
-                      <div className="pmic-field">
-                        <label>Bonus</label>
-                        <input
-                          type="number" inputMode="numeric" min={0} step="1"
-                          value={row.bonus === 0 ? '' : row.bonus}
-                          placeholder="0"
-                          onChange={e => {
-                            const bonus = e.target.value === '' ? 0 : Number(e.target.value)
-                            updateRow({ bonus, ...reCalc({ bonus }) })
-                          }}
-                        />
+                    {/* Amount + delete */}
+                    <div className="pos-mobile-item-card-row1" style={{ marginBottom: 10 }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--pdt-text-4, var(--text-4))' }}>Amount</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span className="pos-mobile-item-amount">{fmt(row.amount)}</span>
+                        <button
+                          type="button"
+                          className="pos-mobile-item-remove"
+                          onClick={() => setRows(prev => prev.filter((_, i) => i !== idx))}
+                        >
+                          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                            <path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                          </svg>
+                        </button>
                       </div>
                     </div>
 
-                    {/* ── Amount bar ── */}
-                    <div className="pmic-amount-bar">
-                      <span className="pmic-amount-label">Amount</span>
-                      <span className="pmic-amount-value">{fmt(row.amount)}</span>
+                    {/* Core: Qty, Rate, Bonus — recalculate amount on every change */}
+                    <div className="pos-mobile-item-core">
+                      {([
+                        { label: 'Qty',   key: 'qty'   },
+                        { label: 'Rate',  key: 'rate'  },
+                        { label: 'Bonus', key: 'bonus' },
+                      ] as const).map(({ label, key }) => (
+                        <div key={key} className="pos-mobile-item-field">
+                          <label>{label}</label>
+                          <input
+                            type="number"
+                            inputMode="decimal"
+                            min={0}
+                            step={key === 'rate' ? '0.01' : '1'}
+                            value={(row as any)[key] === 0 && key !== 'qty' ? '' : (row as any)[key]}
+                            placeholder="0"
+                            onChange={e => {
+                              const val = e.target.value === '' ? 0 : Number(e.target.value)
+                              const next = { ...row, [key]: val }
+                              const { amount, cc_amount } = calcRowAmount({
+                                qty:          Number(key === 'qty'   ? val : row.qty),
+                                rate:         Number(key === 'rate'  ? val : row.rate),
+                                bonus:        Number(key === 'bonus' ? val : row.bonus)  || 0,
+                                discount_pct: Number(row.discount_pct) || 0,
+                                cc_pct:       Number(row.cc_pct)       || 0,
+                              })
+                              updateRow({ [key]: val, amount, cc_amount })
+                            }}
+                          />
+                        </div>
+                      ))}
                     </div>
 
-                    {/* ── Expand toggle ── */}
-                    <button type="button" className="pmic-toggle" onClick={toggleExpand}>
-                      <ChevronDown
-                        size={13}
-                        style={{ transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform .2s' }}
-                      />
+                    {/* Toggle: Batch, Expiry, C.C */}
+                    <div className="pos-mobile-more-toggle" onClick={toggleExpand}>
+                      <ChevronDown size={12} style={{ transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }}/>
                       {expanded ? 'Hide' : 'Show'} Batch · Expiry · C.C %
-                    </button>
+                    </div>
 
-                    {/* ── Expanded: Batch · Expiry · C.C% ── */}
                     {expanded && (
-                      <div className="pmic-fields-3 pmic-extra">
-                        <div className="pmic-field">
+                      <div className="pos-mobile-more-fields">
+                        {/* Batch */}
+                        <div className="pos-mobile-item-field">
                           <label>Batch</label>
                           <input
                             type="text"
@@ -594,7 +575,8 @@ export default function SalesPage() {
                             onChange={e => updateRow({ batch_no: e.target.value })}
                           />
                         </div>
-                        <div className="pmic-field">
+                        {/* Expiry */}
+                        <div className="pos-mobile-item-field">
                           <label>Expiry</label>
                           <input
                             type="text"
@@ -603,15 +585,26 @@ export default function SalesPage() {
                             onChange={e => updateRow({ expiry: e.target.value })}
                           />
                         </div>
-                        <div className="pmic-field">
+                        {/* C.C % — recalculate amount */}
+                        <div className="pos-mobile-item-field">
                           <label>C.C %</label>
                           <input
-                            type="number" inputMode="decimal" min={0} step="0.01"
+                            type="number"
+                            inputMode="decimal"
+                            min={0}
+                            step="0.01"
                             value={row.cc_pct === 0 ? '' : row.cc_pct}
                             placeholder="0"
                             onChange={e => {
                               const cc_pct = e.target.value === '' ? 0 : Number(e.target.value)
-                              updateRow({ cc_pct, ...reCalc({ cc_pct }) })
+                              const { amount, cc_amount } = calcRowAmount({
+                                qty:          Number(row.qty),
+                                rate:         Number(row.rate),
+                                bonus:        Number(row.bonus)        || 0,
+                                discount_pct: Number(row.discount_pct) || 0,
+                                cc_pct,
+                              })
+                              updateRow({ cc_pct, amount, cc_amount })
                             }}
                           />
                         </div>
@@ -621,19 +614,18 @@ export default function SalesPage() {
                 )
               })}
 
-              {/* Add Product button */}
               <button
                 type="button"
-                className="pmic-add-btn"
+                className="pos-add-row-btn"
+                style={{ width: '100%', justifyContent: 'center' }}
                 onClick={() => setRows(prev => [...prev, newRow()])}
               >
-                <Plus size={15}/> Add Product
+                <Plus size={14}/> Add Product
               </button>
             </div>
           </div>
 
           {/* ════════════════════════════════════════════════════════════
-              BILLING SUMMARY          {/* ════════════════════════════════════════════════════════════
               BILLING SUMMARY — IDENTICAL to original on desktop
               Mobile: collapsible accordion
           ════════════════════════════════════════════════════════════ */}
@@ -660,7 +652,7 @@ export default function SalesPage() {
 
             <div className={`pos-accordion-body ${billingOpen ? 'pos-accordion-body--open' : 'pos-accordion-body--closed'}`}>
               {/* Grid — IDENTICAL to original */}
-              <div className="pos-billing-grid">
+              <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
 
                 {/* Discount block — IDENTICAL to original */}
                 <div className="pos-summary-block">
@@ -676,7 +668,7 @@ export default function SalesPage() {
                       <div className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-4)] mb-1">Discount %</div>
                       <div className="flex items-center gap-1.5">
                         <input
-                          type="number" className="erp-input pmic-billing-input text-right"
+                          type="number" className="erp-input text-right" style={{ width: 70 }}
                           step="0.01" min="0" max="100"
                           {...register('discount_pct')}
                         />
@@ -702,7 +694,7 @@ export default function SalesPage() {
                     <div>
                       <div className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-4)] mb-1">Tender Amount</div>
                       <input
-                        type="number" className="erp-input pmic-billing-input text-right"
+                        type="number" className="erp-input text-right" style={{ width: 120 }}
                         step="0.01" min="0" placeholder="0.00"
                         value={tender}
                         onChange={e => setTender(e.target.value === '' ? '' : Number(e.target.value))}
@@ -772,17 +764,14 @@ export default function SalesPage() {
       )}
 
       {/* ════════════════════════════════════════════════════════════════
-          INVOICE LIST
+          INVOICE LIST — IDENTICAL to original
       ════════════════════════════════════════════════════════════════ */}
       {tab === 'list' && (
         <div>
-          {/* Search bar — full width on mobile */}
-          <div className="sil-search-bar">
-            <SearchInput value={search} onChange={v => { setSearch(v); setPage(1) }} className="sil-search-input"/>
+          <div className="flex items-center justify-between mb-3">
+            <SearchInput value={search} onChange={v => { setSearch(v); setPage(1) }} className="w-64"/>
           </div>
-
-          {/* ── DESKTOP: full table ─────────────────────────────────── */}
-          <div className="table-card sil-desktop-table">
+          <div className="table-card">
             <div className="overflow-x-auto">
               <table className="erp-table">
                 <thead>
@@ -841,79 +830,6 @@ export default function SalesPage() {
                 </tbody>
               </table>
             </div>
-            <Pagination page={page} total={total} limit={LIMIT} onChange={setPage}/>
-          </div>
-
-          {/* ── MOBILE: card list ───────────────────────────────────── */}
-          <div className="sil-mobile-list">
-            {loading ? (
-              <div className="sil-loading">
-                {[1,2,3,4,5].map(i => <div key={i} className="sil-card sil-card-skeleton"/>)}
-              </div>
-            ) : sales.length === 0 ? (
-              <Empty message="No sales found"/>
-            ) : (
-              sales.map(s => (
-                <div
-                  key={s.id}
-                  className="sil-card"
-                  onClick={() => setDetailId(s.id)}
-                >
-                  {/* Top row: invoice no + total */}
-                  <div className="sil-card-top">
-                    <span className="sil-card-invno">{s.invoice_no}</span>
-                    <span className="sil-card-total">{fmt(s.net_total)}</span>
-                  </div>
-
-                  {/* Customer + date row */}
-                  <div className="sil-card-sub">
-                    <span className="sil-card-customer">{s.party_name || 'Walk-in Customer'}</span>
-                    <span className="sil-card-date">{fmtDate(s.date_ad)}</span>
-                  </div>
-
-                  {/* Chips row: mode, status, paid, due */}
-                  <div className="sil-card-chips">
-                    <Badge status={s.payment_mode}/>
-                    <Badge status={s.status}/>
-                    {Number(s.paid_amount) > 0 && (
-                      <span className="sil-chip sil-chip-paid">Paid {fmt(s.paid_amount)}</span>
-                    )}
-                    {Number(s.due_amount) > 0 && (
-                      <span className="sil-chip sil-chip-due">Due {fmt(s.due_amount)}</span>
-                    )}
-                    <PostingStatusBadge sourceType="SALE" sourceId={s.id} compact/>
-                  </div>
-
-                  {/* Action buttons — stop propagation so tap doesn't open detail */}
-                  <div className="sil-card-actions" onClick={e => e.stopPropagation()}>
-                    <Button
-                      variant="secondary" size="sm" icon={<Printer size={13}/>}
-                      onClick={async () => {
-                        try {
-                          const res = await salesAPI.get(s.id)
-                          const d = res.data.data
-                          setPrintData({
-                            voucherNo: d.invoice_no, type: 'SALE', date: d.date_ad,
-                            paymentMode: d.payment_mode, partyName: d.party_name,
-                            items: (d.items||[]).map((it: any) => ({
-                              product_name: it.product_name, batch_no: it.batch_no, expiry: it.expiry,
-                              qty: Number(it.qty), bonus: Number(it.bonus)||0, rate: Number(it.rate),
-                              discount_pct: Number(it.discount_pct)||0, cc_pct: Number(it.cc_pct)||0,
-                              cc_amount: Number(it.cc_amount)||0, amount: Number(it.amount),
-                            })),
-                            subtotal: Number(d.subtotal||0), ccAmount: Number(d.cc_amount||0),
-                            netTotal: Number(d.net_total), paidAmount: Number(d.paid_amount), dueAmount: Number(d.due_amount),
-                          })
-                        } catch (e: any) { error('Print failed', e.message) }
-                      }}
-                    >Print</Button>
-                    {s.status === 'active' && (
-                      <Button variant="danger" size="sm" onClick={() => setConfirmCancel(s.id)}>Cancel</Button>
-                    )}
-                  </div>
-                </div>
-              ))
-            )}
             <Pagination page={page} total={total} limit={LIMIT} onChange={setPage}/>
           </div>
         </div>

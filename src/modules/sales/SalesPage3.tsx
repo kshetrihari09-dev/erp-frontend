@@ -772,17 +772,14 @@ export default function SalesPage() {
       )}
 
       {/* ════════════════════════════════════════════════════════════════
-          INVOICE LIST
+          INVOICE LIST — IDENTICAL to original
       ════════════════════════════════════════════════════════════════ */}
       {tab === 'list' && (
         <div>
-          {/* Search bar — full width on mobile */}
-          <div className="sil-search-bar">
-            <SearchInput value={search} onChange={v => { setSearch(v); setPage(1) }} className="sil-search-input"/>
+          <div className="flex items-center justify-between mb-3">
+            <SearchInput value={search} onChange={v => { setSearch(v); setPage(1) }} className="w-64"/>
           </div>
-
-          {/* ── DESKTOP: full table ─────────────────────────────────── */}
-          <div className="table-card sil-desktop-table">
+          <div className="table-card">
             <div className="overflow-x-auto">
               <table className="erp-table">
                 <thead>
@@ -841,79 +838,6 @@ export default function SalesPage() {
                 </tbody>
               </table>
             </div>
-            <Pagination page={page} total={total} limit={LIMIT} onChange={setPage}/>
-          </div>
-
-          {/* ── MOBILE: card list ───────────────────────────────────── */}
-          <div className="sil-mobile-list">
-            {loading ? (
-              <div className="sil-loading">
-                {[1,2,3,4,5].map(i => <div key={i} className="sil-card sil-card-skeleton"/>)}
-              </div>
-            ) : sales.length === 0 ? (
-              <Empty message="No sales found"/>
-            ) : (
-              sales.map(s => (
-                <div
-                  key={s.id}
-                  className="sil-card"
-                  onClick={() => setDetailId(s.id)}
-                >
-                  {/* Top row: invoice no + total */}
-                  <div className="sil-card-top">
-                    <span className="sil-card-invno">{s.invoice_no}</span>
-                    <span className="sil-card-total">{fmt(s.net_total)}</span>
-                  </div>
-
-                  {/* Customer + date row */}
-                  <div className="sil-card-sub">
-                    <span className="sil-card-customer">{s.party_name || 'Walk-in Customer'}</span>
-                    <span className="sil-card-date">{fmtDate(s.date_ad)}</span>
-                  </div>
-
-                  {/* Chips row: mode, status, paid, due */}
-                  <div className="sil-card-chips">
-                    <Badge status={s.payment_mode}/>
-                    <Badge status={s.status}/>
-                    {Number(s.paid_amount) > 0 && (
-                      <span className="sil-chip sil-chip-paid">Paid {fmt(s.paid_amount)}</span>
-                    )}
-                    {Number(s.due_amount) > 0 && (
-                      <span className="sil-chip sil-chip-due">Due {fmt(s.due_amount)}</span>
-                    )}
-                    <PostingStatusBadge sourceType="SALE" sourceId={s.id} compact/>
-                  </div>
-
-                  {/* Action buttons — stop propagation so tap doesn't open detail */}
-                  <div className="sil-card-actions" onClick={e => e.stopPropagation()}>
-                    <Button
-                      variant="secondary" size="sm" icon={<Printer size={13}/>}
-                      onClick={async () => {
-                        try {
-                          const res = await salesAPI.get(s.id)
-                          const d = res.data.data
-                          setPrintData({
-                            voucherNo: d.invoice_no, type: 'SALE', date: d.date_ad,
-                            paymentMode: d.payment_mode, partyName: d.party_name,
-                            items: (d.items||[]).map((it: any) => ({
-                              product_name: it.product_name, batch_no: it.batch_no, expiry: it.expiry,
-                              qty: Number(it.qty), bonus: Number(it.bonus)||0, rate: Number(it.rate),
-                              discount_pct: Number(it.discount_pct)||0, cc_pct: Number(it.cc_pct)||0,
-                              cc_amount: Number(it.cc_amount)||0, amount: Number(it.amount),
-                            })),
-                            subtotal: Number(d.subtotal||0), ccAmount: Number(d.cc_amount||0),
-                            netTotal: Number(d.net_total), paidAmount: Number(d.paid_amount), dueAmount: Number(d.due_amount),
-                          })
-                        } catch (e: any) { error('Print failed', e.message) }
-                      }}
-                    >Print</Button>
-                    {s.status === 'active' && (
-                      <Button variant="danger" size="sm" onClick={() => setConfirmCancel(s.id)}>Cancel</Button>
-                    )}
-                  </div>
-                </div>
-              ))
-            )}
             <Pagination page={page} total={total} limit={LIMIT} onChange={setPage}/>
           </div>
         </div>
