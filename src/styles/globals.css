@@ -995,7 +995,7 @@ td.psc-cell {
 
 /* ── Dropdown panel ─────────────────────────────────────────────────────── */
 .psc-dropdown {
-  
+ 
   top:          calc(100% + 4px);
   left:         0;
   z-index:      9999;
@@ -2440,19 +2440,43 @@ td.psc-cell {
   color: var(--pdt-text-4); display: block; margin-bottom: 3px;
 }
 .pos-theme .pos-mobile-item-field input {
-  width: 100%; height: 38px; border-radius: 9px;
+  width: 100%;
+  height: 42px;
+  border-radius: 9px;
   background: var(--pdt-overlay-04);
-  border: 1px solid var(--pdt-border-2);
+  border: 1.5px solid var(--pdt-border-2);
   color: var(--pdt-text);
-  font-size: 13px;
-  padding: 0 8px;
+  font-size: 14px;
+  padding: 0 10px;
   text-align: center;
   font-family: var(--font-mono);
+  box-sizing: border-box;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+  transition: border-color .15s, box-shadow .15s;
+  /* prevent iOS zoom on focus (font-size must be ≥16px on iOS, we bump via meta) */
 }
 .pos-theme .pos-mobile-item-field input:focus {
-  outline: none;
   border-color: var(--pdt-accent);
   box-shadow: 0 0 0 3px var(--pdt-accent-dim);
+  background: var(--pdt-overlay-06, var(--pdt-overlay-04));
+}
+/* Remove number input spinners — cleaner on mobile */
+.pos-theme .pos-mobile-item-field input[type="number"]::-webkit-inner-spin-button,
+.pos-theme .pos-mobile-item-field input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.pos-theme .pos-mobile-item-field input[type="number"] {
+  -moz-appearance: textfield;
+}
+/* Collapse to 2-col on very narrow screens */
+@media (max-width: 360px) {
+  .pos-theme .pos-mobile-item-core,
+  .pos-theme .pos-mobile-more-fields {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 .pos-theme .pos-mobile-more-toggle {
   display: flex; align-items: center; gap: 5px;
@@ -2632,3 +2656,57 @@ td.psc-cell {
 
 /* Compact "Change" link color matches accent in both contexts */
 .pos-theme .pos-customer-summary button { color: var(--pdt-accent); }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   PSC MOBILE FIX — ProductSearchCell inside mobile product cards
+   Only two rules needed. Nothing above is modified.
+══════════════════════════════════════════════════════════════════════════════ */
+
+/* 1. psc-dropdown must be position:absolute — was blank in original */
+/*    Patched directly on the rule above; this is the mobile card anchor: */
+.pos-mobile-item-card {
+  position: relative;   /* lets psc-dropdown (position:absolute) anchor to card */
+}
+
+/* 2. psc-trigger: bigger tap target on mobile, full border so it's visible */
+@media (max-width: 768px) {
+  .psc-trigger {
+    display:       flex;
+    align-items:   center;
+    width:         100%;
+    min-height:    44px;
+    padding:       0 12px;
+    border:        1.5px solid var(--border);
+    border-radius: 10px;
+    background:    var(--surface);
+    font-size:     14px;
+    font-family:   var(--font);
+    color:         var(--text);
+    text-align:    left;
+    cursor:        pointer;
+    white-space:   nowrap;
+    overflow:      hidden;
+    text-overflow: ellipsis;
+  }
+  .psc-placeholder { color: var(--text-4); }
+
+  /* Dropdown: escape overflow:hidden, appear above keyboard */
+  .psc-dropdown {
+    position:      absolute !important;
+    top:           calc(100% + 4px) !important;
+    left:          0 !important;
+    right:         0 !important;
+    width:         auto !important;
+    min-width:     280px;
+    z-index:       99999 !important;
+    max-height:    50vh !important;
+    border-radius: 12px !important;
+    box-shadow:    0 16px 48px rgba(0,0,0,.18) !important;
+  }
+
+  .psc-list      { max-height: calc(50vh - 8px) !important; -webkit-overflow-scrolling: touch; }
+  .psc-option    { padding: 12px 14px; }
+  .psc-option-name { font-size: 14px; }
+  .psc-empty     { padding: 18px 14px; font-size: 13px; }
+  .psc-create-row { padding: 12px 14px; }
+}
