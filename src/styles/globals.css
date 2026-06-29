@@ -3075,7 +3075,7 @@ td.psc-cell {
     height: 32px;
   }
   /* Discount row: flex row so label + input are side by side */
-  .pos-theme .pos-summary-block .flex.items-center.gap-1\\.5 {
+  .pos-theme .pos-summary-block .flex.items-center.gap-1.5 {
     gap: 8px;
   }
 }
