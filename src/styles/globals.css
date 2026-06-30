@@ -3623,3 +3623,177 @@ td.psc-cell {
   .pp-mc-name { font-size: 13px; }
 }
 
+
+/* ── Generic .form-grid mobile collapse (used by ProductForm and others) ──── */
+@media (max-width: 640px) {
+  .form-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+}
+
+
+/* ── Standalone .span2 for grid items inside .form-grid (collapses on mobile) */
+.span2 { grid-column: span 2; }
+@media (max-width: 640px) {
+  .span2 { grid-column: span 1; }
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   PRODUCTS PAGE — MOBILE & TABLET RESPONSIVENESS
+   Scoped with .prod- prefix. All rules additive.
+══════════════════════════════════════════════════════════════════════════════ */
+
+/* Search input: fixed width on desktop, full width on mobile */
+.prod-search-input { width: 256px; }
+@media (max-width: 640px) {
+  .prod-search-input { width: 100% !important; }
+}
+
+/* Desktop table — hidden on mobile */
+.prod-desktop-table { display: block; }
+@media (max-width: 768px) {
+  .prod-desktop-table { display: none !important; }
+}
+
+/* Mobile card list — hidden on desktop */
+.prod-mobile-list { display: none; }
+@media (max-width: 768px) {
+  .prod-mobile-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px;
+  }
+}
+
+.prod-mobile-skel-wrap { display: flex; flex-direction: column; gap: 10px; }
+.prod-mobile-card-skel {
+  height: 110px;
+  cursor: default;
+  background: linear-gradient(90deg, var(--surface) 25%, var(--surface-2) 50%, var(--surface) 75%);
+  background-size: 400% 100%;
+  animation: prod-shimmer 1.4s ease infinite;
+}
+@keyframes prod-shimmer {
+  0%   { background-position: 100% 50%; }
+  100% { background-position: 0%   50%; }
+}
+
+/* Individual product card */
+.prod-mobile-card {
+  background:    var(--surface);
+  border:        1.5px solid var(--border);
+  border-radius: 14px;
+  padding:       14px;
+  display:       flex;
+  flex-direction: column;
+  gap:           8px;
+}
+
+/* Top row: name + company (left) and code (right) */
+.prod-mc-top {
+  display:         flex;
+  align-items:     flex-start;
+  justify-content: space-between;
+  gap:             10px;
+}
+.prod-mc-name-wrap { flex: 1; min-width: 0; }
+.prod-mc-name {
+  font-weight: 600;
+  font-size:   14px;
+  color:       var(--text);
+  margin:      0;
+  line-height: 1.3;
+}
+.prod-mc-company {
+  font-size:  11.5px;
+  color:      var(--text-4);
+  margin:     2px 0 0;
+}
+.prod-mc-code {
+  font-family:   var(--font-mono, monospace);
+  font-size:     11px;
+  font-weight:   700;
+  color:         var(--brand);
+  background:    var(--surface-2);
+  padding:       2px 8px;
+  border-radius: 6px;
+  flex-shrink:   0;
+  white-space:   nowrap;
+}
+
+/* Generic name line */
+.prod-mc-generic {
+  font-size: 12px;
+  color:     var(--text-3);
+}
+
+/* Rates row: MRP / Sale Rate / Stock — 3 equal columns */
+.prod-mc-rates {
+  display:               grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap:                   8px;
+  padding:               10px;
+  background:            var(--surface-2);
+  border-radius:         10px;
+  margin:                2px 0;
+}
+.prod-mc-rate-item {
+  display:        flex;
+  flex-direction: column;
+  align-items:    center;
+  gap:            3px;
+}
+.prod-mc-rate-label {
+  font-size:      9.5px;
+  font-weight:    700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color:          var(--text-4);
+}
+.prod-mc-rate-value {
+  font-family: var(--font-mono, monospace);
+  font-size:   14px;
+  font-weight: 700;
+  color:       var(--text);
+}
+.prod-mc-stock-low { color: #dc2626; }
+
+/* Footer: chips left, actions right */
+.prod-mc-footer {
+  display:         flex;
+  align-items:     center;
+  justify-content: space-between;
+  gap:             8px;
+  flex-wrap:       wrap;
+}
+.prod-mc-chips {
+  display: flex;
+  gap:     6px;
+}
+.prod-mc-actions {
+  display: flex;
+  gap:     6px;
+}
+.prod-mc-btn {
+  padding:       6px 12px;
+  border-radius: 8px;
+  border:        1px solid var(--border);
+  background:    var(--surface-2);
+  color:         var(--text-2);
+  font-size:     12px;
+  font-weight:   600;
+  cursor:        pointer;
+  min-height:    34px;
+  -webkit-tap-highlight-color: transparent;
+}
+.prod-mc-btn-danger {
+  border-color: rgba(220,38,38,.3);
+  color:        #dc2626;
+  background:   rgba(220,38,38,.06);
+}
+.prod-mc-btn:active { background: var(--surface-3); }
+.prod-mc-btn-danger:active { background: rgba(220,38,38,.12); }
+

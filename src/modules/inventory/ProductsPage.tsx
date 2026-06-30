@@ -54,7 +54,7 @@ function ProductForm({ initial, onClose }: { initial?: Product | null; onClose: 
   return (
     <>
       <div className="form-grid">
-        <div style={{ gridColumn: 'span 2' }}><Field label="Product Name *" name="name" /></div>
+        <div className="span2"><Field label="Product Name *" name="name" /></div>
         <Field label="Generic Name" name="generic_name" />
         <Field label="Company / Brand" name="company_name" />
         <Field label="Category" name="category" />
@@ -103,11 +103,12 @@ export default function ProductsPage() {
       </div>
 
       <div className="flex items-center gap-2 mb-3">
-        <SearchInput value={searchRaw} onChange={setSearch} className="w-64" />
+        <SearchInput value={searchRaw} onChange={setSearch} className="prod-search-input" />
       </div>
 
       <div className="table-card">
-        <div className="overflow-x-auto">
+        {/* Desktop table */}
+        <div className="overflow-x-auto prod-desktop-table">
           <table className="erp-table">
             <thead>
               <tr><th>Code</th><th>Product</th><th>Generic</th><th>Unit</th>
@@ -152,6 +153,70 @@ export default function ProductsPage() {
             </tbody>
           </table>
         </div>
+
+        {/* Mobile card list */}
+        <div className="prod-mobile-list">
+          {isLoading ? (
+            <div className="prod-mobile-skel-wrap">
+              {[1,2,3,4,5].map(i => <div key={i} className="prod-mobile-card prod-mobile-card-skel" />)}
+            </div>
+          ) : rows.length === 0 ? (
+            <Empty message="No products found" icon={<Package size={32}/>}/>
+          ) : (
+            rows.map(p => (
+              <div key={p.id} className="prod-mobile-card">
+                {/* Top: name + code */}
+                <div className="prod-mc-top">
+                  <div className="prod-mc-name-wrap">
+                    <p className="prod-mc-name">{p.name}</p>
+                    {p.company_name && <p className="prod-mc-company">{p.company_name}</p>}
+                  </div>
+                  <span className="prod-mc-code">{p.item_code}</span>
+                </div>
+
+                {/* Generic name */}
+                {p.generic_name && (
+                  <div className="prod-mc-generic">{p.generic_name}</div>
+                )}
+
+                {/* Rates row */}
+                <div className="prod-mc-rates">
+                  <div className="prod-mc-rate-item">
+                    <span className="prod-mc-rate-label">MRP</span>
+                    <span className="prod-mc-rate-value">{fmt(p.mrp)}</span>
+                  </div>
+                  <div className="prod-mc-rate-item">
+                    <span className="prod-mc-rate-label">Sale Rate</span>
+                    <span className="prod-mc-rate-value">{fmt(p.sales_rate)}</span>
+                  </div>
+                  <div className="prod-mc-rate-item">
+                    <span className="prod-mc-rate-label">Stock</span>
+                    <span className={`prod-mc-rate-value ${p.current_stock < p.min_stock ? 'prod-mc-stock-low' : ''}`}>
+                      {p.current_stock}
+                      {p.current_stock < p.min_stock && <span style={{ marginLeft: 3 }}>⚠</span>}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Chips + actions */}
+                <div className="prod-mc-footer">
+                  <div className="prod-mc-chips">
+                    <span className="badge badge-muted">{p.unit}</span>
+                    {p.is_active
+                      ? <span className="badge badge-green">Active</span>
+                      : <span className="badge badge-red">Inactive</span>
+                    }
+                  </div>
+                  <div className="prod-mc-actions">
+                    <button className="prod-mc-btn" onClick={() => { setEditing(p); setModal(true) }}>Edit</button>
+                    <button className="prod-mc-btn prod-mc-btn-danger" onClick={() => setDelId(p.id)}>Delete</button>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
         <Pagination page={page} total={total} limit={20} onChange={setPage} />
       </div>
 
