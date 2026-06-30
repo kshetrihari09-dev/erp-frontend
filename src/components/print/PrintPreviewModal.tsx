@@ -14,9 +14,12 @@ import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Printer, Download, X, Copy, Maximize2, Mail,
-  MessageCircle, ChevronRight, CheckCircle2, Clock,
+  MessageCircle, ChevronRight, CheckCircle2, Clock, UploadCloud, Loader2,
 } from 'lucide-react'
 import { fmt, fmtDate } from '@/utils'
+import { htmlToPdfBlob } from '@/utils/htmlToPdfBlob'
+import { uploadDocumentToCloud } from '@/components/cloudStorage/CloudBackupButton'
+import useUIStore from '@/store/uiStore'
 import useAuthStore from '@/store/authStore'
 import useTemplateStore from '@/store/templateStore'
 import { usePrint, type PrintSize } from './usePrint'
@@ -66,6 +69,8 @@ export default function PrintPreviewModal({
   data, open, onClose, onNextBill, autoprint = false,
 }: PrintPreviewModalProps) {
   const { company }     = useAuthStore()
+  const { success: toastSuccess, error: toastError } = useUIStore()
+  const [backingUp, setBackingUp] = useState(false)
   const tpl             = useTemplateStore(s => s.activeTemplate)
   const { print, downloadPDF } = usePrint()
   const printRef        = useRef<HTMLDivElement>(null)
@@ -113,6 +118,20 @@ export default function PrintPreviewModal({
     if (!printData || !printRef.current) return
     downloadPDF(printRef, `${printData.voucherNo}.pdf`, { size })
   }, [printData, size, downloadPDF])
+
+  const handleCloudBackup = useCallback(async () => {
+    if (!printData || !printRef.current) return
+    setBackingUp(true)
+    try {
+      const blob = await htmlToPdfBlob(printRef.current, { paperSize: size === 'a4' ? 'a4' : 'a4' })
+      await uploadDocumentToCloud(blob, `${printData.voucherNo}.pdf`)
+      toastSuccess('Backed up to cloud storage', `${printData.voucherNo}.pdf`)
+    } catch (e: any) {
+      toastError('Cloud backup failed', e?.response?.data?.message || e.message)
+    } finally {
+      setBackingUp(false)
+    }
+  }, [printData, size, toastSuccess, toastError])
 
   const handleNextBill = useCallback(() => {
     onNextBill?.()
@@ -236,6 +255,12 @@ export default function PrintPreviewModal({
                 <ActionBtn icon={<Printer size={15}/>}   label="Print"          shortcut="Ctrl+P" color={typeColor} onClick={handlePrint}    primary />
                 <ActionBtn icon={<Download size={15}/>}  label="Download PDF"                      color="#2563eb"   onClick={handleDownload} />
                 <ActionBtn icon={<Copy size={15}/>}      label="Print Duplicate"                   color="#7c3aed"   onClick={() => { setCopies(2); setTimeout(handlePrint, 100) }} />
+                <ActionBtn
+                  icon={backingUp ? <Loader2 size={15} className="animate-spin"/> : <UploadCloud size={15}/>}
+                  label={backingUp ? 'Backing up…' : 'Backup to Cloud'}
+                  color="#0d9488"
+                  onClick={handleCloudBackup}
+                />
 
                 <Divider />
 
