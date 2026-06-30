@@ -284,3 +284,40 @@ export const settingsAPI = {
   createFiscalYear: (data: Params) => http.post('/settings/fiscal-years', data),
   auditLog:         (params?: Params) => http.get<ApiResponse<AuditLog[]>>('/settings/audit-log', { params }),
 }
+
+// ─── Cloud Storage Integration (new, additive) ─────────────────────────────────
+export interface CloudStorageProviderInfo {
+  id:         string
+  label:      string
+  logoKey:    string
+  configured: boolean
+}
+
+export interface CloudStorageConnection {
+  provider:           string
+  label:              string
+  logoKey:            string
+  status:             'connected' | 'disconnected' | 'expired' | 'error'
+  accountEmail:       string | null
+  accountDisplayName?: string | null
+  lastSyncAt:         string | null
+  lastSyncStatus?:    string | null
+  lastErrorMessage?:  string | null
+  isDefault:          boolean
+  autoUploadEnabled:  boolean
+  folderName:         string
+  connectedAt?:       string | null
+  tokenExpiresAt?:    string | null
+}
+
+export const cloudStorageAPI = {
+  providers:    () => http.get<ApiResponse<CloudStorageProviderInfo[]>>('/cloud-storage/providers'),
+  connections:  () => http.get<ApiResponse<CloudStorageConnection[]>>('/cloud-storage/connections'),
+  connection:   (provider: string) => http.get<ApiResponse<CloudStorageConnection>>(`/cloud-storage/connections/${provider}`),
+  connect:      (provider: string) => http.post<ApiResponse<{ authUrl: string }>>(`/cloud-storage/connections/${provider}/connect`),
+  disconnect:   (provider: string) => http.post<ApiResponse<{ success: boolean }>>(`/cloud-storage/connections/${provider}/disconnect`),
+  testConnection: (provider: string) => http.post<ApiResponse<{ ok: boolean; message?: string }>>(`/cloud-storage/connections/${provider}/test`),
+  updateSettings: (provider: string, data: { folderName?: string; autoUploadEnabled?: boolean }) =>
+    http.put<ApiResponse<CloudStorageConnection>>(`/cloud-storage/connections/${provider}/settings`, data),
+  setDefault:   (provider: string) => http.post<ApiResponse<CloudStorageConnection[]>>('/cloud-storage/default', { provider }),
+}

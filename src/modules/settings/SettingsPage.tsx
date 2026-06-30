@@ -10,12 +10,14 @@ import { fmtDateTime, fmtDate } from '@/utils'
 import { USER_ROLES } from '@/constants'
 import type { User } from '@/types'
 import TemplateTab from './TemplateTab'
+import CloudStorageTab from './CloudStorageTab'
 
 const TABS = [
   { id: 'company',    label: 'Company'        },
   { id: 'users',      label: 'Users'          },
   { id: 'fiscal',     label: 'Fiscal Years'   },
   { id: 'template',   label: 'Print Template' },
+  { id: 'cloud_storage', label: 'Cloud Storage' },
   { id: 'audit',      label: 'Audit Log'      },
 ]
 
@@ -349,6 +351,7 @@ export default function SettingsPage() {
       {tab === 'fiscal'   && <FiscalTab />}
       {tab === 'audit'    && <AuditTab />}
       {tab === 'template' && <TemplateTab />}
+      {tab === 'cloud_storage' && <CloudStorageTab />}
     </div>
   )
 }

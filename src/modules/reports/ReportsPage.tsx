@@ -159,10 +159,10 @@ function FilterBar({ dateFrom, dateTo, loading, onDateChange, onGenerate, onRese
   }
 
   return (
-    <div style={{ ...CARD, padding: '16px 20px', marginBottom: 20 }}>
-      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+    <div className="rpt-filterbar" style={{ ...CARD, padding: '16px 20px', marginBottom: 20 }}>
+      <div className="rpt-filterbar-row" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
         {/* Quick range pills */}
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        <div className="rpt-quick-pills" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {QUICK_RANGES.map(r => (
             <button key={r.key} onClick={() => applyRange(r.key)} style={{
               padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer',
@@ -176,10 +176,10 @@ function FilterBar({ dateFrom, dateTo, loading, onDateChange, onGenerate, onRese
           ))}
         </div>
 
-        <div style={{ width: 1, height: 24, background: 'var(--border)', margin: '0 4px' }} />
+        <div className="rpt-divider" style={{ width: 1, height: 24, background: 'var(--border)', margin: '0 4px' }} />
 
         {/* Date inputs */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div className="rpt-date-inputs" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <Calendar size={14} color="var(--text-4)" />
           <input type="date" value={dateFrom} className="erp-input"
             onChange={e => { setActive('custom'); onDateChange('from', e.target.value) }} />
@@ -189,11 +189,11 @@ function FilterBar({ dateFrom, dateTo, loading, onDateChange, onGenerate, onRese
         </div>
 
         {/* Actions */}
-        <div style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>
-          <button onClick={onReset} className="btn btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+        <div className="rpt-filterbar-actions" style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>
+          <button onClick={onReset} className="btn btn-secondary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 13 }}>
             <X size={13}/> Reset
           </button>
-          <button onClick={onGenerate} disabled={loading} className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <button onClick={onGenerate} disabled={loading} className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
             {loading ? <RefreshCw size={13} className="animate-spin"/> : <Search size={13}/>}
             Generate
           </button>
@@ -242,7 +242,7 @@ function TableCard({ title, count, badge, actions, children }: {
   return (
     <div style={CARD}>
       {(title || actions) && (
-        <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div className="rpt-tablecard-header" style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           {title && <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>{title}</div>}
           {count !== undefined && (
             <span style={{ background: 'var(--surface-2)', color: 'var(--text-3)', borderRadius: 99, padding: '2px 8px', fontSize: 12, fontWeight: 600 }}>{count}</span>
@@ -250,10 +250,10 @@ function TableCard({ title, count, badge, actions, children }: {
           {badge && (
             <span style={{ background: A.primary + '15', color: A.primary, borderRadius: 99, padding: '2px 8px', fontSize: 12, fontWeight: 600 }}>{badge}</span>
           )}
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>{actions}</div>
+          <div className="rpt-tablecard-actions" style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap' }}>{actions}</div>
         </div>
       )}
-      <div style={{ overflowX: 'auto' }}>{children}</div>
+      <div className="rpt-table-scroll" style={{ overflowX: 'auto' }}>{children}</div>
     </div>
   )
 }
@@ -321,9 +321,9 @@ function ChartTooltip({ active, payload, label }: any) {
 // ── Search input helper ───────────────────────────────────────────────────────
 function SearchInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
-    <div style={{ position: 'relative' }}>
+    <div className="rpt-search-wrap" style={{ position: 'relative' }}>
       <Search size={13} style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-4)', pointerEvents: 'none' }}/>
-      <input value={value} onChange={e => onChange(e.target.value)} placeholder="Search…" className="erp-input"
+      <input value={value} onChange={e => onChange(e.target.value)} placeholder="Search…" className="erp-input rpt-search-input"
         style={{ paddingLeft: 28, paddingRight: 8, height: 30, width: 180, fontSize: 12 }}
       />
     </div>
@@ -400,7 +400,7 @@ function SalesReport() {
       />
 
       {hasData && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 20 }}>
+        <div className="rpt-kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 20 }}>
           <KpiCard label="Total Invoices"  value={String(kpi.count)}   sub="in selected period"          icon={<FileText    size={18}/>} color={A.primary} />
           <KpiCard label="Total Revenue"   value={fmt(kpi.total)}      sub={`avg ${fmt(kpi.avg)} / inv`} icon={<TrendingUp  size={18}/>} color={A.success} />
           <KpiCard label="Total Paid"      value={fmt(kpi.paid)}       sub={`${kpi.paidPct}% collected`} icon={<CheckCircle size={18}/>} color={A.success} trend={kpi.paidPct - 100} />
@@ -409,7 +409,7 @@ function SalesReport() {
       )}
 
       {hasData && trendData.length > 1 && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px 260px', gap: 16, marginBottom: 20 }}>
+        <div className="rpt-chart-row" style={{ display: 'grid', gridTemplateColumns: '1fr 280px 260px', gap: 16, marginBottom: 20 }}>
           <div style={{ ...CARD, padding: 20 }}>
             <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)', marginBottom: 16 }}>Sales Trend</div>
             <ResponsiveContainer width="100%" height={160}>
@@ -456,7 +456,7 @@ function SalesReport() {
         <TableCard title="Sales Transactions" count={filtered.length} badge={fmt(kpi.total)}
           actions={<><SearchInput value={search} onChange={setSearch}/><ExportMenu onCSV={() => downloadCSV(filtered, 'sales-report')} onPrint={() => window.print()}/></>}
         >
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <table className="rpt-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>{['Invoice No','Date','Party','Total','Paid','Due','Mode','Status'].map(h => (
                 <th key={h} style={{ ...TH, textAlign: ['Total','Paid','Due'].includes(h) ? 'right' : 'left' }}>{h}</th>
@@ -533,7 +533,7 @@ function PurchaseReport() {
       />
       {rows.length > 0 && (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 20 }}>
+          <div className="rpt-kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 20 }}>
             <KpiCard label="Total Bills"    value={String(filtered.length)}                             icon={<Package      size={18}/>} color={A.purple} />
             <KpiCard label="Total Spent"    value={fmt(total)}                                          icon={<TrendingDown size={18}/>} color={A.danger} />
             <KpiCard label="Outstanding"    value={fmt(totalDue)}                                       icon={<AlertCircle  size={18}/>} color={A.warning}/>
@@ -542,7 +542,7 @@ function PurchaseReport() {
           <TableCard title="Purchase Bills" count={filtered.length} badge={fmt(total)}
             actions={<><SearchInput value={search} onChange={setSearch}/><ExportMenu onCSV={() => downloadCSV(filtered, 'purchase-report')} onPrint={() => window.print()}/></>}
           >
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <table className="rpt-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>{['Bill No','Date','Supplier','Total','Due','Status'].map(h => (
                   <th key={h} style={{ ...TH, textAlign: ['Total','Due'].includes(h) ? 'right' : 'left' }}>{h}</th>
@@ -625,7 +625,7 @@ function PnLReport() {
       {report && (
         <>
           {/* Net profit banner */}
-          <div style={{ ...CARD, padding: '24px 32px', marginBottom: 20, background: `linear-gradient(135deg, ${netColor}10 0%, ${netColor}05 100%)`, border: `1.5px solid ${netColor}30`, display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
+          <div className="rpt-pnl-banner" style={{ ...CARD, padding: '24px 32px', marginBottom: 20, background: `linear-gradient(135deg, ${netColor}10 0%, ${netColor}05 100%)`, border: `1.5px solid ${netColor}30`, display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
             <div>
               <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: netColor, marginBottom: 4 }}>
                 NET {isProfit ? 'PROFIT' : 'LOSS'}
@@ -639,7 +639,7 @@ function PnLReport() {
                 </div>
               )}
             </div>
-            <div style={{ display: 'flex', gap: 32, flexWrap: 'wrap' }}>
+            <div className="rpt-pnl-stats" style={{ display: 'flex', gap: 32, flexWrap: 'wrap' }}>
               {[{ label: 'Total Revenue', val: report.totalIncome, color: A.success }, { label: 'Total Expenses', val: report.totalExpense, color: A.danger }].map(s => (
                 <div key={s.label}>
                   <div style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>{s.label}</div>
@@ -647,7 +647,7 @@ function PnLReport() {
                 </div>
               ))}
             </div>
-            <div style={{ marginLeft: 'auto' }}>
+            <div className="rpt-pnl-chart" style={{ marginLeft: 'auto' }}>
               <ResponsiveContainer width={160} height={100}>
                 <PieChart>
                   <Pie data={chartData} cx="50%" cy="50%" innerRadius={30} outerRadius={45} paddingAngle={3} dataKey="value">
@@ -666,13 +666,13 @@ function PnLReport() {
             </button>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 16 }}>
+          <div className="rpt-pnl-sections" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 16 }}>
             {[
               { title: 'Income',   rows: report.incomeRows,  total: report.totalIncome,  color: A.success, Icon: TrendingUp,   emptyMsg: 'No income accounts in this period',   totalLabel: 'TOTAL INCOME' },
               { title: 'Expenses', rows: report.expenseRows, total: report.totalExpense, color: A.danger,  Icon: TrendingDown, emptyMsg: 'No expense accounts in this period',  totalLabel: 'TOTAL EXPENSES' },
             ].map(sec => (
               <TableCard key={sec.title} title={sec.title} badge={fmt(sec.total)} actions={<sec.Icon size={16} color={sec.color}/>}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <table className="rpt-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead><tr>
                     {['Code','Account','Amount'].map((h, i) => <th key={h} style={{ ...TH, textAlign: i === 2 ? 'right' : 'left' }}>{h}</th>)}
                   </tr></thead>
@@ -729,15 +729,15 @@ function StockReport() {
 
   return (
     <>
-      <div style={{ display: 'flex', gap: 12, marginBottom: 20, alignItems: 'center' }}>
-        <button onClick={generate} disabled={loading} className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <div className="rpt-load-row" style={{ display: 'flex', gap: 12, marginBottom: 20, alignItems: 'center' }}>
+        <button onClick={generate} disabled={loading} className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
           {loading ? <RefreshCw size={13} className="animate-spin"/> : <Search size={13}/>} Load Report
         </button>
       </div>
 
       {rows.length > 0 && (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 20 }}>
+          <div className="rpt-kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 20 }}>
             <KpiCard label="Total Products"   value={String(filtered.length)} icon={<Package     size={18}/>} color={A.cyan}   />
             <KpiCard label="Total Stock Value" value={fmt(totalValue)}         icon={<TrendingUp  size={18}/>} color={A.primary}/>
             <KpiCard label="Low Stock Items"   value={String(lowStock)}        icon={<AlertCircle size={18}/>} color={lowStock > 0 ? A.warning : A.success}/>
@@ -745,7 +745,7 @@ function StockReport() {
           <TableCard title="Stock Valuation" count={filtered.length} badge={fmt(totalValue)}
             actions={<><SearchInput value={search} onChange={setSearch}/><ExportMenu onCSV={() => downloadCSV(filtered, 'stock-report')} onPrint={() => window.print()}/></>}
           >
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <table className="rpt-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead><tr>
                 {['Code','Product','Unit','Stock','P.Rate','Value','Status'].map(h => (
                   <th key={h} style={{ ...TH, textAlign: ['Stock','P.Rate','Value'].includes(h) ? 'right' : 'left' }}>{h}</th>
@@ -796,12 +796,12 @@ function ExpiryReport() {
 
   return (
     <>
-      <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap', alignItems: 'center' }}>
-        <button onClick={generate} disabled={loading} className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <div className="rpt-load-row" style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap', alignItems: 'center' }}>
+        <button onClick={generate} disabled={loading} className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
           {loading ? <RefreshCw size={13} className="animate-spin"/> : <AlertCircle size={13}/>} Load Expiry Report
         </button>
         {rows.length > 0 && (
-          <button onClick={() => downloadCSV(rows, 'expiry-report')} className="btn btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+          <button onClick={() => downloadCSV(rows, 'expiry-report')} className="btn btn-secondary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 13 }}>
             <Download size={13}/> Export CSV
           </button>
         )}
@@ -809,13 +809,13 @@ function ExpiryReport() {
 
       {rows.length > 0 && (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16, marginBottom: 20 }}>
+          <div className="rpt-kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16, marginBottom: 20 }}>
             <KpiCard label="Total Batches" value={String(rows.length)}    icon={<Package     size={18}/>} color={A.primary}/>
             <KpiCard label="Expired"       value={String(expired.length)} icon={<XCircle     size={18}/>} color={A.danger} />
             <KpiCard label="Expiring Soon" value={String(nearExp.length)} icon={<AlertCircle size={18}/>} color={A.warning}/>
           </div>
           <TableCard title="Expiry Details" count={rows.length}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <table className="rpt-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead><tr>
                 {['Product','Batch','Qty','Expiry','Days Left'].map(h => (
                   <th key={h} style={{ ...TH, textAlign: ['Qty','Days Left'].includes(h) ? 'right' : 'left' }}>{h}</th>
@@ -879,30 +879,30 @@ function PartyBalanceReport() {
 
   return (
     <>
-      <div style={{ ...CARD, padding: '14px 20px', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+      <div className="rpt-partybal-toolbar" style={{ ...CARD, padding: '14px 20px', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         {/* Toggle */}
-        <div style={{ display: 'flex', background: 'var(--surface-2)', borderRadius: 8, padding: 3, gap: 2 }}>
+        <div className="rpt-type-toggle" style={{ display: 'flex', background: 'var(--surface-2)', borderRadius: 8, padding: 3, gap: 2 }}>
           {[{ v: 'customer', l: 'Customers' }, { v: 'supplier', l: 'Suppliers' }].map(opt => (
             <button key={opt.v} onClick={() => setType(opt.v)} style={{
               padding: '5px 16px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none',
               background: type === opt.v ? 'var(--surface)' : 'transparent',
               color: type === opt.v ? A.primary : 'var(--text-2)',
               boxShadow: type === opt.v ? '0 1px 4px rgba(0,0,0,0.08)' : 'none',
-              transition: 'all 0.15s', fontFamily: 'var(--font)',
+              transition: 'all 0.15s', fontFamily: 'var(--font)', flex: 1,
             }}>{opt.l}</button>
           ))}
         </div>
         <SearchInput value={search} onChange={setSearch}/>
-        <button onClick={() => load(type)} className="btn btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+        <button onClick={() => load(type)} className="btn btn-secondary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 13 }}>
           <RefreshCw size={13}/> Refresh
         </button>
         {rows.length > 0 && (
-          <button onClick={() => downloadCSV(filtered, `party-balance-${type}`)} className="btn btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+          <button onClick={() => downloadCSV(filtered, `party-balance-${type}`)} className="btn btn-secondary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 13 }}>
             <Download size={13}/> Export
           </button>
         )}
         {summary && (
-          <div style={{ marginLeft: 'auto' }}>
+          <div className="rpt-partybal-summary" style={{ marginLeft: 'auto' }}>
             <div style={{ ...CARD, padding: '6px 14px', borderRadius: 10, display: 'inline-flex', alignItems: 'center', gap: 8 }}>
               <span style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 600 }}>{type === 'customer' ? 'TOTAL RECEIVABLE' : 'TOTAL PAYABLE'}</span>
               <span style={{ fontSize: 14, fontWeight: 700, color: Number(totalBalance) > 0 ? A.warning : A.success, fontFamily: 'monospace' }}>
@@ -914,7 +914,7 @@ function PartyBalanceReport() {
       </div>
 
       {rows.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16, marginBottom: 20 }}>
+        <div className="rpt-kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16, marginBottom: 20 }}>
           <KpiCard label={`Total ${type === 'customer' ? 'Customers' : 'Suppliers'}`} value={String(filtered.length)} icon={<Users       size={18}/>} color={A.primary}/>
           <KpiCard label="Total Invoiced"  value={fmt(totalInvoiced)} icon={<FileText    size={18}/>} color={A.purple} />
           <KpiCard label="Outstanding Due" value={fmt(totalDue)}      icon={<AlertCircle size={18}/>} color={A.warning}/>
@@ -923,7 +923,7 @@ function PartyBalanceReport() {
       )}
 
       <TableCard title={`${type === 'customer' ? 'Customer' : 'Supplier'} Balances`} count={filtered.length}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <table className="rpt-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead><tr>
             {['Code','Name','Phone','PAN','Total Invoiced','Paid','Due','Balance'].map(h => (
               <th key={h} style={{ ...TH, textAlign: ['Total Invoiced','Paid','Due','Balance'].includes(h) ? 'right' : 'left' }}>{h}</th>
@@ -975,26 +975,26 @@ export default function ReportsPage() {
     <div style={{ minHeight: '100vh' }}>
 
       {/* Page header + tabs */}
-      <div style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)', padding: '20px 0 0', marginBottom: 24, marginLeft: -28, marginRight: -28, paddingLeft: 28, paddingRight: 28 }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
+      <div className="rpt-header" style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)', padding: '20px 0 0', marginBottom: 24 }}>
+        <div className="rpt-header-top" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
           <div>
             <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--text-4)', marginBottom: 4 }}>Analytics</div>
             <h1 style={{ fontSize: 24, fontWeight: 800, color: 'var(--text)', margin: 0, letterSpacing: '-0.5px' }}>Reports</h1>
             <p style={{ fontSize: 14, color: 'var(--text-2)', margin: '4px 0 0' }}>View and analyze your business performance</p>
           </div>
-          <div style={{ background: A.primary + '12', border: `1px solid ${A.primary}30`, borderRadius: 10, padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div className="rpt-live-badge" style={{ background: A.primary + '12', border: `1px solid ${A.primary}30`, borderRadius: 10, padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
             <BarChart2 size={16} color={A.primary}/>
             <span style={{ fontSize: 12, fontWeight: 600, color: A.primary }}>Live Data</span>
           </div>
         </div>
 
         {/* Tab strip */}
-        <div style={{ display: 'flex', gap: 2, overflowX: 'auto', scrollbarWidth: 'none' }}>
+        <div className="rpt-tab-strip" style={{ display: 'flex', gap: 2, overflowX: 'auto', scrollbarWidth: 'none' }}>
           {REPORT_TABS.map(t => (
             <button key={t.id} onClick={() => setTab(t.id)} style={{
               display: 'flex', alignItems: 'center', gap: 6,
               padding: '10px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
-              border: 'none', background: 'transparent', whiteSpace: 'nowrap',
+              border: 'none', background: 'transparent', whiteSpace: 'nowrap', flexShrink: 0,
               color: tab === t.id ? A.primary : 'var(--text-2)',
               borderBottom: `2.5px solid ${tab === t.id ? A.primary : 'transparent'}`,
               marginBottom: -1, transition: 'all 0.15s', fontFamily: 'var(--font)',
