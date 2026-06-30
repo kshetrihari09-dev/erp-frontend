@@ -3797,3 +3797,203 @@ td.psc-cell {
 .prod-mc-btn:active { background: var(--surface-3); }
 .prod-mc-btn-danger:active { background: rgba(220,38,38,.12); }
 
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   LEDGER PAGE — MOBILE & TABLET RESPONSIVENESS
+   Scoped with .ldg- prefix. All rules additive.
+══════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Filter row: party / dates / type / actions ──────────────────────────── */
+.ldg-date-fields {
+  display: flex;
+  gap: 12px;
+}
+.ldg-date-field { width: 150px; }
+.ldg-type-field { width: 148px; }
+
+@media (max-width: 768px) {
+  .ldg-filter-row { flex-direction: column; align-items: stretch; gap: 12px; }
+  .ldg-party-field { min-width: 0 !important; width: 100%; }
+  .ldg-date-fields { width: 100%; gap: 10px; }
+  .ldg-date-field  { width: 100%; flex: 1; }
+  .ldg-type-field  { width: 100%; }
+  .ldg-actions     { width: 100%; }
+  .ldg-actions button,
+  .ldg-generate-btn { flex: 1; min-width: 0; }
+}
+@media (max-width: 420px) {
+  .ldg-date-fields { flex-direction: column; }
+}
+
+/* ── Party header: chart panel collapses below info on mobile ───────────── */
+@media (max-width: 768px) {
+  .ldg-party-header-row { flex-direction: column; }
+  .ldg-info-panel {
+    border-right: none !important;
+    border-bottom: 1px solid var(--border);
+    min-width: 0 !important;
+  }
+  .ldg-chart-panel {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+}
+
+/* ── KPI grid: 4 → 2 → 1 ──────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .ldg-kpi-grid { grid-template-columns: repeat(2, 1fr) !important; }
+}
+@media (max-width: 420px) {
+  .ldg-kpi-grid { grid-template-columns: 1fr !important; }
+}
+
+/* ── Secondary stat tiles: 6 → 3 → 2 ─────────────────────────────────────── */
+@media (max-width: 900px) {
+  .ldg-stat-grid { grid-template-columns: repeat(3, 1fr) !important; }
+}
+@media (max-width: 480px) {
+  .ldg-stat-grid { grid-template-columns: repeat(2, 1fr) !important; }
+}
+
+/* ── Table toolbar: search + count stack on mobile ───────────────────────── */
+@media (max-width: 640px) {
+  .ldg-toolbar { flex-direction: column; align-items: stretch; }
+  .ldg-toolbar-search-wrap { width: 100%; }
+  .ldg-search-input-wrap { flex: 1; width: 100%; }
+  .ldg-search-input-wrap input { width: 100% !important; }
+}
+
+/* ── Desktop table: hidden on mobile ─────────────────────────────────────── */
+.ldg-desktop-table-wrap { display: block; }
+@media (max-width: 768px) {
+  .ldg-desktop-table-wrap { display: none !important; }
+}
+
+/* ── Mobile ledger entry cards ────────────────────────────────────────────── */
+.ldg-mobile-list { display: none; }
+@media (max-width: 768px) {
+  .ldg-mobile-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+  }
+}
+
+.ldg-mobile-skel-wrap { display: flex; flex-direction: column; gap: 8px; }
+.ldg-mobile-card-skel {
+  height: 92px;
+  cursor: default;
+  background: linear-gradient(90deg, var(--surface) 25%, var(--surface-2) 50%, var(--surface) 75%);
+  background-size: 400% 100%;
+  animation: ldg-shimmer 1.4s ease infinite;
+}
+@keyframes ldg-shimmer {
+  0%   { background-position: 100% 50%; }
+  100% { background-position: 0%   50%; }
+}
+
+.ldg-mobile-card {
+  background:    var(--surface);
+  border:        1px solid var(--border);
+  border-radius: 12px;
+  padding:       12px 14px;
+  display:       flex;
+  flex-direction: column;
+  gap:           8px;
+}
+.ldg-mobile-card-opening {
+  background: var(--surface-2);
+}
+
+.ldg-mc-top {
+  display:         flex;
+  align-items:     center;
+  justify-content: space-between;
+  gap:             8px;
+}
+.ldg-mc-date {
+  font-family: var(--font-mono, monospace);
+  font-size:   12px;
+  color:       var(--text-3);
+  font-weight: 500;
+}
+
+.ldg-mc-desc {
+  display:        flex;
+  flex-direction: column;
+  gap:            2px;
+}
+.ldg-mc-ref {
+  font-family: var(--font-mono, monospace);
+  font-size:   11.5px;
+  font-weight: 700;
+  color:       #3b82f6;
+}
+.ldg-mc-desc-text {
+  font-size: 13px;
+  color:     var(--text-2);
+}
+
+.ldg-mc-amounts {
+  display:               grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap:                   8px;
+  padding-top:           8px;
+  border-top:            1px solid var(--border);
+  margin-top:            2px;
+}
+.ldg-mc-amount-item {
+  display:        flex;
+  flex-direction: column;
+  gap:            2px;
+}
+.ldg-mc-amount-label {
+  font-size:      9.5px;
+  font-weight:    700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color:          var(--text-4);
+}
+.ldg-mc-amount-value {
+  font-family: var(--font-mono, monospace);
+  font-size:   13px;
+  font-weight: 600;
+}
+
+/* Mobile period totals footer */
+.ldg-mc-totals {
+  background:    var(--surface-2);
+  border:        1px solid var(--border-2, var(--border));
+  border-radius: 12px;
+  padding:       12px 14px;
+  margin-top:    2px;
+}
+.ldg-mc-totals-label {
+  display:        block;
+  font-size:      10px;
+  font-weight:    700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color:          var(--text-3);
+  margin-bottom:  6px;
+}
+.ldg-mc-totals-row {
+  display:   flex;
+  flex-wrap: wrap;
+  gap:       14px;
+  font-size: 12px;
+  color:     var(--text-3);
+}
+.ldg-mc-totals-row strong {
+  font-family: var(--font-mono, monospace);
+  font-size:   13px;
+}
+
+/* ── Pagination: stack on small screens ──────────────────────────────────── */
+@media (max-width: 560px) {
+  .ldg-pagination { flex-direction: column; align-items: stretch !important; }
+  .ldg-pagination > div:first-child { justify-content: center; flex-wrap: wrap; }
+  .ldg-pagination > div:last-child  { justify-content: center; }
+}
+

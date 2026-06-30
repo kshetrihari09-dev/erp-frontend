@@ -301,9 +301,9 @@ export default function LedgerPage() {
       <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}
         style={{ ...CARD, padding: '18px 20px', marginBottom: 16 }}
       >
-        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12, flexWrap: 'wrap' }}>
+        <div className="ldg-filter-row" style={{ display: 'flex', alignItems: 'flex-end', gap: 12, flexWrap: 'wrap' }}>
           {/* Party */}
-          <div style={{ flex: 1, minWidth: 200 }}>
+          <div className="ldg-party-field" style={{ flex: 1, minWidth: 200 }}>
             <label style={LABEL_STYLE}><Building2 size={10} /> Party</label>
             <select className="erp-input" style={{ width: '100%' }} value={partyId}
               onChange={e => { setPartyId(e.target.value); setLedgerData(null); setError('') }}>
@@ -321,17 +321,19 @@ export default function LedgerPage() {
           </div>
 
           {/* Date inputs */}
-          {[{ label: 'From Date', val: dateFrom, set: setDateFrom }, { label: 'To Date', val: dateTo, set: setDateTo }].map(f => (
-            <div key={f.label} style={{ width: 150 }}>
-              <label style={LABEL_STYLE}><Calendar size={10} /> {f.label}</label>
-              <input type="date" className="erp-input" value={f.val} onChange={e => f.set(e.target.value)} />
-            </div>
-          ))}
+          <div className="ldg-date-fields">
+            {[{ label: 'From Date', val: dateFrom, set: setDateFrom }, { label: 'To Date', val: dateTo, set: setDateTo }].map(f => (
+              <div key={f.label} className="ldg-date-field">
+                <label style={LABEL_STYLE}><Calendar size={10} /> {f.label}</label>
+                <input type="date" className="erp-input" style={{ width: '100%' }} value={f.val} onChange={e => f.set(e.target.value)} />
+              </div>
+            ))}
+          </div>
 
           {/* Tx type */}
-          <div style={{ width: 148 }}>
+          <div className="ldg-type-field">
             <label style={LABEL_STYLE}><SlidersHorizontal size={10} /> Tx Type</label>
-            <select className="erp-input" value={txFilter} onChange={e => { setTxFilter(e.target.value); setPage(1) }}>
+            <select className="erp-input" style={{ width: '100%' }} value={txFilter} onChange={e => { setTxFilter(e.target.value); setPage(1) }}>
               <option value="">All Types</option>
               {['SALES', 'PURCHASE', 'RECEIPT', 'PAYMENT', 'RETURN', 'opening'].map(t => (
                 <option key={t} value={t}>{t.charAt(0) + t.slice(1).toLowerCase()}</option>
@@ -340,9 +342,10 @@ export default function LedgerPage() {
           </div>
 
           {/* Actions */}
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <div className="ldg-actions" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button disabled={!partyId || loading} onClick={generate}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 7, height: 35, padding: '0 20px', fontSize: 13, fontWeight: 700, borderRadius: 9, color: '#fff', border: 'none', cursor: !partyId || loading ? 'not-allowed' : 'pointer', background: 'linear-gradient(135deg,#2563eb,#1d4ed8)', boxShadow: '0 2px 10px rgba(37,99,235,.35)', opacity: !partyId || loading ? 0.55 : 1 }}>
+              className="ldg-generate-btn"
+              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7, height: 35, padding: '0 20px', fontSize: 13, fontWeight: 700, borderRadius: 9, color: '#fff', border: 'none', cursor: !partyId || loading ? 'not-allowed' : 'pointer', background: 'linear-gradient(135deg,#2563eb,#1d4ed8)', boxShadow: '0 2px 10px rgba(37,99,235,.35)', opacity: !partyId || loading ? 0.55 : 1 }}>
               {loading ? <RefreshCw size={13} className="animate-spin" /> : <Search size={13} />}
               Show Ledger
             </button>
@@ -385,9 +388,9 @@ export default function LedgerPage() {
             {/* Party header */}
             <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}
               style={{ ...CARD, overflow: 'hidden' }}>
-              <div style={{ display: 'flex', flexWrap: 'wrap' }}>
+              <div className="ldg-party-header-row" style={{ display: 'flex', flexWrap: 'wrap' }}>
                 {/* Info panel */}
-                <div style={{ flex: 1, minWidth: 260, padding: '20px 22px', borderRight: '1px solid var(--border)' }}>
+                <div className="ldg-info-panel" style={{ flex: 1, minWidth: 260, padding: '20px 22px', borderRight: '1px solid var(--border)' }}>
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
                     <div style={{ width: 52, height: 52, borderRadius: 14, background: 'linear-gradient(135deg,#3b82f6,#1d4ed8)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: 20, flexShrink: 0 }}>
                       {party?.name?.[0]?.toUpperCase() ?? '?'}
@@ -410,7 +413,7 @@ export default function LedgerPage() {
                   </div>
                 </div>
                 {/* Chart panel */}
-                <div style={{ padding: '18px 22px', width: 300, minWidth: 200 }}>
+                <div className="ldg-chart-panel" style={{ padding: '18px 22px', width: 300, minWidth: 200 }}>
                   <div style={{ ...LABEL_STYLE, marginBottom: 10 }}><Activity size={10} /> Balance Trend</div>
                   {loading
                     ? <div style={{ height: 80, borderRadius: 10, background: 'var(--surface-3)' }} />
@@ -421,7 +424,7 @@ export default function LedgerPage() {
             </motion.div>
 
             {/* KPI row */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
+            <div className="ldg-kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
               {loading ? (
                 Array.from({ length: 4 }).map((_, i) => <SkeletonKpi key={i} />)
               ) : (
@@ -438,7 +441,7 @@ export default function LedgerPage() {
             </div>
 
             {/* Secondary tiles */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 10 }}>
+            <div className="ldg-stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 10 }}>
               {[
                 { icon: <Activity size={13} style={{ color: 'var(--text-3)' }} />,   label: 'Transactions', value: dataRows.length },
                 { icon: <FileText  size={13} style={{ color: '#3b82f6' }} />,         label: 'Invoices',     value: salesRows.length },
@@ -461,9 +464,9 @@ export default function LedgerPage() {
             style={{ ...CARD, overflow: 'hidden' }}>
 
             {/* Toolbar */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '12px 18px', borderBottom: '1px solid var(--border)', flexWrap: 'wrap' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div style={{ position: 'relative' }}>
+            <div className="ldg-toolbar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '12px 18px', borderBottom: '1px solid var(--border)', flexWrap: 'wrap' }}>
+              <div className="ldg-toolbar-search-wrap" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div className="ldg-search-input-wrap" style={{ position: 'relative' }}>
                   <Search size={13} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-4)', pointerEvents: 'none' }} />
                   <input type="text" placeholder="Search entries…" className="erp-input" style={{ width: 220, paddingLeft: 32 }}
                     value={search} onChange={e => { setSearch(e.target.value); setPage(1) }} />
@@ -481,8 +484,8 @@ export default function LedgerPage() {
               </div>
             </div>
 
-            {/* Table */}
-            <div style={{ overflowX: 'auto' }}>
+            {/* Desktop table */}
+            <div className="ldg-desktop-table-wrap" style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ background: 'var(--surface-2)', borderBottom: '1px solid var(--border)' }}>
@@ -546,9 +549,77 @@ export default function LedgerPage() {
               </table>
             </div>
 
+            {/* Mobile card list */}
+            <div className="ldg-mobile-list">
+              {loading ? (
+                <div className="ldg-mobile-skel-wrap">
+                  {[1,2,3,4,5].map(i => <div key={i} className="ldg-mobile-card ldg-mobile-card-skel" />)}
+                </div>
+              ) : (
+                pagedRows.map((e: any, i: number) => {
+                  const bal = Number(e.running_balance ?? e.balance ?? 0)
+                  const isOpening = e.type === 'opening'
+                  const rowBalColor = bal > 0 ? 'var(--green)' : bal < 0 ? 'var(--red)' : 'var(--text-3)'
+                  return (
+                    <div key={i} className={`ldg-mobile-card ${isOpening ? 'ldg-mobile-card-opening' : ''}`}>
+                      {/* Top: date + type badge */}
+                      <div className="ldg-mc-top">
+                        <span className="ldg-mc-date">
+                          {isOpening ? 'Opening Balance' : (e.date_ad ? fmtDate(e.date_ad) : e.date || '—')}
+                        </span>
+                        {e.type && <TxBadge type={e.type} />}
+                      </div>
+
+                      {/* Reference + description */}
+                      {(e.reference || e.description) && (
+                        <div className="ldg-mc-desc">
+                          {e.reference && <span className="ldg-mc-ref">{e.reference}</span>}
+                          {e.description && <span className="ldg-mc-desc-text">{e.description}</span>}
+                        </div>
+                      )}
+
+                      {/* Debit / Credit / Balance row */}
+                      <div className="ldg-mc-amounts">
+                        <div className="ldg-mc-amount-item">
+                          <span className="ldg-mc-amount-label">Debit</span>
+                          <span className="ldg-mc-amount-value" style={{ color: Number(e.debit) > 0 ? 'var(--red)' : 'var(--text-4)' }}>
+                            {Number(e.debit) > 0 ? fmt(e.debit) : '—'}
+                          </span>
+                        </div>
+                        <div className="ldg-mc-amount-item">
+                          <span className="ldg-mc-amount-label">Credit</span>
+                          <span className="ldg-mc-amount-value" style={{ color: Number(e.credit) > 0 ? 'var(--green)' : 'var(--text-4)' }}>
+                            {Number(e.credit) > 0 ? fmt(e.credit) : '—'}
+                          </span>
+                        </div>
+                        <div className="ldg-mc-amount-item">
+                          <span className="ldg-mc-amount-label">Balance</span>
+                          <span className="ldg-mc-amount-value" style={{ color: rowBalColor, fontWeight: 800 }}>
+                            {fmt(bal)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })
+              )}
+
+              {/* Mobile period totals footer */}
+              {!loading && pagedRows.length > 0 && (
+                <div className="ldg-mc-totals">
+                  <span className="ldg-mc-totals-label">Period Totals</span>
+                  <div className="ldg-mc-totals-row">
+                    <span>Dr <strong style={{ color: 'var(--red)' }}>{fmt(totalDr)}</strong></span>
+                    <span>Cr <strong style={{ color: 'var(--green)' }}>{fmt(totalCr)}</strong></span>
+                    <span>Bal <strong style={{ color: balColor }}>{fmt(closingBal)}</strong></span>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* Pagination */}
             {!loading && filteredRows.length > rowsPerPage && (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 18px', borderTop: '1px solid var(--border)', flexWrap: 'wrap', gap: 10 }}>
+              <div className="ldg-pagination" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 18px', borderTop: '1px solid var(--border)', flexWrap: 'wrap', gap: 10 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-3)' }}>
                   <span>Rows per page:</span>
                   <select className="erp-input" style={{ width: 64, padding: '4px 6px', fontSize: 12 }}
