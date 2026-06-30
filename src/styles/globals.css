@@ -3075,7 +3075,7 @@ td.psc-cell {
     height: 32px;
   }
   /* Discount row: flex row so label + input are side by side */
-  .pos-theme .pos-summary-block .flex.items-center.gap-1\.5 {
+  .pos-theme .pos-summary-block .flex.items-center.gap-1\\.5 {
     gap: 8px;
   }
 }
@@ -3289,4 +3289,337 @@ td.psc-cell {
 }
 .dark .sil-chip-paid { background: rgba(34,197,94,.12); color: #4ade80; border-color: rgba(34,197,94,.25); }
 .dark .sil-chip-due  { background: rgba(251,191,36,.10); color: #fbbf24; border-color: rgba(251,191,36,.25); }
+
+
+/* ── Reusable field label (used in PurchasePage header form) ──────────────── */
+.pmic-field-label {
+  display:        block;
+  font-size:      11px;
+  font-weight:    600;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+  color:          var(--text-3);
+  margin-bottom:  6px;
+}
+.pos-theme .pmic-field-label {
+  color: var(--pdt-text-3, var(--text-3));
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   PURCHASE PAGE — desktop/mobile item view toggle
+══════════════════════════════════════════════════════════════════════════════ */
+
+/* Desktop table — visible on desktop, hidden on mobile */
+.purchase-table-wrap { display: block; }
+@media (max-width: 768px) {
+  .purchase-table-wrap { display: none !important; }
+}
+
+/* Mobile cards — hidden on desktop, visible on mobile */
+.purchase-cards {
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+}
+@media (max-width: 768px) {
+  .purchase-cards { display: flex !important; }
+}
+
+/* Items header: wraps on small screens so Scan button doesn't overflow */
+.purchase-items-header {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+@media (max-width: 480px) {
+  .purchase-items-header {
+    align-items: flex-start;
+  }
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   STICKY MOBILE SAVE BAR — shared by Purchase / Sales Return / Purchase Return
+══════════════════════════════════════════════════════════════════════════════ */
+
+/* Adds bottom padding so page content clears the fixed bar on mobile */
+.inv-has-mobile-bar { padding-bottom: 0; }
+@media (max-width: 768px) {
+  .inv-has-mobile-bar { padding-bottom: 88px; }
+}
+
+/* Desktop action row — hidden on mobile */
+.inv-desktop-action { display: flex; }
+@media (max-width: 768px) {
+  .inv-desktop-action { display: none !important; }
+}
+
+/* Sticky bottom bar — hidden on desktop, fixed on mobile */
+.inv-mobile-save-bar { display: none; }
+@media (max-width: 768px) {
+  .inv-mobile-save-bar {
+    display:        flex;
+    position:       fixed;
+    left: 0; right: 0; bottom: 0;
+    z-index:        60;
+    padding:        10px 16px;
+    padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    background:     rgba(255,255,255,.94);
+    backdrop-filter: blur(16px) saturate(160%);
+    border-top:     1px solid var(--border);
+    box-shadow:     0 -4px 16px rgba(0,0,0,.06);
+  }
+  .inv-mobile-save-bar.dark {
+    background:  rgba(17,17,23,.92);
+    border-top-color: var(--pdt-border, var(--border));
+  }
+}
+
+.imsb-main {
+  flex:           1;
+  display:        flex;
+  align-items:    center;
+  justify-content: center;
+  gap:            8px;
+  height:         50px;
+  border-radius:  14px;
+  font-size:      14.5px;
+  font-weight:    700;
+  letter-spacing: -.01em;
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   PARTY PAGE (Customers / Suppliers) — MOBILE & TABLET RESPONSIVENESS
+   Scoped with .pp- prefix. All rules additive — nothing above modified.
+══════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Page header: full-bleed handled via class instead of fixed -28px hack ── */
+.pp-header {
+  margin-left:  -28px;
+  margin-right: -28px;
+  padding-left:  28px;
+  padding-right: 28px;
+}
+@media (max-width: 768px) {
+  .pp-header {
+    margin-left:  -16px;
+    margin-right: -16px;
+    padding-left:  16px;
+    padding-right: 16px;
+  }
+  .pp-header-inner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .pp-header-inner > button,
+  .pp-header-inner > .btn,
+  .pp-header-inner button {
+    width: 100%;
+    justify-content: center;
+  }
+}
+@media (max-width: 480px) {
+  .pp-header {
+    margin-left:  -12px;
+    margin-right: -12px;
+    padding-left:  12px;
+    padding-right: 12px;
+  }
+}
+
+/* ── KPI grid: 4 → 2 → 1 columns ─────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .pp-kpi-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 12px !important; }
+}
+@media (max-width: 480px) {
+  .pp-kpi-grid { grid-template-columns: 1fr !important; }
+}
+
+/* ── Filter toolbar: stack on mobile ─────────────────────────────────────── */
+@media (max-width: 768px) {
+  .pp-toolbar-row { flex-direction: column; align-items: stretch; }
+  .pp-search-wrap { max-width: 100% !important; min-width: 0 !important; width: 100%; }
+  .pp-filter-selects { width: 100%; }
+  .pp-filter-selects > div { flex: 1; }
+  .pp-toolbar-actions { margin-left: 0 !important; width: 100%; }
+  .pp-toolbar-actions button { flex: 1; justify-content: center; }
+}
+@media (max-width: 420px) {
+  .pp-filter-selects { flex-direction: column; }
+}
+
+/* ── Desktop table: hidden on mobile ─────────────────────────────────────── */
+.pp-desktop-table-wrap { display: block; }
+@media (max-width: 768px) {
+  .pp-desktop-table-wrap { display: none !important; }
+}
+
+/* ── Bulk action bar: wrap on mobile ─────────────────────────────────────── */
+@media (max-width: 480px) {
+  .pp-bulk-bar { flex-wrap: wrap; }
+}
+
+/* ── Mobile card list: hidden on desktop ─────────────────────────────────── */
+.pp-mobile-list { display: none; }
+@media (max-width: 768px) {
+  .pp-mobile-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px;
+  }
+}
+
+.pp-mobile-skel-wrap { display: flex; flex-direction: column; gap: 10px; }
+.pp-mobile-card-skel {
+  height: 96px;
+  cursor: default;
+  background: linear-gradient(90deg, var(--surface) 25%, var(--surface-2) 50%, var(--surface) 75%);
+  background-size: 400% 100%;
+  animation: pp-shimmer 1.4s ease infinite;
+}
+@keyframes pp-shimmer {
+  0%   { background-position: 100% 50%; }
+  100% { background-position: 0%   50%; }
+}
+
+/* Individual party card */
+.pp-mobile-card {
+  background:    var(--surface);
+  border:        1.5px solid var(--border);
+  border-radius: 14px;
+  padding:       14px;
+  display:       flex;
+  flex-direction: column;
+  gap:           10px;
+  cursor:        pointer;
+  transition:    background .12s, border-color .12s;
+  -webkit-tap-highlight-color: transparent;
+}
+.pp-mobile-card:active { background: var(--surface-2); }
+
+/* Top row: avatar + name/code + balance */
+.pp-mc-top {
+  display:     flex;
+  align-items: center;
+  gap:         10px;
+}
+.pp-mc-avatar {
+  width:           38px;
+  height:          38px;
+  border-radius:   11px;
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  color:           #fff;
+  font-size:       14px;
+  font-weight:     800;
+  flex-shrink:     0;
+}
+.pp-mc-name-wrap { flex: 1; min-width: 0; }
+.pp-mc-name {
+  font-weight:   600;
+  font-size:     14px;
+  color:         var(--text);
+  line-height:   1.2;
+  margin:        0;
+  overflow:      hidden;
+  text-overflow: ellipsis;
+  white-space:   nowrap;
+}
+.pp-mc-code {
+  display:       inline-block;
+  font-family:   monospace;
+  font-size:     10px;
+  font-weight:   700;
+  padding:       1px 6px;
+  border-radius: 4px;
+  margin-top:    3px;
+}
+.pp-mc-balance { flex-shrink: 0; }
+
+/* Contact row */
+.pp-mc-contact {
+  display:   flex;
+  flex-wrap: wrap;
+  gap:       10px;
+  font-size: 12px;
+  color:     var(--text-3);
+}
+.pp-mc-contact-item {
+  display:     inline-flex;
+  align-items: center;
+  gap:         4px;
+}
+.pp-mc-pan {
+  font-family:   monospace;
+  font-size:     11px;
+  background:    var(--surface-3);
+  padding:       1px 6px;
+  border-radius: 4px;
+}
+
+/* Chips row */
+.pp-mc-chips {
+  display:   flex;
+  flex-wrap: wrap;
+  gap:       6px;
+  align-items: center;
+}
+.pp-mc-credit {
+  font-size:     11px;
+  font-family:   monospace;
+  color:         var(--text-3);
+  background:    var(--surface-2);
+  border:        1px solid var(--border);
+  padding:       2px 8px;
+  border-radius: 20px;
+}
+.pp-mc-control {
+  display:       inline-flex;
+  align-items:   center;
+  gap:           4px;
+  font-size:     11px;
+  font-weight:   500;
+  padding:       2px 8px;
+  border-radius: 6px;
+}
+
+/* Actions row */
+.pp-mc-actions {
+  display:     flex;
+  gap:         8px;
+  padding-top: 8px;
+  border-top:  1px solid var(--border);
+  margin-top:  2px;
+}
+.pp-mc-action-btn {
+  flex:            1;
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  gap:             5px;
+  min-height:      38px;
+  border-radius:   9px;
+  border:          1px solid var(--border);
+  background:      var(--surface-2);
+  color:           var(--text-2);
+  font-size:       12.5px;
+  font-weight:     600;
+  cursor:          pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.pp-mc-action-btn:active { background: var(--surface-3); }
+
+/* ── PartyForm modal grid: 2-col → 1-col on mobile ───────────────────────── */
+@media (max-width: 560px) {
+  .pp-form-grid { grid-template-columns: 1fr !important; gap: 12px !important; }
+}
+
+/* ── SideDrawer: full width on small phones (already responsive via 100%) ── */
+@media (max-width: 400px) {
+  .pp-mc-name { font-size: 13px; }
+}
 

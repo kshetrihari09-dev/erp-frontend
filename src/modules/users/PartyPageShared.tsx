@@ -291,8 +291,8 @@ export function PartyForm({ initial, onClose, onCreate, label, defaultRole, acce
 
   return (
     <>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, padding: 4 }}>
-        <div style={{ gridColumn: '1 / -1' }}>
+      <div className="pp-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, padding: 4 }}>
+        <div className="pp-form-span2" style={{ gridColumn: '1 / -1' }}>
           <label style={labelStyle}>{label} Name *</label>
           <input style={inputStyle(!!errors.name)} placeholder={`e.g. ${label === 'Customer' ? 'Sunrise Trading Co.' : 'Himal Distributors Pvt. Ltd.'}`} {...register('name')} />
           {errors.name && <p style={{ fontSize: 11, color: '#dc2626', marginTop: 4 }}>{errors.name.message}</p>}
@@ -609,8 +609,8 @@ export function PartyPage({
     <div style={{ minHeight: '100vh' }}>
 
       {/* Page header */}
-      <div style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)', padding: '16px 0 16px', marginBottom: 20, marginLeft: -28, marginRight: -28, paddingLeft: 28, paddingRight: 28, position: 'sticky', top: 0, zIndex: 30 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div className="pp-header" style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)', padding: '16px 0 16px', marginBottom: 20, position: 'sticky', top: 0, zIndex: 30 }}>
+        <div className="pp-header-inner" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
             <nav style={{ display: 'flex',alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--text-4)', marginBottom: 4,}}>
               <span>Parties</span>
@@ -629,7 +629,7 @@ export function PartyPage({
       </div>
 
       {/* KPI row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 20 }}>
+      <div className="pp-kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 20 }}>
         <KpiCard label={`Total ${label}s`}    value={isLoading ? '—' : total}             sub="Across all pages"     icon={icon}      iconBg={accent.subtle} iconColor={accent.solid} loading={isLoading} />
         <KpiCard label={`Active ${label}s`}   value={isLoading ? '—' : activeCount}       sub="On this page"        icon={<span style={{fontSize:18}}>✅</span>} iconBg="rgba(16,185,129,0.1)" iconColor="#059669" loading={isLoading} />
         <KpiCard label={kpiLabel}             value={isLoading ? '—' : fmt(totalBalance)} sub="Outstanding balance"  icon={kpiIcon}   iconBg="rgba(245,158,11,0.1)" iconColor="#b45309" loading={isLoading} />
@@ -637,28 +637,30 @@ export function PartyPage({
       </div>
 
       {/* Filter toolbar */}
-      <div style={{ ...CARD, padding: '14px 18px', marginBottom: 20 }}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
-          <div style={{ position: 'relative', flex: 1, minWidth: 200, maxWidth: 300 }}>
+      <div className="pp-toolbar" style={{ ...CARD, padding: '14px 18px', marginBottom: 20 }}>
+        <div className="pp-toolbar-row" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
+          <div className="pp-search-wrap" style={{ position: 'relative', flex: 1, minWidth: 200, maxWidth: 300 }}>
             <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-4)', pointerEvents: 'none' }} />
             <input className="erp-input" style={{ width: '100%', paddingLeft: 30 }}
               placeholder={`Search ${label.toLowerCase()}s…`}
               value={searchRaw} onChange={e => { setSearch(e.target.value); setPage(1) }} />
           </div>
 
-          {[
-            { val: statusFilter, set: (v: any) => setStatus(v), opts: [['all','All Status'],['active','Active'],['inactive','Inactive']] },
-            { val: balFilter,    set: (v: any) => setBalFilter(v), opts: [['all','All Balances'],['positive','Has Balance'],['zero','Zero Balance']] },
-          ].map((sel, i) => (
-            <div key={i} style={{ position: 'relative' }}>
-              <select value={sel.val} onChange={e => sel.set(e.target.value)} className="erp-input" style={{ paddingRight: 28, appearance: 'none', cursor: 'pointer' }}>
-                {sel.opts.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-              </select>
-              <ChevronDown size={11} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-4)', pointerEvents: 'none' }} />
-            </div>
-          ))}
+          <div className="pp-filter-selects" style={{ display: 'flex', gap: 10 }}>
+            {[
+              { val: statusFilter, set: (v: any) => setStatus(v), opts: [['all','All Status'],['active','Active'],['inactive','Inactive']] },
+              { val: balFilter,    set: (v: any) => setBalFilter(v), opts: [['all','All Balances'],['positive','Has Balance'],['zero','Zero Balance']] },
+            ].map((sel, i) => (
+              <div key={i} style={{ position: 'relative', flex: 1 }}>
+                <select value={sel.val} onChange={e => sel.set(e.target.value)} className="erp-input" style={{ width: '100%', paddingRight: 28, appearance: 'none', cursor: 'pointer' }}>
+                  {sel.opts.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                </select>
+                <ChevronDown size={11} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-4)', pointerEvents: 'none' }} />
+              </div>
+            ))}
+          </div>
 
-          <div style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>
+          <div className="pp-toolbar-actions" style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>
             <Button variant="ghost" size="sm" onClick={() => { setSearch(''); setStatus('all'); setBalFilter('all'); setSortKey('name'); setSortDir('asc') }}>
               <RotateCcw size={12} /> Reset
             </Button>
@@ -668,16 +670,16 @@ export function PartyPage({
       </div>
 
       {/* Table */}
-      <div style={{ ...CARD, overflow: 'hidden' }}>
+      <div className="pp-table-card" style={{ ...CARD, overflow: 'hidden' }}>
         {selected.size > 0 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', background: accent.subtle, borderBottom: `1px solid ${accent.border}` }}>
+          <div className="pp-bulk-bar" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', background: accent.subtle, borderBottom: `1px solid ${accent.border}` }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: accent.solid }}>{selected.size} selected</span>
             <Button variant="ghost" size="sm" style={{ color: '#dc2626' }}><Trash2 size={12} /> Delete</Button>
             <Button variant="ghost" size="sm" onClick={() => setSelected(new Set())}><X size={12} /> Clear</Button>
           </div>
         )}
 
-        <div style={{ overflowX: 'auto' }}>
+        <div className="pp-desktop-table-wrap" style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ background: 'var(--surface-2)', borderBottom: '1px solid var(--border)' }}>
@@ -784,6 +786,84 @@ export function PartyPage({
               })}
             </tbody>
           </table>
+        </div>
+
+        {/* ── MOBILE: card list (hidden on desktop via CSS) ─────────── */}
+        <div className="pp-mobile-list">
+          {isLoading ? (
+            <div className="pp-mobile-skel-wrap">
+              {[1,2,3,4,5].map(i => <div key={i} className="pp-mobile-card pp-mobile-card-skel" />)}
+            </div>
+          ) : filteredRows.length === 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px 24px', textAlign: 'center' }}>
+              <div style={{ width: 56, height: 56, borderRadius: 16, background: 'var(--surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14, fontSize: 28 }}>
+                {label === 'Customer' ? '👤' : '🏭'}
+              </div>
+              <p style={{ fontWeight: 600, fontSize: 14, color: 'var(--text)', marginBottom: 4 }}>No {label.toLowerCase()}s found</p>
+              <p style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 16 }}>
+                {searchRaw || statusFilter !== 'all' || balFilter !== 'all' ? 'Try adjusting your filters' : `Add your first ${label.toLowerCase()} to get started`}
+              </p>
+              {!(searchRaw || statusFilter !== 'all' || balFilter !== 'all') && (
+                <Button variant="primary" size="sm" icon={<Plus size={12}/>}
+                  style={{ background: accent.solid }}
+                  onClick={() => { setEditing(null); setModal(true) }}>
+                  Create {label}
+                </Button>
+              )}
+            </div>
+          ) : (
+            filteredRows.map(p => (
+              <div key={p.id} className="pp-mobile-card" onClick={() => setPreview(p)}>
+                {/* Top row: avatar + name/code + balance */}
+                <div className="pp-mc-top">
+                  <div className="pp-mc-avatar" style={{ background: `linear-gradient(135deg, ${accent.solid}, ${accent.solid}cc)` }}>
+                    {p.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="pp-mc-name-wrap">
+                    <p className="pp-mc-name">{p.name}</p>
+                    <span className="pp-mc-code" style={{ background: accent.subtle, color: accent.solid }}>{p.code}</span>
+                  </div>
+                  <div className="pp-mc-balance">
+                    <BalanceChip value={p.current_balance} />
+                  </div>
+                </div>
+
+                {/* Contact row */}
+                {(p.phone || p.pan_no) && (
+                  <div className="pp-mc-contact">
+                    {p.phone  && <span className="pp-mc-contact-item"><Phone size={11}/> {p.phone}</span>}
+                    {p.pan_no && <span className="pp-mc-contact-item pp-mc-pan">{p.pan_no}</span>}
+                  </div>
+                )}
+
+                {/* Chips row */}
+                <div className="pp-mc-chips">
+                  <StatusBadge active={p.is_active} />
+                  {p.credit_limit ? (
+                    <span className="pp-mc-credit">Limit {fmt(p.credit_limit)}</span>
+                  ) : null}
+                  {p.control_account_name && (
+                    <span className="pp-mc-control" style={{ color: accent.solid, background: accent.subtle, border: `1px solid ${accent.border}` }}>
+                      <Landmark size={10} />{p.control_account_name}
+                    </span>
+                  )}
+                </div>
+
+                {/* Actions */}
+                <div className="pp-mc-actions" onClick={e => e.stopPropagation()}>
+                  <button className="pp-mc-action-btn" onClick={() => setPreview(p)}>
+                    <Eye size={13}/> View
+                  </button>
+                  <button className="pp-mc-action-btn" onClick={() => { setEditing(p); setModal(true) }}>
+                    <Edit2 size={13}/> Edit
+                  </button>
+                  <button className="pp-mc-action-btn" onClick={() => setLedger(p)}>
+                    <BookOpen size={13}/> Ledger
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
         </div>
 
         <div style={{ padding: '10px 16px', borderTop: '1px solid var(--border)' }}>
