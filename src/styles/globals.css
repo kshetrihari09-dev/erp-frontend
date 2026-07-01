@@ -1007,8 +1007,7 @@ td.psc-cell {
 }
 
 /* ── Dropdown panel ─────────────────────────────────────────────────────── */
-.psc-dropdown {
- 
+.psc-dropdown { 
   top:          calc(100% + 4px);
   left:         0;
   z-index:      9999;
