@@ -87,6 +87,7 @@ const KpiCard = memo(({ icon, accentColor, glowColor, label, value, delta, delta
         padding: '20px 22px',
         position: 'relative',
         overflow: 'hidden',
+        minWidth: 0,
         cursor: 'default',
         transition: 'all 0.22s cubic-bezier(.4,0,.2,1)',
       }}
@@ -115,7 +116,7 @@ const KpiCard = memo(({ icon, accentColor, glowColor, label, value, delta, delta
           <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: tk.textMuted, marginBottom: 4, fontFamily: 'var(--font-mono)' }}>
             {label}
           </div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: tk.text, letterSpacing: '-0.04em', fontFamily: 'var(--font-mono)', marginBottom: 6 }}>
+          <div style={{ fontSize: 'clamp(16px, 5vw, 22px)', fontWeight: 800, color: tk.text, letterSpacing: '-0.04em', fontFamily: 'var(--font-mono)', marginBottom: 6, overflowWrap: 'anywhere' }}>
             {value}
           </div>
           {delta && (
@@ -331,6 +332,60 @@ export default function AccountingPage() {
 
   return (
     <div className="acc-page" style={{ minHeight: '100vh' }}>
+      <style>{`
+        /* ── Accounting page — mobile/tablet responsive (self-contained, additive) ── */
+        .acc-page { max-width: 100%; overflow-x: hidden; }
+        .acc-kpi-grid, .acc-analytics-grid, .acc-stat-grid, .acc-tb-kpi-grid { min-width: 0; }
+        .acc-kpi-grid > *, .acc-analytics-grid > *, .acc-stat-grid > *, .acc-tb-kpi-grid > * { min-width: 0; }
+
+        @media (max-width: 1024px) {
+          .acc-kpi-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 12px !important; }
+          .acc-analytics-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 12px !important; }
+          .acc-tb-kpi-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important; }
+        }
+        @media (max-width: 767px) {
+          .acc-page .acc-filter-row { flex-direction: column !important; align-items: stretch !important; gap: 10px !important; }
+          .acc-page .acc-filter-row > * { width: 100% !important; }
+          .acc-page .acc-filter-row .erp-input { width: 100% !important; }
+          .acc-page .acc-filter-row .acc-filter-count { text-align: left !important; margin-left: 0 !important; }
+          .acc-page .erp-input { width: 100% !important; min-height: 44px !important; box-sizing: border-box; }
+          .acc-page .h-7, .acc-page .h-8 { min-height: 40px !important; height: auto !important; padding-top: 6px !important; padding-bottom: 6px !important; }
+          .acc-page .page-btn { min-width: 36px !important; min-height: 36px !important; }
+          .acc-tab-btn { min-height: 44px !important; padding: 11px 14px !important; font-size: 12px !important; }
+          .acc-tab-content { padding: 14px 12px !important; }
+          .acc-tb-filter-row { flex-direction: column !important; align-items: stretch !important; gap: 10px !important; }
+          .acc-tb-filter-field { width: 100% !important; }
+          .acc-tb-filter-field .erp-input { width: 100% !important; min-height: 44px !important; box-sizing: border-box; }
+          .acc-tb-filter-actions { width: 100% !important; }
+          .acc-tb-filter-actions button { flex: 1 1 calc(50% - 8px) !important; min-height: 44px !important; justify-content: center !important; }
+          .acc-tb-toolbar { flex-direction: column !important; align-items: stretch !important; }
+          .acc-tb-search-wrap { width: 100% !important; }
+          .acc-tb-search-wrap input { width: 100% !important; min-height: 44px !important; box-sizing: border-box; }
+          .acc-tb-toolbar-actions { width: 100% !important; justify-content: flex-start !important; }
+        }
+        @media (min-width: 768px) and (max-width: 1024px) {
+          .acc-page .acc-filter-row { display: grid !important; grid-template-columns: 1fr 1fr; align-items: center; }
+          .acc-page .acc-filter-row .acc-filter-btn,
+          .acc-page .acc-filter-row .acc-filter-count { grid-column: span 2; }
+          .acc-tb-filter-row { display: grid !important; grid-template-columns: 1fr 1fr; align-items: end; gap: 12px !important; }
+          .acc-tb-filter-actions { grid-column: span 2; }
+        }
+        @media (max-width: 560px) {
+          .acc-kpi-grid { grid-template-columns: 1fr !important; gap: 10px !important; margin-bottom: 14px !important; }
+        }
+        @media (max-width: 480px) {
+          .acc-kpi-card { padding: 14px 16px !important; }
+          .acc-tb-kpi-grid { grid-template-columns: 1fr !important; gap: 8px !important; }
+        }
+        @media (max-width: 640px) {
+          .acc-analytics-grid { grid-template-columns: 1fr !important; gap: 10px !important; margin-bottom: 14px !important; }
+          .acc-analytics-card { padding: 16px !important; }
+          .acc-tab-content { padding: 12px 8px !important; }
+        }
+        @media (max-width: 420px) {
+          .acc-tab-btn { padding: 10px 11px !important; font-size: 11.5px !important; gap: 5px !important; }
+        }
+      `}</style>
 
       {/* KPIs */}
       <div className="acc-kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16, marginBottom: 20 }}>
