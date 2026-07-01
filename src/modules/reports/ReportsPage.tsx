@@ -122,24 +122,24 @@ function KpiCard({ label, value, sub, icon, color, trend }: {
   icon: React.ReactNode; color: string; trend?: number
 }) {
   return (
-    <div style={{ ...CARD, padding: 20, cursor: 'default', transition: 'transform 0.15s, box-shadow 0.15s' }}
+    <div style={{ ...CARD, padding: '14px 16px', cursor: 'default', transition: 'transform 0.15s, box-shadow 0.15s' }}
       onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 20px rgba(0,0,0,0.12)' }}
       onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ''; (e.currentTarget as HTMLElement).style.boxShadow = '' }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-        <div style={{ width: 40, height: 40, borderRadius: 12, background: color + '18', display: 'flex', alignItems: 'center', justifyContent: 'center', color }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+        <div style={{ width: 36, height: 36, borderRadius: 10, background: color + '18', display: 'flex', alignItems: 'center', justifyContent: 'center', color }}>
           {icon}
         </div>
         {trend !== undefined && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 12, fontWeight: 600, color: trend >= 0 ? A.success : A.danger }}>
-            {trend >= 0 ? <ArrowUpRight size={14}/> : <ArrowDownRight size={14}/>}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, fontWeight: 600, color: trend >= 0 ? A.success : A.danger }}>
+            {trend >= 0 ? <ArrowUpRight size={13}/> : <ArrowDownRight size={13}/>}
             {Math.abs(trend).toFixed(1)}%
           </div>
         )}
       </div>
-      <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.5px' }}>{value}</div>
-      <div style={{ fontSize: 13, color: 'var(--text-2)', marginTop: 4, fontWeight: 500 }}>{label}</div>
-      {sub && <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>{sub}</div>}
+      <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.5px' }}>{value}</div>
+      <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 3, fontWeight: 500 }}>{label}</div>
+      {sub && <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>{sub}</div>}
     </div>
   )
 }
@@ -238,18 +238,20 @@ function TableCard({ title, count, badge, actions, children }: {
   return (
     <div style={CARD}>
       {(title || actions) && (
-        <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 12 }}>
-          {title && <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>{title}</div>}
-          {count !== undefined && (
-            <span style={{ background: 'var(--surface-2)', color: 'var(--text-3)', borderRadius: 99, padding: '2px 8px', fontSize: 12, fontWeight: 600 }}>{count}</span>
-          )}
-          {badge && (
-            <span style={{ background: A.primary + '15', color: A.primary, borderRadius: 99, padding: '2px 8px', fontSize: 12, fontWeight: 600 }}>{badge}</span>
-          )}
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>{actions}</div>
+        <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', rowGap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+            {title && <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>{title}</div>}
+            {count !== undefined && (
+              <span style={{ background: 'var(--surface-2)', color: 'var(--text-3)', borderRadius: 99, padding: '2px 8px', fontSize: 12, fontWeight: 600 }}>{count}</span>
+            )}
+            {badge && (
+              <span style={{ background: A.primary + '15', color: A.primary, borderRadius: 99, padding: '2px 8px', fontSize: 12, fontWeight: 600 }}>{badge}</span>
+            )}
+          </div>
+          {actions && <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', flex: '1 1 auto', justifyContent: 'flex-end', alignItems: 'center' }}>{actions}</div>}
         </div>
       )}
-      <div style={{ overflowX: 'auto' }}>{children}</div>
+      <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>{children}</div>
     </div>
   )
 }
@@ -317,10 +319,10 @@ function ChartTooltip({ active, payload, label }: any) {
 // ── Search input helper ───────────────────────────────────────────────────────
 function SearchInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
-    <div style={{ position: 'relative' }}>
+    <div style={{ position: 'relative', flex: '1 1 120px', minWidth: 0, maxWidth: 220 }}>
       <Search size={13} style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-4)', pointerEvents: 'none' }}/>
       <input value={value} onChange={e => onChange(e.target.value)} placeholder="Search…" className="erp-input"
-        style={{ paddingLeft: 28, paddingRight: 8, height: 30, width: 180, fontSize: 12 }}
+        style={{ paddingLeft: 28, paddingRight: 8, height: 30, width: '100%', fontSize: 12 }}
       />
     </div>
   )
@@ -414,7 +416,7 @@ function SalesReport() {
       />
 
       {hasData && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 20 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 16, marginBottom: 20 }}>
           <KpiCard label="Total Invoices"  value={String(kpi.count)}   sub="in selected period"          icon={<FileText    size={18}/>} color={A.primary} />
           <KpiCard label="Total Revenue"   value={fmt(kpi.total)}      sub={`avg ${fmt(kpi.avg)} / inv`} icon={<TrendingUp  size={18}/>} color={A.success} />
           <KpiCard label="Total Paid"      value={fmt(kpi.paid)}       sub={`${kpi.paidPct}% collected`} icon={<CheckCircle size={18}/>} color={A.success} trend={kpi.paidPct - 100} />
@@ -570,7 +572,7 @@ function PurchaseReport() {
       />
       {rows.length > 0 && (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 16, marginBottom: 20 }}>
             <KpiCard label="Total Bills"    value={String(filtered.length)}                             icon={<Package      size={18}/>} color={A.purple} />
             <KpiCard label="Total Spent"    value={fmt(total)}                                          icon={<TrendingDown size={18}/>} color={A.danger} />
             <KpiCard label="Outstanding"    value={fmt(totalDue)}                                       icon={<AlertCircle  size={18}/>} color={A.warning}/>
@@ -794,7 +796,7 @@ function StockReport() {
 
       {rows.length > 0 && (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 16, marginBottom: 20 }}>
             <KpiCard label="Total Products"   value={String(filtered.length)} icon={<Package     size={18}/>} color={A.cyan}   />
             <KpiCard label="Total Stock Value" value={fmt(totalValue)}         icon={<TrendingUp  size={18}/>} color={A.primary}/>
             <KpiCard label="Low Stock Items"   value={String(lowStock)}        icon={<AlertCircle size={18}/>} color={lowStock > 0 ? A.warning : A.success}/>
@@ -882,7 +884,7 @@ function ExpiryReport() {
 
       {rows.length > 0 && (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16, marginBottom: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 16, marginBottom: 20 }}>
             <KpiCard label="Total Batches" value={String(rows.length)}    icon={<Package     size={18}/>} color={A.primary}/>
             <KpiCard label="Expired"       value={String(expired.length)} icon={<XCircle     size={18}/>} color={A.danger} />
             <KpiCard label="Expiring Soon" value={String(nearExp.length)} icon={<AlertCircle size={18}/>} color={A.warning}/>
@@ -1004,7 +1006,7 @@ function PartyBalanceReport() {
       </div>
 
       {rows.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16, marginBottom: 20 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 16, marginBottom: 20 }}>
           <KpiCard label={`Total ${type === 'customer' ? 'Customers' : 'Suppliers'}`} value={String(filtered.length)} icon={<Users       size={18}/>} color={A.primary}/>
           <KpiCard label="Total Invoiced"  value={fmt(totalInvoiced)} icon={<FileText    size={18}/>} color={A.purple} />
           <KpiCard label="Outstanding Due" value={fmt(totalDue)}      icon={<AlertCircle size={18}/>} color={A.warning}/>
@@ -1088,33 +1090,40 @@ export default function ReportsPage() {
   return (
     <div style={{ minHeight: '100vh' }}>
 
-      {/* Page header + tabs */}
-      <div className="bleed-header" style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)', padding: '20px 0 0', marginBottom: 24 }}>
-        <div className="flex flex-wrap items-start justify-between gap-3" style={{ marginBottom: 20 }}>
+      {/* Page header + tabs — full bleed via negative margin matching page-content padding */}
+      <div style={{
+        background: 'var(--surface)', borderBottom: '1px solid var(--border)',
+        marginLeft: 'calc(-1 * var(--page-px, 28px))',
+        marginRight: 'calc(-1 * var(--page-px, 28px))',
+        paddingLeft: 'var(--page-px, 28px)',
+        paddingRight: 'var(--page-px, 28px)',
+        paddingTop: 20, marginBottom: 24,
+      }}>
+        {/* Title row */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, marginBottom: 16 }}>
           <div>
-            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--text-4)', marginBottom: 4 }}>Analytics</div>
-            <h1 className="text-xl sm:text-2xl" style={{ fontWeight: 800, color: 'var(--text)', margin: 0, letterSpacing: '-0.5px' }}>Reports</h1>
-            <p className="hidden sm:block" style={{ fontSize: 14, color: 'var(--text-2)', margin: '4px 0 0' }}>View and analyze your business performance</p>
+            <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.2, color: 'var(--text-4)', marginBottom: 3 }}>Analytics</div>
+            <h1 style={{ fontSize: 'clamp(18px, 4vw, 24px)', fontWeight: 800, color: 'var(--text)', margin: 0, letterSpacing: '-0.5px' }}>Reports</h1>
           </div>
-          <div style={{ background: A.primary + '12', border: `1px solid ${A.primary}30`, borderRadius: 10, padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <BarChart2 size={16} color={A.primary}/>
-            <span style={{ fontSize: 12, fontWeight: 600, color: A.primary }}>Live Data</span>
+          <div style={{ background: A.primary + '12', border: `1px solid ${A.primary}30`, borderRadius: 10, padding: '6px 12px', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+            <BarChart2 size={14} color={A.primary}/>
+            <span style={{ fontSize: 11, fontWeight: 600, color: A.primary }}>Live Data</span>
           </div>
         </div>
 
-        {/* Tab strip — already horizontally scrollable for mobile via overflowX:auto */}
-        <div style={{ display: 'flex', gap: 2, overflowX: 'auto', scrollbarWidth: 'none' }}>
+        {/* Tab strip — scrolls horizontally on mobile, no wrap */}
+        <div style={{ display: 'flex', gap: 0, overflowX: 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
           {REPORT_TABS.map(t => (
             <button key={t.id} onClick={() => setTab(t.id)} style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '10px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 5,
+              padding: '9px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer',
               border: 'none', background: 'transparent', whiteSpace: 'nowrap',
               color: tab === t.id ? A.primary : 'var(--text-2)',
               borderBottom: `2.5px solid ${tab === t.id ? A.primary : 'transparent'}`,
-              marginBottom: -1, transition: 'all 0.15s', fontFamily: 'var(--font)',
+              marginBottom: -1, transition: 'color 0.15s', fontFamily: 'var(--font)',
               flexShrink: 0,
             }}>
-              <span style={{ color: tab === t.id ? A.primary : 'var(--text-4)' }}>{t.icon}</span>
+              <span style={{ color: tab === t.id ? A.primary : 'var(--text-4)', display: 'flex' }}>{t.icon}</span>
               {t.label}
             </button>
           ))}
