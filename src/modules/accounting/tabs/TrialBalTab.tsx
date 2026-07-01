@@ -16,7 +16,6 @@ import {
   ArrowUpDown, ArrowUp, ArrowDown, LayoutList, AlignJustify,
 } from 'lucide-react'
 import type { TrialBalanceRow } from '@/types'
-import { useAccResponsive } from '../useAccResponsive'
 
 // ── Theme tokens ──────────────────────────────────────────────────────────────
 function useTokens() {
@@ -137,14 +136,13 @@ const SummaryCard = memo(({ icon, iconBg, iconColor, label, value, sub, valColor
         boxShadow: tk.cardShadow,
         borderRadius: 14,
         padding: '18px 20px',
-        minWidth: 0,
       }}
     >
       <div style={{ width: 42, height: 42, borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12, background: iconBg, color: iconColor }}>
         {icon}
       </div>
       <div style={{ fontSize: 10, fontWeight: 700, color: tk.textMuted, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4, fontFamily: 'var(--font-mono)' }}>{label}</div>
-      <div style={{ fontSize: 'clamp(15px, 4.5vw, 19px)', fontWeight: 800, fontFamily: 'var(--font-mono)', letterSpacing: '-0.03em', color: valColor ?? tk.text, overflowWrap: 'anywhere' }}>{value}</div>
+      <div style={{ fontSize: 19, fontWeight: 800, fontFamily: 'var(--font-mono)', letterSpacing: '-0.03em', color: valColor ?? tk.text }}>{value}</div>
       {sub && <div style={{ fontSize: 11, color: tk.textFaint, marginTop: 3 }}>{sub}</div>}
     </motion.div>
   )
@@ -275,7 +273,6 @@ function TBtn({ active, onClick, children, title }: { active?: boolean; onClick:
 export default function TrialBalTab() {
   const { user, company } = useAuthStore()
   const tk = useTokens()
-  const { isMobile, isTablet } = useAccResponsive()
 
   const [dateFrom, setDateFrom] = useState(new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0])
   const [dateTo,   setDateTo  ] = useState(new Date().toISOString().split('T')[0])
@@ -392,36 +389,36 @@ export default function TrialBalTab() {
       <motion.div id="tb-no-print" initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}
         style={{ ...cardStyle, padding: '18px 20px', marginBottom: 16 }}
       >
-        <div className="acc-tb-filter-row" style={{ display: 'flex', alignItems: 'flex-end', gap: 12, flexWrap: 'wrap', ...(isMobile ? { flexDirection: 'column', alignItems: 'stretch' } : {}) }}>
+        <div className="acc-tb-filter-row" style={{ display: 'flex', alignItems: 'flex-end', gap: 12, flexWrap: 'wrap' }}>
           {[
             { label: 'From Date',     value: dateFrom, onChange: setDateFrom, width: 155 },
             { label: 'As of Date',    value: dateTo,   onChange: setDateTo,   width: 155 },
           ].map(f => (
-            <div key={f.label} className="acc-tb-filter-field" style={isMobile ? { width: '100%' } : undefined}>
+            <div key={f.label} className="acc-tb-filter-field">
               <label style={{ fontSize: 10, fontWeight: 700, color: tk.textMuted, textTransform: 'uppercase', letterSpacing: '0.1em', display: 'block', marginBottom: 6, fontFamily: 'var(--font-mono)' }}>{f.label}</label>
-              <input type="date" className="erp-input" style={{ width: isMobile ? '100%' : f.width, minHeight: isMobile ? 44 : undefined, boxSizing: 'border-box' }} value={f.value} onChange={e => f.onChange(e.target.value)} />
+              <input type="date" className="erp-input acc-tb-date-input" value={f.value} onChange={e => f.onChange(e.target.value)} />
             </div>
           ))}
-          <div className="acc-tb-filter-field" style={isMobile ? { width: '100%' } : undefined}>
+          <div className="acc-tb-filter-field">
             <label style={{ fontSize: 10, fontWeight: 700, color: tk.textMuted, textTransform: 'uppercase', letterSpacing: '0.1em', display: 'block', marginBottom: 6, fontFamily: 'var(--font-mono)' }}>Account Type</label>
-            <select className="erp-input" style={{ width: isMobile ? '100%' : 148, minHeight: isMobile ? 44 : undefined, boxSizing: 'border-box' }} value={typeFilter} onChange={e => setTypeFilter(e.target.value)}>
+            <select className="erp-input acc-filter-select" value={typeFilter} onChange={e => setTypeFilter(e.target.value)}>
               <option value="">All Types</option>
               {accountTypes.map(t => <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>)}
             </select>
           </div>
-          <div className="acc-tb-filter-actions" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', ...(isMobile ? { width: '100%' } : {}) }}>
+          <div className="acc-tb-filter-actions" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button
               onClick={generate} disabled={isLoading || isFetching}
-              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7, height: isMobile ? 44 : 35, padding: '0 20px', fontSize: 13, fontWeight: 700, borderRadius: 9, color: '#fff', border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#2563eb,#1d4ed8)', boxShadow: '0 2px 10px rgba(37,99,235,.35)', opacity: (isLoading||isFetching) ? 0.6 : 1, transition: 'opacity 0.15s', flex: isMobile ? '1 1 auto' : undefined }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 7, height: 35, padding: '0 20px', fontSize: 13, fontWeight: 700, borderRadius: 9, color: '#fff', border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#2563eb,#1d4ed8)', boxShadow: '0 2px 10px rgba(37,99,235,.35)', opacity: (isLoading||isFetching) ? 0.6 : 1, transition: 'opacity 0.15s' }}
             >
               {(isLoading || isFetching) ? <RefreshCw size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Search size={13} />}
               Generate
             </button>
             {hasData && (
               <>
-                <button onClick={handlePrint}        className="btn btn-secondary" style={{ height: isMobile ? 40 : 35, flex: isMobile ? '1 1 calc(33% - 6px)' : undefined, justifyContent: 'center' }}><Printer size={13} /> Print</button>
-                <button onClick={handleExportExcel}  className="btn btn-secondary" style={{ height: isMobile ? 40 : 35, flex: isMobile ? '1 1 calc(33% - 6px)' : undefined, justifyContent: 'center' }}><FileSpreadsheet size={13} /> Excel</button>
-                <button onClick={handleExportCSV}    className="btn btn-secondary" style={{ height: isMobile ? 40 : 35, flex: isMobile ? '1 1 calc(33% - 6px)' : undefined, justifyContent: 'center' }}><Download size={13} /> CSV</button>
+                <button onClick={handlePrint}        className="btn btn-secondary" style={{ height: 35 }}><Printer size={13} /> Print</button>
+                <button onClick={handleExportExcel}  className="btn btn-secondary" style={{ height: 35 }}><FileSpreadsheet size={13} /> Excel</button>
+                <button onClick={handleExportCSV}    className="btn btn-secondary" style={{ height: 35 }}><Download size={13} /> CSV</button>
               </>
             )}
           </div>
@@ -469,7 +466,7 @@ export default function TrialBalTab() {
             </AnimatePresence>
 
             {/* ── KPI Summary Cards ─────────────────────────────────────────── */}
-            <div className="acc-tb-kpi-grid" style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : isTablet ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap: isMobile ? 8 : 12, marginBottom: 16, minWidth: 0 }} id="tb-no-print">
+            <div className="acc-tb-kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 16 }} id="tb-no-print">
               {summaryCards.map(sc => <SummaryCard key={sc.label} {...sc} />)}
             </div>
 
@@ -478,12 +475,12 @@ export default function TrialBalTab() {
               style={{ ...cardStyle, overflow: 'hidden' }}
             >
               {/* Toolbar */}
-              <div id="tb-no-print" className="acc-tb-toolbar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '12px 18px', borderBottom: `1px solid ${tk.theadBorder}`, flexWrap: 'wrap', ...(isMobile ? { flexDirection: 'column', alignItems: 'stretch' } : {}) }}>
-                <div className="acc-tb-search-wrap" style={{ position: 'relative', width: isMobile ? '100%' : undefined }}>
+              <div id="tb-no-print" className="acc-tb-toolbar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '12px 18px', borderBottom: `1px solid ${tk.theadBorder}`, flexWrap: 'wrap' }}>
+                <div className="acc-tb-search-wrap" style={{ position: 'relative' }}>
                   <Search size={13} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: tk.textFaint, pointerEvents: 'none' }} />
-                  <input placeholder="Search accounts…" className="erp-input" style={{ width: isMobile ? '100%' : 210, paddingLeft: 32, minHeight: isMobile ? 44 : undefined, boxSizing: 'border-box' }} value={search} onChange={e => setSearch(e.target.value)} />
+                  <input placeholder="Search accounts…" className="erp-input acc-tb-search-input" style={{ paddingLeft: 32 }} value={search} onChange={e => setSearch(e.target.value)} />
                 </div>
-                <div className="acc-tb-toolbar-actions" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', width: isMobile ? '100%' : undefined }}>
+                <div className="acc-tb-toolbar-actions" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                   <TBtn active={showZero} onClick={() => setShowZero(v => !v)} title={showZero ? 'Hide zero balances' : 'Show zero balances'}>
                     {showZero ? <Eye size={12} /> : <EyeOff size={12} />} Zero
                   </TBtn>

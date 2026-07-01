@@ -308,7 +308,20 @@ input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
   border-color: rgba(255,255,255,.08);
 }
 
-.page-content { flex: 1; padding: 24px 28px; min-height: calc(100vh - var(--topbar-h)); --page-px: 28px; }
+.page-content { flex: 1; padding: 24px 28px; min-height: calc(100vh - var(--topbar-h)); }
+
+/* Full-bleed header bar used by pages (e.g. Reports) that want their
+   sticky header strip to span edge-to-edge of .page-content regardless
+   of that container's current padding. Defined as a class (not inline
+   styles) specifically so it can track .page-content's own responsive
+   padding instead of assuming a fixed 28px on every screen size. */
+.bleed-header {
+  margin-left: -28px; margin-right: -28px;
+  padding-left: 28px; padding-right: 28px;
+}
+@media (max-width: 640px) {
+  .bleed-header { margin-left: -10px; margin-right: -10px; padding-left: 10px; padding-right: 10px; }
+}
 
 /* ── PAGE STRUCTURE ──────────────────────────────────────────────────── */
 .page-header {
@@ -1907,19 +1920,11 @@ td.psc-cell {
 .mb-5 { margin-bottom: 18px; }
 
 /* ── Global overflow guard ──────────────────────────────────────────────── */
-/* NOTE: overflow-x hidden on page-content breaks negative-margin bleed
-   headers on mobile, so we guard it only on the outer app-layout wrapper. */
-.app-layout { overflow-x: hidden; }
-.page-content { box-sizing: border-box; }
+.page-content { overflow-x: hidden; box-sizing: border-box; }
 
-/* ── Tablet tweaks (768px and below) ────────────────────────────────────── */
-@media (max-width: 768px) {
-  .page-content       { padding: 16px 14px; --page-px: 14px; }
-}
-
-/* ── Mobile tweaks (640px and below) ────────────────────────────────────── */
+/* ── Mobile tweaks ──────────────────────────────────────────────────────── */
 @media (max-width: 640px) {
-  .page-content       { padding: 12px 10px; --page-px: 10px; }
+  .page-content       { padding: 12px 10px; }
   .dash-card-header   { padding: 12px 14px; }
   .dash-greeting      { padding: 12px 14px; }
   .dash-greeting-stats{ display: none; }
@@ -4004,4 +4009,275 @@ td.psc-cell {
   .ldg-pagination > div:first-child { justify-content: center; flex-wrap: wrap; }
   .ldg-pagination > div:last-child  { justify-content: center; }
 }
+
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   ACCOUNTING PAGE — MOBILE & TABLET RESPONSIVENESS
+   Scoped with the .acc- prefix / .acc-page ancestor. All rules are additive
+   and override inline styles only via !important at the breakpoints below —
+   desktop (>1024px) layout, business logic, data, and calculations are
+   completely untouched.
+   Breakpoints covered: 320 / 360 / 375 / 390 / 414 / 480 / 640 / 768 / 820 /
+   912 / 1024.
+══════════════════════════════════════════════════════════════════════════════ */
+
+/* ── KPI grid (top of Accounting page): 4 → 2 → 1 ─────────────────────────── */
+@media (max-width: 1024px) {
+  .acc-kpi-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 12px !important; }
+}
+@media (max-width: 560px) {
+  .acc-kpi-grid { grid-template-columns: 1fr !important; gap: 10px !important; margin-bottom: 14px !important; }
+}
+@media (max-width: 480px) {
+  .acc-kpi-card { padding: 14px 16px !important; }
+}
+
+/* ── Analytics section (Donut / Stats / Trend): 3 → 2 → 1 ─────────────────── */
+@media (max-width: 1024px) {
+  .acc-analytics-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 12px !important; }
+}
+@media (max-width: 640px) {
+  .acc-analytics-grid { grid-template-columns: 1fr !important; gap: 10px !important; margin-bottom: 14px !important; }
+  .acc-analytics-card { padding: 16px !important; }
+}
+@media (max-width: 400px) {
+  .acc-stat-grid { gap: 8px !important; }
+}
+
+/* ── Tab bar: keep horizontally scrollable, tap-friendly buttons ─────────── */
+.acc-tabbar { -webkit-overflow-scrolling: touch; }
+@media (max-width: 768px) {
+  .acc-tab-btn { min-height: 44px !important; padding: 11px 14px !important; font-size: 12px !important; }
+}
+@media (max-width: 420px) {
+  .acc-tab-btn { padding: 10px 11px !important; font-size: 11.5px !important; gap: 5px !important; }
+}
+
+/* ── Tab content padding ───────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .acc-tab-content { padding: 14px 12px !important; }
+}
+@media (max-width: 400px) {
+  .acc-tab-content { padding: 12px 8px !important; }
+}
+
+/* ── Generic filter rows (Vouchers / Accounts / Voucher Postings tabs) ────── */
+@media (max-width: 767px) {
+  .acc-page .acc-filter-row {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+  }
+  .acc-page .acc-filter-row > * { width: 100% !important; }
+  .acc-page .acc-filter-row select.erp-input,
+  .acc-page .acc-filter-row input.erp-input,
+  .acc-page .acc-filter-row .erp-input { width: 100% !important; }
+  .acc-page .acc-filter-row .acc-filter-count { text-align: left !important; margin-left: 0 !important; }
+  .acc-page .acc-filter-row .acc-filter-btn { width: 100% !important; }
+}
+@media (min-width: 768px) and (max-width: 1024px) {
+  .acc-page .acc-filter-row {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+    align-items: center;
+  }
+  .acc-page .acc-filter-row .acc-filter-btn,
+  .acc-page .acc-filter-row .acc-filter-count { grid-column: span 2; }
+}
+
+/* ── Inputs / selects: full width + 44px touch target on mobile ──────────── */
+@media (max-width: 767px) {
+  .acc-page .erp-input { width: 100% !important; min-height: 44px !important; box-sizing: border-box; }
+}
+
+/* ── Small utility buttons: comfortable touch target on mobile ───────────── */
+@media (max-width: 767px) {
+  .acc-page .h-7, .acc-page .h-8 { min-height: 40px !important; height: auto !important; padding-top: 6px !important; padding-bottom: 6px !important; }
+  .acc-page .page-btn { min-width: 36px !important; min-height: 36px !important; }
+}
+
+/* ── Trial Balance: filter card (date range / type / actions) ────────────── */
+@media (max-width: 767px) {
+  .acc-tb-filter-row { flex-direction: column !important; align-items: stretch !important; gap: 10px !important; }
+  .acc-tb-filter-field { width: 100% !important; }
+  .acc-tb-filter-field input.erp-input,
+  .acc-tb-filter-field select.erp-input { width: 100% !important; min-height: 44px !important; box-sizing: border-box; }
+  .acc-tb-filter-actions { width: 100% !important; }
+  .acc-tb-filter-actions button { flex: 1 1 calc(50% - 8px) !important; min-height: 44px !important; justify-content: center !important; }
+}
+@media (min-width: 768px) and (max-width: 1024px) {
+  .acc-tb-filter-row { display: grid !important; grid-template-columns: 1fr 1fr; align-items: end; gap: 12px !important; }
+  .acc-tb-filter-actions { grid-column: span 2; }
+}
+
+/* ── Trial Balance: KPI summary cards: 4 → 2 → 1 ──────────────────────────── */
+@media (max-width: 1024px) {
+  .acc-tb-kpi-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important; }
+}
+@media (max-width: 480px) {
+  .acc-tb-kpi-grid { grid-template-columns: 1fr !important; gap: 8px !important; }
+}
+
+/* ── Trial Balance: table toolbar (search + view controls) ───────────────── */
+@media (max-width: 640px) {
+  .acc-tb-toolbar { flex-direction: column !important; align-items: stretch !important; }
+  .acc-tb-search-wrap { width: 100% !important; }
+  .acc-tb-search-wrap input { width: 100% !important; min-height: 44px !important; box-sizing: border-box; }
+  .acc-tb-toolbar-actions { width: 100% !important; justify-content: flex-start !important; }
+}
+
+/* ── Prevent any residual horizontal page overflow inside the Accounting page */
+.acc-page { max-width: 100%; overflow-x: hidden; }
+.acc-page .acc-tab-content { max-width: 100%; }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   ACCOUNTING PAGE — MOBILE & TABLET RESPONSIVENESS
+   Works alongside the inline <style> block in AccountingPage.tsx.
+   All rules additive, scoped with .acc- prefix.
+══════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Filter selects: fixed width on desktop, full width on mobile ─────────── */
+.acc-filter-select { width: 160px; }
+@media (max-width: 768px) {
+  .acc-filter-select { width: 100% !important; }
+}
+
+/* ── TrialBal date inputs: fixed on desktop, full on mobile ──────────────── */
+.acc-tb-date-input { width: 155px; }
+@media (max-width: 768px) {
+  .acc-tb-date-input { width: 100% !important; }
+}
+
+/* ── TrialBal toolbar search: fixed on desktop, full on mobile ────────────── */
+.acc-tb-search-input { width: 210px; }
+@media (max-width: 768px) {
+  .acc-tb-search-input { width: 100% !important; }
+}
+
+/* ── Desktop table / mobile list toggle ──────────────────────────────────── */
+.acc-desktop-table { display: block; }
+@media (max-width: 768px) {
+  .acc-desktop-table { display: none !important; }
+}
+
+.acc-mobile-list { display: none; }
+@media (max-width: 768px) {
+  .acc-mobile-list {
+    display:        flex;
+    flex-direction: column;
+    gap:            10px;
+    padding:        12px;
+  }
+}
+
+/* Skeleton */
+.acc-mobile-skel-wrap { display: flex; flex-direction: column; gap: 10px; }
+.acc-mobile-card-skel {
+  height:     80px;
+  cursor:     default;
+  background: linear-gradient(90deg, var(--surface) 25%, var(--surface-2) 50%, var(--surface) 75%);
+  background-size: 400% 100%;
+  animation:  acc-shimmer 1.4s ease infinite;
+  border-radius: 12px;
+}
+@keyframes acc-shimmer {
+  0%   { background-position: 100% 50%; }
+  100% { background-position:   0% 50%; }
+}
+
+/* ── Individual card ─────────────────────────────────────────────────────── */
+.acc-mobile-card {
+  background:     var(--surface);
+  border:         1.5px solid var(--border);
+  border-radius:  14px;
+  padding:        13px 14px;
+  display:        flex;
+  flex-direction: column;
+  gap:            8px;
+  cursor:         pointer;
+  transition:     background .12s, border-color .12s;
+  -webkit-tap-highlight-color: transparent;
+}
+.acc-mobile-card:active { background: var(--surface-2); }
+
+/* Top row: voucher no (left) + amount (right) */
+.acc-mc-top {
+  display:         flex;
+  align-items:     center;
+  justify-content: space-between;
+  gap:             8px;
+}
+.acc-mc-no {
+  font-family:    var(--font-mono, monospace);
+  font-size:      13px;
+  font-weight:    700;
+  color:          var(--brand);
+  letter-spacing: .01em;
+}
+.acc-mc-amount {
+  font-family:    var(--font-mono, monospace);
+  font-size:      15px;
+  font-weight:    800;
+  color:          var(--text);
+  letter-spacing: -.3px;
+}
+
+/* Sub row: party (left) + date (right) */
+.acc-mc-sub {
+  display:         flex;
+  align-items:     center;
+  justify-content: space-between;
+  gap:             8px;
+}
+.acc-mc-party {
+  font-size:     13px;
+  font-weight:   500;
+  color:         var(--text-2);
+  flex:          1;
+  min-width:     0;
+  overflow:      hidden;
+  text-overflow: ellipsis;
+  white-space:   nowrap;
+}
+.acc-mc-date {
+  font-family: var(--font-mono, monospace);
+  font-size:   12px;
+  color:       var(--text-3);
+  flex-shrink: 0;
+}
+
+/* Chips row: badges */
+.acc-mc-chips {
+  display:     flex;
+  flex-wrap:   wrap;
+  gap:         6px;
+  align-items: center;
+}
+
+/* Narration text */
+.acc-mc-narration {
+  font-size:     12px;
+  color:         var(--text-3);
+  background:    var(--surface-2);
+  padding:       6px 10px;
+  border-radius: 8px;
+  border:        1px solid var(--border);
+  overflow:      hidden;
+  text-overflow: ellipsis;
+  white-space:   nowrap;
+}
+
+/* Actions row */
+.acc-mc-actions {
+  display:     flex;
+  gap:         8px;
+  padding-top: 6px;
+  border-top:  1px solid var(--border);
+  margin-top:  2px;
+}
+.acc-mc-actions button { flex: 1; justify-content: center; min-height: 36px; }
+
+/* ── Dark mode ────────────────────────────────────────────────────────────── */
+.dark .acc-mobile-card { background: var(--surface); border-color: var(--border); }
+.dark .acc-mobile-card:active { background: var(--surface-2); }
 

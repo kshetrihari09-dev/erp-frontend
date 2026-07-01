@@ -8,7 +8,6 @@ import { Button, Modal, Empty, SkeletonRows } from '@/components/ui'
 import { fmt } from '@/utils'
 import { ACCOUNT_TYPES } from '@/constants'
 import type { Account } from '@/types'
-import { useAccResponsive } from '../useAccResponsive'
 
 const schema = z.object({
   name:     z.string().min(1, 'Required'),
@@ -34,7 +33,7 @@ function AccountForm({ onClose }: { onClose: () => void }) {
   return (
     <>
       <div className="form-grid">
-        <div style={{ gridColumn: 'span 2' }}>
+        <div className="span2">
           <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">Account Name *</label>
           <input className="erp-input" placeholder="e.g. Cash in Hand" {...register('name')} />
           {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name.message}</p>}
@@ -78,7 +77,6 @@ function AccountForm({ onClose }: { onClose: () => void }) {
 export default function AccountsTab({ onCount }: { onCount?: (count: number) => void } = {}) {
   const [typeFilter, setTypeFilter] = useState('')
   const [modal, setModal] = useState(false)
-  const { isMobile } = useAccResponsive()
   const { data, isLoading } = useAccounts({ type: typeFilter || undefined })
   const accounts = (data as Account[]) || []
 
@@ -87,15 +85,15 @@ export default function AccountsTab({ onCount }: { onCount?: (count: number) => 
 
   return (
     <div>
-      <div className="flex items-center justify-between gap-3 mb-3 acc-filter-row" style={isMobile ? { flexDirection: 'column', alignItems: 'stretch' } : undefined}>
-        <select className="erp-input" style={{ width: isMobile ? '100%' : 160, minHeight: isMobile ? 44 : undefined }} value={typeFilter} onChange={e => setTypeFilter(e.target.value)}>
+      <div className="flex items-center justify-between gap-3 mb-3 acc-filter-row">
+        <select className="erp-input acc-filter-select" value={typeFilter} onChange={e => setTypeFilter(e.target.value)}>
           <option value="">All Types</option>
           {ACCOUNT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
         </select>
-        <Button variant="primary" icon={<Plus size={14}/>} onClick={() => setModal(true)} className={isMobile ? 'acc-filter-btn w-full justify-center' : 'acc-filter-btn'}>New Account</Button>
+        <Button variant="primary" icon={<Plus size={14}/>} onClick={() => setModal(true)} className="acc-filter-btn">New Account</Button>
       </div>
       <div className="table-card">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto acc-desktop-table">
           <table className="erp-table">
             <thead>
               <tr>
@@ -126,6 +124,37 @@ export default function AccountsTab({ onCount }: { onCount?: (count: number) => 
               }
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile card list */}
+        <div className="acc-mobile-list">
+          {isLoading ? (
+            <div className="acc-mobile-skel-wrap">
+              {[1,2,3,4].map(i => <div key={i} className="acc-mobile-card acc-mobile-card-skel" />)}
+            </div>
+          ) : accounts.length === 0 ? (
+            <Empty message="No accounts found — create one to get started"/>
+          ) : (
+            accounts.map(a => (
+              <div key={a.id} className="acc-mobile-card">
+                <div className="acc-mc-top">
+                  <span className="acc-mc-no">{a.code}</span>
+                  <span className="acc-mc-amount">{fmt(a.balance ?? 0)}</span>
+                </div>
+                <div className="acc-mc-sub">
+                  <span className="acc-mc-party">{a.name}</span>
+                </div>
+                <div className="acc-mc-chips">
+                  <span className="badge badge-blue">{a.type}</span>
+                  {a.is_group
+                    ? <span className="badge badge-purple">Group</span>
+                    : <span className="badge badge-muted">Ledger</span>
+                  }
+                  {a.sub_type && <span className="acc-mc-narration" style={{ padding: 0, border: 'none', background: 'none' }}>{a.sub_type}</span>}
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
       <Modal open={modal} onClose={() => setModal(false)} title="New Account" size="lg">

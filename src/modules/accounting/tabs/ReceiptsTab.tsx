@@ -71,7 +71,7 @@ function QuickVoucherForm({ type, accounts, parties, onClose }: {
           <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">Amount</label>
           <input type="number" step="0.01" min="0" className="erp-input" placeholder="0.00" {...register('amount')} />
         </div>
-        <div style={{ gridColumn: 'span 2' }}>
+        <div className="span2">
           <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">Narration</label>
           <input className="erp-input" placeholder="Being amount received / paid…" {...register('narration')} />
         </div>
@@ -137,7 +137,7 @@ function VoucherListTab({ apiCall, type, title, onCount }: {
         <Button variant="primary" icon={<Plus size={14}/>} onClick={() => setModal(true)}>New {title}</Button>
       </div>
       <div className="table-card">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto acc-desktop-table">
           <table className="erp-table">
             <thead>
               <tr><th>Voucher No</th><th>Date</th><th>Party</th><th>Narration</th><th className="td-right">Amount</th><th>Status</th><th></th></tr>
@@ -173,6 +173,45 @@ function VoucherListTab({ apiCall, type, title, onCount }: {
               }
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile card list */}
+        <div className="acc-mobile-list">
+          {loading ? (
+            <div className="acc-mobile-skel-wrap">
+              {[1,2,3].map(i => <div key={i} className="acc-mobile-card acc-mobile-card-skel" />)}
+            </div>
+          ) : rows.length === 0 ? (
+            <Empty message={`No ${title.toLowerCase()}s found`}/>
+          ) : (
+            rows.map((v: any) => (
+              <div key={v.id} className="acc-mobile-card">
+                <div className="acc-mc-top">
+                  <span className="acc-mc-no">{v.voucher_no || '—'}</span>
+                  <span className="acc-mc-amount">{fmt(v.total_amount ?? v.amount ?? 0)}</span>
+                </div>
+                <div className="acc-mc-sub">
+                  <span className="acc-mc-party">{v.party_name || 'No party'}</span>
+                  <span className="acc-mc-date">{fmtDate(v.voucher_date || v.date)}</span>
+                </div>
+                <div className="acc-mc-chips">
+                  <Badge status={(v.status || 'posted').toLowerCase()}/>
+                </div>
+                {v.narration && <div className="acc-mc-narration">{v.narration}</div>}
+                <div className="acc-mc-actions">
+                  <Button variant="secondary" size="sm" icon={<Printer size={12}/>}
+                    onClick={() => setListPrintData({
+                      voucherNo: v.voucher_no || '—', type,
+                      date: v.voucher_date || v.date,
+                      partyName: v.party_name || undefined,
+                      narration: v.narration || undefined,
+                      netTotal: Number(v.total_amount ?? v.amount ?? 0),
+                      paidAmount: Number(v.total_amount ?? v.amount ?? 0),
+                    })}>Print</Button>
+                </div>
+              </div>
+            ))
+          )}
         </div>
         <Pagination page={page} total={total} limit={LIMIT} onChange={setPage} />
       </div>

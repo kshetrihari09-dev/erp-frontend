@@ -115,7 +115,7 @@ export default function PeriodsTab({ onCount }: { onCount?: (count: number) => v
       </div>
 
       <div className="table-card">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto acc-desktop-table">
           <table className="erp-table">
             <thead>
               <tr>
@@ -163,6 +163,44 @@ export default function PeriodsTab({ onCount }: { onCount?: (count: number) => v
               }
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile card list */}
+        <div className="acc-mobile-list">
+          {loading ? (
+            <div className="acc-mobile-skel-wrap">
+              {[1,2].map(i => <div key={i} className="acc-mobile-card acc-mobile-card-skel" />)}
+            </div>
+          ) : periods.length === 0 ? (
+            <Empty message="No accounting periods — create one to lock/unlock transaction windows" />
+          ) : (
+            periods.map((p: any) => (
+              <div key={p.id} className="acc-mobile-card">
+                <div className="acc-mc-top">
+                  <span className="acc-mc-party" style={{ fontWeight: 700, fontSize: 14 }}>{p.name}</span>
+                  {p.is_locked
+                    ? <span className="badge badge-red">Locked</span>
+                    : <span className="badge badge-green">Open</span>
+                  }
+                </div>
+                <div className="acc-mc-sub">
+                  <span className="acc-mc-date">{fmtDate(p.start_date)}</span>
+                  <span style={{ color: 'var(--text-4)', fontSize: 12 }}>—</span>
+                  <span className="acc-mc-date">{fmtDate(p.end_date)}</span>
+                </div>
+                <div className="acc-mc-actions">
+                  <Button
+                    variant={p.is_locked ? 'success' : 'danger'} size="sm"
+                    icon={p.is_locked ? <Unlock size={12}/> : <Lock size={12}/>}
+                    onClick={() => toggleLock(p.id, p.is_locked)}
+                    style={{ flex: 1, justifyContent: 'center' }}
+                  >
+                    {p.is_locked ? 'Unlock' : 'Lock'}
+                  </Button>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
 

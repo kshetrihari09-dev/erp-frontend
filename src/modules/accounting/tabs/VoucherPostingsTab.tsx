@@ -17,7 +17,6 @@ import { useVoucherPostings } from '@/hooks/useQuery'
 import { Empty, SkeletonRows } from '@/components/ui'
 import { fmt, fmtDate } from '@/utils'
 import type { VoucherPosting } from '@/types'
-import { useAccResponsive } from '../useAccResponsive'
 
 const SOURCE_TYPE_OPTIONS = [
   { value: '',                label: 'All Sources'      },
@@ -51,7 +50,6 @@ function VoucherStatusIcon({ status }: { status: string }) {
 export default function VoucherPostingsTab({ onCount }: { onCount?: (count: number) => void } = {}) {
   const [sourceType, setSourceType] = useState('')
   const [page, setPage]             = useState(1)
-  const { isMobile } = useAccResponsive()
 
   const { data, isLoading } = useVoucherPostings({
     source_type: sourceType || undefined,
@@ -68,10 +66,10 @@ export default function VoucherPostingsTab({ onCount }: { onCount?: (count: numb
   return (
     <div>
       {/* ── Filters ───────────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-3 mb-3 acc-filter-row" style={isMobile ? { flexDirection: 'column', alignItems: 'stretch' } : undefined}>
+      <div className="flex items-center gap-3 mb-3 acc-filter-row">
         <select
           className="erp-input"
-          style={{ width: isMobile ? '100%' : 180, minHeight: isMobile ? 44 : undefined }}
+          className="acc-filter-select"
           value={sourceType}
           onChange={e => { setSourceType(e.target.value); setPage(1) }}
         >
@@ -80,7 +78,7 @@ export default function VoucherPostingsTab({ onCount }: { onCount?: (count: numb
           ))}
         </select>
         {pagination && (
-          <span className="text-xs text-[var(--text-3)] ml-auto acc-filter-count" style={isMobile ? { marginLeft: 0, textAlign: 'left' } : undefined}>
+          <span className="text-xs text-[var(--text-3)] ml-auto acc-filter-count">
             {pagination.total} posting{pagination.total !== 1 ? 's' : ''}
           </span>
         )}
@@ -88,7 +86,7 @@ export default function VoucherPostingsTab({ onCount }: { onCount?: (count: numb
 
       {/* ── Table ─────────────────────────────────────────────────────────── */}
       <div className="table-card">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto acc-desktop-table">
           <table className="erp-table">
             <thead>
               <tr>
@@ -177,6 +175,42 @@ export default function VoucherPostingsTab({ onCount }: { onCount?: (count: numb
               }
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile card list */}
+        <div className="acc-mobile-list">
+          {isLoading ? (
+            <div className="acc-mobile-skel-wrap">
+              {[1,2,3,4].map(i => <div key={i} className="acc-mobile-card acc-mobile-card-skel" />)}
+            </div>
+          ) : postings.length === 0 ? null : (
+            postings.map(p => (
+              <div key={p.id} className="acc-mobile-card">
+                <div className="acc-mc-top">
+                  <span className="acc-mc-no">{p.voucher_no}</span>
+                  {p.total_amount != null && <span className="acc-mc-amount">{fmt(p.total_amount)}</span>}
+                </div>
+                <div className="acc-mc-sub">
+                  <span className="acc-mc-party">{p.source_ref ?? '—'}</span>
+                  <span className="acc-mc-date">{p.posted_at ? fmtDate(p.posted_at) : '—'}</span>
+                </div>
+                <div className="acc-mc-chips">
+                  <span className={`badge ${SOURCE_BADGE[p.source_type] ?? 'badge-muted'} text-[10px]`}>
+                    {p.source_type.replace('_', ' ')}
+                  </span>
+                  <span className="flex items-center gap-1 text-xs">
+                    <VoucherStatusIcon status={p.voucher_status} />
+                    <span className="capitalize">{p.voucher_status}</span>
+                  </span>
+                </div>
+                {p.journal_entry_id && (
+                  <div className="acc-mc-narration">
+                    JE: {p.journal_entry_id.slice(0, 8)}…
+                  </div>
+                )}
+              </div>
+            ))
+          )}
         </div>
       </div>
 
