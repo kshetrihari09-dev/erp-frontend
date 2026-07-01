@@ -80,6 +80,7 @@ const KpiCard = memo(({ icon, accentColor, glowColor, label, value, delta, delta
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.45, delay, ease: [0.4, 0, 0.2, 1] }}
+      className="acc-kpi-card"
       style={{
         ...tk.card,
         borderRadius: 16,
@@ -222,10 +223,11 @@ function AnalyticsSection({ vouchers }: { vouchers: any[] }) {
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.45, delay: 0.2 }}
+      className="acc-analytics-grid"
       style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 20 }}
     >
       {/* Donut */}
-      <div style={cardStyle}>
+      <div style={cardStyle} className="acc-analytics-card">
         <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: tk.textMuted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'var(--font-mono)' }}>
           <Layers size={11} style={{ color: '#3b82f6' }} /> Voucher Distribution
         </div>
@@ -254,11 +256,11 @@ function AnalyticsSection({ vouchers }: { vouchers: any[] }) {
       </div>
 
       {/* Stats */}
-      <div style={cardStyle}>
+      <div style={cardStyle} className="acc-analytics-card">
         <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: tk.textMuted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'var(--font-mono)' }}>
           <BarChart3 size={11} style={{ color: '#8b5cf6' }} /> Voucher Statistics
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
+        <div className="acc-stat-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
           {statCards.map(s => (
             <div key={s.label} style={{ background: s.bg, border: `1px solid ${s.border}`, borderRadius: 10, padding: '12px 14px' }}>
               <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: s.color, opacity: 0.8, marginBottom: 4 }}>{s.label}</div>
@@ -279,7 +281,7 @@ function AnalyticsSection({ vouchers }: { vouchers: any[] }) {
       </div>
 
       {/* Trend */}
-      <div style={cardStyle}>
+      <div style={cardStyle} className="acc-analytics-card">
         <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: tk.textMuted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'var(--font-mono)' }}>
           <TrendingUp size={11} style={{ color: '#10b981' }} /> Monthly Trend
         </div>
@@ -328,10 +330,10 @@ export default function AccountingPage() {
   }, [])
 
   return (
-    <div style={{ minHeight: '100vh' }}>
+    <div className="acc-page" style={{ minHeight: '100vh' }}>
 
       {/* KPIs */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16, marginBottom: 20 }}>
+      <div className="acc-kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16, marginBottom: 20 }}>
         <KpiCard icon={<Layers size={20}/>}   accentColor="#3b82f6" glowColor="0 0 28px rgba(59,130,246,0.15)"  label="Total Vouchers" value={kpiLoading ? '—' : String(kpiData?.total || 0)} delta="+12.45%" deltaUp loading={kpiLoading} delay={0.05}/>
         <KpiCard icon={<Receipt size={20}/>}  accentColor="#10b981" glowColor="0 0 28px rgba(16,185,129,0.15)" label="Total Receipts" value={kpiLoading ? '—' : `₹${fmt(kpiData?.receipts || 0)}`} delta="+18.23%" deltaUp loading={kpiLoading} delay={0.1}/>
         <KpiCard icon={<CreditCard size={20}/>} accentColor="#8b5cf6" glowColor="0 0 28px rgba(139,92,246,0.15)" label="Total Payments" value={kpiLoading ? '—' : `₹${fmt(kpiData?.payments || 0)}`} delta="-5.32%" deltaUp={false} loading={kpiLoading} delay={0.15}/>
@@ -351,7 +353,7 @@ export default function AccountingPage() {
         style={{ ...tk.card, borderRadius: 16, overflow: 'hidden' }}
       >
         {/* Tab bar */}
-        <div style={{ borderBottom: `1px solid ${tk.divider}`, overflowX: 'auto', scrollbarWidth: 'none' }}>
+        <div className="acc-tabbar" style={{ borderBottom: `1px solid ${tk.divider}`, overflowX: 'auto', scrollbarWidth: 'none' }}>
           <div style={{ display: 'flex', minWidth: 'max-content' }}>
             {TABS.map(t => {
               const Icon = t.icon
@@ -359,6 +361,7 @@ export default function AccountingPage() {
               return (
                 <button
                   key={t.id}
+                  className="acc-tab-btn"
                   onClick={() => setTab(t.id)}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 7,
@@ -392,7 +395,7 @@ export default function AccountingPage() {
         </div>
 
         {/* Content */}
-        <div style={{ padding: '20px 22px' }}>
+        <div className="acc-tab-content" style={{ padding: '20px 22px' }}>
           <AnimatePresence mode="wait">
             <motion.div key={tab} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.18 }}>
               {tab === 'vouchers'         && <VouchersTab />}

@@ -1007,7 +1007,8 @@ td.psc-cell {
 }
 
 /* ── Dropdown panel ─────────────────────────────────────────────────────── */
-.psc-dropdown { 
+.psc-dropdown {
+ 
   top:          calc(100% + 4px);
   left:         0;
   z-index:      9999;
@@ -4009,3 +4010,122 @@ td.psc-cell {
   .ldg-pagination > div:last-child  { justify-content: center; }
 }
 
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   ACCOUNTING PAGE — MOBILE & TABLET RESPONSIVENESS
+   Scoped with the .acc- prefix / .acc-page ancestor. All rules are additive
+   and override inline styles only via !important at the breakpoints below —
+   desktop (>1024px) layout, business logic, data, and calculations are
+   completely untouched.
+   Breakpoints covered: 320 / 360 / 375 / 390 / 414 / 480 / 640 / 768 / 820 /
+   912 / 1024.
+══════════════════════════════════════════════════════════════════════════════ */
+
+/* ── KPI grid (top of Accounting page): 4 → 2 → 1 ─────────────────────────── */
+@media (max-width: 1024px) {
+  .acc-kpi-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 12px !important; }
+}
+@media (max-width: 560px) {
+  .acc-kpi-grid { grid-template-columns: 1fr !important; gap: 10px !important; margin-bottom: 14px !important; }
+}
+@media (max-width: 480px) {
+  .acc-kpi-card { padding: 14px 16px !important; }
+}
+
+/* ── Analytics section (Donut / Stats / Trend): 3 → 2 → 1 ─────────────────── */
+@media (max-width: 1024px) {
+  .acc-analytics-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 12px !important; }
+}
+@media (max-width: 640px) {
+  .acc-analytics-grid { grid-template-columns: 1fr !important; gap: 10px !important; margin-bottom: 14px !important; }
+  .acc-analytics-card { padding: 16px !important; }
+}
+@media (max-width: 400px) {
+  .acc-stat-grid { gap: 8px !important; }
+}
+
+/* ── Tab bar: keep horizontally scrollable, tap-friendly buttons ─────────── */
+.acc-tabbar { -webkit-overflow-scrolling: touch; }
+@media (max-width: 768px) {
+  .acc-tab-btn { min-height: 44px !important; padding: 11px 14px !important; font-size: 12px !important; }
+}
+@media (max-width: 420px) {
+  .acc-tab-btn { padding: 10px 11px !important; font-size: 11.5px !important; gap: 5px !important; }
+}
+
+/* ── Tab content padding ───────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .acc-tab-content { padding: 14px 12px !important; }
+}
+@media (max-width: 400px) {
+  .acc-tab-content { padding: 12px 8px !important; }
+}
+
+/* ── Generic filter rows (Vouchers / Accounts / Voucher Postings tabs) ────── */
+@media (max-width: 767px) {
+  .acc-page .acc-filter-row {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+  }
+  .acc-page .acc-filter-row > * { width: 100% !important; }
+  .acc-page .acc-filter-row select.erp-input,
+  .acc-page .acc-filter-row input.erp-input,
+  .acc-page .acc-filter-row .erp-input { width: 100% !important; }
+  .acc-page .acc-filter-row .acc-filter-count { text-align: left !important; margin-left: 0 !important; }
+  .acc-page .acc-filter-row .acc-filter-btn { width: 100% !important; }
+}
+@media (min-width: 768px) and (max-width: 1024px) {
+  .acc-page .acc-filter-row {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+    align-items: center;
+  }
+  .acc-page .acc-filter-row .acc-filter-btn,
+  .acc-page .acc-filter-row .acc-filter-count { grid-column: span 2; }
+}
+
+/* ── Inputs / selects: full width + 44px touch target on mobile ──────────── */
+@media (max-width: 767px) {
+  .acc-page .erp-input { width: 100% !important; min-height: 44px !important; box-sizing: border-box; }
+}
+
+/* ── Small utility buttons: comfortable touch target on mobile ───────────── */
+@media (max-width: 767px) {
+  .acc-page .h-7, .acc-page .h-8 { min-height: 40px !important; height: auto !important; padding-top: 6px !important; padding-bottom: 6px !important; }
+  .acc-page .page-btn { min-width: 36px !important; min-height: 36px !important; }
+}
+
+/* ── Trial Balance: filter card (date range / type / actions) ────────────── */
+@media (max-width: 767px) {
+  .acc-tb-filter-row { flex-direction: column !important; align-items: stretch !important; gap: 10px !important; }
+  .acc-tb-filter-field { width: 100% !important; }
+  .acc-tb-filter-field input.erp-input,
+  .acc-tb-filter-field select.erp-input { width: 100% !important; min-height: 44px !important; box-sizing: border-box; }
+  .acc-tb-filter-actions { width: 100% !important; }
+  .acc-tb-filter-actions button { flex: 1 1 calc(50% - 8px) !important; min-height: 44px !important; justify-content: center !important; }
+}
+@media (min-width: 768px) and (max-width: 1024px) {
+  .acc-tb-filter-row { display: grid !important; grid-template-columns: 1fr 1fr; align-items: end; gap: 12px !important; }
+  .acc-tb-filter-actions { grid-column: span 2; }
+}
+
+/* ── Trial Balance: KPI summary cards: 4 → 2 → 1 ──────────────────────────── */
+@media (max-width: 1024px) {
+  .acc-tb-kpi-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important; }
+}
+@media (max-width: 480px) {
+  .acc-tb-kpi-grid { grid-template-columns: 1fr !important; gap: 8px !important; }
+}
+
+/* ── Trial Balance: table toolbar (search + view controls) ───────────────── */
+@media (max-width: 640px) {
+  .acc-tb-toolbar { flex-direction: column !important; align-items: stretch !important; }
+  .acc-tb-search-wrap { width: 100% !important; }
+  .acc-tb-search-wrap input { width: 100% !important; min-height: 44px !important; box-sizing: border-box; }
+  .acc-tb-toolbar-actions { width: 100% !important; justify-content: flex-start !important; }
+}
+
+/* ── Prevent any residual horizontal page overflow inside the Accounting page */
+.acc-page { max-width: 100%; overflow-x: hidden; }
+.acc-page .acc-tab-content { max-width: 100%; }

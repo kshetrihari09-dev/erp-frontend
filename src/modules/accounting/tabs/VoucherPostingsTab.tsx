@@ -66,7 +66,7 @@ export default function VoucherPostingsTab({ onCount }: { onCount?: (count: numb
   return (
     <div>
       {/* ── Filters ───────────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-3 mb-3">
+      <div className="flex items-center gap-3 mb-3 acc-filter-row">
         <select
           className="erp-input"
           style={{ width: 180 }}
@@ -78,7 +78,7 @@ export default function VoucherPostingsTab({ onCount }: { onCount?: (count: numb
           ))}
         </select>
         {pagination && (
-          <span className="text-xs text-[var(--text-3)] ml-auto">
+          <span className="text-xs text-[var(--text-3)] ml-auto acc-filter-count">
             {pagination.total} posting{pagination.total !== 1 ? 's' : ''}
           </span>
         )}

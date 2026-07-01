@@ -85,12 +85,12 @@ export default function AccountsTab({ onCount }: { onCount?: (count: number) => 
 
   return (
     <div>
-      <div className="flex items-center justify-between gap-3 mb-3">
+      <div className="flex items-center justify-between gap-3 mb-3 acc-filter-row">
         <select className="erp-input" style={{ width: 160 }} value={typeFilter} onChange={e => setTypeFilter(e.target.value)}>
           <option value="">All Types</option>
           {ACCOUNT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
         </select>
-        <Button variant="primary" icon={<Plus size={14}/>} onClick={() => setModal(true)}>New Account</Button>
+        <Button variant="primary" icon={<Plus size={14}/>} onClick={() => setModal(true)} className="acc-filter-btn">New Account</Button>
       </div>
       <div className="table-card">
         <div className="overflow-x-auto">
