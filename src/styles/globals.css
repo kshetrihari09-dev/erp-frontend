@@ -310,12 +310,6 @@ input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
 
 .page-content { flex: 1; padding: 24px 28px; min-height: calc(100vh - var(--topbar-h)); --page-px: 28px; }
 
-/* Full-bleed header uses var(--page-px) so it always matches the container's
-   actual horizontal padding at every breakpoint without duplicating values. */
-@media (max-width: 640px) {
-  .page-content { --page-px: 10px; }
-}
-
 /* ── PAGE STRUCTURE ──────────────────────────────────────────────────── */
 .page-header {
   display: flex; align-items: center; justify-content: space-between;
@@ -1913,9 +1907,17 @@ td.psc-cell {
 .mb-5 { margin-bottom: 18px; }
 
 /* ── Global overflow guard ──────────────────────────────────────────────── */
-.page-content { overflow-x: hidden; box-sizing: border-box; }
+/* NOTE: overflow-x hidden on page-content breaks negative-margin bleed
+   headers on mobile, so we guard it only on the outer app-layout wrapper. */
+.app-layout { overflow-x: hidden; }
+.page-content { box-sizing: border-box; }
 
-/* ── Mobile tweaks ──────────────────────────────────────────────────────── */
+/* ── Tablet tweaks (768px and below) ────────────────────────────────────── */
+@media (max-width: 768px) {
+  .page-content       { padding: 16px 14px; --page-px: 14px; }
+}
+
+/* ── Mobile tweaks (640px and below) ────────────────────────────────────── */
 @media (max-width: 640px) {
   .page-content       { padding: 12px 10px; --page-px: 10px; }
   .dash-card-header   { padding: 12px 14px; }

@@ -14,6 +14,26 @@ import {
   CheckCircle, Clock, XCircle, MinusCircle,
 } from 'lucide-react'
 
+// ── Responsive helpers ────────────────────────────────────────────────────────
+function useWindowWidth() {
+  const [width, setWidth] = useState(() => window.innerWidth)
+  useEffect(() => {
+    const handler = () => setWidth(window.innerWidth)
+    window.addEventListener('resize', handler)
+    return () => window.removeEventListener('resize', handler)
+  }, [])
+  return width
+}
+
+// Returns the actual horizontal padding of .page-content at the current
+// viewport width — mirrors the media queries in globals.css exactly.
+function usePagePx() {
+  const w = useWindowWidth()
+  if (w <= 640) return 10
+  if (w <= 768) return 14
+  return 28
+}
+
 /* ─────────────────────────────────────────────────────────────────────────────
    All surfaces, borders and text use CSS custom properties so the page
    automatically adapts to light / dark mode via globals.css .dark { } vars.
@@ -151,6 +171,7 @@ function FilterBar({ dateFrom, dateTo, loading, onDateChange, onGenerate, onRese
   onGenerate: () => void; onReset: () => void
 }) {
   const [active, setActive] = useState('year')
+  const isMobile = useWindowWidth() <= 640
 
   function applyRange(key: string) {
     setActive(key)
@@ -159,12 +180,12 @@ function FilterBar({ dateFrom, dateTo, loading, onDateChange, onGenerate, onRese
   }
 
   return (
-    <div style={{ ...CARD, padding: '14px 16px', marginBottom: 20 }}>
-      {/* Quick range pills — always wrap */}
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+    <div style={{ ...CARD, padding: '12px 14px', marginBottom: 16 }}>
+      {/* Quick range pills */}
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
         {QUICK_RANGES.map(r => (
           <button key={r.key} onClick={() => applyRange(r.key)} style={{
-            padding: '5px 11px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+            padding: '4px 10px', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer',
             border: `1.5px solid ${active === r.key ? A.primary : 'var(--border)'}`,
             background: active === r.key ? A.primary + '12' : 'transparent',
             color: active === r.key ? A.primary : 'var(--text-2)',
@@ -175,22 +196,22 @@ function FilterBar({ dateFrom, dateTo, loading, onDateChange, onGenerate, onRese
         ))}
       </div>
 
-      {/* Date row + actions — stack on small screens */}
-      <div className="flex flex-wrap items-center gap-2">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: '1 1 auto', minWidth: 0 }}>
-          <Calendar size={14} color="var(--text-4)" style={{ flexShrink: 0 }}/>
+      {/* Date pickers + action buttons */}
+      <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 8, alignItems: isMobile ? 'stretch' : 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>
+          <Calendar size={13} color="var(--text-4)" style={{ flexShrink: 0 }}/>
           <input type="date" value={dateFrom} className="erp-input" style={{ flex: 1, minWidth: 0 }}
             onChange={e => { setActive('custom'); onDateChange('from', e.target.value) }} />
-          <span style={{ color: 'var(--text-4)', fontSize: 12, flexShrink: 0 }}>—</span>
+          <span style={{ color: 'var(--text-4)', fontSize: 12, flexShrink: 0 }}>–</span>
           <input type="date" value={dateTo} className="erp-input" style={{ flex: 1, minWidth: 0 }}
             onChange={e => { setActive('custom'); onDateChange('to', e.target.value) }} />
         </div>
         <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-          <button onClick={onReset} className="btn btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
-            <X size={13}/> Reset
+          <button onClick={onReset} className="btn btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, flex: isMobile ? 1 : undefined, justifyContent: 'center' }}>
+            <X size={12}/> Reset
           </button>
-          <button onClick={onGenerate} disabled={loading} className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            {loading ? <RefreshCw size={13} className="animate-spin"/> : <Search size={13}/>}
+          <button onClick={onGenerate} disabled={loading} className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, flex: isMobile ? 1 : undefined, justifyContent: 'center' }}>
+            {loading ? <RefreshCw size={12} className="animate-spin"/> : <Search size={12}/>}
             Generate
           </button>
         </div>
@@ -366,6 +387,8 @@ function SalesReport() {
   const [loading,  setLoading ] = useState(false)
   const [search,   setSearch  ] = useState('')
   const { error } = useUIStore()
+  const w = useWindowWidth()
+  const isMobile = w <= 640
 
   async function generate() {
     setLoading(true)
@@ -425,7 +448,7 @@ function SalesReport() {
       )}
 
       {hasData && trendData.length > 1 && (
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px_260px] gap-4" style={{ marginBottom: 20 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : w <= 900 ? '1fr 1fr' : '1fr 280px 260px', gap: 12, marginBottom: 20 }}>
           <div style={{ ...CARD, padding: 20 }}>
             <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)', marginBottom: 16 }}>Sales Trend</div>
             <ResponsiveContainer width="100%" height={160}>
@@ -473,7 +496,7 @@ function SalesReport() {
           actions={<><SearchInput value={search} onChange={setSearch}/><ExportMenu onCSV={() => downloadCSV(filtered, 'sales-report')} onPrint={() => window.print()}/></>}
         >
           {/* Desktop table */}
-          <div className="hidden sm:block">
+          <div className="hidden md:block">
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>{['Invoice No','Date','Party','Total','Paid','Due','Mode','Status'].map(h => (
@@ -511,7 +534,7 @@ function SalesReport() {
             </table>
           </div>
           {/* Mobile card list */}
-          <div className="block sm:hidden">
+          <div className="block md:hidden">
             {loading ? <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-4)' }}>Loading…</div>
               : filtered.length === 0 ? <EmptyState message="No records."/>
               : filtered.map((r: any, i: number) => (
@@ -581,7 +604,7 @@ function PurchaseReport() {
           <TableCard title="Purchase Bills" count={filtered.length} badge={fmt(total)}
             actions={<><SearchInput value={search} onChange={setSearch}/><ExportMenu onCSV={() => downloadCSV(filtered, 'purchase-report')} onPrint={() => window.print()}/></>}
           >
-            <div className="hidden sm:block">
+            <div className="hidden md:block">
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr>{['Bill No','Date','Supplier','Total','Due','Status'].map(h => (
@@ -612,7 +635,7 @@ function PurchaseReport() {
                 )}
               </table>
             </div>
-            <div className="block sm:hidden">
+            <div className="block md:hidden">
               {loading ? <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-4)' }}>Loading…</div>
                 : filtered.map((r: any, i: number) => (
                   <MobileCard key={i}>
@@ -705,7 +728,7 @@ function PnLReport() {
                   </div>
                 ))}
               </div>
-              <div className="hidden sm:block" style={{ marginLeft: 'auto' }}>
+              <div className="hidden md:block" style={{ marginLeft: 'auto' }}>
                 <ResponsiveContainer width={140} height={90}>
                   <PieChart>
                     <Pie data={chartData} cx="50%" cy="50%" innerRadius={25} outerRadius={40} paddingAngle={3} dataKey="value">
@@ -725,7 +748,7 @@ function PnLReport() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {[
               { title: 'Income',   rows: report.incomeRows,  total: report.totalIncome,  color: A.success, Icon: TrendingUp,   emptyMsg: 'No income accounts in this period',   totalLabel: 'TOTAL INCOME' },
               { title: 'Expenses', rows: report.expenseRows, total: report.totalExpense, color: A.danger,  Icon: TrendingDown, emptyMsg: 'No expense accounts in this period',  totalLabel: 'TOTAL EXPENSES' },
@@ -804,7 +827,7 @@ function StockReport() {
           <TableCard title="Stock Valuation" count={filtered.length} badge={fmt(totalValue)}
             actions={<><SearchInput value={search} onChange={setSearch}/><ExportMenu onCSV={() => downloadCSV(filtered, 'stock-report')} onPrint={() => window.print()}/></>}
           >
-            <div className="hidden sm:block">
+            <div className="hidden md:block">
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead><tr>
                   {['Code','Product','Unit','Stock','P.Rate','Value','Status'].map(h => (
@@ -826,7 +849,7 @@ function StockReport() {
                 </tbody>
               </table>
             </div>
-            <div className="block sm:hidden">
+            <div className="block md:hidden">
               {filtered.map((r: any, i: number) => (
                 <MobileCard key={i}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -890,7 +913,7 @@ function ExpiryReport() {
             <KpiCard label="Expiring Soon" value={String(nearExp.length)} icon={<AlertCircle size={18}/>} color={A.warning}/>
           </div>
           <TableCard title="Expiry Details" count={rows.length}>
-            <div className="hidden sm:block">
+            <div className="hidden md:block">
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead><tr>
                   {['Product','Batch','Qty','Expiry','Days Left'].map(h => (
@@ -916,7 +939,7 @@ function ExpiryReport() {
                 </tbody>
               </table>
             </div>
-            <div className="block sm:hidden">
+            <div className="block md:hidden">
               {rows.map((r: any, i: number) => {
                 const days = r.expiry_date ? Math.round((new Date(r.expiry_date).getTime() - Date.now()) / 86400000) : null
                 const dColor = days === null ? 'var(--text-4)' : days < 0 ? A.danger : days < 30 ? A.warning : A.success
@@ -1016,7 +1039,7 @@ function PartyBalanceReport() {
 
       <TableCard title={`${type === 'customer' ? 'Customer' : 'Supplier'} Balances`} count={filtered.length}>
         {/* Desktop table */}
-        <div className="hidden sm:block">
+        <div className="hidden md:block">
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead><tr>
               {['Code','Name','Phone','PAN','Total Invoiced','Paid','Due','Balance'].map(h => (
@@ -1056,7 +1079,7 @@ function PartyBalanceReport() {
           </table>
         </div>
         {/* Mobile card list */}
-        <div className="block sm:hidden">
+        <div className="block md:hidden">
           {loading ? <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-4)' }}>Loading…</div>
             : filtered.length === 0 ? <EmptyState message={`No ${type}s found`}/>
             : filtered.map((r: any, i: number) => {
@@ -1086,37 +1109,43 @@ function PartyBalanceReport() {
 // ════════════════════════════════════════════════════════════════════════════
 export default function ReportsPage() {
   const [tab, setTab] = useState('sales')
+  const px = usePagePx()
+  const w  = useWindowWidth()
+  const isMobile = w <= 640
+  const isTablet = w <= 768
 
   return (
     <div style={{ minHeight: '100vh' }}>
 
-      {/* Page header + tabs — full bleed via negative margin matching page-content padding */}
+      {/* Full-bleed header — negative margins exactly cancel page-content's
+          horizontal padding so it stretches edge-to-edge at every breakpoint. */}
       <div style={{
-        background: 'var(--surface)', borderBottom: '1px solid var(--border)',
-        marginLeft: 'calc(-1 * var(--page-px, 28px))',
-        marginRight: 'calc(-1 * var(--page-px, 28px))',
-        paddingLeft: 'var(--page-px, 28px)',
-        paddingRight: 'var(--page-px, 28px)',
-        paddingTop: 20, marginBottom: 24,
+        background: 'var(--surface)',
+        borderBottom: '1px solid var(--border)',
+        marginLeft: -px, marginRight: -px,
+        paddingLeft: px, paddingRight: px,
+        paddingTop: isMobile ? 14 : 20,
+        marginBottom: isMobile ? 16 : 24,
       }}>
         {/* Title row */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, marginBottom: 16 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: isMobile ? 12 : 16 }}>
           <div>
-            <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.2, color: 'var(--text-4)', marginBottom: 3 }}>Analytics</div>
-            <h1 style={{ fontSize: 'clamp(18px, 4vw, 24px)', fontWeight: 800, color: 'var(--text)', margin: 0, letterSpacing: '-0.5px' }}>Reports</h1>
+            <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.2, color: 'var(--text-4)', marginBottom: 2 }}>Analytics</div>
+            <h1 style={{ fontSize: isMobile ? 18 : isTablet ? 20 : 24, fontWeight: 800, color: 'var(--text)', margin: 0, letterSpacing: '-0.5px' }}>Reports</h1>
           </div>
-          <div style={{ background: A.primary + '12', border: `1px solid ${A.primary}30`, borderRadius: 10, padding: '6px 12px', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-            <BarChart2 size={14} color={A.primary}/>
+          <div style={{ background: A.primary + '12', border: `1px solid ${A.primary}30`, borderRadius: 8, padding: isMobile ? '5px 10px' : '6px 12px', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+            <BarChart2 size={13} color={A.primary}/>
             <span style={{ fontSize: 11, fontWeight: 600, color: A.primary }}>Live Data</span>
           </div>
         </div>
 
-        {/* Tab strip — scrolls horizontally on mobile, no wrap */}
-        <div style={{ display: 'flex', gap: 0, overflowX: 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+        {/* Tab strip — scrolls horizontally, never wraps, tab label hidden on very small screens */}
+        <div style={{ display: 'flex', overflowX: 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none', gap: 0 }}>
           {REPORT_TABS.map(t => (
             <button key={t.id} onClick={() => setTab(t.id)} style={{
-              display: 'flex', alignItems: 'center', gap: 5,
-              padding: '9px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: isMobile ? 4 : 5,
+              padding: isMobile ? '8px 10px' : '9px 14px',
+              fontSize: isMobile ? 11 : 12, fontWeight: 600, cursor: 'pointer',
               border: 'none', background: 'transparent', whiteSpace: 'nowrap',
               color: tab === t.id ? A.primary : 'var(--text-2)',
               borderBottom: `2.5px solid ${tab === t.id ? A.primary : 'transparent'}`,
@@ -1124,7 +1153,7 @@ export default function ReportsPage() {
               flexShrink: 0,
             }}>
               <span style={{ color: tab === t.id ? A.primary : 'var(--text-4)', display: 'flex' }}>{t.icon}</span>
-              {t.label}
+              {isMobile ? t.label.split(' ')[0] : t.label}
             </button>
           ))}
         </div>
