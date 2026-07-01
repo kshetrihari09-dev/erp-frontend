@@ -9,6 +9,7 @@ import { VOUCHER_TYPES } from '@/constants'
 import { PrintPreviewModal } from '@/components/print'
 import type { PrintData } from '@/components/print'
 import type { Voucher, Account, Party } from '@/types'
+import { useAccResponsive } from '../useAccResponsive'
 
 const LIMIT = 20
 
@@ -21,6 +22,7 @@ interface VouchersTabProps {
 
 export default function VouchersTab({ onCount, openSignal }: VouchersTabProps = {}) {
   const { success, error } = useUIStore()
+  const { isMobile } = useAccResponsive()
   const [vouchers, setVouchers] = useState<Voucher[]>([])
   const [total,    setTotal]    = useState(0)
   const [page,     setPage]     = useState(1)
@@ -66,13 +68,13 @@ export default function VouchersTab({ onCount, openSignal }: VouchersTabProps = 
 
   return (
     <div>
-      <div className="flex items-center gap-2 mb-3 flex-wrap acc-filter-row">
-        <SearchInput value={search} onChange={setSearch} className="w-52" />
-        <select className="erp-input" style={{ width: 150 }} value={typeFilter} onChange={e => { setTypeFilter(e.target.value); setPage(1) }}>
+      <div className="flex items-center gap-2 mb-3 flex-wrap acc-filter-row" style={isMobile ? { flexDirection: 'column', alignItems: 'stretch' } : undefined}>
+        <SearchInput value={search} onChange={setSearch} className={isMobile ? 'w-full' : 'w-52'} />
+        <select className="erp-input" style={{ width: isMobile ? '100%' : 150, minHeight: isMobile ? 44 : undefined }} value={typeFilter} onChange={e => { setTypeFilter(e.target.value); setPage(1) }}>
           <option value="">All Types</option>
           {VOUCHER_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
         </select>
-        <select className="erp-input" style={{ width: 130 }} value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1) }}>
+        <select className="erp-input" style={{ width: isMobile ? '100%' : 130, minHeight: isMobile ? 44 : undefined }} value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1) }}>
           <option value="">All Status</option>
           {['draft','posted','cancelled','reversed'].map(s => <option key={s}>{s}</option>)}
         </select>

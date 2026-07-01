@@ -12,6 +12,7 @@ import {
 import { accountingAPI } from '@/services/api'
 import useUIStore from '@/store/uiStore'
 import { fmt } from '@/utils'
+import { useAccResponsive } from './useAccResponsive'
 
 import VouchersTab        from './tabs/VouchersTab'
 import AccountsTab        from './tabs/AccountsTab'
@@ -75,6 +76,7 @@ interface KpiProps {
 
 const KpiCard = memo(({ icon, accentColor, glowColor, label, value, delta, deltaUp, loading, delay = 0 }: KpiProps) => {
   const tk = useThemeTokens()
+  const { isMobile } = useAccResponsive()
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -84,7 +86,7 @@ const KpiCard = memo(({ icon, accentColor, glowColor, label, value, delta, delta
       style={{
         ...tk.card,
         borderRadius: 16,
-        padding: '20px 22px',
+        padding: isMobile ? '14px 16px' : '20px 22px',
         position: 'relative',
         overflow: 'hidden',
         minWidth: 0,
@@ -168,6 +170,7 @@ interface AnalyticsData {
 
 function AnalyticsSection({ vouchers }: { vouchers: any[] }) {
   const tk = useThemeTokens()
+  const { isMobile, isTablet } = useAccResponsive()
 
   const analytics = useMemo<AnalyticsData>(() => {
     if (!vouchers.length) {
@@ -209,7 +212,7 @@ function AnalyticsSection({ vouchers }: { vouchers: any[] }) {
 
   const hasDistribution = analytics.distribution.some(d => d.value > 0)
 
-  const cardStyle: React.CSSProperties = { ...tk.card, borderRadius: 16, padding: '20px 22px' }
+  const cardStyle: React.CSSProperties = { ...tk.card, borderRadius: 16, padding: '20px 22px', minWidth: 0 }
 
   // Status stat card themes — light uses soft pastels, dark uses translucent tints
   const statCards = [
@@ -225,10 +228,10 @@ function AnalyticsSection({ vouchers }: { vouchers: any[] }) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.45, delay: 0.2 }}
       className="acc-analytics-grid"
-      style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 20 }}
+      style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : isTablet ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)', gap: isMobile ? 10 : 16, marginBottom: isMobile ? 14 : 20, minWidth: 0 }}
     >
       {/* Donut */}
-      <div style={cardStyle} className="acc-analytics-card">
+      <div style={{ ...cardStyle, padding: isMobile ? 16 : cardStyle.padding }} className="acc-analytics-card">
         <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: tk.textMuted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'var(--font-mono)' }}>
           <Layers size={11} style={{ color: '#3b82f6' }} /> Voucher Distribution
         </div>
@@ -257,7 +260,7 @@ function AnalyticsSection({ vouchers }: { vouchers: any[] }) {
       </div>
 
       {/* Stats */}
-      <div style={cardStyle} className="acc-analytics-card">
+      <div style={{ ...cardStyle, padding: isMobile ? 16 : cardStyle.padding }} className="acc-analytics-card">
         <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: tk.textMuted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'var(--font-mono)' }}>
           <BarChart3 size={11} style={{ color: '#8b5cf6' }} /> Voucher Statistics
         </div>
@@ -282,7 +285,7 @@ function AnalyticsSection({ vouchers }: { vouchers: any[] }) {
       </div>
 
       {/* Trend */}
-      <div style={cardStyle} className="acc-analytics-card">
+      <div style={{ ...cardStyle, padding: isMobile ? 16 : cardStyle.padding }} className="acc-analytics-card">
         <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: tk.textMuted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'var(--font-mono)' }}>
           <TrendingUp size={11} style={{ color: '#10b981' }} /> Monthly Trend
         </div>
@@ -311,6 +314,7 @@ export default function AccountingPage() {
   const [kpiLoading, setKpiLoading] = useState(true)
   const [vouchers, setVouchers] = useState<any[]>([])
   const tk = useThemeTokens()
+  const { isMobile, isTablet } = useAccResponsive()
 
   useEffect(() => {
     async function loadKpi() {
@@ -388,7 +392,7 @@ export default function AccountingPage() {
       `}</style>
 
       {/* KPIs */}
-      <div className="acc-kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16, marginBottom: 20 }}>
+      <div className="acc-kpi-grid" style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : isTablet ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap: isMobile ? 10 : 16, marginBottom: isMobile ? 14 : 20, minWidth: 0 }}>
         <KpiCard icon={<Layers size={20}/>}   accentColor="#3b82f6" glowColor="0 0 28px rgba(59,130,246,0.15)"  label="Total Vouchers" value={kpiLoading ? '—' : String(kpiData?.total || 0)} delta="+12.45%" deltaUp loading={kpiLoading} delay={0.05}/>
         <KpiCard icon={<Receipt size={20}/>}  accentColor="#10b981" glowColor="0 0 28px rgba(16,185,129,0.15)" label="Total Receipts" value={kpiLoading ? '—' : `₹${fmt(kpiData?.receipts || 0)}`} delta="+18.23%" deltaUp loading={kpiLoading} delay={0.1}/>
         <KpiCard icon={<CreditCard size={20}/>} accentColor="#8b5cf6" glowColor="0 0 28px rgba(139,92,246,0.15)" label="Total Payments" value={kpiLoading ? '—' : `₹${fmt(kpiData?.payments || 0)}`} delta="-5.32%" deltaUp={false} loading={kpiLoading} delay={0.15}/>
@@ -419,14 +423,16 @@ export default function AccountingPage() {
                   className="acc-tab-btn"
                   onClick={() => setTab(t.id)}
                   style={{
-                    display: 'flex', alignItems: 'center', gap: 7,
-                    padding: '13px 20px', fontSize: 12.5, fontWeight: 600,
+                    display: 'flex', alignItems: 'center', gap: isMobile ? 5 : 7,
+                    padding: isMobile ? '11px 12px' : '13px 20px', fontSize: isMobile ? 11.5 : 12.5, fontWeight: 600,
+                    minHeight: isMobile ? 44 : undefined,
                     whiteSpace: 'nowrap', border: 'none', cursor: 'pointer',
                     background: isActive ? tk.tabActiveBg : 'transparent',
                     color: isActive ? tk.tabActiveText : tk.tabInactiveText,
                     borderBottom: `2px solid ${isActive ? '#3b82f6' : 'transparent'}`,
                     transition: 'all 0.16s cubic-bezier(.4,0,.2,1)',
                     fontFamily: 'var(--font)',
+                    boxSizing: 'border-box',
                   }}
                   onMouseEnter={e => {
                     if (!isActive) {
@@ -450,7 +456,7 @@ export default function AccountingPage() {
         </div>
 
         {/* Content */}
-        <div className="acc-tab-content" style={{ padding: '20px 22px' }}>
+        <div className="acc-tab-content" style={{ padding: isMobile ? '12px 10px' : '20px 22px' }}>
           <AnimatePresence mode="wait">
             <motion.div key={tab} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.18 }}>
               {tab === 'vouchers'         && <VouchersTab />}

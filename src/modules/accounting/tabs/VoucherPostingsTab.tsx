@@ -17,6 +17,7 @@ import { useVoucherPostings } from '@/hooks/useQuery'
 import { Empty, SkeletonRows } from '@/components/ui'
 import { fmt, fmtDate } from '@/utils'
 import type { VoucherPosting } from '@/types'
+import { useAccResponsive } from '../useAccResponsive'
 
 const SOURCE_TYPE_OPTIONS = [
   { value: '',                label: 'All Sources'      },
@@ -50,6 +51,7 @@ function VoucherStatusIcon({ status }: { status: string }) {
 export default function VoucherPostingsTab({ onCount }: { onCount?: (count: number) => void } = {}) {
   const [sourceType, setSourceType] = useState('')
   const [page, setPage]             = useState(1)
+  const { isMobile } = useAccResponsive()
 
   const { data, isLoading } = useVoucherPostings({
     source_type: sourceType || undefined,
@@ -66,10 +68,10 @@ export default function VoucherPostingsTab({ onCount }: { onCount?: (count: numb
   return (
     <div>
       {/* ── Filters ───────────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-3 mb-3 acc-filter-row">
+      <div className="flex items-center gap-3 mb-3 acc-filter-row" style={isMobile ? { flexDirection: 'column', alignItems: 'stretch' } : undefined}>
         <select
           className="erp-input"
-          style={{ width: 180 }}
+          style={{ width: isMobile ? '100%' : 180, minHeight: isMobile ? 44 : undefined }}
           value={sourceType}
           onChange={e => { setSourceType(e.target.value); setPage(1) }}
         >
@@ -78,7 +80,7 @@ export default function VoucherPostingsTab({ onCount }: { onCount?: (count: numb
           ))}
         </select>
         {pagination && (
-          <span className="text-xs text-[var(--text-3)] ml-auto acc-filter-count">
+          <span className="text-xs text-[var(--text-3)] ml-auto acc-filter-count" style={isMobile ? { marginLeft: 0, textAlign: 'left' } : undefined}>
             {pagination.total} posting{pagination.total !== 1 ? 's' : ''}
           </span>
         )}
