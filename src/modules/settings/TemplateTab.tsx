@@ -107,7 +107,7 @@ export default function TemplateTab() {
         {/* Toolbar */}
         <div className="tpl-toolbar">
           <h2 className="tpl-heading">Invoice Template</h2>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div className="tpl-toolbar-actions" style={{ display: 'flex', gap: 8 }}>
             <button className="tpl-btn tpl-btn--ghost" onClick={resetTemplate} title="Reset to defaults">
               <RotateCcw size={13} /> Reset
             </button>

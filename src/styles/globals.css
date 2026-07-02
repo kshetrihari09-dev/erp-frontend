@@ -1920,7 +1920,7 @@ td.psc-cell {
 .mb-5 { margin-bottom: 18px; }
 
 /* ── Global overflow guard ──────────────────────────────────────────────── */
-.page-content { overflow-x: hidden; box-sizing: border-box; }
+.page-content { overflow-x: auto; box-sizing: border-box; }
 
 /* ── Mobile tweaks ──────────────────────────────────────────────────────── */
 @media (max-width: 640px) {
@@ -4023,7 +4023,7 @@ td.psc-cell {
 
 /* ── KPI grid (top of Accounting page): 4 → 2 → 1 ─────────────────────────── */
 @media (max-width: 1024px) {
-  .acc-kpi-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 12px !important; }
+  .acc-kpi-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 12px !important;}
 }
 @media (max-width: 560px) {
   .acc-kpi-grid { grid-template-columns: 1fr !important; gap: 10px !important; margin-bottom: 14px !important; }
@@ -4177,6 +4177,7 @@ td.psc-cell {
 
 /* ── Individual card shell ───────────────────────────────────────────────── */
 .acc-mobile-card {
+  margin-right:10px;
   background:      var(--surface);
   border:          1.5px solid var(--border);
   border-radius:   14px;

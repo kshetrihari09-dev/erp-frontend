@@ -229,19 +229,21 @@ function AnalyticsSection({ vouchers }: { vouchers: any[] }) {
     >
       {/* Donut */}
       <div style={cardStyle} className="acc-analytics-card">
-        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: tk.textMuted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'var(--font-mono)' }}>
+        <div style={{fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: tk.textMuted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'var(--font-mono)' }}>
           <Layers size={11} style={{ color: '#3b82f6' }} /> Voucher Distribution
         </div>
         {hasDistribution ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <ResponsiveContainer width="100%" height={170}>
-              <PieChart>
-                <Pie data={analytics.distribution} cx="50%" cy="50%" innerRadius={50} outerRadius={76} paddingAngle={2} dataKey="value" labelLine={false} label={CustomDonutLabel}>
-                  {analytics.distribution.map((_, i) => <Cell key={i} fill={DONUT_COLORS[i % DONUT_COLORS.length]} />)}
-                </Pie>
-                <Tooltip content={(props) => <ChartTooltip {...props} dark={tk.dark} />} />
-              </PieChart>
-            </ResponsiveContainer>
+            <div style={{ width: '100%', overflow: 'auto', minWidth: 0 }}>
+              <ResponsiveContainer width="100%" height={170}>
+                <PieChart>
+                  <Pie data={analytics.distribution} cx="50%" cy="50%" innerRadius={50} outerRadius={76} paddingAngle={2} dataKey="value" labelLine={false} label={CustomDonutLabel}>
+                    {analytics.distribution.map((_, i) => <Cell key={i} fill={DONUT_COLORS[i % DONUT_COLORS.length]} />)}
+                  </Pie>
+                  <Tooltip content={(props) => <ChartTooltip {...props} dark={tk.dark} />} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '6px 12px', marginTop: 8 }}>
               {analytics.distribution.map((d, i) => (
                 <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: tk.textMuted }}>
@@ -287,6 +289,7 @@ function AnalyticsSection({ vouchers }: { vouchers: any[] }) {
           <TrendingUp size={11} style={{ color: '#10b981' }} /> Monthly Trend
         </div>
         {analytics.trend.length >= 2 ? (
+          <div style={{ width: '100%', overflow: 'hidden', minWidth: 0 }}>
           <ResponsiveContainer width="100%" height={180}>
             <LineChart data={analytics.trend} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={tk.gridStroke} />
@@ -296,6 +299,7 @@ function AnalyticsSection({ vouchers }: { vouchers: any[] }) {
               <Line type="monotone" dataKey="count" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3, fill: '#3b82f6', strokeWidth: 0 }} activeDot={{ r: 5, fill: '#3b82f6', stroke: 'rgba(59,130,246,0.3)', strokeWidth: 4 }} />
             </LineChart>
           </ResponsiveContainer>
+          </div>
         ) : (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 150, color: tk.textFaint, fontSize: 13 }}>Not enough data</div>
         )}
@@ -385,6 +389,14 @@ export default function AccountingPage() {
         @media (max-width: 420px) {
           .acc-tab-btn { padding: 10px 11px !important; font-size: 11.5px !important; gap: 5px !important; }
         }
+        /* Stat grid inside analytics: 2-col on mobile is OK but collapse on very small */
+        @media (max-width: 380px) {
+          .acc-stat-grid { grid-template-columns: 1fr !important; }
+        }
+        /* Analytics card: ensure no overflow */
+        .acc-analytics-card { overflow: hidden; min-width: 0; }
+        /* VoucherDistribution label: prevent overflow */
+        .acc-analytics-card > div:first-child { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
       `}</style>
 
       {/* KPIs */}

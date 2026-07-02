@@ -66,7 +66,7 @@ function CompanyTab() {
       <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-5 shadow-card">
         <div className="font-bold text-sm mb-4">Company Information</div>
         <div className="form-grid">
-          <div style={{ gridColumn: 'span 2' }}>
+          <div className="stp-span2">
             <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">Company Name *</label>
             <input className="erp-input" {...register('name')} />
           </div>
@@ -94,7 +94,7 @@ function CompanyTab() {
             <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">VAT %</label>
             <input type="number" className="erp-input" {...register('vat_percent')} />
           </div>
-          <div style={{ gridColumn: 'span 2' }}>
+          <div className="stp-span2">
             <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">Address</label>
             <input className="erp-input" placeholder="Kathmandu, Nepal" {...register('address')} />
           </div>
@@ -143,7 +143,7 @@ function UserForm({ onClose }: { onClose: () => void }) {
           <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">Password *</label>
           <input type="password" className="erp-input" {...register('password')} />
         </div>
-        <div style={{ gridColumn: 'span 2' }}>
+        <div className="stp-span2">
           <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">Role</label>
           <select className="erp-input" {...register('role')}>
             {USER_ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
@@ -169,7 +169,8 @@ function UsersTab() {
         <Button variant="primary" icon={<Plus size={14}/>} onClick={() => setModal(true)}>Add User</Button>
       </div>
       <div className="table-card">
-        <div className="overflow-x-auto">
+        {/* Desktop */}
+        <div className="overflow-x-auto stp-desktop-table">
           <table className="erp-table">
             <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Status</th><th>Last Login</th></tr></thead>
             <tbody>
@@ -190,6 +191,31 @@ function UsersTab() {
               }
             </tbody>
           </table>
+        </div>
+        {/* Mobile */}
+        <div className="stp-mobile-list">
+          {isLoading
+            ? [1,2,3].map(i => <div key={i} className="stp-card stp-card-skel"/>)
+            : users.length === 0
+              ? <Empty message="No users found"/>
+              : users.map(u => (
+                  <div key={u.id} className="stp-card">
+                    <div className="stp-card-top">
+                      <div className="stp-card-avatar">{u.name?.[0]?.toUpperCase() ?? '?'}</div>
+                      <div className="stp-card-main">
+                        <p className="stp-card-title">{u.name}</p>
+                        <p className="stp-card-sub">{u.email}</p>
+                      </div>
+                      {u.is_active ? <span className="badge badge-green">Active</span> : <span className="badge badge-red">Inactive</span>}
+                    </div>
+                    <div className="stp-card-chips">
+                      <span className="badge badge-purple">{u.role}</span>
+                      {u.phone && <span className="stp-card-meta">{u.phone}</span>}
+                    </div>
+                    <div className="stp-card-footer">Last login: {u.last_login_at ? fmtDateTime(u.last_login_at) : 'Never'}</div>
+                  </div>
+                ))
+          }
         </div>
       </div>
       <Modal open={modal} onClose={() => setModal(false)} title="Add User" size="md">
@@ -262,7 +288,8 @@ function FiscalTab() {
       )}
 
       <div className="table-card">
-        <div className="overflow-x-auto">
+        {/* Desktop */}
+        <div className="overflow-x-auto stp-desktop-table">
           <table className="erp-table">
             <thead><tr><th>Name</th><th>Start (AD)</th><th>End (AD)</th><th>Start (BS)</th><th>End (BS)</th><th>Locked</th></tr></thead>
             <tbody>
@@ -272,7 +299,6 @@ function FiscalTab() {
                   ? years.map((y: any) => (
                       <tr key={y.id}>
                         <td className="font-semibold">{y.name}</td>
-                        {/* Backend columns: start_date_ad / end_date_ad (not start_date / end_date) */}
                         <td className="td-mono">{fmtDate(y.start_date_ad || y.start_date)}</td>
                         <td className="td-mono">{fmtDate(y.end_date_ad   || y.end_date)}</td>
                         <td className="td-mono">{y.start_date_bs || '—'}</td>
@@ -284,6 +310,30 @@ function FiscalTab() {
               }
             </tbody>
           </table>
+        </div>
+        {/* Mobile */}
+        <div className="stp-mobile-list">
+          {isLoading
+            ? [1,2].map(i => <div key={i} className="stp-card stp-card-skel"/>)
+            : years.length === 0
+              ? <Empty message="No fiscal years configured. Click '+ Add Fiscal Year' to create one."/>
+              : years.map((y: any) => (
+                  <div key={y.id} className="stp-card">
+                    <div className="stp-card-top">
+                      <div className="stp-card-main">
+                        <p className="stp-card-title">{y.name}</p>
+                      </div>
+                      {y.is_locked ? <span className="badge badge-red">Locked</span> : <span className="badge badge-green">Open</span>}
+                    </div>
+                    <div className="stp-fy-grid">
+                      <div className="stp-fy-item"><span className="stp-fy-label">Start AD</span><span className="stp-fy-val">{fmtDate(y.start_date_ad || y.start_date)}</span></div>
+                      <div className="stp-fy-item"><span className="stp-fy-label">End AD</span><span className="stp-fy-val">{fmtDate(y.end_date_ad || y.end_date)}</span></div>
+                      {y.start_date_bs && <div className="stp-fy-item"><span className="stp-fy-label">Start BS</span><span className="stp-fy-val">{y.start_date_bs}</span></div>}
+                      {y.end_date_bs   && <div className="stp-fy-item"><span className="stp-fy-label">End BS</span><span className="stp-fy-val">{y.end_date_bs}</span></div>}
+                    </div>
+                  </div>
+                ))
+          }
         </div>
       </div>
     </div>
@@ -303,7 +353,8 @@ function AuditTab() {
         <Shield size={14} className="text-[var(--text-4)]"/>
         <span className="font-semibold text-sm">Audit Trail</span>
       </div>
-      <div className="overflow-x-auto">
+      {/* Desktop */}
+      <div className="overflow-x-auto stp-desktop-table">
         <table className="erp-table">
           <thead><tr><th>Time</th><th>User</th><th>Action</th><th>Entity</th><th>Details</th><th>IP</th></tr></thead>
           <tbody>
@@ -330,6 +381,34 @@ function AuditTab() {
             }
           </tbody>
         </table>
+      </div>
+      {/* Mobile */}
+      <div className="stp-mobile-list">
+        {isLoading
+          ? [1,2,3,4].map(i => <div key={i} className="stp-card stp-card-skel"/>)
+          : rows.length === 0
+            ? <Empty message="No audit entries"/>
+            : rows.map((l: any, i: number) => (
+                <div key={i} className="stp-card">
+                  <div className="stp-card-top">
+                    <div className="stp-card-main">
+                      <p className="stp-card-title">{l.user_name}</p>
+                      <p className="stp-card-sub">{fmtDateTime(l.created_at)}</p>
+                    </div>
+                    <span className={`badge ${l.action?.includes('DELETE') || l.action?.includes('CANCEL') ? 'badge-red' : l.action?.includes('CREATE') ? 'badge-green' : 'badge-blue'}`}>{l.action}</span>
+                  </div>
+                  <div className="stp-card-chips">
+                    <span className="stp-audit-entity">{l.entity_type || l.entity || '—'}</span>
+                    {l.ip_address && <span className="stp-card-meta">{l.ip_address}</span>}
+                  </div>
+                  <div className="stp-audit-detail">
+                    {l.payload_after
+                      ? (typeof l.payload_after === 'string' ? l.payload_after.slice(0, 120) : JSON.stringify(l.payload_after).slice(0, 120))
+                      : l.new_value || '—'}
+                  </div>
+                </div>
+              ))
+        }
       </div>
       <Pagination page={page} total={total} limit={30} onChange={setPage} />
     </div>

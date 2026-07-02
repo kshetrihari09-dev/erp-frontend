@@ -152,20 +152,20 @@ export default function VouchersTab({ onCount, openSignal }: VouchersTabProps = 
                   <span className="badge badge-blue">{v.voucher_type}</span>
                   <Badge status={v.status}/>
                 </div>
-                {v.narration && <div className="acc-mc-narration">{v.narration}</div>}
+                {v.narration && v.narration.trim() && <div className="acc-mc-narration">{v.narration}</div>}
                 <div className="acc-mc-actions" onClick={e => e.stopPropagation()}>
-                  <Button variant="secondary" size="sm" icon={<Printer size={12}/>}
+                  <Button variant="secondary" size="sm" icon={<Printer size={12}/>} style={{ flex: 'none' }}
                     onClick={() => setPrintData({
                       voucherNo: v.voucher_no, type: (v.voucher_type || 'JOURNAL') as any,
                       date: v.voucher_date, partyName: v.party_name || undefined,
                       narration: v.narration || undefined, netTotal: Number(v.total_amount || 0),
                     })}>Print</Button>
                   {v.status === 'draft' && (
-                    <Button variant="primary" size="sm" icon={<CheckCircle2 size={12}/>}
+                    <Button variant="primary" size="sm" icon={<CheckCircle2 size={12}/>} style={{ flex: 'none' }}
                       onClick={() => postVoucher(v.id)}>Post</Button>
                   )}
                   {v.status === 'posted' && (
-                    <Button variant="danger" size="sm" icon={<RotateCcw size={12}/>}
+                    <Button variant="danger" size="sm" icon={<RotateCcw size={12}/>} style={{ flex: 'none' }}
                       onClick={() => reverseVoucher(v.id)}>Reverse</Button>
                   )}
                 </div>
