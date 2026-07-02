@@ -4131,76 +4131,65 @@ td.psc-cell {
 .acc-page .acc-tab-content { max-width: 100%; }
 
 /* ══════════════════════════════════════════════════════════════════════════════
-   ACCOUNTING PAGE — MOBILE & TABLET RESPONSIVENESS
-   Works alongside the inline <style> block in AccountingPage.tsx.
-   All rules additive, scoped with .acc- prefix.
+   ACCOUNTING — MOBILE TABLE → CARD TOGGLE + CARD ANATOMY
+   Focused addition: only handles the table/card visibility swap and card styles.
+   All filter-row, KPI-grid, tab-btn rules are already in AccountingPage.tsx <style>.
 ══════════════════════════════════════════════════════════════════════════════ */
 
-/* ── Filter selects: fixed width on desktop, full width on mobile ─────────── */
-.acc-filter-select { width: 160px; }
-@media (max-width: 768px) {
-  .acc-filter-select { width: 100% !important; }
+/* ── Desktop table wrapper: hidden on mobile ─────────────────────────────── */
+.acc-desktop-table           { display: block; }
+@media (max-width: 767px) {
+  .acc-desktop-table         { display: none !important; }
 }
 
-/* ── TrialBal date inputs: fixed on desktop, full on mobile ──────────────── */
-.acc-tb-date-input { width: 155px; }
-@media (max-width: 768px) {
-  .acc-tb-date-input { width: 100% !important; }
-}
-
-/* ── TrialBal toolbar search: fixed on desktop, full on mobile ────────────── */
-.acc-tb-search-input { width: 210px; }
-@media (max-width: 768px) {
-  .acc-tb-search-input { width: 100% !important; }
-}
-
-/* ── Desktop table / mobile list toggle ──────────────────────────────────── */
-.acc-desktop-table { display: block; }
-@media (max-width: 768px) {
-  .acc-desktop-table { display: none !important; }
-}
-
-.acc-mobile-list { display: none; }
-@media (max-width: 768px) {
+/* ── Mobile card list: hidden on desktop, shown on mobile ────────────────── */
+.acc-mobile-list             { display: none; }
+@media (max-width: 767px) {
   .acc-mobile-list {
     display:        flex;
     flex-direction: column;
     gap:            10px;
-    padding:        12px;
+    padding:        12px 4px;
   }
 }
 
-/* Skeleton */
+/* ── Tablet (768-1024): still show table but with horizontal scroll ───────── */
+@media (min-width: 768px) and (max-width: 1024px) {
+  .acc-desktop-table         { overflow-x: auto; }
+  .acc-desktop-table table   { min-width: 600px; font-size: 12px; }
+  .acc-desktop-table th,
+  .acc-desktop-table td      { padding: 8px 10px !important; }
+}
+
+/* ── Skeleton loading cards ──────────────────────────────────────────────── */
 .acc-mobile-skel-wrap { display: flex; flex-direction: column; gap: 10px; }
 .acc-mobile-card-skel {
-  height:     80px;
-  cursor:     default;
-  background: linear-gradient(90deg, var(--surface) 25%, var(--surface-2) 50%, var(--surface) 75%);
+  height:          80px;
+  border-radius:   12px;
+  background:      linear-gradient(90deg, var(--surface) 25%, var(--surface-2) 50%, var(--surface) 75%);
   background-size: 400% 100%;
-  animation:  acc-shimmer 1.4s ease infinite;
-  border-radius: 12px;
+  animation:       acc-card-shimmer 1.4s ease infinite;
 }
-@keyframes acc-shimmer {
+@keyframes acc-card-shimmer {
   0%   { background-position: 100% 50%; }
   100% { background-position:   0% 50%; }
 }
 
-/* ── Individual card ─────────────────────────────────────────────────────── */
+/* ── Individual card shell ───────────────────────────────────────────────── */
 .acc-mobile-card {
-  background:     var(--surface);
-  border:         1.5px solid var(--border);
-  border-radius:  14px;
-  padding:        13px 14px;
-  display:        flex;
-  flex-direction: column;
-  gap:            8px;
-  cursor:         pointer;
-  transition:     background .12s, border-color .12s;
+  background:      var(--surface);
+  border:          1.5px solid var(--border);
+  border-radius:   14px;
+  padding:         13px 14px;
+  display:         flex;
+  flex-direction:  column;
+  gap:             8px;
+  transition:      background .12s, border-color .12s;
   -webkit-tap-highlight-color: transparent;
 }
 .acc-mobile-card:active { background: var(--surface-2); }
 
-/* Top row: voucher no (left) + amount (right) */
+/* Top row: voucher/code no (left) + amount (right) */
 .acc-mc-top {
   display:         flex;
   align-items:     center;
@@ -4213,6 +4202,7 @@ td.psc-cell {
   font-weight:    700;
   color:          var(--brand);
   letter-spacing: .01em;
+  flex-shrink:    0;
 }
 .acc-mc-amount {
   font-family:    var(--font-mono, monospace);
@@ -4222,7 +4212,7 @@ td.psc-cell {
   letter-spacing: -.3px;
 }
 
-/* Sub row: party (left) + date (right) */
+/* Sub row: party name (left) + date (right) */
 .acc-mc-sub {
   display:         flex;
   align-items:     center;
@@ -4241,12 +4231,12 @@ td.psc-cell {
 }
 .acc-mc-date {
   font-family: var(--font-mono, monospace);
-  font-size:   12px;
+  font-size:   11.5px;
   color:       var(--text-3);
   flex-shrink: 0;
 }
 
-/* Chips row: badges */
+/* Chips row */
 .acc-mc-chips {
   display:     flex;
   flex-wrap:   wrap;
@@ -4254,30 +4244,74 @@ td.psc-cell {
   align-items: center;
 }
 
-/* Narration text */
+/* Narration pill */
 .acc-mc-narration {
   font-size:     12px;
   color:         var(--text-3);
   background:    var(--surface-2);
-  padding:       6px 10px;
-  border-radius: 8px;
   border:        1px solid var(--border);
+  border-radius: 8px;
+  padding:       5px 10px;
   overflow:      hidden;
   text-overflow: ellipsis;
   white-space:   nowrap;
 }
 
-/* Actions row */
+/* Actions row at bottom of card */
 .acc-mc-actions {
   display:     flex;
   gap:         8px;
-  padding-top: 6px;
+  padding-top: 8px;
   border-top:  1px solid var(--border);
   margin-top:  2px;
 }
-.acc-mc-actions button { flex: 1; justify-content: center; min-height: 36px; }
+.acc-mc-actions button {
+  flex:        1;
+  min-height:  38px;
+  justify-content: center;
+}
 
-/* ── Dark mode ────────────────────────────────────────────────────────────── */
-.dark .acc-mobile-card { background: var(--surface); border-color: var(--border); }
+/* ── Filter selects and inputs not already handled by inline style ────────── */
+/* These classes are used on standalone select/input elements inside tabs     */
+/* They do NOT use .acc-filter-row so the inline style can't catch them       */
+.acc-filter-select          { width: 160px; }
+.acc-tb-search-input        { width: 210px; }
+.acc-tb-date-input          { width: 155px; }
+
+@media (max-width: 767px) {
+  .acc-filter-select         { width: 100% !important; min-height: 44px !important; }
+  .acc-tb-search-input       { width: 100% !important; min-height: 44px !important; }
+  .acc-tb-date-input         { width: 100% !important; min-height: 44px !important; }
+}
+
+/* ── AccountsTab filter row (uses justify-between, not acc-filter-row wrap) ─ */
+@media (max-width: 767px) {
+  .acc-page .acc-filter-row.justify-between,
+  .acc-page [class*="justify-between"].acc-filter-row {
+    flex-direction: column !important;
+    align-items:    stretch !important;
+    gap:            10px !important;
+  }
+}
+
+/* ── Pagination row inside tab content: ensure it fits ───────────────────── */
+@media (max-width: 767px) {
+  .acc-tab-content .pagination-row,
+  .acc-tab-content [class*="pagination"] {
+    flex-wrap: wrap;
+    gap:       8px;
+  }
+}
+
+/* ── VoucherPostingsTab: source-type heading row stack on mobile ──────────── */
+@media (max-width: 767px) {
+  .acc-page .acc-filter-row.items-center {
+    flex-direction: column !important;
+    align-items:    stretch !important;
+  }
+}
+
+/* ── Dark mode ───────────────────────────────────────────────────────────── */
+.dark .acc-mobile-card        { background: var(--surface);   border-color: var(--border); }
 .dark .acc-mobile-card:active { background: var(--surface-2); }
 
