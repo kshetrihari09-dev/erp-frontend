@@ -209,7 +209,7 @@ function AnalyticsSection({ vouchers }: { vouchers: any[] }) {
 
   const hasDistribution = analytics.distribution.some(d => d.value > 0)
 
-  const cardStyle: React.CSSProperties = { ...tk.card, borderRadius: 16, padding: '20px 22px', overflow: 'hidden', minWidth: 0 }
+  const cardStyle: React.CSSProperties = { ...tk.card, borderRadius: 16, padding: '20px 22px' }
 
   // Status stat card themes — light uses soft pastels, dark uses translucent tints
   const statCards = [
@@ -234,7 +234,6 @@ function AnalyticsSection({ vouchers }: { vouchers: any[] }) {
         </div>
         {hasDistribution ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <div style={{width:"100%",overflow:"hidden",minWidth:0}}>
             <ResponsiveContainer width="100%" height={170}>
               <PieChart>
                 <Pie data={analytics.distribution} cx="50%" cy="50%" innerRadius={50} outerRadius={76} paddingAngle={2} dataKey="value" labelLine={false} label={CustomDonutLabel}>
@@ -243,7 +242,6 @@ function AnalyticsSection({ vouchers }: { vouchers: any[] }) {
                 <Tooltip content={(props) => <ChartTooltip {...props} dark={tk.dark} />} />
               </PieChart>
             </ResponsiveContainer>
-            </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '6px 12px', marginTop: 8 }}>
               {analytics.distribution.map((d, i) => (
                 <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: tk.textMuted }}>
@@ -289,7 +287,6 @@ function AnalyticsSection({ vouchers }: { vouchers: any[] }) {
           <TrendingUp size={11} style={{ color: '#10b981' }} /> Monthly Trend
         </div>
         {analytics.trend.length >= 2 ? (
-          <div style={{width:"100%",overflow:"hidden",minWidth:0}}>
           <ResponsiveContainer width="100%" height={180}>
             <LineChart data={analytics.trend} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={tk.gridStroke} />
@@ -299,7 +296,6 @@ function AnalyticsSection({ vouchers }: { vouchers: any[] }) {
               <Line type="monotone" dataKey="count" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3, fill: '#3b82f6', strokeWidth: 0 }} activeDot={{ r: 5, fill: '#3b82f6', stroke: 'rgba(59,130,246,0.3)', strokeWidth: 4 }} />
             </LineChart>
           </ResponsiveContainer>
-          </div>
         ) : (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 150, color: tk.textFaint, fontSize: 13 }}>Not enough data</div>
         )}

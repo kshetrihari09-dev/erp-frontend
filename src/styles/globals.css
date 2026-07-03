@@ -4113,6 +4113,7 @@ td.psc-cell {
 /* ── Trial Balance: KPI summary cards: 4 → 2 → 1 ──────────────────────────── */
 @media (max-width: 1024px) {
   .acc-tb-kpi-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important; }
+  .acc-tb-kpi-grid > div { padding: 14px 16px !important; }
 }
 @media (max-width: 480px) {
   .acc-tb-kpi-grid { grid-template-columns: 1fr !important; gap: 8px !important; }
@@ -4131,61 +4132,452 @@ td.psc-cell {
 .acc-page .acc-tab-content { max-width: 100%; }
 
 /* ══════════════════════════════════════════════════════════════════════════════
-   ACCOUNTING MOBILE CARDS — table→card toggle for VouchersTab and other tabs
-   Breakpoint: 767px (matches the rest of the accounting responsive block above)
+   SETTINGS PAGE — MOBILE & TABLET RESPONSIVENESS
+   stp- prefix. All rules additive.
 ══════════════════════════════════════════════════════════════════════════════ */
 
-.acc-desktop-table           { display: block; }
-@media (max-width: 767px)  { .acc-desktop-table { display: none !important; } }
-
-@media (min-width: 768px) and (max-width: 1024px) {
-  .acc-desktop-table           { overflow-x: auto; }
-  .acc-desktop-table table     { min-width: 600px; font-size: 12px; }
-  .acc-desktop-table th,
-  .acc-desktop-table td        { padding: 8px 10px !important; }
+/* ── form-grid: collapse to 1 col on mobile ──────────────────────────────── */
+@media (max-width: 640px) {
+  .form-grid { grid-template-columns: 1fr !important; gap: 12px !important; }
 }
 
-.acc-mobile-list             { display: none; }
+/* ── stp-span2: span full width in form-grid, collapse on mobile ─────────── */
+.stp-span2 { grid-column: span 2; }
+@media (max-width: 640px) { .stp-span2 { grid-column: span 1; } }
+
+/* ── Desktop table: hidden on mobile ─────────────────────────────────────── */
+.stp-desktop-table           { display: block; }
 @media (max-width: 767px) {
-  .acc-mobile-list { display: flex; flex-direction: column; gap: 10px; padding: 12px 4px; }
+  .stp-desktop-table         { display: none !important; }
 }
 
-.acc-mobile-skel-wrap { display: flex; flex-direction: column; gap: 10px; }
-.acc-mobile-card-skel {
-  height: 80px; border-radius: 12px;
-  background: linear-gradient(90deg, var(--surface) 25%, var(--surface-2) 50%, var(--surface) 75%);
+/* ── Tablet: table stays, gets h-scroll + compact cells ─────────────────── */
+@media (min-width: 768px) and (max-width: 1024px) {
+  .stp-desktop-table          { overflow-x: auto; }
+  .stp-desktop-table table    { min-width: 560px; font-size: 12px; }
+  .stp-desktop-table th,
+  .stp-desktop-table td       { padding: 8px 10px !important; }
+}
+
+/* ── Mobile card list ─────────────────────────────────────────────────────── */
+.stp-mobile-list             { display: none; }
+@media (max-width: 767px) {
+  .stp-mobile-list {
+    display:        flex;
+    flex-direction: column;
+    gap:            10px;
+    padding:        12px;
+  }
+}
+
+/* Skeleton */
+.stp-card-skel {
+  height:          80px;
+  border-radius:   12px;
+  background:      linear-gradient(90deg, var(--surface) 25%, var(--surface-2) 50%, var(--surface) 75%);
   background-size: 400% 100%;
-  animation: acc-card-shimmer 1.4s ease infinite;
+  animation:       stp-shimmer 1.4s ease infinite;
 }
-@keyframes acc-card-shimmer { 0% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+@keyframes stp-shimmer {
+  0%   { background-position: 100% 50%; }
+  100% { background-position:   0% 50%; }
+}
 
-.acc-mobile-card {
-  background: var(--surface); border: 1.5px solid var(--border); border-radius: 14px;
-  padding: 13px 14px; display: flex; flex-direction: column; gap: 8px;
-  transition: background .12s; overflow: hidden; min-width: 0;
+/* Card shell */
+.stp-card {
+  background:      var(--surface);
+  border:          1.5px solid var(--border);
+  border-radius:   14px;
+  padding:         13px 14px;
+  display:         flex;
+  flex-direction:  column;
+  gap:             8px;
+  transition:      background .12s;
   -webkit-tap-highlight-color: transparent;
+}
+.stp-card:active { background: var(--surface-2); }
+
+/* Top row: avatar + name/sub + badge */
+.stp-card-top {
+  display:     flex;
+  align-items: center;
+  gap:         10px;
+}
+.stp-card-avatar {
+  width:           36px;
+  height:          36px;
+  border-radius:   10px;
+  background:      linear-gradient(135deg, #7c3aed, #5b21b6);
+  color:           #fff;
+  font-weight:     800;
+  font-size:       14px;
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  flex-shrink:     0;
+}
+.stp-card-main { flex: 1; min-width: 0; }
+.stp-card-title {
+  font-weight:   600;
+  font-size:     14px;
+  color:         var(--text);
+  margin:        0;
+  overflow:      hidden;
+  text-overflow: ellipsis;
+  white-space:   nowrap;
+}
+.stp-card-sub {
+  font-size:     12px;
+  color:         var(--text-3);
+  margin:        2px 0 0;
+  font-family:   var(--font-mono, monospace);
+  overflow:      hidden;
+  text-overflow: ellipsis;
+  white-space:   nowrap;
+}
+
+/* Chips row */
+.stp-card-chips {
+  display:     flex;
+  flex-wrap:   wrap;
+  align-items: center;
+  gap:         8px;
+}
+.stp-card-meta {
+  font-size:   12px;
+  color:       var(--text-3);
+  font-family: var(--font-mono, monospace);
+}
+
+/* Footer text row */
+.stp-card-footer {
+  font-size:   11.5px;
+  color:       var(--text-4);
+  padding-top: 6px;
+  border-top:  1px solid var(--border);
+}
+
+/* Audit-specific */
+.stp-audit-entity {
+  font-size:     11px;
+  font-weight:   600;
+  font-family:   var(--font-mono, monospace);
+  color:         var(--text-2);
+  background:    var(--surface-2);
+  padding:       2px 8px;
+  border-radius: 6px;
+}
+.stp-audit-detail {
+  font-size:     12px;
+  color:         var(--text-3);
+  background:    var(--surface-2);
+  border:        1px solid var(--border);
+  border-radius: 8px;
+  padding:       7px 10px;
+  word-break:    break-word;
+  line-height:   1.4;
+}
+
+/* Fiscal year date grid */
+.stp-fy-grid {
+  display:               grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap:                   8px;
+  padding:               10px;
+  background:            var(--surface-2);
+  border-radius:         10px;
+}
+.stp-fy-item { display: flex; flex-direction: column; gap: 2px; }
+.stp-fy-label {
+  font-size:      9.5px;
+  font-weight:    700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color:          var(--text-4);
+}
+.stp-fy-val {
+  font-family: var(--font-mono, monospace);
+  font-size:   12.5px;
+  font-weight: 600;
+  color:       var(--text);
+}
+
+/* ── TemplateTab: split-pane stacks on tablet/mobile ─────────────────────── */
+@media (max-width: 900px) {
+  .tpl-layout {
+    flex-direction: column !important;
+    height:         auto !important;
+    min-height:     0 !important;
+  }
+  .tpl-controls {
+    width:          100% !important;
+    border-right:   none !important;
+    border-bottom:  1px solid var(--border);
+    max-height:     60vh;
+    overflow-y:     auto;
+  }
+  .tpl-preview-panel { min-height: 400px; }
+  .tpl-toolbar       { flex-wrap: wrap; gap: 8px; }
+  .tpl-toolbar-actions { flex: 1; }
+  .tpl-toolbar-actions button { flex: 1; justify-content: center; min-height: 40px; }
+}
+@media (max-width: 480px) {
+  .tpl-heading           { font-size: 14px !important; }
+  .tpl-btn               { font-size: 12px !important; padding: 7px 10px !important; }
+  .tpl-preview-scroll    { padding: 12px !important; }
+}
+
+/* ── Page header: allow New User / Save button to stack on narrow screens ─── */
+@media (max-width: 480px) {
+  .page-header { flex-wrap: wrap; }
+  .page-header button { width: 100%; justify-content: center; }
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   ACCOUNTING — MOBILE TABLE → CARD TOGGLE + CARD ANATOMY
+   Breakpoint: 767px (matches AccountingPage.tsx inline <style>).
+   Tablet 768-1024px: table stays with h-scroll + compact cells.
+══════════════════════════════════════════════════════════════════════════════ */
+
+/* Desktop table: visible always, hidden only on mobile */
+.acc-desktop-table        { display: block; }
+@media (max-width: 767px) {
+  .acc-desktop-table      { display: none !important; }
+}
+
+/* Tablet: table stays but scrollable + compact */
+@media (min-width: 768px) and (max-width: 1024px) {
+  .acc-desktop-table             { overflow-x: auto; }
+  .acc-desktop-table table       { min-width: 600px; font-size: 12px; }
+  .acc-desktop-table th,
+  .acc-desktop-table td          { padding: 8px 10px !important; }
+}
+
+/* Mobile card list: hidden on desktop/tablet, shown on mobile */
+.acc-mobile-list          { display: none; }
+@media (max-width: 767px) {
+  .acc-mobile-list {
+    display:        flex;
+    flex-direction: column;
+    gap:            8px;
+    padding:        10px 4px;
+  }
+}
+
+/* Skeletons — sized to match the compacted card */
+.acc-mobile-skel-wrap { display: flex; flex-direction: column; gap: 8px; }
+.acc-mobile-card-skel {
+  height:          58px;
+  border-radius:   12px;
+  background:      linear-gradient(90deg, var(--surface) 25%, var(--surface-2) 50%, var(--surface) 75%);
+  background-size: 400% 100%;
+  animation:       acc-shimmer 1.4s ease infinite;
+}
+@keyframes acc-shimmer {
+  0%   { background-position: 100% 50%; }
+  100% { background-position:   0% 50%; }
+}
+
+/* Card shell — compact, content-driven height, no empty placeholder sections */
+.acc-mobile-card {
+  background:      var(--surface);
+  border:          1.5px solid var(--border);
+  border-radius:   12px;
+  padding:         11px 13px;
+  display:         flex;
+  flex-direction:  column;
+  gap:             6px;
+  transition:      background .12s;
+  -webkit-tap-highlight-color: transparent;
+  overflow:        hidden;   /* prevent any child from bleeding out */
 }
 .acc-mobile-card:active { background: var(--surface-2); }
 
-.acc-mc-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
-.acc-mc-no  { font-family: var(--font-mono,monospace); font-size: 13px; font-weight: 700; color: var(--brand); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 1; }
-.acc-mc-amount { font-family: var(--font-mono,monospace); font-size: 15px; font-weight: 800; color: var(--text); flex-shrink: 0; }
-
-.acc-mc-sub    { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
-.acc-mc-party  { font-size: 13px; font-weight: 500; color: var(--text-2); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.acc-mc-date   { font-family: var(--font-mono,monospace); font-size: 11.5px; color: var(--text-3); flex-shrink: 0; }
-
-.acc-mc-chips  { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-
-.acc-mc-narration {
-  font-size: 12px; color: var(--text-3); background: var(--surface-2);
-  border: 1px solid var(--border); border-radius: 8px; padding: 5px 10px;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+/* Top / Sub rows: primary text (left) + amount/date (right) */
+.acc-mc-top,
+.acc-mc-sub {
+  display:         flex;
+  align-items:     center;
+  justify-content: space-between;
+  gap:             8px;
+  min-width:       0;
+}
+/* Optional wrapper that lets a badge sit directly next to the primary text
+   without adding a whole extra row — .acc-mc-top/.acc-mc-sub still behave
+   exactly as before for cards that don't use it (e.g. PeriodsTab). */
+.acc-mc-line {
+  display:     flex;
+  align-items: center;
+  gap:         6px;
+  min-width:   0;
+  flex:        1 1 auto;
+}
+.acc-mc-no {
+  font-family:    var(--font-mono, monospace);
+  font-size:      12.5px;
+  font-weight:    700;
+  color:          var(--brand);
+  overflow:       hidden;
+  text-overflow:  ellipsis;
+  white-space:    nowrap;
+  flex-shrink:    1;
+  min-width:      0;
+}
+.acc-mc-amount {
+  font-family:    var(--font-mono, monospace);
+  font-size:      14px;
+  font-weight:    800;
+  color:          var(--text);
+  flex-shrink:    0;
 }
 
-/* Actions: natural-width, no forced flex:1 */
-.acc-mc-actions { display: flex; gap: 8px; padding-top: 8px; border-top: 1px solid var(--border); margin-top: 2px; flex-wrap: wrap; }
-.acc-mc-actions button { min-height: 38px; }
+.acc-mc-party {
+  font-size:     12.5px;
+  font-weight:   500;
+  color:         var(--text-2);
+  flex:          1;
+  min-width:     0;
+  overflow:      hidden;
+  text-overflow: ellipsis;
+  white-space:   nowrap;
+}
+.acc-mc-date {
+  font-family: var(--font-mono, monospace);
+  font-size:   11px;
+  color:       var(--text-3);
+  flex-shrink: 0;
+}
 
-.dark .acc-mobile-card        { background: var(--surface); border-color: var(--border); }
+/* Chips — kept for any card that still needs a standalone badge row */
+.acc-mc-chips {
+  display:     flex;
+  flex-wrap:   wrap;
+  gap:         5px;
+  align-items: center;
+}
+
+/* Narration: only rendered when non-empty (enforced in JSX) */
+.acc-mc-narration {
+  font-size:     11.5px;
+  color:         var(--text-3);
+  background:    var(--surface-2);
+  border:        1px solid var(--border);
+  border-radius: 7px;
+  padding:       4px 9px;
+  overflow:      hidden;
+  text-overflow: ellipsis;
+  white-space:   nowrap;
+}
+
+/* Actions: natural-width buttons, NO flex:1 stretch */
+.acc-mc-actions {
+  display:     flex;
+  gap:         7px;
+  padding-top: 7px;
+  border-top:  1px solid var(--border);
+  flex-wrap:   wrap;
+}
+/* Buttons keep natural size — no forced flex:1 */
+.acc-mc-actions button { min-height: 34px; }
+
+/* Filter selects / inputs not covered by inline <style> */
+.acc-filter-select   { width: 160px; }
+.acc-tb-search-input { width: 210px; }
+.acc-tb-date-input   { width: 155px; }
+
+@media (max-width: 767px) {
+  .acc-filter-select   { width: 100% !important; min-height: 44px !important; }
+  .acc-tb-search-input { width: 100% !important; min-height: 44px !important; }
+  .acc-tb-date-input   { width: 100% !important; min-height: 44px !important; }
+}
+
+/* Dark mode */
+.dark .acc-mobile-card        { background: var(--surface);   border-color: var(--border); }
 .dark .acc-mobile-card:active { background: var(--surface-2); }
+
+/* ===========================
+   ACCOUNTING RESPONSIVE FIX
+=========================== */
+
+*{
+    min-width:0;
+}
+
+.acc-page,
+.acc-content,
+.acc-tab-content{
+    width:100%;
+    max-width:100%;
+    overflow-x:hidden;
+}
+
+
+.acc-filter-select,
+.acc-filter-field,
+.acc-filter-input{
+    width:100%;
+}
+
+.table-card{
+    width:100%;
+    overflow:hidden;
+}
+
+.table-card .overflow-x-auto{
+    overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
+}
+
+.erp-table{
+    min-width:900px;
+}
+
+.acc-kpi-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+    gap:16px;
+}
+
+img,
+svg,
+canvas{
+    max-width:100%;
+}
+
+@media (max-width:768px){
+
+.page-content{
+    padding:12px;
+}
+
+.form-grid{
+    grid-template-columns:1fr;
+}
+
+.form-grid.col3{
+    grid-template-columns:1fr;
+}
+
+.form-grid .span2{
+    grid-column:auto;
+}
+
+.acc-filter-row{
+    flex-direction:column;
+    align-items:stretch;
+}
+
+.acc-filter-row>*{
+    width:100%;
+}
+
+.acc-kpi-grid{
+    grid-template-columns:1fr;
+}
+
+.erp-table{
+    min-width:700px;
+}
+
+}

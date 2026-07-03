@@ -33,7 +33,7 @@ function AccountForm({ onClose }: { onClose: () => void }) {
   return (
     <>
       <div className="form-grid">
-        <div className="span2">
+        <div style={{ gridColumn: 'span 2' }}>
           <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">Account Name *</label>
           <input className="erp-input" placeholder="e.g. Cash in Hand" {...register('name')} />
           {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name.message}</p>}
@@ -86,14 +86,14 @@ export default function AccountsTab({ onCount }: { onCount?: (count: number) => 
   return (
     <div>
       <div className="flex items-center justify-between gap-3 mb-3 acc-filter-row">
-        <select className="erp-input acc-filter-select" value={typeFilter} onChange={e => setTypeFilter(e.target.value)}>
+        <select className="erp-input" style={{ width: 160 }} value={typeFilter} onChange={e => setTypeFilter(e.target.value)}>
           <option value="">All Types</option>
           {ACCOUNT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
         </select>
         <Button variant="primary" icon={<Plus size={14}/>} onClick={() => setModal(true)} className="acc-filter-btn">New Account</Button>
       </div>
       <div className="table-card">
-        <div className="overflow-x-auto acc-desktop-table">
+        <div className="overflow-x-auto">
           <table className="erp-table">
             <thead>
               <tr>
@@ -124,37 +124,6 @@ export default function AccountsTab({ onCount }: { onCount?: (count: number) => 
               }
             </tbody>
           </table>
-        </div>
-
-        {/* Mobile card list */}
-        <div className="acc-mobile-list">
-          {isLoading ? (
-            <div className="acc-mobile-skel-wrap">
-              {[1,2,3,4].map(i => <div key={i} className="acc-mobile-card acc-mobile-card-skel" />)}
-            </div>
-          ) : accounts.length === 0 ? (
-            <Empty message="No accounts found — create one to get started"/>
-          ) : (
-            accounts.map(a => (
-              <div key={a.id} className="acc-mobile-card">
-                <div className="acc-mc-top">
-                  <span className="acc-mc-no">{a.code}</span>
-                  <span className="acc-mc-amount">{fmt(a.balance ?? 0)}</span>
-                </div>
-                <div className="acc-mc-sub">
-                  <span className="acc-mc-party">{a.name}</span>
-                </div>
-                <div className="acc-mc-chips">
-                  <span className="badge badge-blue">{a.type}</span>
-                  {a.is_group
-                    ? <span className="badge badge-purple">Group</span>
-                    : <span className="badge badge-muted">Ledger</span>
-                  }
-                  {a.sub_type && <span className="acc-mc-narration" style={{ padding: 0, border: 'none', background: 'none' }}>{a.sub_type}</span>}
-                </div>
-              </div>
-            ))
-          )}
         </div>
       </div>
       <Modal open={modal} onClose={() => setModal(false)} title="New Account" size="lg">

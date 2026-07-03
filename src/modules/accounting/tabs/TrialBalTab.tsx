@@ -386,7 +386,7 @@ export default function TrialBalTab() {
     <div id="tb-print-area">
 
       {/* ── Filter Card ────────────────────────────────────────────────────── */}
-      <motion.div id="tb-no-print" className="acc-tb-card" initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}
+      <motion.div id="tb-no-print" initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}
         style={{ ...cardStyle, padding: '18px 20px', marginBottom: 16 }}
       >
         <div className="acc-tb-filter-row" style={{ display: 'flex', alignItems: 'flex-end', gap: 12, flexWrap: 'wrap' }}>
@@ -396,12 +396,12 @@ export default function TrialBalTab() {
           ].map(f => (
             <div key={f.label} className="acc-tb-filter-field">
               <label style={{ fontSize: 10, fontWeight: 700, color: tk.textMuted, textTransform: 'uppercase', letterSpacing: '0.1em', display: 'block', marginBottom: 6, fontFamily: 'var(--font-mono)' }}>{f.label}</label>
-              <input type="date" className="erp-input acc-tb-date-input" value={f.value} onChange={e => f.onChange(e.target.value)} />
+              <input type="date" className="erp-input" style={{ width: f.width }} value={f.value} onChange={e => f.onChange(e.target.value)} />
             </div>
           ))}
           <div className="acc-tb-filter-field">
             <label style={{ fontSize: 10, fontWeight: 700, color: tk.textMuted, textTransform: 'uppercase', letterSpacing: '0.1em', display: 'block', marginBottom: 6, fontFamily: 'var(--font-mono)' }}>Account Type</label>
-            <select className="erp-input acc-filter-select" value={typeFilter} onChange={e => setTypeFilter(e.target.value)}>
+            <select className="erp-input" style={{ width: 148 }} value={typeFilter} onChange={e => setTypeFilter(e.target.value)}>
               <option value="">All Types</option>
               {accountTypes.map(t => <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>)}
             </select>
@@ -427,7 +427,7 @@ export default function TrialBalTab() {
 
       {/* ── Empty Prompt ────────────────────────────────────────────────────── */}
       {!isQueried && !isLoading && (
-        <motion.div className="acc-tb-empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
           style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '80px 0', textAlign: 'center' }}
         >
           <div style={{ width: 72, height: 72, borderRadius: 20, background: 'rgba(59,130,246,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 36, marginBottom: 16 }}>⚖️</div>
@@ -441,7 +441,7 @@ export default function TrialBalTab() {
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
 
             {/* ── Report Header ─────────────────────────────────────────────── */}
-            <div className="acc-tb-report-card" style={{ ...cardStyle, padding: '18px 22px', marginBottom: 14, textAlign: 'center' }}>
+            <div style={{ ...cardStyle, padding: '18px 22px', marginBottom: 14, textAlign: 'center' }}>
               {company?.name && <div style={{ fontSize: 16, fontWeight: 800, color: tk.text }}>{company.name}</div>}
               <div style={{ fontSize: 18, fontWeight: 800, color: tk.reportTitle, letterSpacing: '-0.02em', marginTop: 2 }}>Trial Balance</div>
               <div style={{ fontSize: 13, color: tk.textMuted, marginTop: 4 }}>
@@ -471,14 +471,14 @@ export default function TrialBalTab() {
             </div>
 
             {/* ── Table Card ───────────────────────────────────────────────── */}
-            <motion.div className="acc-tabcard" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.2 }}
+            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.2 }}
               style={{ ...cardStyle, overflow: 'hidden' }}
             >
               {/* Toolbar */}
               <div id="tb-no-print" className="acc-tb-toolbar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '12px 18px', borderBottom: `1px solid ${tk.theadBorder}`, flexWrap: 'wrap' }}>
                 <div className="acc-tb-search-wrap" style={{ position: 'relative' }}>
                   <Search size={13} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: tk.textFaint, pointerEvents: 'none' }} />
-                  <input placeholder="Search accounts…" className="erp-input acc-tb-search-input" style={{ paddingLeft: 32 }} value={search} onChange={e => setSearch(e.target.value)} />
+                  <input placeholder="Search accounts…" className="erp-input" style={{ width: 210, paddingLeft: 32 }} value={search} onChange={e => setSearch(e.target.value)} />
                 </div>
                 <div className="acc-tb-toolbar-actions" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                   <TBtn active={showZero} onClick={() => setShowZero(v => !v)} title={showZero ? 'Hide zero balances' : 'Show zero balances'}>
