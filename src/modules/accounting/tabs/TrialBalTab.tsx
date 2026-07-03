@@ -386,7 +386,7 @@ export default function TrialBalTab() {
     <div id="tb-print-area">
 
       {/* ── Filter Card ────────────────────────────────────────────────────── */}
-      <motion.div id="tb-no-print" initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}
+      <motion.div id="tb-no-print" className="acc-tb-card" initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}
         style={{ ...cardStyle, padding: '18px 20px', marginBottom: 16 }}
       >
         <div className="acc-tb-filter-row" style={{ display: 'flex', alignItems: 'flex-end', gap: 12, flexWrap: 'wrap' }}>
@@ -427,7 +427,7 @@ export default function TrialBalTab() {
 
       {/* ── Empty Prompt ────────────────────────────────────────────────────── */}
       {!isQueried && !isLoading && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+        <motion.div className="acc-tb-empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }}
           style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '80px 0', textAlign: 'center' }}
         >
           <div style={{ width: 72, height: 72, borderRadius: 20, background: 'rgba(59,130,246,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 36, marginBottom: 16 }}>⚖️</div>
@@ -441,7 +441,7 @@ export default function TrialBalTab() {
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
 
             {/* ── Report Header ─────────────────────────────────────────────── */}
-            <div style={{ ...cardStyle, padding: '18px 22px', marginBottom: 14, textAlign: 'center' }}>
+            <div className="acc-tb-report-card" style={{ ...cardStyle, padding: '18px 22px', marginBottom: 14, textAlign: 'center' }}>
               {company?.name && <div style={{ fontSize: 16, fontWeight: 800, color: tk.text }}>{company.name}</div>}
               <div style={{ fontSize: 18, fontWeight: 800, color: tk.reportTitle, letterSpacing: '-0.02em', marginTop: 2 }}>Trial Balance</div>
               <div style={{ fontSize: 13, color: tk.textMuted, marginTop: 4 }}>
@@ -471,7 +471,7 @@ export default function TrialBalTab() {
             </div>
 
             {/* ── Table Card ───────────────────────────────────────────────── */}
-            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.2 }}
+            <motion.div className="acc-tabcard" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.2 }}
               style={{ ...cardStyle, overflow: 'hidden' }}
             >
               {/* Toolbar */}

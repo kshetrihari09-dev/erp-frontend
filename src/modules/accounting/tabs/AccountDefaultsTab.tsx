@@ -199,7 +199,7 @@ export default function AccountDefaultsTab() {
 
       {/* ── Role Table ────────────────────────────────────────────────────── */}
       <div className="table-card">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto acc-desktop-table">
           <table className="erp-table">
             <thead>
               <tr>
@@ -302,6 +302,62 @@ export default function AccountDefaultsTab() {
               }
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile card list */}
+        <div className="acc-mobile-list">
+          {loadingDefaults || loadingAccounts ? (
+            <div className="acc-mobile-skel-wrap">
+              {[1,2,3,4].map(i => <div key={i} className="acc-mobile-card acc-mobile-card-skel" />)}
+            </div>
+          ) : (
+            ACCOUNT_DEFAULT_ROLES.map(({ value: role, label, hint }) => {
+              const mapped   = defaultsByRole[role]
+              const required = REQUIRED_ROLES.has(role)
+              return (
+                <div key={role} className="acc-mobile-card">
+                  <div className="acc-mc-top">
+                    <span className="acc-mc-no" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {mapped
+                        ? <CheckCircle size={13} className="text-green-500 shrink-0" />
+                        : required
+                          ? <AlertCircle size={13} className="text-red-400 shrink-0" />
+                          : <div className="w-3 h-3 rounded-full border-2 border-[var(--border)] shrink-0" />
+                      }
+                      {role}
+                    </span>
+                  </div>
+                  <div className="acc-mc-sub">
+                    <span className="acc-mc-party">
+                      {mapped
+                        ? <>
+                            <code className="text-[11px] font-mono text-[var(--brand)] mr-1">{mapped.account_code}</code>
+                            {mapped.account_name}
+                          </>
+                        : <span className="italic text-[var(--text-3)]">Not set</span>
+                      }
+                    </span>
+                  </div>
+                  <div className="acc-mc-chips">
+                    {required && <span className="text-[9px] font-bold uppercase tracking-wider text-red-500 bg-red-100 dark:bg-red-900/30 px-1 py-0.5 rounded">required</span>}
+                    {mapped && <span className="badge badge-blue capitalize">{mapped.account_type}</span>}
+                  </div>
+                  <div className="acc-mc-actions">
+                    <Button variant="secondary" size="sm" icon={<Settings size={11}/>}
+                      onClick={() => setAssignModal({ role, label, hint })}>
+                      {mapped ? 'Change' : 'Assign'}
+                    </Button>
+                    {mapped && (
+                      <Button variant="danger" size="sm" icon={<Trash2 size={11}/>}
+                        onClick={() => deleteDefault.mutate(role)}>
+                        Remove
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )
+            })
+          )}
         </div>
       </div>
 

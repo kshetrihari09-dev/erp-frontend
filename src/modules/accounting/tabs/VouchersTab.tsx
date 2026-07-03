@@ -9,6 +9,7 @@ import { VOUCHER_TYPES } from '@/constants'
 import { PrintPreviewModal } from '@/components/print'
 import type { PrintData } from '@/components/print'
 import type { Voucher, Account, Party } from '@/types'
+import { useState as _useState } from 'react'
 
 const LIMIT = 20
 
@@ -30,6 +31,7 @@ export default function VouchersTab({ onCount, openSignal }: VouchersTabProps = 
   const [loading,  setLoading]  = useState(false)
   const [modal,    setModal]    = useState(false)
   const [detail,   setDetail]   = useState<Voucher | null>(null)
+  const [printData, setPrintData] = useState<PrintData | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -68,11 +70,11 @@ export default function VouchersTab({ onCount, openSignal }: VouchersTabProps = 
     <div>
       <div className="flex items-center gap-2 mb-3 flex-wrap acc-filter-row">
         <SearchInput value={search} onChange={setSearch} className="w-52" />
-        <select className="erp-input" className="acc-filter-select" value={typeFilter} onChange={e => { setTypeFilter(e.target.value); setPage(1) }}>
+        <select className="erp-input" style={{ width: 150 }} value={typeFilter} onChange={e => { setTypeFilter(e.target.value); setPage(1) }}>
           <option value="">All Types</option>
           {VOUCHER_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
         </select>
-        <select className="erp-input" className="acc-filter-select" value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1) }}>
+        <select className="erp-input" style={{ width: 130 }} value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1) }}>
           <option value="">All Status</option>
           {['draft','posted','cancelled','reversed'].map(s => <option key={s}>{s}</option>)}
         </select>
@@ -127,53 +129,47 @@ export default function VouchersTab({ onCount, openSignal }: VouchersTabProps = 
             </tbody>
           </table>
         </div>
+        <Pagination page={page} total={total} limit={LIMIT} onChange={setPage} />
 
         {/* Mobile card list */}
         <div className="acc-mobile-list">
           {loading ? (
             <div className="acc-mobile-skel-wrap">
-              {[1,2,3,4].map(i => <div key={i} className="acc-mobile-card acc-mobile-card-skel" />)}
+              {[1,2,3,4].map(i => <div key={i} className="acc-mobile-card acc-mobile-card-skel"/>)}
             </div>
           ) : vouchers.length === 0 ? (
             <Empty message="No vouchers found"/>
-          ) : (
-            vouchers.map(v => (
-              <div key={v.id} className="acc-mobile-card"
-                onClick={() => accountingAPI.voucher(v.id).then(r => setDetail(r.data.data)).catch(() => {})}>
-                <div className="acc-mc-top">
-                  <span className="acc-mc-no">{v.voucher_no}</span>
-                  <span className="acc-mc-amount">{fmt(v.total_amount)}</span>
-                </div>
-                <div className="acc-mc-sub">
-                  <span className="acc-mc-party">{v.party_name || 'No party'}</span>
-                  <span className="acc-mc-date">{fmtDate(v.voucher_date)}</span>
-                </div>
-                <div className="acc-mc-chips">
-                  <span className="badge badge-blue">{v.voucher_type}</span>
-                  <Badge status={v.status}/>
-                </div>
-                {v.narration && v.narration.trim() && <div className="acc-mc-narration">{v.narration}</div>}
-                <div className="acc-mc-actions" onClick={e => e.stopPropagation()}>
-                  <Button variant="secondary" size="sm" icon={<Printer size={12}/>} style={{ flex: 'none' }}
-                    onClick={() => setPrintData({
-                      voucherNo: v.voucher_no, type: (v.voucher_type || 'JOURNAL') as any,
-                      date: v.voucher_date, partyName: v.party_name || undefined,
-                      narration: v.narration || undefined, netTotal: Number(v.total_amount || 0),
-                    })}>Print</Button>
-                  {v.status === 'draft' && (
-                    <Button variant="primary" size="sm" icon={<CheckCircle2 size={12}/>} style={{ flex: 'none' }}
-                      onClick={() => postVoucher(v.id)}>Post</Button>
-                  )}
-                  {v.status === 'posted' && (
-                    <Button variant="danger" size="sm" icon={<RotateCcw size={12}/>} style={{ flex: 'none' }}
-                      onClick={() => reverseVoucher(v.id)}>Reverse</Button>
-                  )}
-                </div>
+          ) : vouchers.map(v => (
+            <div key={v.id} className="acc-mobile-card"
+              onClick={() => accountingAPI.voucher(v.id).then(r => setDetail(r.data.data)).catch(() => {})}>
+              <div className="acc-mc-top">
+                <span className="acc-mc-no">{v.voucher_no}</span>
+                <span className="acc-mc-amount">{fmt(v.total_amount)}</span>
               </div>
-            ))
-          )}
+              <div className="acc-mc-sub">
+                <span className="acc-mc-party">{v.party_name || 'No party'}</span>
+                <span className="acc-mc-date">{fmtDate(v.voucher_date)}</span>
+              </div>
+              <div className="acc-mc-chips">
+                <span className="badge badge-blue">{v.voucher_type}</span>
+                <Badge status={v.status}/>
+              </div>
+              {v.narration?.trim() && <div className="acc-mc-narration">{v.narration}</div>}
+              <div className="acc-mc-actions" onClick={e => e.stopPropagation()}>
+                <Button variant="secondary" size="sm" icon={<Printer size={12}/>}
+                  onClick={() => setPrintData({ voucherNo: v.voucher_no, type: (v.voucher_type||'JOURNAL') as any, date: v.voucher_date, partyName: v.party_name||undefined, narration: v.narration||undefined, netTotal: Number(v.total_amount||0) })}>
+                  Print
+                </Button>
+                {v.status === 'draft' && (
+                  <Button variant="primary" size="sm" icon={<CheckCircle2 size={12}/>} onClick={() => postVoucher(v.id)}>Post</Button>
+                )}
+                {v.status === 'posted' && (
+                  <Button variant="danger" size="sm" icon={<RotateCcw size={12}/>} onClick={() => reverseVoucher(v.id)}>Reverse</Button>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
-        <Pagination page={page} total={total} limit={LIMIT} onChange={setPage} />
       </div>
 
       {/* Voucher detail modal */}
@@ -222,6 +218,8 @@ export default function VouchersTab({ onCount, openSignal }: VouchersTabProps = 
           </div>
         )}
       </Modal>
+
+      <PrintPreviewModal data={printData} open={!!printData} onClose={() => setPrintData(null)} />
 
       {/* Create voucher modal */}
       <Modal open={modal} onClose={() => setModal(false)} title="Create Voucher" size="xl">

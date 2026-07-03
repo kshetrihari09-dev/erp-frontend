@@ -68,8 +68,7 @@ export default function VoucherPostingsTab({ onCount }: { onCount?: (count: numb
       {/* ── Filters ───────────────────────────────────────────────────────── */}
       <div className="flex items-center gap-3 mb-3 acc-filter-row">
         <select
-          className="erp-input"
-          className="acc-filter-select"
+          className="erp-input acc-filter-select"
           value={sourceType}
           onChange={e => { setSourceType(e.target.value); setPage(1) }}
         >
