@@ -195,9 +195,9 @@ export default function PrintPreviewModal({
             transition={{ type: 'spring', stiffness: 400, damping: 30 }}
             style={{
               position: 'fixed',
-              top:       effectiveFullscreen ? 0 : '50%',
-              left:      effectiveFullscreen ? 0 : '50%',
-              transform: effectiveFullscreen ? 'none' : 'translate(50%, 50%)',
+              top:       effectiveFullscreen ? 0 : '0%',
+              left:      effectiveFullscreen ? 0 : '0%',
+              transform: effectiveFullscreen ? 'none' : 'translate(20%, 20%)',
               width:     effectiveFullscreen ? '100vw' : isTablet ? 'min(880px, 96vw)' : 'min(1000px, 98vw)',
               height:    effectiveFullscreen ? '100dvh' : 'auto',
               maxHeight: effectiveFullscreen ? '100dvh' : '92dvh',
