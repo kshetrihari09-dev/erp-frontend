@@ -1,21 +1,32 @@
 /**
  * PrintPreviewModal.tsx
  *
- * Now reads from templateStore:
+ * Reads from templateStore:
  *   - paperSize → default print size
  *   - primaryColor → type badge colour override
  *   - all other TemplateConfig flags passed to InvoiceTemplate
  *
  * Keyboard shortcuts: Ctrl+P Print | Enter Next Bill | Esc Close
+ *
+ * Responsive layout (UI/UX only — no business, print, or PDF logic changed):
+ *   Desktop (>=1024px): unchanged two-column dialog (preview | sidebar).
+ *   Tablet  (768–1023px): large dialog, preview stacked above a full-width
+ *                         controls panel.
+ *   Mobile  (<768px): fullscreen app-like modal — compact sticky header,
+ *                      maximised scrollable preview, sticky bottom action
+ *                      bar (paper size, copies, print, download), and a
+ *                      "More" sheet for secondary actions (Email, WhatsApp,
+ *                      Duplicate, Cloud Backup, Next Bill).
+ *
+ * Breakpoints are driven by usePrintResponsive() (JS + resize listener)
+ * rather than CSS media queries — consistent with the pattern already used
+ * for the Accounting module's mobile layout in this codebase.
  */
 
 import { useRef, useEffect, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import {
-  Printer, Download, X, Copy, Maximize2, Mail,
-  MessageCircle, ChevronRight, CheckCircle2, Clock, UploadCloud, Loader2,
-} from 'lucide-react'
+import { Maximize2, X, CheckCircle2 } from 'lucide-react'
 import { fmt, fmtDate } from '@/utils'
 import { htmlToPdfBlob } from '@/utils/htmlToPdfBlob'
 import { uploadDocumentToCloud } from '@/components/cloudStorage/CloudBackupButton'
@@ -23,7 +34,10 @@ import useUIStore from '@/store/uiStore'
 import useAuthStore from '@/store/authStore'
 import useTemplateStore from '@/store/templateStore'
 import { usePrint, type PrintSize } from './usePrint'
+import { usePrintResponsive } from './usePrintResponsive'
 import InvoiceTemplate, { type PrintData } from './InvoiceTemplate'
+import { ControlsPanel, Kbd, iconBtnStyle } from './PrintPreviewControls'
+import { MobileHeader, MobileBottomBar, MoreSheet } from './PrintPreviewMobile'
 
 const TYPE_COLORS: Record<string, string> = {
   SALE:            '#16a34a',
@@ -74,14 +88,19 @@ export default function PrintPreviewModal({
   const tpl             = useTemplateStore(s => s.activeTemplate)
   const { print, downloadPDF } = usePrint()
   const printRef        = useRef<HTMLDivElement>(null)
+  const { isMobile, isTablet, isDesktop } = usePrintResponsive()
 
   // Initialise size from template setting; user can override per-print
   const [size,       setSize]       = useState<PrintSize>(() => tplSizeToPrintSize(tpl.paperSize))
   const [copies,     setCopies]     = useState(1)
   const [fullscreen, setFullscreen] = useState(false)
+  const [moreOpen,   setMoreOpen]   = useState(false)
 
   // Sync size when template changes
   useEffect(() => { setSize(tplSizeToPrintSize(tpl.paperSize)) }, [tpl.paperSize])
+
+  // Mobile is always a fullscreen, app-like modal
+  const effectiveFullscreen = isMobile || fullscreen
 
   const printData: PrintData | null = data ? { ...data, company: data.company ?? company } : null
 
@@ -96,11 +115,11 @@ export default function PrintPreviewModal({
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'p') { e.preventDefault(); handlePrint() }
       if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey) { handleNextBill() }
-      if (e.key === 'Escape') { onClose() }
+      if (e.key === 'Escape') { moreOpen ? setMoreOpen(false) : onClose() }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [open, size, copies])
+  }, [open, size, copies, moreOpen])
 
   const handlePrint = useCallback(() => {
     if (!printData || !printRef.current) return
@@ -133,6 +152,14 @@ export default function PrintPreviewModal({
     }
   }, [printData, size, toastSuccess, toastError])
 
+  const handleDuplicate = useCallback(() => {
+    setCopies(2)
+    setTimeout(handlePrint, 100)
+  }, [handlePrint])
+
+  const handleEmail    = useCallback(() => { if (printData) shareEmail(printData, company) }, [printData, company])
+  const handleWhatsApp = useCallback(() => { if (printData) shareWhatsApp(printData) }, [printData])
+
   const handleNextBill = useCallback(() => {
     onNextBill?.()
     onClose()
@@ -144,6 +171,10 @@ export default function PrintPreviewModal({
   // Use template primaryColor if defined, else fall back to type colour
   const typeColor = tpl.primaryColor || TYPE_COLORS[printData.type] || '#334155'
 
+  // Vertical stacking applies to both tablet (panel below preview) and
+  // mobile (fullscreen, bottom bar instead of a panel)
+  const stacked = isTablet || isMobile
+
   return createPortal(
     <AnimatePresence>
       {open && (
@@ -152,201 +183,144 @@ export default function PrintPreviewModal({
             key="backdrop"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            onClick={onClose}
+            onClick={isMobile ? undefined : onClose}
             style={{ position: 'fixed', inset: 0, zIndex: 9998, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
           />
 
           <motion.div
             key="modal"
-            initial={{ opacity: 0, scale: 0.92, y: 24 }}
+            initial={{ opacity: 0, scale: 0.96, y: 16 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 12 }}
+            exit={{ opacity: 0, scale: 0.97, y: 8 }}
             transition={{ type: 'spring', stiffness: 400, damping: 30 }}
             style={{
               position: 'fixed',
-              top:       fullscreen ? 0 : '50%',
-              left:      fullscreen ? 0 : '50%',
-              transform: fullscreen ? 'none' : 'translate(-50%, -50%)',
-              width:     fullscreen ? '100vw' : 'min(1000px, 98vw)',
-              height:    fullscreen ? '100vh' : 'auto',
-              maxHeight: fullscreen ? '100vh' : '92dvh',
+              top:       effectiveFullscreen ? 0 : '50%',
+              left:      effectiveFullscreen ? 0 : '50%',
+              transform: effectiveFullscreen ? 'none' : 'translate(-50%, -50%)',
+              width:     effectiveFullscreen ? '100vw' : isTablet ? 'min(880px, 96vw)' : 'min(1000px, 98vw)',
+              height:    effectiveFullscreen ? '100dvh' : 'auto',
+              maxHeight: effectiveFullscreen ? '100dvh' : '92dvh',
               zIndex: 9999,
               background: 'var(--surface, #fff)',
-              borderRadius: fullscreen ? 0 : '16px',
+              borderRadius: effectiveFullscreen ? 0 : '16px',
               boxShadow: '0 25px 80px rgba(0,0,0,0.35)',
-              overflow: 'hidden',
+              overflowX: 'hidden',
               display: 'flex',
               flexDirection: 'column',
             }}
           >
             {/* ── Header ────────────────────────────────────────────────── */}
-            <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border,#e2e8f0)', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
-              <div style={{ width: 38, height: 38, borderRadius: '50%', background: typeColor + '18', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <CheckCircle2 size={20} style={{ color: typeColor }} />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text,#111)' }}>
-                  {printData.voucherNo}
-                  <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 600, background: typeColor + '18', color: typeColor, padding: '2px 8px', borderRadius: 99, letterSpacing: 0.5 }}>
-                    {printData.type.replace('_', ' ')}
-                  </span>
+            {isMobile ? (
+              <MobileHeader printData={printData} typeColor={typeColor} onClose={onClose} />
+            ) : (
+              <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border,#e2e8f0)', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+                <div style={{ width: 38, height: 38, borderRadius: '50%', background: typeColor + '18', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <CheckCircle2 size={20} style={{ color: typeColor }} />
                 </div>
-                <div style={{ fontSize: 12, color: 'var(--text-3,#888)', marginTop: 2 }}>
-                  {printData.partyName && <span>{printData.partyName} · </span>}
-                  {fmtDate(printData.date)} · <b style={{ color: typeColor }}>{fmt(printData.netTotal)}</b>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text,#111)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {printData.voucherNo}
+                    <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 600, background: typeColor + '18', color: typeColor, padding: '2px 8px', borderRadius: 99, letterSpacing: 0.5 }}>
+                      {printData.type.replace('_', ' ')}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--text-3,#888)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {printData.partyName && <span>{printData.partyName} · </span>}
+                    {fmtDate(printData.date)} · <b style={{ color: typeColor }}>{fmt(printData.netTotal)}</b>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                  <button onClick={() => setFullscreen(v => !v)} title="Toggle fullscreen" style={iconBtnStyle}><Maximize2 size={16} /></button>
+                  <button onClick={onClose} title="Close (Esc)" style={iconBtnStyle}><X size={18} /></button>
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: 4 }}>
-                <button onClick={() => setFullscreen(v => !v)} title="Toggle fullscreen" style={iconBtnStyle}><Maximize2 size={16} /></button>
-                <button onClick={onClose} title="Close (Esc)" style={iconBtnStyle}><X size={18} /></button>
-              </div>
-            </div>
+            )}
 
             {/* ── Body ──────────────────────────────────────────────────── */}
-            <div style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'var(--ppm-dir, row)' as any }}>
-            <style>{`@media(max-width:640px){:root{--ppm-dir:column}}.ppm-sidebar{width:196px;flex-shrink:0}@media(max-width:640px){.ppm-sidebar{width:100%!important;border-left:none!important;border-top:1px solid var(--border,#e2e8f0)!important;flex-direction:row!important;flex-wrap:wrap;gap:6px;padding:12px!important}.ppm-sidebar-top{display:flex;flex-wrap:wrap;gap:6px;width:100%}.ppm-sidebar-btns{display:flex;flex-wrap:wrap;gap:6px;width:100%}.ppm-sidebar-btns button{flex:1;min-width:calc(50% - 3px)!important;white-space:nowrap}.ppm-hints{display:none!important}}</style>
+            <div style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: stacked ? 'column' : 'row', minHeight: 0 }}>
 
               {/* Preview */}
-              <div style={{ flex: 1, padding: 12, overflow: 'auto', background: '#f8f9fa', display: 'flex', justifyContent: 'center', alignItems: 'flex-start', minWidth: 0 }}>
+              <div style={{
+                flex: 1, minWidth: 0, minHeight: 0,
+                padding: isMobile ? 8 : 12,
+                overflow: 'auto',
+                background: '#f8f9fa',
+                display: 'flex', justifyContent: 'center', alignItems: 'flex-start',
+                WebkitOverflowScrolling: 'touch',
+              }}>
                 <div style={{
                   background: '#fff', borderRadius: 8, boxShadow: '0 2px 12px rgba(0,0,0,0.1)',
-                  padding: size === 'a4' ? 16 : 10,
+                  padding: size === 'a4' ? (isMobile ? 10 : 16) : (isMobile ? 6 : 10),
                   width: '100%',
                   maxWidth: size === 'a4' ? 'min(210mm,100%)' : size === 'thermal-80' ? '80mm' : '58mm',
                   overflowX: 'auto', margin: '0 auto', boxSizing: 'border-box' as const,
                 }}>
-                  {/* InvoiceTemplate now receives the full tpl config */}
+                  {/* InvoiceTemplate receives the full tpl config — rendering unchanged */}
                   <InvoiceTemplate ref={printRef} data={printData} size={size} tpl={tpl} />
                 </div>
               </div>
 
-              {/* Sidebar */}
-              <div className="ppm-sidebar" style={{ width: 196, flexShrink: 0, borderLeft: '1px solid var(--border,#e2e8f0)', padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: 8, background: 'var(--surface,#fff)' }}>
-
-                <div className="ppm-sidebar-top">
-                {/* Paper size */}
-                <div style={{ marginBottom: 4 }}>
-                  <SideLabel>Paper Size</SideLabel>
-                  {(['a4', 'thermal-80', 'thermal-58'] as PrintSize[]).map(s => (
-                    <button key={s} onClick={() => setSize(s)} style={{
-                      display: 'block', width: '100%', textAlign: 'left',
-                      padding: '5px 8px', marginBottom: 2, borderRadius: 6,
-                      border: size === s ? `1.5px solid ${typeColor}` : '1.5px solid transparent',
-                      background: size === s ? typeColor + '12' : 'transparent',
-                      color: size === s ? typeColor : 'var(--text-2,#444)',
-                      fontSize: 12, cursor: 'pointer', fontWeight: size === s ? 600 : 400,
-                      transition: 'all 0.15s',
-                    }}>
-                      {s === 'a4' ? 'A4 (Standard)' : s === 'thermal-80' ? 'Thermal 80mm' : 'Thermal 58mm'}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Copies */}
-                <div style={{ marginBottom: 8 }}>
-                  <SideLabel>Copies</SideLabel>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <button onClick={() => setCopies(c => Math.max(1, c - 1))} style={counterBtnStyle}>−</button>
-                    <span style={{ fontWeight: 700, fontSize: 15, minWidth: 24, textAlign: 'center' }}>{copies}</span>
-                    <button onClick={() => setCopies(c => Math.min(5, c + 1))} style={counterBtnStyle}>+</button>
-                  </div>
-                </div>
-                </div>{/* end ppm-sidebar-top */}
-
-                <div className="ppm-sidebar-btns">
-                <Divider />
-
-                <ActionBtn icon={<Printer size={15}/>}   label="Print"          shortcut="Ctrl+P" color={typeColor} onClick={handlePrint}    primary />
-                <ActionBtn icon={<Download size={15}/>}  label="Download PDF"                      color="#2563eb"   onClick={handleDownload} />
-                <ActionBtn icon={<Copy size={15}/>}      label="Print Duplicate"                   color="#7c3aed"   onClick={() => { setCopies(2); setTimeout(handlePrint, 100) }} />
-                <ActionBtn
-                  icon={backingUp ? <Loader2 size={15} className="animate-spin"/> : <UploadCloud size={15}/>}
-                  label={backingUp ? 'Backing up…' : 'Backup to Cloud'}
-                  color="#0d9488"
-                  onClick={handleCloudBackup}
+              {/* Controls: right sidebar (desktop) or full-width panel (tablet) */}
+              {(isDesktop || isTablet) && (
+                <ControlsPanel
+                  layout={isDesktop ? 'sidebar' : 'panel'}
+                  size={size} setSize={setSize}
+                  copies={copies} setCopies={setCopies}
+                  typeColor={typeColor}
+                  handlePrint={handlePrint}
+                  handleDownload={handleDownload}
+                  handleCloudBackup={handleCloudBackup}
+                  backingUp={backingUp}
+                  handleEmail={handleEmail}
+                  handleWhatsApp={handleWhatsApp}
+                  handleDuplicate={handleDuplicate}
+                  onNextBill={onNextBill}
+                  handleNextBill={handleNextBill}
+                  onClose={onClose}
                 />
+              )}
+            </div>
 
-                <Divider />
+            {/* ── Mobile sticky bottom action bar ──────────────────────── */}
+            {isMobile && (
+              <MobileBottomBar
+                size={size} setSize={setSize}
+                copies={copies} setCopies={setCopies}
+                typeColor={typeColor}
+                onPrint={handlePrint}
+                onDownload={handleDownload}
+                onMore={() => setMoreOpen(true)}
+              />
+            )}
 
-                <ActionBtn icon={<Mail size={15}/>}           label="Email Invoice" color="#0891b2" onClick={() => shareEmail(printData, company)} />
-                <ActionBtn icon={<MessageCircle size={15}/>}  label="WhatsApp"      color="#16a34a" onClick={() => shareWhatsApp(printData)} />
-
-                </div>{/* end ppm-sidebar-btns */}
-                <div style={{ flex: 1 }} />
-
-                {onNextBill && (
-                  <ActionBtn icon={<ChevronRight size={15}/>} label="Next Bill" shortcut="Enter" color="#334155" onClick={handleNextBill} primary />
-                )}
-                <ActionBtn icon={<Clock size={15}/>} label="Close" shortcut="Esc" color="#888" onClick={onClose} />
+            {/* ── Footer hints (desktop / tablet only) ─────────────────── */}
+            {!isMobile && (
+              <div style={{ padding: '8px 20px', borderTop: '1px solid var(--border,#e2e8f0)', fontSize: 10, color: 'var(--text-4,#aaa)', display: 'flex', gap: 16, flexShrink: 0, background: 'var(--surface,#fff)', flexWrap: 'wrap' }}>
+                <span><Kbd>Ctrl+P</Kbd> Print</span>
+                {onNextBill && <span><Kbd>Enter</Kbd> Next Bill</span>}
+                <span><Kbd>Esc</Kbd> Close</span>
               </div>
-            </div>
-
-            {/* ── Footer hints ──────────────────────────────────────────── */}
-            <div className="ppm-hints" style={{ padding: '8px 20px', borderTop: '1px solid var(--border,#e2e8f0)', fontSize: 10, color: 'var(--text-4,#aaa)', display: 'flex', gap: 16, flexShrink: 0, background: 'var(--surface,#fff)' }}>
-              <span><Kbd>Ctrl+P</Kbd> Print</span>
-              {onNextBill && <span><Kbd>Enter</Kbd> Next Bill</span>}
-              <span><Kbd>Esc</Kbd> Close</span>
-            </div>
+            )}
           </motion.div>
+
+          {/* ── Mobile "More" sheet (secondary actions) ────────────────── */}
+          {isMobile && (
+            <MoreSheet
+              open={moreOpen}
+              onClose={() => setMoreOpen(false)}
+              onEmail={handleEmail}
+              onWhatsApp={handleWhatsApp}
+              onDuplicate={handleDuplicate}
+              onCloudBackup={handleCloudBackup}
+              backingUp={backingUp}
+              onNextBill={onNextBill}
+              handleNextBill={handleNextBill}
+            />
+          )}
         </>
       )}
     </AnimatePresence>,
     document.body
   )
-}
-
-/* ── Small helpers ────────────────────────────────────────────────────────── */
-
-function SideLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-3,#888)', marginBottom: 6, textTransform: 'uppercase' as const, letterSpacing: 0.5 }}>
-      {children}
-    </div>
-  )
-}
-
-function Divider() {
-  return <div style={{ height: 1, background: 'var(--border,#e2e8f0)', margin: '4px 0' }} />
-}
-
-function Kbd({ children }: { children: React.ReactNode }) {
-  return (
-    <kbd style={{ background: 'var(--surface-2,#f1f5f9)', border: '1px solid var(--border,#e2e8f0)', borderRadius: 4, padding: '1px 5px', fontSize: 9, fontFamily: 'monospace' }}>
-      {children}
-    </kbd>
-  )
-}
-
-function ActionBtn({ icon, label, shortcut, color, onClick, primary }: {
-  icon: React.ReactNode; label: string; shortcut?: string; color: string; onClick: () => void; primary?: boolean
-}) {
-  return (
-    <button onClick={onClick} style={{
-      display: 'flex', alignItems: 'center', gap: 7,
-      width: '100%', padding: primary ? '8px 10px' : '6px 10px',
-      borderRadius: 8,
-      border: primary ? `1.5px solid ${color}` : '1.5px solid var(--border,#e2e8f0)',
-      background: primary ? color : 'transparent',
-      color:   primary ? '#fff' : color,
-      fontSize: 12, fontWeight: primary ? 700 : 500,
-      cursor: 'pointer', transition: 'all 0.15s',
-      whiteSpace: 'nowrap' as const,
-    }}>
-      {icon}
-      <span style={{ flex: 1, textAlign: 'left' as const }}>{label}</span>
-      {shortcut && <span style={{ fontSize: 9, opacity: 0.65, fontWeight: 400 }}>{shortcut}</span>}
-    </button>
-  )
-}
-
-const iconBtnStyle: React.CSSProperties = {
-  background: 'transparent', border: 'none', cursor: 'pointer', padding: 6,
-  color: 'var(--text-3,#888)', borderRadius: 6,
-}
-const counterBtnStyle: React.CSSProperties = {
-  width: 28, height: 28, borderRadius: 6,
-  border: '1.5px solid var(--border,#e2e8f0)',
-  background: 'transparent', cursor: 'pointer',
-  fontSize: 16, fontWeight: 700, color: 'var(--text-2,#444)',
-  display: 'flex', alignItems: 'center', justifyContent: 'center',
 }
