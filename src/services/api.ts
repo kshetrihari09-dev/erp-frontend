@@ -114,24 +114,18 @@ export const returnsAPI = {
 }
 
 // ─── Sales Returns (dedicated module) ──────────────────────────────────────────
-// NOTE: endpoint paths follow this module's own JSDoc (POST /returns/sales).
-// Backend source isn't included in this project export — verify these paths
-// against your actual routes before relying on them in production.
 export const salesReturnsAPI = {
   listSales: (params?: Params) => http.get<ApiResponse<Sale[]>>('/sales', { params }),
   getSale:   (id: string)      => http.get<ApiResponse<Sale>>(`/sales/${id}`),
-  list:      (params?: Params) => http.get('/returns/sales', { params }),
+  list:      (params?: Params) => http.get('/returns', { params: { ...params, type: 'sales' } }),
   create:    (data: Params)    => http.post('/returns/sales', data),
 }
 
 // ─── Purchase Returns (dedicated module) ───────────────────────────────────────
-// NOTE: endpoint paths follow this module's own JSDoc (POST /returns/purchase).
-// Backend source isn't included in this project export — verify these paths
-// against your actual routes before relying on them in production.
 export const purchaseReturnsAPI = {
   listPurchases: (params?: Params) => http.get<ApiResponse<Purchase[]>>('/purchases', { params }),
   getPurchase:   (id: string)      => http.get<ApiResponse<Purchase>>(`/purchases/${id}`),
-  list:          (params?: Params) => http.get('/returns/purchase', { params }),
+  list:          (params?: Params) => http.get('/returns', { params: { ...params, type: 'purchase' } }),
   create:        (data: Params)    => http.post('/returns/purchase', data),
 }
 
