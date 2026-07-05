@@ -196,7 +196,7 @@ export default function PrintPreviewModal({
             style={{
               position: 'fixed',
               top:       effectiveFullscreen ? 0 : '0%',
-              left:      effectiveFullscreen ? 0 : '0%',
+              left:      effectiveFullscreen ? 0 : '-50%',
               transform: effectiveFullscreen ? 'none' : 'translate(0%, 70%)',
               width:     effectiveFullscreen ? '100vw' : isTablet ? 'min(880px, 96vw)' : 'min(1000px, 98vw)',
               height:    effectiveFullscreen ? '100dvh' : 'auto',
