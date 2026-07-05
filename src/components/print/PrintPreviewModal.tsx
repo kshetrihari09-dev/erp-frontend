@@ -164,12 +164,12 @@ export default function PrintPreviewModal({
             transition={{ type: 'spring', stiffness: 400, damping: 30 }}
             style={{
               position: 'fixed',
-              top:    fullscreen ? 0      : '5%',
-              left:   fullscreen ? 0      : '20%',
+              top:       fullscreen ? 0 : '50%',
+              left:      fullscreen ? 0 : '50%',
               transform: fullscreen ? 'none' : 'translate(-50%, -50%)',
-              width:  fullscreen ? '100vw' : 'min(1000px, 98vw)',
-              height: fullscreen ? '100vh' : 'auto',
-              maxHeight: fullscreen ? '100vh' : '90vh',
+              width:     fullscreen ? '100vw' : 'min(1000px, 98vw)',
+              height:    fullscreen ? '100vh' : 'auto',
+              maxHeight: fullscreen ? '100vh' : '92dvh',
               zIndex: 9999,
               background: 'var(--surface, #fff)',
               borderRadius: fullscreen ? 0 : '16px',
@@ -203,7 +203,8 @@ export default function PrintPreviewModal({
             </div>
 
             {/* ── Body ──────────────────────────────────────────────────── */}
-            <div style={{ flex: 1, overflow: 'auto', display: 'flex' }}>
+            <div style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'var(--ppm-dir, row)' as any }}>
+            <style>{`@media(max-width:640px){:root{--ppm-dir:column}}.ppm-sidebar{width:196px;flex-shrink:0}@media(max-width:640px){.ppm-sidebar{width:100%!important;border-left:none!important;border-top:1px solid var(--border,#e2e8f0)!important;flex-direction:row!important;flex-wrap:wrap;gap:6px;padding:12px!important}.ppm-sidebar-top{display:flex;flex-wrap:wrap;gap:6px;width:100%}.ppm-sidebar-btns{display:flex;flex-wrap:wrap;gap:6px;width:100%}.ppm-sidebar-btns button{flex:1;min-width:calc(50% - 3px)!important;white-space:nowrap}.ppm-hints{display:none!important}}</style>
 
               {/* Preview */}
               <div style={{ flex: 1, padding: 12, overflow: 'auto', background: '#f8f9fa', display: 'flex', justifyContent: 'center', alignItems: 'flex-start', minWidth: 0 }}>
@@ -220,8 +221,9 @@ export default function PrintPreviewModal({
               </div>
 
               {/* Sidebar */}
-              <div style={{ width: 196, flexShrink: 0, borderLeft: '1px solid var(--border,#e2e8f0)', padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: 8, background: 'var(--surface,#fff)' }}>
+              <div className="ppm-sidebar" style={{ width: 196, flexShrink: 0, borderLeft: '1px solid var(--border,#e2e8f0)', padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: 8, background: 'var(--surface,#fff)' }}>
 
+                <div className="ppm-sidebar-top">
                 {/* Paper size */}
                 <div style={{ marginBottom: 4 }}>
                   <SideLabel>Paper Size</SideLabel>
@@ -249,7 +251,9 @@ export default function PrintPreviewModal({
                     <button onClick={() => setCopies(c => Math.min(5, c + 1))} style={counterBtnStyle}>+</button>
                   </div>
                 </div>
+                </div>{/* end ppm-sidebar-top */}
 
+                <div className="ppm-sidebar-btns">
                 <Divider />
 
                 <ActionBtn icon={<Printer size={15}/>}   label="Print"          shortcut="Ctrl+P" color={typeColor} onClick={handlePrint}    primary />
@@ -267,6 +271,7 @@ export default function PrintPreviewModal({
                 <ActionBtn icon={<Mail size={15}/>}           label="Email Invoice" color="#0891b2" onClick={() => shareEmail(printData, company)} />
                 <ActionBtn icon={<MessageCircle size={15}/>}  label="WhatsApp"      color="#16a34a" onClick={() => shareWhatsApp(printData)} />
 
+                </div>{/* end ppm-sidebar-btns */}
                 <div style={{ flex: 1 }} />
 
                 {onNextBill && (
@@ -277,7 +282,7 @@ export default function PrintPreviewModal({
             </div>
 
             {/* ── Footer hints ──────────────────────────────────────────── */}
-            <div style={{ padding: '8px 20px', borderTop: '1px solid var(--border,#e2e8f0)', fontSize: 10, color: 'var(--text-4,#aaa)', display: 'flex', gap: 16, flexShrink: 0, background: 'var(--surface,#fff)' }}>
+            <div className="ppm-hints" style={{ padding: '8px 20px', borderTop: '1px solid var(--border,#e2e8f0)', fontSize: 10, color: 'var(--text-4,#aaa)', display: 'flex', gap: 16, flexShrink: 0, background: 'var(--surface,#fff)' }}>
               <span><Kbd>Ctrl+P</Kbd> Print</span>
               {onNextBill && <span><Kbd>Enter</Kbd> Next Bill</span>}
               <span><Kbd>Esc</Kbd> Close</span>
