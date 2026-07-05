@@ -12,6 +12,8 @@ const Dashboard    = lazy(() => import('@/modules/dashboard/DashboardPage'))
 const SalesPage    = lazy(() => import('@/modules/sales/SalesPage'))
 const PurchasePage = lazy(() => import('@/modules/purchases/PurchasePage'))
 const ReturnsPage  = lazy(() => import('@/modules/billing/ReturnsPage'))
+const SalesReturnPage    = lazy(() => import('@/modules/billing/SalesReturnPage'))
+const PurchaseReturnPage = lazy(() => import('@/modules/billing/PurchaseReturnPage'))
 const ProductsPage = lazy(() => import('@/modules/inventory/ProductsPage'))
 const StockPage    = lazy(() => import('@/modules/inventory/StockPage'))
 const ReceivePage  = lazy(() => import('@/modules/inventory/ReceivePage'))
@@ -25,10 +27,6 @@ const SettingsPage = lazy(() => import('@/modules/settings/SettingsPage'))
 
 // NEW: Mobile scanner page — public route, no auth, no layout
 const MobileScannerPage = lazy(() => import('@/modules/scanner/MobileScannerPage'))
-const SalesReturnPage   = lazy(() => import('@/modules/billing/SalesReturnPage'))
-const PurchaseReturnPage = lazy(() => import('@/modules/billing/PurchaseReturnPage'))
-
-
 
 function PageLoader() {
   return (
@@ -63,7 +61,7 @@ export default function Router() {
             <Route path="returns"          element={<ReturnsPage />} />
             <Route path="sales-returns"    element={<SalesReturnPage />} />
             <Route path="purchase-return"  element={<PurchaseReturnPage />} />
-            <Route path="purchase-returns" element={<ReturnsPage />} />
+            <Route path="purchase-returns" element={<PurchaseReturnPage />} />
 
             {/* Inventory */}
             <Route path="products"     element={<ProductsPage />} />
