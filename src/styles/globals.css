@@ -3139,7 +3139,7 @@ td.psc-cell {
 .sil-search-bar {
   display:       flex;
   align-items:   center;
-  margin-bottom: 12px;
+  margin: 12px;
 }
 .sil-search-input { width: 260px; }
 @media (max-width: 768px) {
