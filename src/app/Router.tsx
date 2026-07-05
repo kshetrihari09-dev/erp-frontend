@@ -25,6 +25,10 @@ const SettingsPage = lazy(() => import('@/modules/settings/SettingsPage'))
 
 // NEW: Mobile scanner page — public route, no auth, no layout
 const MobileScannerPage = lazy(() => import('@/modules/scanner/MobileScannerPage'))
+const SalesReturnPage   = lazy(() => import('@/modules/billing/SalesReturnPage'))
+const PurchaseReturnPage = lazy(() => import('@/modules/billing/PurchaseReturnPage'))
+
+
 
 function PageLoader() {
   return (
@@ -57,8 +61,8 @@ export default function Router() {
             <Route path="purchase"     element={<PurchasePage />} />
             <Route path="purchases"    element={<PurchasePage />} />
             <Route path="returns"          element={<ReturnsPage />} />
-            <Route path="sales-returns"    element={<ReturnsPage />} />
-            <Route path="purchase-return"  element={<ReturnsPage />} />
+            <Route path="sales-returns"    element={<SalesReturnPage />} />
+            <Route path="purchase-return"  element={<PurchaseReturnPage />} />
             <Route path="purchase-returns" element={<ReturnsPage />} />
 
             {/* Inventory */}

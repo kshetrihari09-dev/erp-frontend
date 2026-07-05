@@ -108,12 +108,13 @@ function InvoiceSearchModal({ open, onClose, onSelect }: InvoiceSearchModalProps
         </div>
 
         <div className="border border-[var(--border)] rounded-xl overflow-hidden max-h-80 overflow-y-auto">
+          <style>{`.ret-search-modal-table{} @media(max-width:640px){.ret-search-modal-table{display:none}.ret-search-modal-cards{display:flex!important}}`}</style>
           {loading ? (
             <div className="p-6 text-center text-sm text-[var(--text-3)]">Searching…</div>
           ) : results.length === 0 ? (
             <div className="p-6 text-center text-sm text-[var(--text-3)]">No sales invoices found</div>
           ) : (
-            <table className="erp-table">
+            <table className="erp-table ret-search-modal-table">
               <thead>
                 <tr>
                   <th>Invoice No</th>
@@ -139,6 +140,20 @@ function InvoiceSearchModal({ open, onClose, onSelect }: InvoiceSearchModalProps
                 ))}
               </tbody>
             </table>
+            {/* Mobile card list */}
+            <div className="ret-search-modal-cards" style={{display:'none',flexDirection:'column',gap:8,padding:8}}>
+              {results.map(s => (
+                <div key={s.id} onClick={() => { onSelect(s); onClose() }}
+                  style={{background:'var(--surface)',border:'1.5px solid var(--border)',borderRadius:12,padding:'12px 14px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontFamily:'var(--font-mono)',fontWeight:700,color:'var(--brand)',fontSize:13}}>{(s).invoice_no}</div>
+                    <div style={{fontSize:13,fontWeight:500,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{(s).party_name ?? '—'}</div>
+                    <div style={{fontSize:11,color:'var(--text-3)',fontFamily:'var(--font-mono)'}}>{fmtDate((s).date_ad)} · <Badge status={(s).payment_mode} /></div>
+                  </div>
+                  <div style={{fontFamily:'var(--font-mono)',fontWeight:800,fontSize:14,flexShrink:0}}>{fmt((s).net_total)}</div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       </div>
@@ -289,7 +304,7 @@ function NewReturnForm() {
         </div>
 
         {selectedSale ? (
-          <div className="flex flex-wrap gap-4 p-3 rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800">
+          <div className="ret-info-strip flex flex-wrap gap-4 p-3 rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800">
             <div>
               <p className="text-[10px] text-[var(--text-3)] uppercase font-semibold">Invoice No</p>
               <p className="font-mono font-bold text-brand">{selectedSale.invoice_no}</p>
@@ -324,7 +339,7 @@ function NewReturnForm() {
         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl mb-4 shadow-card overflow-hidden">
           <div className="px-4 py-3 border-b border-[var(--border)] flex items-center justify-between">
             <h3 className="text-sm font-semibold">Return Items</h3>
-            <p className="text-xs text-[var(--text-3)]">Enter quantities to return (max = original sold quantity)</p>
+            <p className="text-xs text-[var(--text-3)] ret-qty-hint">Enter quantities to return (max = original sold quantity)</p>
           </div>
 
           {loadingItems ? (
@@ -332,7 +347,9 @@ function NewReturnForm() {
           ) : items.length === 0 ? (
             <div className="p-6 text-center text-sm text-[var(--text-3)]">No items found for this invoice</div>
           ) : (
-            <div className="overflow-x-auto">
+            <>
+            {/* Desktop table */}
+            <div className="overflow-x-auto ret-items-desktop">
               <table className="erp-table">
                 <thead>
                   <tr>
@@ -384,11 +401,50 @@ function NewReturnForm() {
                 </tfoot>
               </table>
             </div>
-          )}
-        </div>
-      )}
 
-      {/* ── Form fields ────────────────────────────────────────────────────── */}
+            {{/* Mobile return item cards */}}
+            <div className="ret-items-mobile">
+              {{items.map((item, idx) => (
+                <div key={{idx}} style={{{{background: item.error ? 'rgba(239,68,68,0.04)' : 'var(--surface-2)', border: `1.5px solid ${{item.error ? '#fca5a5' : 'var(--border)'}}`, borderRadius:12, padding:'12px 14px', display:'flex', flexDirection:'column', gap:8}}}}>
+                  <div style={{{{fontWeight:600, fontSize:14, color:'var(--text)'}}}}>{{item.product_name}}</div>
+                  {{(item.batch_no || item.expiry) && (
+                    <div style={{{{fontFamily:'var(--font-mono)', fontSize:11.5, color:'var(--text-3)'}}}}>
+                      {{item.batch_no || '—'}}{{item.expiry && ` ({{item.expiry}})`}}
+                    </div>
+                  )}}
+                  <div style={{{{display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8, background:'var(--surface)', borderRadius:10, padding:'10px'}}}}>
+                    {{[[ + sold_label + , item.original_qty], ['Rate', fmt(item.rate)], ['Amount', item.qty > 0 ? fmt(item.amount) : '—']].map(([l,v]) => (
+                      <div key={{l as string}} style={{{{textAlign:'center'}}}}>
+                        <div style={{{{fontSize:'9.5px', fontWeight:700, textTransform:'uppercase', letterSpacing:'.05em', color:'var(--text-4)', marginBottom:3}}}}>{{l}}</div>
+                        <div style={{{{fontFamily:'var(--font-mono)', fontWeight:700, fontSize:13}}}}>{{v}}</div>
+                      </div>
+                    ))}}
+                  </div>
+                  <div style={{{{display:'flex', alignItems:'center', gap:10, paddingTop:8, borderTop:'1.5px solid var(--border)'}}}}>
+                    <label style={{{{fontSize:12, fontWeight:700, color:'var(--text-3)', flexShrink:0}}}}>Return Qty</label>
+                    <input
+                      type="number" inputMode="numeric" min={{0}} max={{item.original_qty}}
+                      value={{item.qty || ''}} placeholder="0"
+                      onChange={{e => updateQty(idx, e.target.value)}}
+                      style={{{{flex:1, maxWidth:100, height:44, borderRadius:10, border:`1.5px solid ${{item.error ? '#ef4444' : 'var(--border-2)'}}`, background:'var(--surface)', color:'var(--text)', fontSize:16, textAlign:'right', padding:'0 12px', outline:'none', fontFamily:'var(--font-mono)', fontWeight:600}}}}
+                    />
+                    {{item.qty > 0 && <div style={{{{fontFamily:'var(--font-mono)', fontWeight:800, fontSize:14, color:'var(--brand)', flexShrink:0}}}}>{{fmt(item.amount)}}</div>}}
+                  </div>
+                  {{item.error && <div style={{{{fontSize:11, color:'#ef4444', fontWeight:500}}}}>{{item.error}}</div>}}
+                </div>
+              ))}}
+              {{/* Mobile total */}}
+              <div style={{{{display:'flex', justifyContent:'space-between', padding:'10px 4px', borderTop:'2px solid var(--border)', marginTop:4}}}}>
+                <span style={{{{fontSize:13, fontWeight:700, color:'var(--text-3)', textTransform:'uppercase', letterSpacing:'.04em'}}}}>Total Return</span>
+                <span style={{{{fontSize:16, fontWeight:800, color:'var(--brand)', fontFamily:'var(--font-mono)'}}}}>{{fmt(totalAmount)}}</span>
+              </div>
+            </div>
+            </>
+          )}}
+        </div>
+      )}}
+
+      {{/* ── Form fields ────────────────────────────────────────────────────── */}
       {selectedSale && (
         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-4 mb-4 shadow-card">
           <div className="form-grid">
@@ -411,14 +467,14 @@ function NewReturnForm() {
 
       {/* ── Action bar ─────────────────────────────────────────────────────── */}
       {selectedSale && (
-        <div className="flex items-center justify-between gap-3">
+        <div className="ret-action-bar" style={{display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, flexWrap:'wrap'}}>
           <div className="text-sm text-[var(--text-3)]">
             {hasItems
               ? <span className="text-green-600 font-medium flex items-center gap-1.5"><CheckCircle2 size={14}/> {items.filter(i=>i.qty>0).length} item(s) to return • {fmt(totalAmount)}</span>
               : 'Enter return quantities above'
             }
           </div>
-          <div className="flex gap-2">
+          <div className="ret-action-btns" style={{display:'flex', gap:8}}>
             <Button variant="secondary" onClick={clearSale}>Cancel</Button>
             <Button
               variant="primary"
@@ -473,7 +529,7 @@ function ReturnsList() {
   return (
     <div>
       <div className="table-card">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto ret-list-desktop">
           <table className="erp-table">
             <thead>
               <tr>
@@ -518,6 +574,45 @@ function ReturnsList() {
               ))}
             </tbody>
           </table>
+        </div>
+        <Pagination page={page} total={total} limit={LIMIT} onChange={setPage} />
+
+        {/* Mobile card list */}
+        <div className="ret-list-mobile">
+          {loading ? (
+            [1,2,3].map(i => <div key={i} style={{height:84, borderRadius:12, background:'linear-gradient(90deg,var(--surface) 25%,var(--surface-2) 50%,var(--surface) 75%)', backgroundSize:'400% 100%', animation:'ret-shimmer 1.4s ease infinite'}}/>)
+          ) : list.length === 0 ? (
+            <Empty message="No returns yet" />
+          ) : list.map(r => (
+            <div key={r.id} style={{background:'var(--surface)', border:'1.5px solid var(--border)', borderRadius:14, padding:'13px 14px', display:'flex', flexDirection:'column', gap:8}}>
+              <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                <span style={{fontFamily:'var(--font-mono)', fontWeight:700, color:'var(--brand)', fontSize:13}}>{r.voucher_no}</span>
+                <span style={{fontFamily:'var(--font-mono)', fontWeight:800, fontSize:14}}>{fmt(r.total_amount)}</span>
+              </div>
+              <div style={{display:'flex', justifyContent:'space-between', fontSize:12, color:'var(--text-3)'}}>
+                <span>{r.party_name ?? '—'}</span>
+                <span style={{fontFamily:'var(--font-mono)'}}>{fmtDate(r.voucher_date)}</span>
+              </div>
+              <div style={{display:'flex', gap:6, flexWrap:'wrap', alignItems:'center'}}>
+                <Badge status={(r.status ?? 'posted').toLowerCase()} />
+                {r.reference_no && <span style={{fontSize:11, fontFamily:'var(--font-mono)', color:'var(--text-3)', background:'var(--surface-2)', padding:'2px 8px', borderRadius:6}}>Invoice: {r.reference_no}</span>}
+              </div>
+              <div style={{paddingTop:8, borderTop:'1px solid var(--border)'}}>
+                <Button variant="secondary" size="sm" icon={<Printer size={12}/>}
+                  style={{width:'100%', justifyContent:'center'}}
+                  onClick={() => setPrint({
+                    voucherNo: r.voucher_no,
+                    type: 'SALE_RETURN',
+                    date: r.voucher_date,
+                    referenceNo: r.reference_no ?? undefined,
+                    partyName: r.party_name ?? undefined,
+                    narration: r.narration ?? undefined,
+                    netTotal: Number(r.total_amount) || 0,
+                  })}
+                >Print</Button>
+              </div>
+            </div>
+          ))}
         </div>
         <Pagination page={page} total={total} limit={LIMIT} onChange={setPage} />
       </div>
