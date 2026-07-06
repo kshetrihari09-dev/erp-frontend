@@ -3,6 +3,7 @@ import type { ApiResponse, Company, User, Sale, SaleItem, Purchase, PurchaseItem
   Product, Party, Account, AccountDefault, Voucher, VoucherLine,
   VoucherPosting, PostingStatus, DashboardStats, PnLReport,
   TrialBalanceRow, LedgerEntry, StockBatch, InvoiceTemplate, FiscalYear, AuditLog } from '@/types'
+import type { ScannedProduct } from '@/types/scanner'
 
 type Params = Record<string, unknown>
 
@@ -267,6 +268,29 @@ export const scannerAPI = {
   networkInfo: () =>
     http.get<ApiResponse<{ ip: string; port: number }>>(
       '/scanner/network-info',
+    ),
+
+  /**
+   * Local (same-device) product lookups — used by the instant camera
+   * scanner (useLocalScanner). Same two endpoints the cross-device mobile
+   * flow already uses; called here through the normal authenticated `http`
+   * instance since this runs in the user's own logged-in tab (no session
+   * token / forwarded JWT needed).
+   *
+   * lookupBarcode() returns the FULL product shape (current_stock +
+   * batches) — it's also used to hydrate a fuzzy-search pick into a
+   * complete ScannedProduct before returning the final scan result,
+   * exactly mirroring what the backend already does server-side for the
+   * cross-device flow.
+   */
+  lookupBarcode: (code: string) =>
+    http.get<ApiResponse<ScannedProduct>>(
+      `/scanner/products/barcode/${encodeURIComponent(code)}`,
+    ),
+  fuzzySearch: (q: string, limit = 15) =>
+    http.get<ApiResponse<Array<Omit<ScannedProduct, 'current_stock' | 'batches'>>>>(
+      '/scanner/products/fuzzy',
+      { params: { q, limit } },
     ),
 }
 

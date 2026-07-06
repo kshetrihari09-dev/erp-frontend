@@ -2,19 +2,29 @@
  * ScanButton.tsx
  *
  * Drop this beside the "Invoice Items" header in SalesPage and PurchasePage.
- * Lazy-loads ScannerModal — zero cost on initial page load.
+ * Lazy-loads the scanner UI — zero cost on initial page load.
+ *
+ * NEW DEFAULT FLOW (per scanner redesign):
+ *   Tap Scan → local camera opens instantly (LocalScannerView) → scan →
+ *   result returned automatically → scanner closes.
+ *
+ * The QR / cross-device flow (ScannerModal + useScannerSession) is
+ * unchanged and still fully available:
+ *   - automatically, as a fallback, if this device has no camera at all
+ *   - manually, via "Use Another Device" inside the local scanner view
  *
  * Usage:
  *   <ScanButton context="sales"    onResult={handleScanResult} />
  *   <ScanButton context="purchase" onResult={handleScanResult} />
  */
 
-import { lazy, Suspense, useCallback } from 'react'
+import { lazy, Suspense, useCallback, useState } from 'react'
 import { ScanLine } from 'lucide-react'
 import useScannerSession from '@/hooks/scanner/useScannerSession'
 import type { ScanResult } from '@/types/scanner'
 
-const ScannerModal = lazy(() => import('./ScannerModal'))
+const ScannerModal     = lazy(() => import('./ScannerModal'))
+const LocalScannerView = lazy(() => import('./LocalScannerView'))
 
 interface Props {
   context:   'sales' | 'purchase'
@@ -22,23 +32,49 @@ interface Props {
   disabled?: boolean
 }
 
+// A camera counts as "available" if the browser exposes the mediaDevices
+// API at all — the actual permission prompt/denial is handled inside
+// LocalScannerView so the user always gets a friendly retry screen there
+// rather than silently falling back.
+function hasCameraSupport(): boolean {
+  return typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia
+}
+
 export default function ScanButton({ context, onResult, disabled }: Props) {
-  const { state, open, close, retry } = useScannerSession({ context, onResult })
+  const [localOpen, setLocalOpen] = useState(false)
+
+  // Existing cross-device session hook — completely unchanged.
+  const { state: qrState, open: openQr, close: closeQr, retry: retryQr } = useScannerSession({ context, onResult })
 
   const handleClick = useCallback(() => {
-    if (state.isOpen) close(); else open()
-  }, [state.isOpen, open, close])
+    if (localOpen || qrState.isOpen) {
+      setLocalOpen(false)
+      closeQr()
+      return
+    }
+    if (hasCameraSupport()) {
+      setLocalOpen(true)
+    } else {
+      // No camera on this device at all — go straight to the QR fallback.
+      openQr()
+    }
+  }, [localOpen, qrState.isOpen, closeQr, openQr])
 
-  const isActive    = state.isOpen
-  const isConnected = state.status === 'connected'
-  const isDone      = state.status === 'done'
+  const handleUseAnotherDevice = useCallback(() => {
+    setLocalOpen(false)
+    openQr()
+  }, [openQr])
+
+  const isActive    = localOpen || qrState.isOpen
+  const isConnected = qrState.status === 'connected'
+  const isDone      = qrState.status === 'done'
 
   return (
     <>
       <button
         onClick={handleClick}
         disabled={disabled}
-        title={isActive ? 'Click to cancel scan' : 'Scan medicine with phone camera'}
+        title={isActive ? 'Click to cancel scan' : 'Scan medicine with camera'}
         className={[
           'inline-flex items-center gap-1.5 px-3 h-8 rounded-lg border text-xs font-semibold transition-all',
           isActive
@@ -55,7 +91,17 @@ export default function ScanButton({ context, onResult, disabled }: Props) {
       </button>
 
       <Suspense fallback={null}>
-        <ScannerModal state={state} context={context} onClose={close} onRetry={retry} />
+        <LocalScannerView
+          open={localOpen}
+          context={context}
+          onResult={onResult}
+          onClose={() => setLocalOpen(false)}
+          onUseAnotherDevice={handleUseAnotherDevice}
+        />
+      </Suspense>
+
+      <Suspense fallback={null}>
+        <ScannerModal state={qrState} context={context} onClose={closeQr} onRetry={retryQr} />
       </Suspense>
     </>
   )
