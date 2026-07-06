@@ -66,6 +66,23 @@ export default function useProductCapture({ active, mode, onBarcode, onOcrText }
     streamRef.current = null
   }, [stopBarcodeLoop])
 
+  // Attaches the current stream to the <video> element if it isn't already
+  // attached. Split out from startCamera (and also called defensively — see
+  // the effect below) because the <video> element doesn't exist yet at the
+  // exact moment getUserMedia() resolves: the modal only renders <video>
+  // once status flips to 'ready', but startCamera() runs while status is
+  // still 'requesting-permission'. If the stream is captured but never
+  // attached, videoRef.current stays null/stale and the barcode loop and
+  // OCR capture both silently do nothing forever (same failure mode fixed
+  // previously in useLocalScanner).
+  const attachStream = useCallback(async () => {
+    const video  = videoRef.current
+    const stream = streamRef.current
+    if (!video || !stream || video.srcObject === stream) return
+    video.srcObject = stream
+    try { await video.play() } catch {}
+  }, [])
+
   const startCamera = useCallback(async (): Promise<boolean> => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -74,7 +91,7 @@ export default function useProductCapture({ active, mode, onBarcode, onOcrText }
       })
       if (!mountedRef.current) { stream.getTracks().forEach(t => t.stop()); return false }
       streamRef.current = stream
-      if (videoRef.current) { videoRef.current.srcObject = stream; await videoRef.current.play() }
+      await attachStream()
       return true
     } catch (err: any) {
       if (!mountedRef.current) return false
@@ -183,10 +200,11 @@ export default function useProductCapture({ active, mode, onBarcode, onOcrText }
     setState(s => ({ ...s, status: 'requesting-permission', error: null }))
     const ok = await startCamera()
     if (ok && mountedRef.current) {
+      await attachStream()
       setState(s => ({ ...s, status: 'ready' }))
       if (mode === 'barcode') await startBarcodeLoop()
     }
-  }, [startCamera, startBarcodeLoop, mode])
+  }, [startCamera, startBarcodeLoop, attachStream, mode])
 
   // ── Switch between barcode / label without re-requesting permission ─────
   useEffect(() => {
@@ -211,6 +229,10 @@ export default function useProductCapture({ active, mode, onBarcode, onOcrText }
     async function init() {
       const ok = await startCamera()
       if (cancelled || !mountedRef.current || !ok) return
+      // Belt-and-suspenders: attachStream() already ran inside startCamera,
+      // but we re-check here too before flipping to 'ready' and kicking
+      // off the barcode loop.
+      await attachStream()
       setState(s => ({ ...s, status: 'ready' }))
       if (mode === 'barcode') await startBarcodeLoop()
     }
@@ -219,6 +241,17 @@ export default function useProductCapture({ active, mode, onBarcode, onOcrText }
     return () => { cancelled = true; stopCamera() }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active])
+
+  // ── Defensive re-attach ──────────────────────────────────────────────────
+  // Runs whenever the scanner is active and status changes. If the <video>
+  // element and the MediaStream both exist but aren't wired together yet
+  // (e.g. the <video> mounted/remounted after the stream was captured),
+  // this reconnects them — the actual fix for the "camera opens, but the
+  // preview stays blank" bug.
+  useEffect(() => {
+    if (!active) return
+    attachStream()
+  }, [active, state.status, attachStream])
 
   return { state, videoRef, captureAndExtract, extractFromFile, retryPermission }
 }
