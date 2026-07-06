@@ -15,6 +15,7 @@
  */
 
 import { useRef, useState, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   X, Zap, ZapOff, RefreshCw, ImageIcon, ScanLine, Type,
@@ -23,6 +24,12 @@ import {
 import useLocalScanner from '@/hooks/scanner/useLocalScanner'
 import type { ScanResult } from '@/types/scanner'
 import { ScanFrame, ModeBadge, ProductCard } from './ScannerUI'
+
+// Highest z-index used anywhere in this codebase is `.psc-dropdown` at
+// 99999 (globals.css) — a mobile product-search combobox that can still be
+// mounted when the scanner opens. The scanner must always win, so this is
+// set well above that (and above .sidebar 200 / .topbar 100 / toasts 9999).
+const SCANNER_Z_INDEX = 999999
 
 interface Props {
   open:               boolean
@@ -66,12 +73,18 @@ export default function LocalScannerView({ open, context, onResult, onClose, onU
 
   const showDrawer = state.status === 'matches' || state.status === 'submitting'
 
-  return (
+  return createPortal(
     <AnimatePresence>
       <motion.div
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[9999] bg-black flex flex-col overflow-hidden"
-        style={{ height: '100dvh' }}
+        className="bg-black flex flex-col overflow-hidden"
+        style={{
+          position: 'fixed',
+          inset: 0,
+          width: '100vw',
+          height: '100dvh',
+          zIndex: SCANNER_Z_INDEX,
+        }}
       >
         {/* ── Denied permission ────────────────────────────────────────────── */}
         {state.status === 'denied' && (
@@ -307,6 +320,7 @@ export default function LocalScannerView({ open, context, onResult, onClose, onU
           )}
         </AnimatePresence>
       </motion.div>
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   )
 }

@@ -16,12 +16,20 @@
  */
 
 import { useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   X, ScanLine, Loader2, CheckCircle2,
   WifiOff, Smartphone, RotateCcw, Zap, Wifi, Clock, AlertTriangle,
 } from 'lucide-react'
 import type { ScannerState } from '@/hooks/scanner/useScannerSession'
+
+// Same z-index ceiling as LocalScannerView — must clear .psc-dropdown's
+// 99999 (globals.css), .sidebar's 200, and .topbar's 100. This modal was
+// previously z-50, which is LOWER than .sidebar's 200 — meaning the sidebar
+// could already render above this QR dialog even without any stacking-
+// context quirks. Portaling + this z-index fixes both issues at once.
+const SCANNER_MODAL_Z_INDEX = 999999
 
 interface Props {
   state:   ScannerState
@@ -149,10 +157,17 @@ export default function ScannerModal({ state, context, onClose, onRetry }: Props
   const lowOnTime     = secondsLeft !== null && secondsLeft <= 30 && secondsLeft > 0
   const noLanWarning  = qrUrl?.includes('localhost') || qrUrl?.includes('127.0.0.1')
 
-  return (
+  return createPortal(
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div
+          style={{
+            position: 'fixed', inset: 0, width: '100vw', height: '100dvh',
+            zIndex: SCANNER_MODAL_Z_INDEX,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: 16,
+          }}
+        >
           <motion.div
             className="absolute inset-0 bg-black/40 backdrop-blur-sm"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -318,6 +333,7 @@ export default function ScannerModal({ state, context, onClose, onRetry }: Props
           </motion.div>
         </div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   )
 }
