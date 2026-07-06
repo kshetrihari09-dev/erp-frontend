@@ -12,34 +12,6 @@
  *
  * Lazy-loaded from ScanButton so it (and its zxing/tesseract dependencies)
  * cost nothing until a user actually opens the scanner.
- *
- * ── BUGFIX (video element readiness) ───────────────────────────────────────
- * The <video> element used to be rendered ONLY while
- * status was 'scanning' | 'matches' | 'submitting' | 'done'. useLocalScanner
- * requests the camera (getUserMedia) while status is still
- * 'requesting-permission' — i.e. before that block, and therefore before
- * the <video> tag exists in the DOM at all. `videoRef.current` was `null`
- * at the moment the stream came back, so `videoRef.current.srcObject =
- * stream` never ran. The status was then flipped to 'scanning', a *new*
- * <video> element mounted, but nothing ever re-attached the stream to it.
- * The element rendered (black box, `bg-black`), which is why "the camera
- * opens" and it can look like a live preview — but `videoRef.current
- * .readyState` stayed at 0 (HAVE_NOTHING) forever, because no stream was
- * ever actually playing in it.
- *
- * Both the barcode loop and the OCR loop start every tick with:
- *   if (!videoRef.current || videoRef.current.readyState < 2 || ...) return
- * so every single tick silently no-op'd — no barcode detection, no OCR,
- * no console error, no rejected promise. That's why both pipelines died
- * identically and silently.
- *
- * Fix: the <video> element is now mounted unconditionally for the entire
- * time the scanner view is open (see the block right below the portal
- * root), so `videoRef.current` is already set by the time
- * useLocalScanner's `startCamera()` resolves — exactly like the working
- * useMobileScanner/MobileScannerPage pair, which only ever starts the
- * camera in an effect keyed off a status that's guaranteed to already
- * have the <video> tag mounted.
  */
 
 import { useRef, useState, useCallback } from 'react'
@@ -99,9 +71,7 @@ export default function LocalScannerView({ open, context, onResult, onClose, onU
 
   if (!open) return null
 
-  const showDrawer  = state.status === 'matches' || state.status === 'submitting'
-  const cameraUsable = state.status === 'scanning' || state.status === 'matches' ||
-                       state.status === 'submitting' || state.status === 'done'
+  const showDrawer = state.status === 'matches' || state.status === 'submitting'
 
   return createPortal(
     <AnimatePresence>
@@ -116,103 +86,100 @@ export default function LocalScannerView({ open, context, onResult, onClose, onU
           zIndex: SCANNER_Z_INDEX,
         }}
       >
-        <div className="relative flex-1 overflow-hidden bg-black">
-          {/*
-            Always mounted while the scanner is open — see bugfix note at
-            top of file. Do NOT wrap this in a status check.
-          */}
-          <video
-            ref={videoRef}
-            playsInline muted autoPlay
-            className="absolute inset-0 w-full h-full object-cover"
-          />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/55 via-transparent to-black/65 pointer-events-none" />
-
-          {state.status === 'scanning' && <ScanFrame mode={state.mode} />}
-
-          {/* Success overlay */}
-          {state.status === 'done' && (
-            <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center gap-3">
-              <motion.div
-                initial={{ scale: 0 }} animate={{ scale: 1 }}
-                transition={{ type: 'spring', duration: 0.4 }}
-                className="w-20 h-20 rounded-full bg-green-500 flex items-center justify-center shadow-lg shadow-green-500/40"
+        {/* ── Denied permission ────────────────────────────────────────────── */}
+        {state.status === 'denied' && (
+          <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+            <div className="w-16 h-16 rounded-2xl bg-red-500/15 flex items-center justify-center mb-4">
+              <CameraOff size={28} className="text-red-400" />
+            </div>
+            <p className="text-white font-bold text-lg mb-2">Camera access needed</p>
+            <p className="text-slate-400 text-sm leading-relaxed mb-6 max-w-xs">
+              We need permission to use your camera to scan barcodes and medicine packaging.
+            </p>
+            <div className="flex flex-col gap-2.5 w-full max-w-[240px]">
+              <button
+                onClick={retryPermission}
+                className="flex items-center justify-center gap-2 px-5 py-3 bg-blue-600 text-white rounded-xl font-semibold text-sm"
               >
-                <CheckCircle2 size={38} className="text-white" />
-              </motion.div>
-              <p className="text-white font-bold text-base">Added!</p>
+                <RotateCcw size={14} /> Try Again
+              </button>
+              <button
+                onClick={() => setShowSettingsHelp(v => !v)}
+                className="flex items-center justify-center gap-2 px-5 py-3 bg-white/10 text-white rounded-xl font-semibold text-sm"
+              >
+                Open Camera Settings
+              </button>
+              <button
+                onClick={onUseAnotherDevice}
+                className="flex items-center justify-center gap-2 px-5 py-2.5 text-slate-400 text-xs font-medium mt-1"
+              >
+                <Smartphone size={13} /> Use Another Device Instead
+              </button>
             </div>
-          )}
-
-          {/* ── Denied permission ────────────────────────────────────────── */}
-          {state.status === 'denied' && (
-            <div className="absolute inset-0 z-10 bg-black flex flex-col items-center justify-center p-6 text-center">
-              <div className="w-16 h-16 rounded-2xl bg-red-500/15 flex items-center justify-center mb-4">
-                <CameraOff size={28} className="text-red-400" />
+            {showSettingsHelp && (
+              <div className="mt-5 max-w-xs text-xs text-slate-400 bg-white/5 border border-white/10 rounded-xl p-3.5 text-left leading-relaxed">
+                Your browser blocks apps from opening settings directly. Look for a camera/lock icon
+                in your address bar, or go to your browser/phone Settings → Site or App Permissions →
+                Camera, and allow access for this app.
               </div>
-              <p className="text-white font-bold text-lg mb-2">Camera access needed</p>
-              <p className="text-slate-400 text-sm leading-relaxed mb-6 max-w-xs">
-                We need permission to use your camera to scan barcodes and medicine packaging.
-              </p>
-              <div className="flex flex-col gap-2.5 w-full max-w-[240px]">
-                <button
-                  onClick={retryPermission}
-                  className="flex items-center justify-center gap-2 px-5 py-3 bg-blue-600 text-white rounded-xl font-semibold text-sm"
+            )}
+          </div>
+        )}
+
+        {/* ── Hard error (no camera device, etc.) ─────────────────────────── */}
+        {state.status === 'error' && (
+          <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+            <div className="w-16 h-16 rounded-2xl bg-red-500/15 flex items-center justify-center mb-4">
+              <AlertCircle size={28} className="text-red-400" />
+            </div>
+            <p className="text-white font-bold text-lg mb-2">Scanner error</p>
+            <p className="text-slate-400 text-sm leading-relaxed mb-6 max-w-xs">{state.error}</p>
+            <div className="flex flex-col gap-2.5 w-full max-w-[240px]">
+              <button onClick={rescan} className="flex items-center justify-center gap-2 px-5 py-3 bg-blue-600 text-white rounded-xl font-semibold text-sm">
+                <RotateCcw size={14} /> Try Again
+              </button>
+              <button onClick={onUseAnotherDevice} className="flex items-center justify-center gap-2 px-5 py-2.5 text-slate-400 text-xs font-medium">
+                <Smartphone size={13} /> Use Another Device Instead
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Requesting permission (camera opening) ──────────────────────── */}
+        {state.status === 'requesting-permission' && (
+          <div className="flex-1 flex flex-col items-center justify-center gap-3">
+            <Loader2 size={26} className="text-blue-400 animate-spin" />
+            <p className="text-white/70 text-sm">Opening camera…</p>
+          </div>
+        )}
+
+        {/* ── Camera + scanning UI ─────────────────────────────────────────── */}
+        {(state.status === 'scanning' || state.status === 'matches' || state.status === 'submitting' || state.status === 'done') && (
+          <div className="relative flex-1 overflow-hidden bg-black">
+            <video
+              ref={videoRef}
+              playsInline muted autoPlay
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-b from-black/55 via-transparent to-black/65 pointer-events-none" />
+
+            {state.status === 'scanning' && <ScanFrame mode={state.mode} />}
+
+            {/* Success overlay */}
+            {state.status === 'done' && (
+              <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center gap-3">
+                <motion.div
+                  initial={{ scale: 0 }} animate={{ scale: 1 }}
+                  transition={{ type: 'spring', duration: 0.4 }}
+                  className="w-20 h-20 rounded-full bg-green-500 flex items-center justify-center shadow-lg shadow-green-500/40"
                 >
-                  <RotateCcw size={14} /> Try Again
-                </button>
-                <button
-                  onClick={() => setShowSettingsHelp(v => !v)}
-                  className="flex items-center justify-center gap-2 px-5 py-3 bg-white/10 text-white rounded-xl font-semibold text-sm"
-                >
-                  Open Camera Settings
-                </button>
-                <button
-                  onClick={onUseAnotherDevice}
-                  className="flex items-center justify-center gap-2 px-5 py-2.5 text-slate-400 text-xs font-medium mt-1"
-                >
-                  <Smartphone size={13} /> Use Another Device Instead
-                </button>
+                  <CheckCircle2 size={38} className="text-white" />
+                </motion.div>
+                <p className="text-white font-bold text-base">Added!</p>
               </div>
-              {showSettingsHelp && (
-                <div className="mt-5 max-w-xs text-xs text-slate-400 bg-white/5 border border-white/10 rounded-xl p-3.5 text-left leading-relaxed">
-                  Your browser blocks apps from opening settings directly. Look for a camera/lock icon
-                  in your address bar, or go to your browser/phone Settings → Site or App Permissions →
-                  Camera, and allow access for this app.
-                </div>
-              )}
-            </div>
-          )}
+            )}
 
-          {/* ── Hard error (no camera device, etc.) ─────────────────────── */}
-          {state.status === 'error' && (
-            <div className="absolute inset-0 z-10 bg-black flex flex-col items-center justify-center p-6 text-center">
-              <div className="w-16 h-16 rounded-2xl bg-red-500/15 flex items-center justify-center mb-4">
-                <AlertCircle size={28} className="text-red-400" />
-              </div>
-              <p className="text-white font-bold text-lg mb-2">Scanner error</p>
-              <p className="text-slate-400 text-sm leading-relaxed mb-6 max-w-xs">{state.error}</p>
-              <div className="flex flex-col gap-2.5 w-full max-w-[240px]">
-                <button onClick={rescan} className="flex items-center justify-center gap-2 px-5 py-3 bg-blue-600 text-white rounded-xl font-semibold text-sm">
-                  <RotateCcw size={14} /> Try Again
-                </button>
-                <button onClick={onUseAnotherDevice} className="flex items-center justify-center gap-2 px-5 py-2.5 text-slate-400 text-xs font-medium">
-                  <Smartphone size={13} /> Use Another Device Instead
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* ── Requesting permission (camera opening) ──────────────────── */}
-          {state.status === 'requesting-permission' && (
-            <div className="absolute inset-0 z-10 bg-black flex flex-col items-center justify-center gap-3">
-              <Loader2 size={26} className="text-blue-400 animate-spin" />
-              <p className="text-white/70 text-sm">Opening camera…</p>
-            </div>
-          )}
-
-          {/* ── Top glass bar ─────────────────────────────────────────────── */}
-          {cameraUsable && (
+            {/* ── Top glass bar ──────────────────────────────────────────── */}
             <div className="absolute top-0 left-0 right-0 flex items-center justify-between p-3.5"
                  style={{ paddingTop: 'max(14px, env(safe-area-inset-top, 0px))' }}>
               <button
@@ -240,66 +207,66 @@ export default function LocalScannerView({ open, context, onResult, onClose, onU
                 </button>
               </div>
             </div>
-          )}
 
-          {/* Mode badge */}
-          {state.status === 'scanning' && (
-            <div className="absolute bottom-[132px] left-0 right-0 flex justify-center pointer-events-none">
-              <ModeBadge mode={state.mode} ocrProgress={state.ocrProgress} />
-            </div>
-          )}
-
-          {/* ── Bottom controls ──────────────────────────────────────────── */}
-          {cameraUsable && !showDrawer && (
-            <div
-              className="absolute bottom-0 left-0 right-0 flex flex-col items-center gap-3 px-4 pb-2"
-              style={{ paddingBottom: 'max(14px, env(safe-area-inset-bottom, 0px))' }}
-            >
-              <button
-                onClick={onUseAnotherDevice}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 bg-white/10 backdrop-blur-md rounded-full text-white/80 text-xs font-medium"
-              >
-                <Smartphone size={12} /> Use Another Device
-              </button>
-
-              <div className="flex items-center justify-center gap-3">
-                <button
-                  onClick={() => galleryInputRef.current?.click()}
-                  aria-label="Scan from gallery"
-                  className="w-12 h-12 rounded-full bg-white/12 backdrop-blur-md flex items-center justify-center text-white active:scale-90 transition-transform"
-                >
-                  <ImageIcon size={19} />
-                </button>
-                <button
-                  onClick={() => setMode('barcode')}
-                  aria-label="Barcode mode"
-                  className={`w-14 h-14 rounded-full flex items-center justify-center transition-transform active:scale-90 ${
-                    state.mode === 'barcode' ? 'bg-blue-600 text-white' : 'bg-white/15 backdrop-blur-md text-white'
-                  }`}
-                >
-                  <ScanLine size={22} />
-                </button>
-                <button
-                  onClick={() => setMode('ocr')}
-                  aria-label="OCR mode"
-                  className={`w-12 h-12 rounded-full flex items-center justify-center transition-transform active:scale-90 ${
-                    state.mode === 'ocr' ? 'bg-purple-600 text-white' : 'bg-white/12 backdrop-blur-md text-white'
-                  }`}
-                >
-                  <Type size={19} />
-                </button>
+            {/* Mode badge */}
+            {state.status === 'scanning' && (
+              <div className="absolute bottom-[132px] left-0 right-0 flex justify-center pointer-events-none">
+                <ModeBadge mode={state.mode} ocrProgress={state.ocrProgress} />
               </div>
+            )}
 
-              <input
-                ref={galleryInputRef}
-                type="file" accept="image/*" className="hidden"
-                onChange={e => { const f = e.target.files?.[0]; if (f) scanImageFile(f); e.target.value = '' }}
-              />
-            </div>
-          )}
-        </div>
+            {/* ── Bottom controls ────────────────────────────────────────── */}
+            {!showDrawer && (
+              <div
+                className="absolute bottom-0 left-0 right-0 flex flex-col items-center gap-3 px-4 pb-2"
+                style={{ paddingBottom: 'max(14px, env(safe-area-inset-bottom, 0px))' }}
+              >
+                <button
+                  onClick={onUseAnotherDevice}
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 bg-white/10 backdrop-blur-md rounded-full text-white/80 text-xs font-medium"
+                >
+                  <Smartphone size={12} /> Use Another Device
+                </button>
 
-        {/* ── Matches bottom sheet ───────────────────────────────────────── */}
+                <div className="flex items-center justify-center gap-3">
+                  <button
+                    onClick={() => galleryInputRef.current?.click()}
+                    aria-label="Scan from gallery"
+                    className="w-12 h-12 rounded-full bg-white/12 backdrop-blur-md flex items-center justify-center text-white active:scale-90 transition-transform"
+                  >
+                    <ImageIcon size={19} />
+                  </button>
+                  <button
+                    onClick={() => setMode('barcode')}
+                    aria-label="Barcode mode"
+                    className={`w-14 h-14 rounded-full flex items-center justify-center transition-transform active:scale-90 ${
+                      state.mode === 'barcode' ? 'bg-blue-600 text-white' : 'bg-white/15 backdrop-blur-md text-white'
+                    }`}
+                  >
+                    <ScanLine size={22} />
+                  </button>
+                  <button
+                    onClick={() => setMode('ocr')}
+                    aria-label="OCR mode"
+                    className={`w-12 h-12 rounded-full flex items-center justify-center transition-transform active:scale-90 ${
+                      state.mode === 'ocr' ? 'bg-purple-600 text-white' : 'bg-white/12 backdrop-blur-md text-white'
+                    }`}
+                  >
+                    <Type size={19} />
+                  </button>
+                </div>
+
+                <input
+                  ref={galleryInputRef}
+                  type="file" accept="image/*" className="hidden"
+                  onChange={e => { const f = e.target.files?.[0]; if (f) scanImageFile(f); e.target.value = '' }}
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Matches bottom sheet ─────────────────────────────────────────── */}
         <AnimatePresence>
           {showDrawer && (
             <motion.div
