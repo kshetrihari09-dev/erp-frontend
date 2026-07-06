@@ -96,6 +96,22 @@ export default function useLocalScanner({ onResult, active }: Options) {
   useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false } }, [])
 
   // ── Camera ─────────────────────────────────────────────────────────────────
+  // Attaches the current stream to the <video> element if it isn't already
+  // attached. Split out from startCamera (and also called defensively — see
+  // the effect below) because the <video> element may not exist yet at the
+  // exact moment getUserMedia() resolves (e.g. while the UI is still showing
+  // a "requesting-permission" screen). If the stream is captured but never
+  // attached, videoRef.current.readyState stays 0 forever, which silently
+  // starves both the barcode loop and the OCR loop (they both bail out on
+  // `readyState < 2` as their very first check, every single tick).
+  const attachStream = useCallback(async () => {
+    const video  = videoRef.current
+    const stream = streamRef.current
+    if (!video || !stream || video.srcObject === stream) return
+    video.srcObject = stream
+    try { await video.play() } catch {}
+  }, [])
+
   const startCamera = useCallback(async (facingMode: 'environment' | 'user' = 'environment'): Promise<boolean> => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -104,7 +120,7 @@ export default function useLocalScanner({ onResult, active }: Options) {
       })
       if (!mountedRef.current) { stream.getTracks().forEach(t => t.stop()); return false }
       streamRef.current = stream
-      if (videoRef.current) { videoRef.current.srcObject = stream; await videoRef.current.play() }
+      await attachStream()
       return true
     } catch (err: any) {
       if (!mountedRef.current) return false
@@ -144,9 +160,10 @@ export default function useLocalScanner({ onResult, active }: Options) {
     setState(s => ({ ...s, facingMode: next, mode: 'idle' }))
     const ok = await startCamera(next)
     if (ok && mountedRef.current) {
+      await attachStream()
       setState(s => ({ ...s, status: 'scanning', mode: manualModeRef.current || 'barcode' }))
     }
-  }, [state.facingMode, stopCamera, startCamera])
+  }, [state.facingMode, stopCamera, startCamera, attachStream])
 
   // ── Product search (same endpoints as useMobileScanner, normal auth) ──────
   const searchBarcode = useCallback(async (code: string): Promise<LocalProduct[]> => {
@@ -360,10 +377,11 @@ export default function useLocalScanner({ onResult, active }: Options) {
     setState(s => ({ ...s, status: 'requesting-permission', error: null }))
     const ok = await startCamera(state.facingMode)
     if (ok && mountedRef.current) {
+      await attachStream()
       setState(s => ({ ...s, status: 'scanning', mode: 'barcode' }))
       await startBarcodeLoop()
     }
-  }, [startCamera, startBarcodeLoop, state.facingMode])
+  }, [startCamera, startBarcodeLoop, state.facingMode, attachStream])
 
   // ── Lifecycle: request permission + start camera as soon as the scanner
   //    view opens; tear everything down when it closes ──────────────────────
@@ -380,6 +398,10 @@ export default function useLocalScanner({ onResult, active }: Options) {
     async function init() {
       const ok = await startCamera('environment')
       if (cancelled || !mountedRef.current || !ok) return
+      // Belt-and-suspenders: attachStream() already ran inside startCamera,
+      // but we re-check here too before flipping to 'scanning' and kicking
+      // off the detection loops.
+      await attachStream()
       setState(s => ({ ...s, status: 'scanning', mode: 'barcode' }))
       await startBarcodeLoop()
     }
@@ -388,6 +410,18 @@ export default function useLocalScanner({ onResult, active }: Options) {
     return () => { cancelled = true; stopCamera() }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active])
+
+  // ── Defensive re-attach ──────────────────────────────────────────────────
+  // Runs whenever the scanner is active and status changes. If the <video>
+  // element and the MediaStream both exist but aren't wired together yet
+  // (e.g. the <video> mounted/remounted after the stream was captured),
+  // this reconnects them. This is what actually prevents the "camera
+  // opens, but nothing is ever detected" failure mode if the video element
+  // is ever conditionally unmounted again in a future UI change.
+  useEffect(() => {
+    if (!active) return
+    attachStream()
+  }, [active, state.status, attachStream])
 
   return {
     state, videoRef,
