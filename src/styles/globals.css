@@ -618,18 +618,21 @@ select.erp-input option { background: var(--surface); color: var(--text); }
   border-radius: 14px;
   padding:       20px 22px;
   box-shadow:    0 1px 4px rgba(16,24,40,.05), 0 0 0 0.5px rgba(16,24,40,.04);
+  position: relative;
+  z-index: 1;
 }
 
+
 .pos-card-title {
-  display:       flex;
-  align-items:   center;
-  gap:           8px;
-  font-size:     13px;
-  font-weight:   700;
-  color:         var(--text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
   letter-spacing: -.01em;
-  z-index:-999;
 }
+
 
 /* ── Total payable card ─────────────────────────────────────────────────── */
 .pos-total-card {
@@ -4592,4 +4595,9 @@ canvas{
     min-width:700px;
 }
 
+.scanner-modal,
+.scanner-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
 }
