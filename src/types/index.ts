@@ -57,6 +57,7 @@ export interface AuthState {
 export interface Product {
   id:            string
   item_code:     string
+  barcode?:      string
   name:          string
   generic_name?: string
   company_name?: string

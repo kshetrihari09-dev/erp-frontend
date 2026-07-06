@@ -1,20 +1,25 @@
-import { useState } from 'react'
+import { useState, lazy, Suspense } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Plus, Package } from 'lucide-react'
+import { Plus, Package, ScanLine, Type } from 'lucide-react'
 import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct } from '@/hooks/useQuery'
 import { Button, Modal, Badge, Pagination, SkeletonRows, Empty, SearchInput, ConfirmDialog } from '@/components/ui'
 import { useDebounce } from '@/hooks/useDebounce'
 import { fmt } from '@/utils'
 import { PRODUCT_UNITS } from '@/constants'
+import { parseProductOcr } from '@/utils/parseProductOcr'
 import type { Product } from '@/types'
+import type { CaptureMode } from '@/hooks/scanner/useProductCapture'
+
+const ProductScanModal = lazy(() => import('@/components/scanner/ProductScanModal'))
 
 const schema = z.object({
   name:          z.string().min(1, 'Required'),
   generic_name:  z.string().optional(),
   company_name:  z.string().optional(),
   category:      z.string().optional(),
+  barcode:       z.string().optional(),
   unit:          z.string().default('PCS'),
   mrp:           z.coerce.number().min(0),
   sales_rate:    z.coerce.number().min(0),
@@ -24,18 +29,48 @@ const schema = z.object({
 })
 type Form = z.infer<typeof schema>
 
+function hasCameraSupport(): boolean {
+  return typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia
+}
+
 function ProductForm({ initial, onClose }: { initial?: Product | null; onClose: () => void }) {
   const create = useCreateProduct()
   const update = useUpdateProduct()
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<Form>({
+  const { register, handleSubmit, setValue, formState: { errors, isSubmitting } } = useForm<Form>({
     resolver: zodResolver(schema),
     defaultValues: initial ? {
       name: initial.name, generic_name: initial.generic_name || '', company_name: initial.company_name || '',
-      category: initial.category || '', unit: initial.unit, mrp: initial.mrp,
+      category: initial.category || '', barcode: initial.barcode || '', unit: initial.unit, mrp: initial.mrp,
       sales_rate: initial.sales_rate, purchase_rate: initial.purchase_rate,
       vat_percent: initial.vat_percent, min_stock: initial.min_stock,
-    } : { unit: 'PCS', vat_percent: 13, min_stock: 0, mrp: 0, sales_rate: 0, purchase_rate: 0 },
+    } : { unit: 'PCS', vat_percent: 13, min_stock: 0, mrp: 0, sales_rate: 0, purchase_rate: 0, barcode: '' },
   })
+
+  const [scanOpen, setScanOpen]   = useState(false)
+  const [scanMode, setScanMode]   = useState<CaptureMode>('barcode')
+  const [scanBanner, setScanBanner] = useState<string | null>(null)
+
+  const openScan = (mode: CaptureMode) => { setScanMode(mode); setScanOpen(true) }
+
+  const handleBarcodeScanned = (code: string) => {
+    setValue('barcode', code, { shouldDirty: true, shouldValidate: true })
+    setScanBanner('Barcode filled from scan — please verify.')
+    setScanOpen(false)
+  }
+
+  const handleLabelScanned = (text: string) => {
+    const parsed = parseProductOcr(text)
+    const filled: string[] = []
+    if (parsed.name)          { setValue('name', parsed.name, { shouldDirty: true, shouldValidate: true }); filled.push('Product Name') }
+    if (parsed.generic_name)  { setValue('generic_name', parsed.generic_name, { shouldDirty: true }); filled.push('Generic Name') }
+    if (parsed.company_name)  { setValue('company_name', parsed.company_name, { shouldDirty: true }); filled.push('Company / Brand') }
+    if (parsed.mrp != null)   { setValue('mrp', parsed.mrp, { shouldDirty: true }); filled.push('MRP') }
+
+    setScanBanner(filled.length
+      ? `Filled from scan: ${filled.join(', ')} — please review before saving.`
+      : "Couldn't confidently extract any fields from that scan — please enter details manually.")
+    setScanOpen(false)
+  }
 
   const onSubmit = handleSubmit(async (data) => {
     if (initial) await update.mutateAsync({ id: initial.id, data })
@@ -53,11 +88,48 @@ function ProductForm({ initial, onClose }: { initial?: Product | null; onClose: 
 
   return (
     <>
+      {hasCameraSupport() && (
+        <div className="flex items-center justify-between mb-4 -mt-1">
+          <button
+            type="button"
+            onClick={() => openScan('label')}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold hover:opacity-80 transition-opacity"
+            style={{ background: 'color-mix(in srgb, var(--brand) 12%, transparent)', color: 'var(--brand)' }}
+          >
+            <Type size={13} /> Scan Product Label
+          </button>
+        </div>
+      )}
+
+      {scanBanner && (
+        <div className="mb-4 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs font-medium flex items-start justify-between gap-2">
+          <span>{scanBanner}</span>
+          <button type="button" onClick={() => setScanBanner(null)} className="text-amber-500 hover:text-amber-700 leading-none">✕</button>
+        </div>
+      )}
+
       <div className="form-grid">
         <div className="span2"><Field label="Product Name *" name="name" /></div>
         <Field label="Generic Name" name="generic_name" />
         <Field label="Company / Brand" name="company_name" />
         <Field label="Category" name="category" />
+        <div>
+          <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">Barcode</label>
+          <div className="flex gap-1.5">
+            <input type="text" className="erp-input" placeholder="Scan or type barcode" {...register('barcode')} />
+            {hasCameraSupport() && (
+              <button
+                type="button"
+                onClick={() => openScan('barcode')}
+                aria-label="Scan barcode"
+                className="shrink-0 w-9 h-9 rounded-lg border border-[var(--border)] flex items-center justify-center text-[var(--text-3)] hover:bg-[var(--surface-3)] transition-colors"
+              >
+                <ScanLine size={16} />
+              </button>
+            )}
+          </div>
+          {errors.barcode && <p className="text-xs text-red-500 mt-1">{errors.barcode.message}</p>}
+        </div>
         <div>
           <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">Unit</label>
           <select className="erp-input" {...register('unit')}>
@@ -76,6 +148,18 @@ function ProductForm({ initial, onClose }: { initial?: Product | null; onClose: 
           {initial ? 'Save Changes' : 'Create Product'}
         </Button>
       </div>
+
+      {scanOpen && (
+        <Suspense fallback={null}>
+          <ProductScanModal
+            open={scanOpen}
+            initialMode={scanMode}
+            onBarcode={handleBarcodeScanned}
+            onOcrText={handleLabelScanned}
+            onClose={() => setScanOpen(false)}
+          />
+        </Suspense>
+      )}
     </>
   )
 }
@@ -121,7 +205,10 @@ export default function ProductsPage() {
                 : rows.length
                   ? rows.map(p => (
                       <tr key={p.id}>
-                        <td className="td-mono text-brand">{p.item_code}</td>
+                        <td className="td-mono text-brand">
+                          {p.item_code}
+                          {p.barcode && <div className="text-[10px] text-[var(--text-4)] font-normal mt-0.5">{p.barcode}</div>}
+                        </td>
                         <td>
                           <div className="font-semibold text-sm">{p.name}</div>
                           {p.company_name && <div className="text-xs text-[var(--text-4)]">{p.company_name}</div>}
@@ -171,7 +258,10 @@ export default function ProductsPage() {
                     <p className="prod-mc-name">{p.name}</p>
                     {p.company_name && <p className="prod-mc-company">{p.company_name}</p>}
                   </div>
-                  <span className="prod-mc-code">{p.item_code}</span>
+                  <div className="text-right">
+                    <span className="prod-mc-code">{p.item_code}</span>
+                    {p.barcode && <div className="text-[10px] text-[var(--text-4)] mt-0.5">{p.barcode}</div>}
+                  </div>
                 </div>
 
                 {/* Generic name */}
