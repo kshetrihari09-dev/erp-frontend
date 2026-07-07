@@ -19,6 +19,7 @@
  */
 
 import { useState, useRef, useCallback, useEffect } from 'react'
+import { preprocessForOcr } from '@/utils/ocrImage'
 
 export type CaptureMode   = 'barcode' | 'label'
 export type CaptureStatus =
@@ -59,62 +60,6 @@ const BARCODE_INTERVAL_MS = 300
 // for a product label/box, which is mostly logos/graphics with a few
 // disconnected blocks of text, not a uniform page of prose.
 const OCR_PSM_SPARSE_TEXT = '11'
-
-// ── OCR preprocessing ────────────────────────────────────────────────────
-// Tesseract is very sensitive to what it's fed. A raw camera frame — even
-// one that looks sharp to the eye — usually has low contrast, uneven
-// lighting/glare, and small print that's below Tesseract's comfortable
-// character-height range. This converts to grayscale, binarizes with an
-// Otsu threshold (computed from the frame itself, so it adapts to lighting
-// instead of using one fixed cutoff), and upscales 2x so small print (MRP,
-// batch no., generic name) has enough pixels to be read reliably.
-function preprocessForOcr(source: CanvasImageSource, srcWidth: number, srcHeight: number): HTMLCanvasElement {
-  const SCALE = 2
-  const canvas = document.createElement('canvas')
-  canvas.width  = srcWidth  * SCALE
-  canvas.height = srcHeight * SCALE
-  const ctx = canvas.getContext('2d')!
-  ctx.imageSmoothingEnabled = true
-  ctx.imageSmoothingQuality = 'high'
-  ctx.drawImage(source, 0, 0, canvas.width, canvas.height)
-
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
-  const data       = imageData.data
-  const pixelCount = canvas.width * canvas.height
-
-  const gray      = new Uint8ClampedArray(pixelCount)
-  const histogram = new Array(256).fill(0)
-  for (let i = 0, p = 0; p < pixelCount; i += 4, p++) {
-    const g = (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114) | 0
-    gray[p] = g
-    histogram[g]++
-  }
-
-  // Otsu's method — finds the threshold that best separates ink from
-  // background for THIS frame, rather than assuming a fixed cutoff that
-  // breaks under different lighting.
-  let sum = 0
-  for (let t = 0; t < 256; t++) sum += t * histogram[t]
-  let sumB = 0, wB = 0, varMax = -1, threshold = 128
-  for (let t = 0; t < 256; t++) {
-    wB += histogram[t]
-    if (wB === 0) continue
-    const wF = pixelCount - wB
-    if (wF === 0) break
-    sumB += t * histogram[t]
-    const mB = sumB / wB
-    const mF = (sum - sumB) / wF
-    const varBetween = wB * wF * (mB - mF) * (mB - mF)
-    if (varBetween > varMax) { varMax = varBetween; threshold = t }
-  }
-
-  for (let p = 0, i = 0; p < pixelCount; p++, i += 4) {
-    const v = gray[p] > threshold ? 255 : 0
-    data[i] = data[i + 1] = data[i + 2] = v
-  }
-  ctx.putImageData(imageData, 0, 0)
-  return canvas
-}
 
 // ── Auto-crop suggestion ─────────────────────────────────────────────────
 // Cheap, dependency-free text-region localization (a "projection profile"

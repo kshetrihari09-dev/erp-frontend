@@ -57,7 +57,7 @@ export default function LocalScannerView({ open, context, onResult, onClose, onU
   }, [onResult, onClose])
 
   const {
-    state, videoRef, toggleFlash, switchCamera, setMode,
+    state, videoRef, containerRef, toggleFlash, switchCamera, setMode,
     selectProduct, rescan, retryPermission, scanImageFile,
   } = useLocalScanner({ context, onResult: handleResult, active: open })
 
@@ -155,7 +155,7 @@ export default function LocalScannerView({ open, context, onResult, onClose, onU
 
         {/* ── Camera + scanning UI ─────────────────────────────────────────── */}
         {(state.status === 'scanning' || state.status === 'matches' || state.status === 'submitting' || state.status === 'done') && (
-          <div className="relative flex-1 overflow-hidden bg-black">
+          <div ref={containerRef} className="relative flex-1 overflow-hidden bg-black">
             <video
               ref={videoRef}
               playsInline muted autoPlay
@@ -164,6 +164,23 @@ export default function LocalScannerView({ open, context, onResult, onClose, onU
             <div className="absolute inset-0 bg-gradient-to-b from-black/55 via-transparent to-black/65 pointer-events-none" />
 
             {state.status === 'scanning' && <ScanFrame mode={state.mode} />}
+
+            {/* Transient "no match yet" feedback — scanning keeps going,
+                this just reassures the user something is happening
+                without interrupting the loop or requiring any action. */}
+            <AnimatePresence>
+              {state.status === 'scanning' && state.notice && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                  className="absolute left-0 right-0 flex justify-center pointer-events-none"
+                  style={{ top: '58%' }}
+                >
+                  <div className="px-3 py-1.5 rounded-full bg-black/70 backdrop-blur-md text-white/90 text-xs font-medium">
+                    {state.notice}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {/* Success overlay */}
             {state.status === 'done' && (
