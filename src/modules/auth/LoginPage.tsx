@@ -270,7 +270,7 @@ export default function LoginPage() {
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<PwForm>({
     resolver: zodResolver(pwSchema),
-    defaultValues: { email:'admin@demo.com', password:'admin123' },
+    defaultValues: { email: '', password: '' },
   })
 
   const startTimer = useCallback(() => {
@@ -582,8 +582,6 @@ export default function LoginPage() {
               </p>
             </div>
           </div>
-
-          <p style={{ textAlign:'center', color:'rgba(255,255,255,0.15)', fontSize:11, marginTop:16 }}>Demo: admin@demo.com / admin123</p>
         </motion.div>
       </div>
     </div>

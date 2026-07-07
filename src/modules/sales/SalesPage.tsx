@@ -269,7 +269,7 @@ export default function SalesPage() {
   // Initials for mobile customer avatar
   const customerInitials = selectedCustomer?.name
     ? selectedCustomer.name.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()
-    : 'WI'
+    : ''
 
   return (
     // pos-theme activates ALL scoped CSS variables and responsive rules in globals.css
@@ -331,7 +331,7 @@ export default function SalesPage() {
                   <div className="pos-customer-summary-avatar">{customerInitials}</div>
                   <div>
                     <div className="pos-customer-summary-name">
-                      {selectedCustomer?.name || 'Walk-in Customer'}
+                      {selectedCustomer?.name || ''}
                     </div>
                     {selectedCustomer?.phone && (
                       <div className="pos-customer-summary-meta">{selectedCustomer.phone}</div>
@@ -356,7 +356,7 @@ export default function SalesPage() {
                     <FieldLabel icon={<User size={11}/>}>Party</FieldLabel>
                     <div className="relative">
                       <select className="erp-input pos-select" {...register('customer_id')}>
-                        <option value="">— Walk-in Customer —</option>
+                        <option value=""></option>
                         {customers.map(c => (
                           <option key={c.id} value={c.id}>
                             {c.code ? `${c.code} - ` : ''}{c.name}
@@ -867,7 +867,7 @@ export default function SalesPage() {
 
                   {/* Customer + date row */}
                   <div className="sil-card-sub">
-                    <span className="sil-card-customer">{s.party_name || 'Walk-in Customer'}</span>
+                    <span className="sil-card-customer">{s.party_name || ''}</span>
                     <span className="sil-card-date">{fmtDate(s.date_ad)}</span>
                   </div>
 
