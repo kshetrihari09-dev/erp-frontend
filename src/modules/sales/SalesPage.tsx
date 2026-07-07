@@ -177,7 +177,15 @@ export default function SalesPage() {
     salesAPI.list({ limit: 1, status: 'active' })
       .then(r => {
         const list = r.data?.data ?? []
-        if (list.length && list[0].date_ad) setLastInvDate(list[0].date_ad)
+        // date_ad comes back as a full ISO timestamp (e.g.
+        // "2026-07-07T00:00:00.000Z"), but the date <input> and
+        // `data.date` below are plain YYYY-MM-DD. Comparing those two
+        // formats directly as strings both breaks same-day posting
+        // (a 10-char date string is lexicographically "less than" a
+        // longer ISO string sharing that same prefix) and shows the raw
+        // timestamp in the error message. Slicing to the date part fixes
+        // both.
+        if (list.length && list[0].date_ad) setLastInvDate(String(list[0].date_ad).slice(0, 10))
       }).catch(() => {})
   }, [])
 
@@ -207,7 +215,7 @@ export default function SalesPage() {
     if (!validRows.length) { setFlash({ type: 'danger', msg: 'Add at least one product' }); return }
     if (!data.customer_id) { setFlash({ type: 'danger', msg: 'Select a customer before posting the sale' }); setCustomerOpen(true); return }
     if (lastInvDate && data.date && data.date < lastInvDate) {
-      setFlash({ type: 'danger', msg: `Date cannot be earlier than the previous invoice date (${lastInvDate}).` })
+      setFlash({ type: 'danger', msg: `Date cannot be earlier than the previous invoice date (${fmtDate(lastInvDate)}).` })
       return
     }
     setSaving(true); setFlash(null)
