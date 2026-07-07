@@ -17,6 +17,7 @@ import type { Product, Party, Purchase } from '@/types'
 import PostingStatusBadge from '@/components/PostingStatusBadge'
 import { PrintPreviewModal } from '@/components/print'
 import type { PrintData } from '@/components/print'
+import AutoCloudBackup from '@/components/cloudStorage/AutoCloudBackup'
 
 const LIMIT = 20
 
@@ -616,6 +617,7 @@ export default function PurchasePage() {
         onClose={() => setPrintData(null)}
         onNextBill={() => { setPrintData(null); reset(); setRows([newRow()]) }}
       />
+      <AutoCloudBackup data={printData} />
     </div>
   )
 }

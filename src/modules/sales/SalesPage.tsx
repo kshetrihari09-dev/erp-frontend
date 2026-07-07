@@ -33,6 +33,7 @@ import ProductSearchCell from '@/components/forms/ProductSearchCell'
 import { fmt, fmtDate, calcRowAmount } from '@/utils'
 import { PrintPreviewModal } from '@/components/print'
 import type { PrintData } from '@/components/print'
+import AutoCloudBackup from '@/components/cloudStorage/AutoCloudBackup'
 import { PAYMENT_MODES } from '@/constants'
 import type { Product, Party, Sale } from '@/types'
 import PostingStatusBadge from '@/components/PostingStatusBadge'
@@ -1004,6 +1005,10 @@ export default function SalesPage() {
           reset({ customer_id: '', date: new Date().toISOString().split('T')[0], payment_mode: 'cash', discount_pct: 0, notes: '' })
         }}
       />
+      {/* Fires automatically the moment a sale posts (printData is set in
+          onSubmit above), independent of whether the print preview modal
+          above is ever opened — see AutoCloudBackup.tsx. */}
+      <AutoCloudBackup data={printData} />
 
     </div>
   )
