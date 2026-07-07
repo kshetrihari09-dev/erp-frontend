@@ -201,10 +201,11 @@ export default function SalesPage() {
     prevCustId.current = customerId
   }, [customerId])
 
-  // ── onSubmit — UNCHANGED ──────────────────────────────────────────────
+  // ── onSubmit — now requires a customer to be selected before posting ────
   const onSubmit = handleSubmit(async (data) => {
     const validRows = rows.filter(r => r.product_id && Number(r.qty) > 0)
     if (!validRows.length) { setFlash({ type: 'danger', msg: 'Add at least one product' }); return }
+    if (!data.customer_id) { setFlash({ type: 'danger', msg: 'Select a customer before posting the sale' }); setCustomerOpen(true); return }
     if (lastInvDate && data.date && data.date < lastInvDate) {
       setFlash({ type: 'danger', msg: `Date cannot be earlier than the previous invoice date (${lastInvDate}).` })
       return
@@ -352,12 +353,12 @@ export default function SalesPage() {
               <div className={`pos-accordion-body ${customerOpen ? 'pos-accordion-body--open' : 'pos-accordion-body--closed'}`}>
                 <div className="pos-customer-grid">
 
-                  {/* Party selector — IDENTICAL to original */}
+                  {/* Party selector — now required (see onSubmit validation below) */}
                   <div className="pos-span2">
-                    <FieldLabel icon={<User size={11}/>}>Party</FieldLabel>
+                    <FieldLabel icon={<User size={11}/>}>Party <span style={{ color: 'var(--danger,#dc2626)' }}>*</span></FieldLabel>
                     <div className="relative">
-                      <select className="erp-input pos-select" {...register('customer_id')}>
-                        <option value=""></option>
+                      <select className="erp-input pos-select" required {...register('customer_id')}>
+                        <option value="">Select a customer…</option>
                         {customers.map(c => (
                           <option key={c.id} value={c.id}>
                             {c.code ? `${c.code} - ` : ''}{c.name}
