@@ -25,14 +25,25 @@ export type CaptureStatus =
   | 'requesting-permission'
   | 'denied'
   | 'ready'
+  | 'cropping'
   | 'ocr-running'
   | 'error'
+
+export interface CropSource {
+  url:           string // object URL for display in the crop overlay
+  naturalWidth:  number
+  naturalHeight: number
+  suggested:     CropRect | null // auto-detected starting crop box, if any
+}
+
+export interface CropRect { x: number; y: number; width: number; height: number } // natural pixel coords
 
 export interface CaptureState {
   status:      CaptureStatus
   mode:        CaptureMode
   error:       string | null
   ocrProgress: number
+  cropSource:  CropSource | null
 }
 
 interface Options {
@@ -44,9 +55,158 @@ interface Options {
 
 const BARCODE_INTERVAL_MS = 300
 
+// Find text anywhere in the image with no layout assumptions — appropriate
+// for a product label/box, which is mostly logos/graphics with a few
+// disconnected blocks of text, not a uniform page of prose.
+const OCR_PSM_SPARSE_TEXT = '11'
+
+// ── OCR preprocessing ────────────────────────────────────────────────────
+// Tesseract is very sensitive to what it's fed. A raw camera frame — even
+// one that looks sharp to the eye — usually has low contrast, uneven
+// lighting/glare, and small print that's below Tesseract's comfortable
+// character-height range. This converts to grayscale, binarizes with an
+// Otsu threshold (computed from the frame itself, so it adapts to lighting
+// instead of using one fixed cutoff), and upscales 2x so small print (MRP,
+// batch no., generic name) has enough pixels to be read reliably.
+function preprocessForOcr(source: CanvasImageSource, srcWidth: number, srcHeight: number): HTMLCanvasElement {
+  const SCALE = 2
+  const canvas = document.createElement('canvas')
+  canvas.width  = srcWidth  * SCALE
+  canvas.height = srcHeight * SCALE
+  const ctx = canvas.getContext('2d')!
+  ctx.imageSmoothingEnabled = true
+  ctx.imageSmoothingQuality = 'high'
+  ctx.drawImage(source, 0, 0, canvas.width, canvas.height)
+
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+  const data       = imageData.data
+  const pixelCount = canvas.width * canvas.height
+
+  const gray      = new Uint8ClampedArray(pixelCount)
+  const histogram = new Array(256).fill(0)
+  for (let i = 0, p = 0; p < pixelCount; i += 4, p++) {
+    const g = (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114) | 0
+    gray[p] = g
+    histogram[g]++
+  }
+
+  // Otsu's method — finds the threshold that best separates ink from
+  // background for THIS frame, rather than assuming a fixed cutoff that
+  // breaks under different lighting.
+  let sum = 0
+  for (let t = 0; t < 256; t++) sum += t * histogram[t]
+  let sumB = 0, wB = 0, varMax = -1, threshold = 128
+  for (let t = 0; t < 256; t++) {
+    wB += histogram[t]
+    if (wB === 0) continue
+    const wF = pixelCount - wB
+    if (wF === 0) break
+    sumB += t * histogram[t]
+    const mB = sumB / wB
+    const mF = (sum - sumB) / wF
+    const varBetween = wB * wF * (mB - mF) * (mB - mF)
+    if (varBetween > varMax) { varMax = varBetween; threshold = t }
+  }
+
+  for (let p = 0, i = 0; p < pixelCount; p++, i += 4) {
+    const v = gray[p] > threshold ? 255 : 0
+    data[i] = data[i + 1] = data[i + 2] = v
+  }
+  ctx.putImageData(imageData, 0, 0)
+  return canvas
+}
+
+// ── Auto-crop suggestion ─────────────────────────────────────────────────
+// Cheap, dependency-free text-region localization (a "projection profile"
+// technique): downscale, take gradient magnitude as an edge-density proxy
+// for "text-like" content, sum it per row and per column, and find where
+// those sums cluster above a fraction of their peak. This is only ever a
+// starting point — CropOverlay still lets the user drag/resize it — so it
+// doesn't need to be exact, just close enough to save most people from
+// having to crop from scratch. Returns null (falls back to a centered
+// default box) if the frame doesn't show a clear enough signal, e.g. a
+// blank wall or a very low-contrast shot.
+function detectTextRegion(canvas: HTMLCanvasElement): CropRect | null {
+  const DOWNSCALE_MAX = 220
+  const scale = Math.min(1, DOWNSCALE_MAX / Math.max(canvas.width, canvas.height))
+  const w = Math.max(1, Math.round(canvas.width  * scale))
+  const h = Math.max(1, Math.round(canvas.height * scale))
+
+  const small = document.createElement('canvas')
+  small.width = w; small.height = h
+  const sctx = small.getContext('2d')!
+  sctx.drawImage(canvas, 0, 0, w, h)
+  const { data } = sctx.getImageData(0, 0, w, h)
+
+  const gray = new Float32Array(w * h)
+  for (let i = 0, p = 0; p < w * h; i += 4, p++) {
+    gray[p] = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114
+  }
+
+  const edge = new Float32Array(w * h)
+  for (let y = 0; y < h; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const idx = y * w + x
+      edge[idx] += Math.abs(gray[idx + 1] - gray[idx - 1])
+    }
+  }
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 0; x < w; x++) {
+      const idx = y * w + x
+      edge[idx] += Math.abs(gray[idx + w] - gray[idx - w])
+    }
+  }
+
+  const rowSum = new Float32Array(h)
+  const colSum = new Float32Array(w)
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const v = edge[y * w + x]
+      rowSum[y] += v
+      colSum[x] += v
+    }
+  }
+
+  const boundsFromProfile = (profile: Float32Array): [number, number] | null => {
+    let max = 0
+    for (let i = 0; i < profile.length; i++) max = Math.max(max, profile[i])
+    if (max <= 0) return null
+    const threshold = max * 0.15
+    let first = -1, last = -1
+    for (let i = 0; i < profile.length; i++) {
+      if (profile[i] >= threshold) { if (first < 0) first = i; last = i }
+    }
+    return first < 0 ? null : [first, last]
+  }
+
+  const rowsBound = boundsFromProfile(rowSum)
+  const colsBound = boundsFromProfile(colSum)
+  if (!rowsBound || !colsBound) return null
+
+  const [y0, y1] = rowsBound
+  const [x0, x1] = colsBound
+  const padX = (x1 - x0) * 0.08 + 2
+  const padY = (y1 - y0) * 0.08 + 2
+  const rx0 = Math.max(0, x0 - padX), rx1 = Math.min(w, x1 + padX)
+  const ry0 = Math.max(0, y0 - padY), ry1 = Math.min(h, y1 + padY)
+
+  // Reject if the detected box is basically the whole frame (no real
+  // localization happened) or implausibly tiny (noise).
+  const areaFrac = ((rx1 - rx0) * (ry1 - ry0)) / (w * h)
+  if (areaFrac > 0.92 || areaFrac < 0.02) return null
+
+  const invScale = 1 / scale
+  return {
+    x:      rx0 * invScale,
+    y:      ry0 * invScale,
+    width:  (rx1 - rx0) * invScale,
+    height: (ry1 - ry0) * invScale,
+  }
+}
+
 export default function useProductCapture({ active, mode, onBarcode, onOcrText }: Options) {
   const [state, setState] = useState<CaptureState>({
-    status: 'requesting-permission', mode, error: null, ocrProgress: 0,
+    status: 'requesting-permission', mode, error: null, ocrProgress: 0, cropSource: null,
   })
 
   const videoRef    = useRef<HTMLVideoElement | null>(null)
@@ -54,7 +214,7 @@ export default function useProductCapture({ active, mode, onBarcode, onOcrText }
   const barcodeTimer = useRef<ReturnType<typeof setInterval> | null>(null)
   const mountedRef  = useRef(true)
 
-  useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false } }, [])
+  useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; revokePendingUrl() } }, [])
 
   const stopBarcodeLoop = useCallback(() => {
     if (barcodeTimer.current) { clearInterval(barcodeTimer.current); barcodeTimer.current = null }
@@ -128,15 +288,24 @@ export default function useProductCapture({ active, mode, onBarcode, onOcrText }
     }, BARCODE_INTERVAL_MS)
   }, [onBarcode, stopBarcodeLoop])
 
-  // ── Capture a single frame and OCR it (label mode, on demand) ────────────
-  const captureAndExtract = useCallback(async () => {
-    if (!videoRef.current || videoRef.current.readyState < 2 || !mountedRef.current) return
+  // Holds the full-resolution, un-preprocessed frame/image while the user
+  // adjusts the crop box. Not in React state because it's a large pixel
+  // buffer that never needs to trigger a re-render itself — only the
+  // small `cropSource` (a display URL + dimensions) does.
+  const pendingCanvasRef = useRef<HTMLCanvasElement | null>(null)
+  const pendingUrlRef    = useRef<string | null>(null)
+
+  const revokePendingUrl = useCallback(() => {
+    if (pendingUrlRef.current) { URL.revokeObjectURL(pendingUrlRef.current); pendingUrlRef.current = null }
+  }, [])
+
+  // Runs the shared OCR pipeline (preprocess → Tesseract) on a cropped
+  // region and reports the result back through onOcrText, same error
+  // handling for both the live-camera and gallery-file paths.
+  const runOcr = useCallback(async (canvas: HTMLCanvasElement) => {
     setState(s => ({ ...s, status: 'ocr-running', ocrProgress: 0, error: null }))
     try {
-      const canvas = document.createElement('canvas')
-      canvas.width  = videoRef.current.videoWidth  || 640
-      canvas.height = videoRef.current.videoHeight || 480
-      canvas.getContext('2d')!.drawImage(videoRef.current, 0, 0)
+      const processed = preprocessForOcr(canvas, canvas.width, canvas.height)
 
       const { createWorker } = await import('tesseract.js')
       const worker = await createWorker('eng', 1, {
@@ -146,55 +315,91 @@ export default function useProductCapture({ active, mode, onBarcode, onOcrText }
           }
         },
       })
-      const { data: { text } } = await worker.recognize(canvas)
+      await worker.setParameters({ tessedit_pageseg_mode: OCR_PSM_SPARSE_TEXT as any })
+      const { data: { text } } = await worker.recognize(processed)
       await worker.terminate()
       if (!mountedRef.current) return
 
       const trimmed = text.trim()
       if (trimmed.length < 3) {
-        setState(s => ({ ...s, status: 'ready', error: 'Could not read any text — try again with better lighting.' }))
+        setState(s => ({ ...s, status: 'ready', cropSource: null, error: 'Could not read any text — try cropping tighter or better lighting.' }))
         return
       }
-      setState(s => ({ ...s, status: 'ready' }))
+      setState(s => ({ ...s, status: 'ready', cropSource: null }))
       onOcrText(trimmed)
     } catch {
-      if (mountedRef.current) setState(s => ({ ...s, status: 'ready', error: 'Could not process that image.' }))
+      if (mountedRef.current) setState(s => ({ ...s, status: 'ready', cropSource: null, error: 'Could not process that image.' }))
     }
   }, [onOcrText])
 
-  // ── Same flow but from a gallery-picked image instead of the live feed ──
-  const extractFromFile = useCallback(async (file: File) => {
-    setState(s => ({ ...s, status: 'ocr-running', ocrProgress: 0, error: null }))
+  // ── Freeze a live camera frame and hand it to the user for cropping ──────
+  const captureFrame = useCallback(() => {
+    if (!videoRef.current || videoRef.current.readyState < 2 || !mountedRef.current) return
+    const canvas = document.createElement('canvas')
+    canvas.width  = videoRef.current.videoWidth  || 640
+    canvas.height = videoRef.current.videoHeight || 480
+    canvas.getContext('2d')!.drawImage(videoRef.current, 0, 0)
+
+    revokePendingUrl()
+    pendingCanvasRef.current = canvas
+    const suggested = detectTextRegion(canvas)
+    canvas.toBlob(blob => {
+      if (!blob || !mountedRef.current) return
+      const url = URL.createObjectURL(blob)
+      pendingUrlRef.current = url
+      setState(s => ({ ...s, status: 'cropping', error: null, cropSource: { url, naturalWidth: canvas.width, naturalHeight: canvas.height, suggested } }))
+    }, 'image/jpeg', 0.92)
+  }, [revokePendingUrl])
+
+  // ── Same, but from a gallery-picked image instead of the live feed ──────
+  const selectFileForCrop = useCallback(async (file: File) => {
     try {
       const bitmap = await createImageBitmap(file)
       const canvas = document.createElement('canvas')
       canvas.width  = bitmap.width
       canvas.height = bitmap.height
       canvas.getContext('2d')!.drawImage(bitmap, 0, 0)
+      bitmap.close?.()
 
-      const { createWorker } = await import('tesseract.js')
-      const worker = await createWorker('eng', 1, {
-        logger: (m: any) => {
-          if (m.status === 'recognizing text' && mountedRef.current) {
-            setState(s => ({ ...s, ocrProgress: Math.round(m.progress * 100) }))
-          }
-        },
-      })
-      const { data: { text } } = await worker.recognize(canvas)
-      await worker.terminate()
-      if (!mountedRef.current) return
-
-      const trimmed = text.trim()
-      if (trimmed.length < 3) {
-        setState(s => ({ ...s, status: 'ready', error: 'Could not read any text from that image.' }))
-        return
-      }
-      setState(s => ({ ...s, status: 'ready' }))
-      onOcrText(trimmed)
+      revokePendingUrl()
+      pendingCanvasRef.current = canvas
+      const suggested = detectTextRegion(canvas)
+      canvas.toBlob(blob => {
+        if (!blob || !mountedRef.current) return
+        const url = URL.createObjectURL(blob)
+        pendingUrlRef.current = url
+        setState(s => ({ ...s, status: 'cropping', error: null, cropSource: { url, naturalWidth: canvas.width, naturalHeight: canvas.height, suggested } }))
+      }, 'image/jpeg', 0.92)
     } catch {
-      if (mountedRef.current) setState(s => ({ ...s, status: 'ready', error: 'Could not process that image.' }))
+      if (mountedRef.current) setState(s => ({ ...s, status: 'ready', error: 'Could not load that image.' }))
     }
-  }, [onOcrText])
+  }, [revokePendingUrl])
+
+  // ── User confirms the crop box — cut the region out and run OCR on it ───
+  const confirmCrop = useCallback((rect: CropRect) => {
+    const source = pendingCanvasRef.current
+    if (!source) return
+    const x = Math.max(0, Math.round(rect.x))
+    const y = Math.max(0, Math.round(rect.y))
+    const w = Math.max(1, Math.min(Math.round(rect.width),  source.width  - x))
+    const h = Math.max(1, Math.min(Math.round(rect.height), source.height - y))
+
+    const cropped = document.createElement('canvas')
+    cropped.width  = w
+    cropped.height = h
+    cropped.getContext('2d')!.drawImage(source, x, y, w, h, 0, 0, w, h)
+
+    revokePendingUrl()
+    pendingCanvasRef.current = null
+    runOcr(cropped)
+  }, [revokePendingUrl, runOcr])
+
+  // ── User backs out of the crop step without extracting anything ─────────
+  const cancelCrop = useCallback(() => {
+    revokePendingUrl()
+    pendingCanvasRef.current = null
+    setState(s => ({ ...s, status: 'ready', cropSource: null, error: null }))
+  }, [revokePendingUrl])
 
   const retryPermission = useCallback(async () => {
     setState(s => ({ ...s, status: 'requesting-permission', error: null }))
@@ -208,7 +413,7 @@ export default function useProductCapture({ active, mode, onBarcode, onOcrText }
 
   // ── Switch between barcode / label without re-requesting permission ─────
   useEffect(() => {
-    if (!active || state.status === 'requesting-permission' || state.status === 'denied' || state.status === 'error') return
+    if (!active || state.status !== 'ready') return
     stopBarcodeLoop()
     setState(s => ({ ...s, mode, status: 'ready', error: null }))
     if (mode === 'barcode') startBarcodeLoop()
@@ -219,7 +424,7 @@ export default function useProductCapture({ active, mode, onBarcode, onOcrText }
   useEffect(() => {
     if (!active) {
       stopCamera()
-      setState({ status: 'requesting-permission', mode, error: null, ocrProgress: 0 })
+      setState({ status: 'requesting-permission', mode, error: null, ocrProgress: 0, cropSource: null })
       return
     }
 
@@ -253,5 +458,5 @@ export default function useProductCapture({ active, mode, onBarcode, onOcrText }
     attachStream()
   }, [active, state.status, attachStream])
 
-  return { state, videoRef, captureAndExtract, extractFromFile, retryPermission }
+  return { state, videoRef, captureFrame, selectFileForCrop, confirmCrop, cancelCrop, retryPermission }
 }

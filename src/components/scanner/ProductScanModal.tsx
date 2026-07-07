@@ -24,6 +24,7 @@ import {
   RotateCcw, Loader2, ImageIcon, CheckCircle2,
 } from 'lucide-react'
 import useProductCapture, { type CaptureMode } from '@/hooks/scanner/useProductCapture'
+import CropOverlay from './CropOverlay'
 
 const Z_INDEX = 999999
 
@@ -49,7 +50,7 @@ export default function ProductScanModal({ open, initialMode, onBarcode, onOcrTe
     onOcrText(text)
   }, [onOcrText])
 
-  const { state, videoRef, captureAndExtract, extractFromFile, retryPermission } =
+  const { state, videoRef, captureFrame, selectFileForCrop, confirmCrop, cancelCrop, retryPermission } =
     useProductCapture({ active: open, mode, onBarcode: handleBarcode, onOcrText: handleOcrText })
 
   if (!open) return null
@@ -108,7 +109,7 @@ export default function ProductScanModal({ open, initialMode, onBarcode, onOcrTe
         )}
 
         {/* ── Camera view ───────────────────────────────────────────────── */}
-        {(state.status === 'ready' || state.status === 'ocr-running') && (
+        {state.status === 'ready' && (
           <div className="relative flex-1 overflow-hidden bg-black">
             <video ref={videoRef} playsInline muted autoPlay className="absolute inset-0 w-full h-full object-cover" />
             <div className="absolute inset-0 bg-gradient-to-b from-black/55 via-transparent to-black/65 pointer-events-none" />
@@ -134,15 +135,7 @@ export default function ProductScanModal({ open, initialMode, onBarcode, onOcrTe
               <div className="w-10" />
             </div>
 
-            {/* OCR progress overlay */}
-            {state.status === 'ocr-running' && (
-              <div className="absolute inset-0 bg-black/55 flex flex-col items-center justify-center gap-3">
-                <Loader2 size={26} className="text-purple-300 animate-spin" />
-                <p className="text-white text-sm font-medium">Reading text… {state.ocrProgress}%</p>
-              </div>
-            )}
-
-            {state.error && state.status === 'ready' && (
+            {state.error && (
               <div className="absolute bottom-[132px] left-4 right-4 flex justify-center pointer-events-none">
                 <div className="px-3 py-2 rounded-lg bg-red-500/90 text-white text-xs font-medium text-center">
                   {state.error}
@@ -156,11 +149,10 @@ export default function ProductScanModal({ open, initialMode, onBarcode, onOcrTe
 
               {mode === 'label' && (
                 <button
-                  onClick={captureAndExtract}
-                  disabled={state.status === 'ocr-running'}
-                  className="flex items-center justify-center gap-2 px-6 py-3 bg-purple-600 disabled:opacity-50 text-white rounded-full font-semibold text-sm active:scale-95 transition-transform"
+                  onClick={captureFrame}
+                  className="flex items-center justify-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-full font-semibold text-sm active:scale-95 transition-transform"
                 >
-                  <CheckCircle2 size={16} /> Capture &amp; Extract
+                  <CheckCircle2 size={16} /> Capture
                 </button>
               )}
 
@@ -201,10 +193,33 @@ export default function ProductScanModal({ open, initialMode, onBarcode, onOcrTe
             <input
               ref={galleryInputRef}
               type="file" accept="image/*" className="hidden"
-              onChange={e => { const f = e.target.files?.[0]; if (f) extractFromFile(f); e.target.value = '' }}
+              onChange={e => { const f = e.target.files?.[0]; if (f) selectFileForCrop(f); e.target.value = '' }}
             />
           </div>
         )}
+
+        {/* ── Crop step (label mode only) — tighten the box, then OCR runs ── */}
+        {state.status === 'cropping' && state.cropSource && (
+          <CropOverlay
+            src={state.cropSource.url}
+            naturalWidth={state.cropSource.naturalWidth}
+            naturalHeight={state.cropSource.naturalHeight}
+            suggestedRect={state.cropSource.suggested}
+            onConfirm={confirmCrop}
+            onCancel={cancelCrop}
+          />
+        )}
+
+        {/* ── OCR running on the cropped region ────────────────────────────── */}
+        {state.status === 'ocr-running' && (
+          <div className="flex-1 flex flex-col items-center justify-center gap-3 bg-black">
+            <Loader2 size={26} className="text-purple-300 animate-spin" />
+            <p className="text-white text-sm font-medium">Reading text… {state.ocrProgress}%</p>
+          </div>
+        )}
+
+        {/* Gallery file picker also needs to be reachable from the barcode-only
+            camera view above; the input itself lives inside the 'ready' block. */}
       </motion.div>
     </AnimatePresence>,
     document.body
