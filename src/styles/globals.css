@@ -87,6 +87,12 @@
   --shadow-lg:  0 20px 48px rgba(0,0,0,.14), 0 4px 12px rgba(0,0,0,.08);
   --shadow-glow:0 0 24px rgba(37,99,235,.18);
   --transition: .18s cubic-bezier(.4,0,.2,1);
+
+  /* Tells the browser this page is light-themed, so native form controls
+     (select/option dropdowns, scrollbars, etc.) render with light chrome
+     to match — without this, native popups ignore our CSS entirely and
+     fall back to the OS default appearance. */
+  color-scheme: light;
 }
 
 /* ── DARK MODE — Premium deep navy ──────────────────────────────────── */
@@ -108,6 +114,11 @@
   --shadow-md:  0 8px 32px rgba(0,0,0,.6), 0 2px 8px rgba(0,0,0,.4);
   --shadow-lg:  0 20px 60px rgba(0,0,0,.7), 0 4px 16px rgba(0,0,0,.5);
   --shadow-glow:0 0 32px rgba(37,99,235,.3);
+
+  /* Native controls (e.g. the batch <select>'s dropdown list) otherwise
+     render with a plain light/white background in dark mode, since the
+     browser has no idea the page is dark without this. */
+  color-scheme: dark;
 }
 
 /* ─────────────────────────────────────────────
