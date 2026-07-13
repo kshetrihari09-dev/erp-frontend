@@ -823,6 +823,11 @@ select.erp-input option { background: var(--surface); color: var(--text); }
   background:    #fff;
   box-shadow:    0 0 0 3px rgba(37,99,235,.1);
 }
+/* The <select>'s own popup list ignores our regular CSS unless the
+   <option> background/color is set directly (same fix already applied
+   to .erp-input below) — without this, BatchSelect's dropdown list
+   stays native light-mode white even when the closed box is dark. */
+select.pos-cell-input option { background: var(--surface); color: var(--text); }
 
 .pos-cell-num {
   text-align:  right;
@@ -2270,6 +2275,7 @@ td.psc-cell {
   background: var(--pdt-overlay-05);
   box-shadow: 0 0 0 3px var(--pdt-accent-dim);
 }
+.pos-theme select.pos-cell-input option { background: var(--pdt-surface); color: var(--pdt-text); }
 .pos-theme .pos-cell-display { color: var(--pdt-text-2); }
 .pos-theme .pos-cell-display--bold { color: var(--pdt-text); }
 .pos-theme .pos-row-delete { color: var(--pdt-text-4); }
