@@ -23,13 +23,13 @@ import {
   WifiOff, Smartphone, RotateCcw, Zap, Wifi, Clock, AlertTriangle,
 } from 'lucide-react'
 import type { ScannerState } from '@/hooks/scanner/useScannerSession'
+import { Z } from '@/styles/zIndex'
 
-// Same z-index ceiling as LocalScannerView — must clear .psc-dropdown's
-// 99999 (globals.css), .sidebar's 200, and .topbar's 100. This modal was
-// previously z-50, which is LOWER than .sidebar's 200 — meaning the sidebar
-// could already render above this QR dialog even without any stacking-
-// context quirks. Portaling + this z-index fixes both issues at once.
-const SCANNER_MODAL_Z_INDEX = 999999
+// Same tier as LocalScannerView / ProductScanModal — see
+// src/styles/zIndex.ts for the app-wide stacking scale. Portaling to
+// document.body + this shared token is what keeps this QR-pairing dialog
+// above the sidebar/topbar/dropdowns regardless of where it's opened from.
+const SCANNER_MODAL_Z_INDEX = Z.scanner
 
 interface Props {
   state:   ScannerState

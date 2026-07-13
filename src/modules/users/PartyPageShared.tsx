@@ -3,6 +3,7 @@ import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { Z } from '@/styles/zIndex'
 import {
   Plus, Search, RotateCcw, Download, ChevronDown,
   Eye, Edit2, BookOpen, FileText, Printer, Trash2,
@@ -152,7 +153,7 @@ export function ActionsMenu({ label, onView, onEdit, onLedger, onDelete }: {
         <MoreVertical size={15} />
       </button>
       {open && (
-        <div style={{ position: 'absolute', right: 0, top: 32, zIndex: 50, width: 176, ...CARD, borderRadius: 12, padding: '4px 0', overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', right: 0, top: 32, zIndex: Z.dropdown, width: 176, ...CARD, borderRadius: 12, padding: '4px 0', overflow: 'hidden' }}>
           {items.map((item, i) =>
             item === null
               ? <div key={i} style={{ borderTop: '1px solid var(--border)', margin: '4px 0' }} />
@@ -210,7 +211,7 @@ export function AccountPicker({ value, accounts, onChange, accent }: {
         <ChevronDown size={13} style={{ color: 'var(--text-4)', flexShrink: 0 }} />
       </button>
       {open && (
-        <div style={{ position: 'absolute', zIndex: 50, top: '100%', left: 0, right: 0, marginTop: 4, ...CARD, borderRadius: 12, overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', zIndex: Z.dropdown, top: '100%', left: 0, right: 0, marginTop: 4, ...CARD, borderRadius: 12, overflow: 'hidden' }}>
           <div style={{ padding: 8, borderBottom: '1px solid var(--border)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--surface-2)', borderRadius: 8, padding: '4px 8px', height: 28 }}>
               <Search size={11} style={{ color: 'var(--text-4)' }} />
@@ -396,7 +397,7 @@ export function SideDrawer({ party, label, defaultRole, accent, onClose, onEdit,
   const defaultAcct = (defaults as AccountDefault[]).find(d => d.role === defaultRole)
 
   return (
-    <div style={{ width:'100%', position: 'fixed', inset: 0, zIndex: 999, display: 'flex', justifyContent: 'flex-end' }} onClick={onClose}>
+    <div style={{ width:'100%', position: 'fixed', inset: 0, zIndex: Z.drawer, display: 'flex', justifyContent: 'flex-end' }} onClick={onClose}>
       <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(1px)' }} />
       <div style={{ position: 'relative', width: '100%', maxWidth: 360, background: 'var(--surface)', height: '100%', boxShadow: '-8px 0 40px rgba(0,0,0,0.18)', display: 'flex', flexDirection: 'column', overflow: 'hidden', }}
         onClick={e => e.stopPropagation()}>
@@ -609,7 +610,7 @@ export function PartyPage({
     <div style={{ minHeight: '100vh' }}>
 
       {/* Page header */}
-      <div className="pp-header" style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)', padding: '16px 0 16px', marginBottom: 20, position: 'sticky', top: 0, zIndex: 30 }}>
+      <div className="pp-header" style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)', padding: '16px 0 16px', marginBottom: 20, position: 'sticky', top: 0, zIndex: Z.sticky }}>
         <div className="pp-header-inner" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
             <nav style={{ display: 'flex',alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--text-4)', marginBottom: 4,}}>

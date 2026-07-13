@@ -25,8 +25,9 @@ import {
 } from 'lucide-react'
 import useProductCapture, { type CaptureMode } from '@/hooks/scanner/useProductCapture'
 import CropOverlay from './CropOverlay'
+import { Z } from '@/styles/zIndex'
 
-const Z_INDEX = 999999
+const Z_INDEX = Z.scanner
 
 interface Props {
   open:        boolean

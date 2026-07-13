@@ -30,6 +30,7 @@ import {
 } from '@/components/ui'
 import InvoiceRowsTable, { newRow, type InvoiceRow } from '@/components/forms/InvoiceRowsTable'
 import ProductSearchCell from '@/components/forms/ProductSearchCell'
+import BatchSelect from '@/components/forms/BatchSelect'
 import { fmt, fmtDate, calcRowAmount } from '@/utils'
 import { PrintPreviewModal } from '@/components/print'
 import type { PrintData } from '@/components/print'
@@ -531,7 +532,9 @@ export default function SalesPage() {
                         products={products}
                         onChange={p => {
                           const { amount, cc_amount } = reCalc({ rate: Number(p.sales_rate) })
-                          updateRow({ product_id: p.id, product_name: p.name, rate: p.sales_rate, amount, cc_amount })
+                          // batch_no/expiry cleared: they belonged to whatever
+                          // product was previously in this row, if any.
+                          updateRow({ product_id: p.id, product_name: p.name, rate: p.sales_rate, amount, cc_amount, batch_no: '', expiry: '' })
                         }}
                         onCreated={p => setProducts(prev => prev.some(x => x.id === p.id) ? prev : [...prev, p])}
                       />
@@ -597,11 +600,13 @@ export default function SalesPage() {
                       <div className="pmic-fields-3 pmic-extra">
                         <div className="pmic-field">
                           <label>Batch</label>
-                          <input
-                            type="text"
+                          <BatchSelect
+                            productId={row.product_id}
                             value={row.batch_no}
-                            placeholder="B001"
-                            onChange={e => updateRow({ batch_no: e.target.value })}
+                            onSelect={batch => updateRow({
+                              batch_no: batch.batch_no || '',
+                              expiry:   batch.expiry_date || batch.expiry || '',
+                            })}
                           />
                         </div>
                         <div className="pmic-field">

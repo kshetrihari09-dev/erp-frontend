@@ -32,6 +32,7 @@ import {
   useState, useRef, useEffect, useCallback,
   type KeyboardEvent,
 } from 'react'
+import { createPortal } from 'react-dom'
 import { Search, Plus, PackageSearch, Loader2 } from 'lucide-react'
 import { productsAPI } from '@/services/api'
 import type { Product } from '@/types'
@@ -55,10 +56,15 @@ export default function ProductSearchCell({
   const [highlighted, setHL]         = useState(0)
   const [loading,     setLoading]    = useState(false)
   const [showCreate,  setShowCreate] = useState(false)
+  // Computed on open (and kept in sync on scroll/resize) from the trigger's
+  // real getBoundingClientRect(), since the dropdown is portaled straight
+  // to document.body — see the root-cause note above openDropdown().
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null)
 
   const inputRef     = useRef<HTMLInputElement>(null)
   const listRef      = useRef<HTMLUListElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const dropdownRef  = useRef<HTMLDivElement>(null) // the portaled dropdown — lives outside containerRef in the DOM
   const debounceRef  = useRef<ReturnType<typeof setTimeout> | null>(null)
   const abortRef     = useRef<AbortController | null>(null)
 
@@ -78,9 +84,13 @@ export default function ProductSearchCell({
   /* ── Close on outside click ───────────────────────────────────────────── */
   useEffect(() => {
     function onMouseDown(e: MouseEvent) {
-      if (!containerRef.current?.contains(e.target as Node)) {
-        closeDropdown()
-      }
+      const target = e.target as Node
+      // The dropdown is portaled to document.body, so it's no longer a DOM
+      // descendant of containerRef — it must be checked separately or
+      // every click inside it would incorrectly register as "outside".
+      if (containerRef.current?.contains(target)) return
+      if (dropdownRef.current?.contains(target)) return
+      closeDropdown()
     }
     document.addEventListener('mousedown', onMouseDown)
     return () => document.removeEventListener('mousedown', onMouseDown)
@@ -130,6 +140,43 @@ export default function ProductSearchCell({
       abortRef.current?.abort()
     }
   }, [])
+
+  /* ── Dropdown position (portaled to document.body) ────────────────────
+   * ROOT CAUSE this replaces: .psc-dropdown previously relied on
+   * `position: absolute` inside the table cell, with a `position: fixed
+   * !important` mobile-only override bolted on top to fight the same
+   * problem on small screens. Two issues fell out of that:
+   *   1. On desktop, the base .psc-dropdown rule had no `position` at
+   *      all, so it rendered in normal document flow (pushing the row's
+   *      height) instead of floating, and its `top`/`left` values did
+   *      nothing.
+   *   2. Even with position fixed, an ancestor `.pos-table-wrap` uses
+   *      `overflow-x: auto` (which computes overflow-y to auto too),
+   *      so an absolutely-positioned dropdown near the bottom of a long
+   *      invoice table could get visually clipped.
+   * Portaling to document.body with a real computed position sidesteps
+   * both — the dropdown is never a descendant of the scrollable table,
+   * so no ancestor's overflow or stacking context can clip or bury it.
+   */
+  const updateDropdownPosition = useCallback(() => {
+    const el = containerRef.current
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    setDropdownPos({ top: rect.bottom + 4, left: rect.left, width: Math.max(rect.width, 280) })
+  }, [])
+
+  useEffect(() => {
+    if (!open) return
+    updateDropdownPosition()
+    // Keep it glued to the trigger if the table scrolls (horizontally or
+    // vertically) or the viewport resizes while the dropdown is open.
+    window.addEventListener('scroll', updateDropdownPosition, true)
+    window.addEventListener('resize', updateDropdownPosition)
+    return () => {
+      window.removeEventListener('scroll', updateDropdownPosition, true)
+      window.removeEventListener('resize', updateDropdownPosition)
+    }
+  }, [open, updateDropdownPosition])
 
   /* ── Open / close helpers ─────────────────────────────────────────────── */
   function openDropdown() {
@@ -252,8 +299,12 @@ export default function ProductSearchCell({
       )}
 
       {/* ── Dropdown ─────────────────────────────────────────────────────── */}
-      {open && (
-        <div className="psc-dropdown">
+      {open && dropdownPos && createPortal(
+        <div
+          ref={dropdownRef}
+          className="psc-dropdown"
+          style={{ position: 'fixed', top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width }}
+        >
           <ul ref={listRef} className="psc-list" role="listbox">
 
             {/* Loading */}
@@ -330,7 +381,8 @@ export default function ProductSearchCell({
             )}
 
           </ul>
-        </div>
+        </div>,
+        document.body,
       )}
 
       {/* ── Quick-add modal ───────────────────────────────────────────────── */}

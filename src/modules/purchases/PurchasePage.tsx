@@ -11,6 +11,7 @@ import {
 } from '@/components/ui'
 import InvoiceRowsTable, { newRow, type InvoiceRow } from '@/components/forms/InvoiceRowsTable'
 import ProductSearchCell from '@/components/forms/ProductSearchCell'
+import BatchSelect from '@/components/forms/BatchSelect'
 import { fmt, fmtDate, calcRowAmount } from '@/utils'
 import { PAYMENT_MODES } from '@/constants'
 import type { Product, Party, Purchase } from '@/types'
@@ -244,6 +245,7 @@ export default function PurchasePage() {
                 rows={rows}
                 products={products}
                 onChange={setRows}
+                onProductsChange={setProducts}
                 showCC={false}
                 showDiscount={false}
               />
@@ -297,7 +299,7 @@ export default function PurchasePage() {
                         products={products}
                         onChange={p => {
                           const { amount } = reCalc({ rate: Number(p.purchase_rate) })
-                          updateRow({ product_id: p.id, product_name: p.name, rate: p.purchase_rate, amount, cc_amount: 0 })
+                          updateRow({ product_id: p.id, product_name: p.name, rate: p.purchase_rate, amount, cc_amount: 0, batch_no: '', expiry: '' })
                         }}
                         onCreated={p => setProducts(prev => prev.some(x => x.id === p.id) ? prev : [...prev, p])}
                       />
@@ -363,11 +365,13 @@ export default function PurchasePage() {
                       <div className="pmic-fields-3 pmic-extra" style={{ gridTemplateColumns: '1fr 1fr' }}>
                         <div className="pmic-field">
                           <label>Batch</label>
-                          <input
-                            type="text"
+                          <BatchSelect
+                            productId={row.product_id}
                             value={row.batch_no}
-                            placeholder="B001"
-                            onChange={e => updateRow({ batch_no: e.target.value })}
+                            onSelect={batch => updateRow({
+                              batch_no: batch.batch_no || '',
+                              expiry:   batch.expiry_date || batch.expiry || '',
+                            })}
                           />
                         </div>
                         <div className="pmic-field">

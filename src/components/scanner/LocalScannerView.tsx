@@ -24,12 +24,12 @@ import {
 import useLocalScanner from '@/hooks/scanner/useLocalScanner'
 import type { ScanResult } from '@/types/scanner'
 import { ScanFrame, ModeBadge, ProductCard } from './ScannerUI'
+import { Z } from '@/styles/zIndex'
 
-// Highest z-index used anywhere in this codebase is `.psc-dropdown` at
-// 99999 (globals.css) — a mobile product-search combobox that can still be
-// mounted when the scanner opens. The scanner must always win, so this is
-// set well above that (and above .sidebar 200 / .topbar 100 / toasts 9999).
-const SCANNER_Z_INDEX = 999999
+// Full-screen scanner overlay — see src/styles/zIndex.ts for the app-wide
+// stacking scale this belongs to. Scanners sit above regular
+// dropdowns/modals since they can be launched while other UI is open.
+const SCANNER_Z_INDEX = Z.scanner
 
 interface Props {
   open:               boolean

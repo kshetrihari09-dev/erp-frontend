@@ -6,6 +6,7 @@
  */
 import { useState } from 'react'
 import { config } from '@/config/env'
+import { Z } from '@/styles/zIndex'
 
 export default function DevBadge() {
   const [expanded, setExpanded] = useState(false)
@@ -20,7 +21,7 @@ export default function DevBadge() {
         position:     'fixed',
         bottom:       12,
         right:        12,
-        zIndex:       99999,
+        zIndex:       Z.devBadge,
         cursor:       'pointer',
         userSelect:   'none',
         fontFamily:   'monospace',

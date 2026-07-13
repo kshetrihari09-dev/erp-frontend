@@ -198,7 +198,7 @@ export default function AppLayout() {
       {/* ── Mobile backdrop ─── */}
       {isMobile && mobileOpen && (
         <div
-          className="fixed inset-0 z-[190] bg-black/40 backdrop-blur-sm"
+          className="fixed inset-0 z-[calc(var(--z-sidebar)-10)] bg-black/40 backdrop-blur-sm"
           onClick={() => setMobileOpen(false)}
         />
       )}
@@ -288,7 +288,7 @@ export default function AppLayout() {
                 </NavLink>
                 {/* Tooltip for collapsed */}
                 {collapsed && hoveredNav === item.to && (
-                  <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 z-[300]">
+                  <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 z-[var(--z-dropdown)]">
                     <div className="bg-[#1e293b] text-[#f1f5f9] text-xs font-semibold px-2.5 py-1.5 rounded-lg whitespace-nowrap shadow-lg">
                       {item.label}
                       {badge > 0 && <span className="ml-1.5 text-red-400">({badge})</span>}

@@ -17,6 +17,34 @@
   --font-display: 'Syne', 'DM Sans', sans-serif;
   --font-mono:  'JetBrains Mono', monospace;
 
+  /* ── Stacking order (z-index scale) ──────────────────────────────────
+     Single source of truth for every z-index in the app. Mirrored 1:1 in
+     src/styles/zIndex.ts for components that set zIndex via inline
+     style/JS (portals, scanner overlays, DevBadge) rather than a CSS
+     class — the two files must always be changed together.
+
+     Order, low to high: sticky headers < dropdowns/popovers/tooltips <
+     mobile bars/FAB < drawers/sidebars < modal backdrop < modal panel <
+     full-screen scanner overlay < a modal launched from within another
+     modal or dropdown (e.g. Quick Add Product) < toast notifications
+     (always the top-most layer) < dev-only badge.
+
+     Do not hardcode a new magic number anywhere — add a rung to this
+     scale instead, so the ordering stays provably consistent. */
+  --z-base:            1;
+  --z-sticky:          100;
+  --z-sidebar:         200;
+  --z-dropdown:        1000;
+  --z-fab:             1100;
+  --z-mobile-bar:      1150;
+  --z-drawer:          1200;
+  --z-modal-backdrop:  1300;
+  --z-modal:           1310;
+  --z-scanner:         1400;
+  --z-nested-modal:    1500;
+  --z-toast:           1600;
+  --z-dev-badge:       1700;
+
   /* Brand */
   --brand:       #2563EB;
   --brand-light: #eff6ff;
@@ -112,7 +140,7 @@ input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
 /* ── SIDEBAR — Always dark, premium ──────────────────────────────────── */
 .sidebar {
   position: fixed; top: 0; left: 0; bottom: 0;
-  z-index: 200;
+  z-index: var(--z-sidebar);
   background: var(--sidebar-bg);
   width:100%;
   display: flex; flex-direction: column;
@@ -249,7 +277,7 @@ input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
 
 /* ── TOPBAR ──────────────────────────────────────────────────────────── */
 .topbar {
-  position: sticky; top: 0; z-index: 100;
+  position: sticky; top: 0; z-index: var(--z-sticky);
   height: var(--topbar-h); min-height: var(--topbar-h);
   display: flex; align-items: center; gap: 12px;
   padding: 0 24px;
@@ -428,7 +456,7 @@ select.erp-input option { background: var(--surface); color: var(--text); }
   border-bottom: 1px solid var(--border);
   white-space: nowrap; font-family: var(--font-mono);
   background: var(--surface-2);
-  position: sticky; top: 0; z-index: 1;
+  position: sticky; top: 0; z-index: var(--z-sticky);
 }
 .erp-table td {
   padding: 10px 14px; border-bottom: 1px solid var(--border);
@@ -1022,18 +1050,18 @@ td.psc-cell {
 }
 
 /* ── Dropdown panel ─────────────────────────────────────────────────────── */
+/* Position (top/left/width) is computed in JS and applied inline, since
+   the dropdown is portaled to document.body — see ProductSearchCell.tsx's
+   updateDropdownPosition(). This rule only owns the dropdown's *look*. */
 .psc-dropdown {
- 
-  top:          calc(100% + 4px);
-  left:         0;
-  z-index:      9999;
-  width:        max(100%, 280px);
+  position:     fixed; /* fallback; always overridden inline with real coordinates */
+  z-index:      var(--z-dropdown);
   background:   var(--surface);
   border:       1.5px solid var(--border);
   box-shadow:   0 8px 24px rgba(16,24,40,.12), 0 2px 8px rgba(16,24,40,.06);
   overflow:     auto;
   animation:    psc-pop .12s ease;
-  }
+}
 @keyframes psc-pop {
   from { opacity: 0; transform: translateY(-4px) scale(.98); }
   to   { opacity: 1; transform: translateY(0)    scale(1);   }
@@ -1041,7 +1069,7 @@ td.psc-cell {
 
 /* ── Option list ────────────────────────────────────────────────────────── */
 .psc-list {
-  z-index:9999;
+  z-index: var(--z-dropdown);
   list-style:  none;
   margin:      0;
   padding:     4px;
@@ -1173,7 +1201,7 @@ td.psc-cell {
 .qam-overlay {
   position:    fixed;
   inset:       0;
-  z-index:     10000;
+  z-index:     var(--z-nested-modal);
   background:  rgba(16,24,40,.45);
   backdrop-filter: blur(3px);
   display:     flex;
@@ -2360,7 +2388,7 @@ td.psc-cell {
     display: flex;
     position: sticky;
     top: 0;
-    z-index: 40;
+    z-index: var(--z-mobile-bar);
     align-items: center;
     justify-content: space-between;
     gap: 12px;
@@ -2542,7 +2570,7 @@ td.psc-cell {
     position: fixed;
     right: 16px;
     bottom: 92px;
-    z-index: 45;
+    z-index: var(--z-fab);
     width: 52px; height: 52px;
     border-radius: 16px;
     background: var(--pdt-accent);
@@ -2564,7 +2592,7 @@ td.psc-cell {
     display: flex;
     position: fixed;
     left: 0; right: 0; bottom: 0;
-    z-index: 50;
+    z-index: var(--z-mobile-bar);
     gap: 10px;
     padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
     background: var(--pdt-glass);
@@ -2720,15 +2748,13 @@ td.psc-cell {
   }
   .psc-placeholder { color: var(--text-4); }
 
-  /* Dropdown: escape overflow:hidden, appear above keyboard */
+  /* Position is now computed in JS uniformly for every viewport size (see
+     ProductSearchCell.tsx) since the dropdown is portaled to
+     document.body — this used to duplicate/fight that with a `position:
+     absolute !important` override just for mobile. What's mobile-specific
+     and still belongs here is purely visual: a shorter max-height (small
+     screens), rounder corners, and a stronger shadow. */
   .psc-dropdown {
-    position:      absolute !important;
-    top:           calc(100% + 4px) !important;
-    left:          0 !important;
-    right:         0 !important;
-    width:         auto !important;
-    min-width:     280px;
-    z-index:       99999 !important;
     max-height:    50vh !important;
     border-radius: 12px !important;
     box-shadow:    0 16px 48px rgba(0,0,0,.18) !important;
@@ -2980,7 +3006,8 @@ td.psc-cell {
   color:          var(--pdt-text-4, var(--text-4));
   margin-bottom:  5px;
 }
-.pos-theme .pmic-field input {
+.pos-theme .pmic-field input,
+.pos-theme .pmic-field select {
   display:          block;
   width:            100%;
   height:           44px;
@@ -3000,10 +3027,15 @@ td.psc-cell {
   appearance:       none;
   transition:       border-color .15s, box-shadow .15s, background .15s;
 }
-.pos-theme .pmic-field input:focus {
+.pos-theme .pmic-field input:focus,
+.pos-theme .pmic-field select:focus {
   border-color: var(--pdt-accent, var(--brand));
   box-shadow:   0 0 0 3px var(--pdt-accent-dim, rgba(59,130,246,.15));
   background:   var(--pdt-overlay-06, var(--surface-2));
+}
+.pos-theme .pmic-field select:disabled {
+  opacity: .6;
+  cursor:  not-allowed;
 }
 /* Remove number spinners */
 .pos-theme .pmic-field input[type="number"]::-webkit-inner-spin-button,
@@ -3389,7 +3421,7 @@ td.psc-cell {
     display:        flex;
     position:       fixed;
     left: 0; right: 0; bottom: 0;
-    z-index:        60;
+    z-index:        var(--z-mobile-bar);
     padding:        10px 16px;
     padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
     background:     rgba(255,255,255,.94);
@@ -4603,7 +4635,7 @@ canvas{
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  z-index: 9999;
+  z-index: var(--z-modal);
 }
 
 .page-loader-text {

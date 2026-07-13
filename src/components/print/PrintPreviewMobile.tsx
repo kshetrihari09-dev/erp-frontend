@@ -10,6 +10,7 @@
  * PrintPreviewModal.tsx. Touch targets are kept >= 44x44px per spec.
  */
 import { motion, AnimatePresence } from 'framer-motion'
+import { Z } from '@/styles/zIndex'
 import {
   ArrowLeft, Printer, Download, MoreHorizontal, X,
   Mail, MessageCircle, Copy, UploadCloud, Loader2, ChevronRight,
@@ -170,7 +171,7 @@ export function MoreSheet({
             key="more-backdrop"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             onClick={onClose}
-            style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,0.45)' }}
+            style={{ position: 'fixed', inset: 0, zIndex: Z.nestedModal, background: 'rgba(0,0,0,0.45)' }}
           />
           <motion.div
             key="more-sheet"
@@ -179,7 +180,7 @@ export function MoreSheet({
             initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
             transition={{ type: 'spring', stiffness: 420, damping: 38 }}
             style={{
-              position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 10001,
+              position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: Z.nestedModal,
               background: 'var(--surface,#fff)',
               borderTopLeftRadius: 18, borderTopRightRadius: 18,
               padding: '10px 14px calc(14px + env(safe-area-inset-bottom, 0px))',

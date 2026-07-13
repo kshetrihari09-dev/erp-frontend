@@ -21,7 +21,7 @@ export default function ToastContainer() {
   const { toasts, removeToast } = useUIStore()
 
   return (
-    <div className="fixed bottom-5 right-5 z-[9999] flex flex-col gap-2 pointer-events-none" style={{ maxWidth: 340 }}>
+    <div className="fixed bottom-5 right-5 z-[var(--z-toast)] flex flex-col gap-2 pointer-events-none" style={{ maxWidth: 340 }}>
       <AnimatePresence>
         {toasts.map((t) => (
           <motion.div

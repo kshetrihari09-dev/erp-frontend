@@ -13,6 +13,7 @@
  */
 
 import { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { X, Package, Loader2, AlertCircle } from 'lucide-react'
 import { productsAPI } from '@/services/api'
 import type { Product } from '@/types'
@@ -138,7 +139,7 @@ export default function QuickAddModal({ initialName, onSave, onClose }: Props) {
   }
 
   // ── Render ──────────────────────────────────────────────────────────── //
-  return (
+  return createPortal(
     <div
       ref={overlayRef}
       className="qam-overlay"
@@ -348,6 +349,7 @@ export default function QuickAddModal({ initialName, onSave, onClose }: Props) {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

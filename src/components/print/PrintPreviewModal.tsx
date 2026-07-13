@@ -38,6 +38,7 @@ import { usePrintResponsive } from './usePrintResponsive'
 import InvoiceTemplate, { type PrintData } from './InvoiceTemplate'
 import { ControlsPanel, Kbd, iconBtnStyle } from './PrintPreviewControls'
 import { MobileHeader, MobileBottomBar, MoreSheet } from './PrintPreviewMobile'
+import { Z } from '@/styles/zIndex'
 
 const TYPE_COLORS: Record<string, string> = {
   SALE:            '#16a34a',
@@ -184,7 +185,7 @@ export default function PrintPreviewModal({
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             onClick={isMobile ? undefined : onClose}
-            style={{ position: 'fixed', inset: 0, zIndex: 9998, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+            style={{ position: 'fixed', inset: 0, zIndex: Z.modalBackdrop, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
           />
 
           <motion.div
@@ -201,7 +202,7 @@ export default function PrintPreviewModal({
               width:     effectiveFullscreen ? '100vw' : isTablet ? 'min(880px, 96vw)' : 'min(1000px, 98vw)',
               height:    effectiveFullscreen ? '100dvh' : 'auto',
               maxHeight: effectiveFullscreen ? '100dvh' : '92dvh',
-              zIndex: 9999,
+              zIndex: Z.modal,
               background: 'var(--surface, #fff)',
               borderRadius: effectiveFullscreen ? 0 : '16px',
               boxShadow: '0 25px 80px rgba(0,0,0,0.35)',

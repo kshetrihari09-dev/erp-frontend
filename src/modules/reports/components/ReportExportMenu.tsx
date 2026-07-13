@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Download, Printer, ChevronDown } from 'lucide-react'
 import { CARD } from '../styles'
+import { Z } from '@/styles/zIndex'
 
 export interface ReportExportMenuProps {
   onCSV: () => void
@@ -16,8 +17,8 @@ export function ReportExportMenu({ onCSV, onPrint }: ReportExportMenuProps) {
       </button>
       {open && (
         <>
-          <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 10 }}/>
-          <div style={{ position: 'absolute', right: 0, top: 36, zIndex: 20, ...CARD, borderRadius: 12, padding: 6, minWidth: 140 }}>
+          <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: Z.dropdown }}/>
+          <div style={{ position: 'absolute', right: 0, top: 36, zIndex: Z.dropdown, ...CARD, borderRadius: 12, padding: 6, minWidth: 140 }}>
             {[
               { label: 'Export CSV', icon: <Download size={13}/>, fn: () => { onCSV(); setOpen(false) } },
               { label: 'Print',      icon: <Printer  size={13}/>, fn: () => { onPrint(); setOpen(false) } },

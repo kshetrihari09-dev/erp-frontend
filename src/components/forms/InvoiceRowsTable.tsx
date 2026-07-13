@@ -14,6 +14,7 @@ import { Plus, Trash2 } from 'lucide-react'
 import { fmt, calcRowAmount } from '@/utils'
 import type { Product } from '@/types'
 import ProductSearchCell from './ProductSearchCell'
+import BatchSelect from './BatchSelect'
 
 /* ── Public types ─────────────────────────────────────────────────────────── */
 
@@ -83,6 +84,15 @@ export default function InvoiceRowsTable({
     onChange(next)
   }
 
+  /* ── Batch selected from the dropdown — fills expiry in the same pass ─── */
+  function handleBatchSelect(idx: number, batch: { batch_no?: string; expiry?: string; expiry_date?: string }) {
+    const next = rows.map((r, i) => {
+      if (i !== idx) return r
+      return { ...r, batch_no: batch.batch_no || '', expiry: batch.expiry_date || batch.expiry || '' }
+    })
+    onChange(next)
+  }
+
   /* ── Product selected from combobox ──────────────────────────────────── */
   function handleProductSelect(idx: number, p: Product) {
     const next = rows.map((r, i) => {
@@ -92,6 +102,12 @@ export default function InvoiceRowsTable({
         product_id:   p.id,
         product_name: p.name,
         rate:         p.sales_rate,
+        // A previously-picked batch belongs to the OLD product — carrying
+        // it over would silently submit the wrong batch. The new
+        // BatchSelect fetches this product's own batches fresh and the
+        // user picks again, same as a brand new row.
+        batch_no:     '',
+        expiry:       '',
       }
       const { amount, cc_amount } = calcRowAmount({
         qty:          Number(updated.qty),
@@ -111,9 +127,9 @@ export default function InvoiceRowsTable({
     }, 50)
   }
 
-  /* ── Quick-created product: add to master list ──────────────────────── */
+  /* ── Quick-created product: add to master list (deduped) ─────────────── */
   function handleProductCreated(p: Product) {
-    onProductsChange?.([...products, p])
+    onProductsChange?.(products.some(x => x.id === p.id) ? products : [...products, p])
   }
 
   /* ── Rows management ─────────────────────────────────────────────────── */
@@ -193,11 +209,11 @@ export default function InvoiceRowsTable({
                 {/* ── Batch ─────────────────────────────────────────── */}
                 {showBatch && (
                   <td>
-                    <input
+                    <BatchSelect
                       className="pos-cell-input pos-batch-input"
+                      productId={row.product_id}
                       value={row.batch_no}
-                      onChange={e => update(idx, 'batch_no', e.target.value)}
-                      placeholder="B001"
+                      onSelect={batch => handleBatchSelect(idx, batch)}
                     />
                   </td>
                 )}
