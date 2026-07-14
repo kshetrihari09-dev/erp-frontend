@@ -59,6 +59,16 @@ export default function InvoiceRowsTable({
   showExpiry = true, showBatch = true,
 }: Props) {
   const firstRowRef = useRef<boolean>(true)
+  const qtyRefs = useRef<Record<number, HTMLInputElement | null>>({})
+
+  /** After a batch is resolved (picked manually, or auto-filled because
+   *  the product only had one batch), send focus straight to that row's
+   *  Quantity field so billing stays fast — no click needed. */
+  function handleBatchDone(idx: number) {
+    // Same tick the popup closes / the row updates — a rAF gives React one
+    // paint to settle so the qty input is actually there to focus.
+    requestAnimationFrame(() => qtyRefs.current[idx]?.focus())
+  }
 
   /* ── Row update helper (unchanged logic) ──────────────────────────────── */
   function update(idx: number, key: keyof InvoiceRow, val: unknown) {
@@ -119,12 +129,9 @@ export default function InvoiceRowsTable({
       return { ...updated, amount, cc_amount }
     })
     onChange(next)
-
-    // Move focus to the Batch field of the same row
-    setTimeout(() => {
-      const batchInputs = document.querySelectorAll<HTMLInputElement>('.pos-batch-input')
-      batchInputs[idx]?.focus()
-    }, 50)
+    // Nothing to focus here anymore — BatchSelect notices the new
+    // product_id itself and opens its own popup (or auto-fills a lone
+    // batch) without any help from this handler. See handleBatchDone.
   }
 
   /* ── Quick-created product: add to master list (deduped) ─────────────── */
@@ -145,6 +152,7 @@ export default function InvoiceRowsTable({
     // Only fire when not inside the ProductSearchCell (it handles its own Enter)
     const target = e.target as HTMLElement
     if (target.classList.contains('psc-input') || target.classList.contains('psc-trigger')) return
+    if (target.classList.contains('pos-batch-trigger')) return
     if (e.key === 'Enter' && idx === rows.length - 1) {
       e.preventDefault()
       onChange([...rows, newRow()])
@@ -210,10 +218,11 @@ export default function InvoiceRowsTable({
                 {showBatch && (
                   <td>
                     <BatchSelect
-                      className="pos-cell-input pos-batch-input"
+                      className="pos-batch-input"
                       productId={row.product_id}
                       value={row.batch_no}
                       onSelect={batch => handleBatchSelect(idx, batch)}
+                      onDone={() => handleBatchDone(idx)}
                     />
                   </td>
                 )}
@@ -233,6 +242,7 @@ export default function InvoiceRowsTable({
                 {/* ── Qty ───────────────────────────────────────────── */}
                 <td>
                   <input
+                    ref={el => { qtyRefs.current[idx] = el }}
                     type="number"
                     className="pos-cell-input pos-cell-num"
                     value={row.qty ?? ''}

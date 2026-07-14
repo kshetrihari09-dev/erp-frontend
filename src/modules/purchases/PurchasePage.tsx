@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { FilePlus, List, Printer, ChevronDown, Plus } from 'lucide-react'
 import ScanButton from '@/components/scanner/ScanButton'
@@ -43,6 +43,9 @@ export default function PurchasePage() {
 
   // Mobile: which rows have Batch/Expiry expanded
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set())
+  // Mobile card Qty inputs — BatchSelect focuses these once a batch is
+  // resolved, same idea as the desktop table's qtyRefs in InvoiceRowsTable.tsx.
+  const mobileQtyRefs = useRef<Record<number, HTMLInputElement | null>>({})
 
   // ── Scanner ───────────────────────────────────────────────────────────
   const handleScanResult = useCallback((result: ScanResult) => {
@@ -51,10 +54,9 @@ export default function PurchasePage() {
     row.product_id   = p.id
     row.product_name = p.name
     row.rate         = p.purchase_rate
-    if (p.batches?.length) {
-      row.batch_no = p.batches[0].batch_no    || ''
-      row.expiry   = p.batches[0].expiry_date || ''
-    }
+    // batch_no/expiry deliberately left blank — BatchSelect fetches this
+    // product's real stock batches and opens its own picker automatically,
+    // same as picking a product by search (see BatchSelect.tsx).
     setRows(prev => {
       const last = prev[prev.length - 1]
       if (last && !last.product_id) return [...prev.slice(0, -1), row]
@@ -300,6 +302,10 @@ export default function PurchasePage() {
                         onChange={p => {
                           const { amount } = reCalc({ rate: Number(p.purchase_rate) })
                           updateRow({ product_id: p.id, product_name: p.name, rate: p.purchase_rate, amount, cc_amount: 0, batch_no: '', expiry: '' })
+                          // Reveal the Batch field immediately — BatchSelect
+                          // mounts as soon as this section is expanded and
+                          // opens its own popup the moment batches load.
+                          setExpandedRows(prev => new Set(prev).add(idx))
                         }}
                         onCreated={p => setProducts(prev => prev.some(x => x.id === p.id) ? prev : [...prev, p])}
                       />
@@ -310,6 +316,7 @@ export default function PurchasePage() {
                       <div className="pmic-field">
                         <label>Qty</label>
                         <input
+                          ref={el => { mobileQtyRefs.current[idx] = el }}
                           type="number" inputMode="numeric" min={0} step="1"
                           value={row.qty === 0 ? '' : row.qty}
                           placeholder="0"
@@ -372,6 +379,7 @@ export default function PurchasePage() {
                               batch_no: batch.batch_no || '',
                               expiry:   batch.expiry_date || batch.expiry || '',
                             })}
+                            onDone={() => requestAnimationFrame(() => mobileQtyRefs.current[idx]?.focus())}
                           />
                         </div>
                         <div className="pmic-field">

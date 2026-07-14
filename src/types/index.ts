@@ -87,6 +87,12 @@ export interface StockBatch {
   qty_available: number
   purchase_rate: number
   sales_rate:   number
+  // Optional — only shown in the batch picker when the backend actually
+  // sends it. Several possible field-name spellings are accepted since
+  // this isn't standardized in the API yet.
+  rack_location?: string
+  location?:      string
+  rack?:          string
 }
 
 // ─── Parties ──────────────────────────────────────────────────────────────────

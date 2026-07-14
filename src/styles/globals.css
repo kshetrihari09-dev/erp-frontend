@@ -823,11 +823,31 @@ select.erp-input option { background: var(--surface); color: var(--text); }
   background:    #fff;
   box-shadow:    0 0 0 3px rgba(37,99,235,.1);
 }
-/* The <select>'s own popup list ignores our regular CSS unless the
-   <option> background/color is set directly (same fix already applied
-   to .erp-input below) — without this, BatchSelect's dropdown list
-   stays native light-mode white even when the closed box is dark. */
-select.pos-cell-input option { background: var(--surface); color: var(--text); }
+/* ── BatchSelect trigger button ───────────────────────────────────────────
+   BatchSelect now renders a real <button> + portaled div/ul dropdown
+   (see BatchSelect.tsx) instead of a native <select>, since native
+   <option> popups don't reliably honor custom colors across browsers.
+   .pos-cell-input above already gives it the right box model/colors for
+   the closed state; this just resets button-specific defaults and
+   handles text overflow/placeholder styling. */
+.pos-batch-trigger {
+  display:        flex;
+  align-items:    center;
+  text-align:     left;
+  cursor:         pointer;
+  border-style:   solid; /* .pos-cell-input sets border: 1.5px solid transparent, but <button> defaults border-style to outset — pin it back */
+}
+.pos-batch-trigger:disabled {
+  cursor:  not-allowed;
+  opacity: .6;
+}
+.pos-batch-trigger-label {
+  overflow:      hidden;
+  text-overflow: ellipsis;
+  white-space:   nowrap;
+}
+.pos-batch-trigger--empty .pos-batch-trigger-label { color: var(--text-4); }
+.pos-theme .pos-batch-trigger--empty .pos-batch-trigger-label { color: var(--pdt-text-4); }
 
 .pos-cell-num {
   text-align:  right;
@@ -1156,6 +1176,72 @@ td.psc-cell {
 }
 .psc-empty--hint { color: var(--text-4); font-style: italic; }
 .psc-empty-icon  { color: var(--text-4); opacity: .55; flex-shrink: 0; }
+
+/* ── Batch picker (BatchSelect.tsx) ───────────────────────────────────────
+   A 6-column grid — Batch / Expiry / Stock / Rack / Price / Status —
+   shared by the header row and every option row so they line up. */
+.pos-batch-grid {
+  display:               grid;
+  grid-template-columns: 1.3fr 72px 56px 72px 68px 92px;
+  gap:                   8px;
+  align-items:           center;
+}
+.pos-batch-head {
+  display:               grid;
+  grid-template-columns: 1.3fr 72px 56px 72px 68px 92px;
+  gap:                   8px;
+  padding:               6px 10px;
+  font-size:             10px;
+  font-weight:           700;
+  text-transform:        uppercase;
+  letter-spacing:        .04em;
+  color:                 var(--text-4);
+  border-bottom:         1px solid var(--border);
+}
+.pos-batch-query {
+  padding:    5px 10px;
+  font-size:  11px;
+  color:      var(--text-3);
+  font-style: italic;
+  border-bottom: 1px solid var(--border);
+}
+.pos-batch-row {
+  display:               grid;
+  grid-template-columns: 1.3fr 72px 56px 72px 68px 92px;
+  gap:                   8px;
+  align-items:           center;
+}
+.pos-batch-row--recommended:not(.psc-option--hl) {
+  background: var(--surface-2);
+}
+.pos-batch-col-no    { font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Transparent to the 6-column grid on desktop — its 4 children each land
+   in their own grid column as if this wrapper weren't there. Mobile
+   overrides this to a real flex group (see the mobile media query). */
+.pos-batch-col-meta  { display: contents; }
+.pos-batch-col-exp,
+.pos-batch-col-stock,
+.pos-batch-col-rack,
+.pos-batch-col-price { font-size: 12px; color: var(--text-3); white-space: nowrap; }
+.pos-batch-col-status{ display: flex; justify-content: flex-start; }
+
+.pos-batch-badge {
+  display:        inline-block;
+  font-size:      9.5px;
+  font-weight:    700;
+  text-transform: uppercase;
+  letter-spacing: .03em;
+  padding:        2px 6px;
+  border-radius:  999px;
+  white-space:    nowrap;
+}
+.pos-batch-badge--recommended { color: #15803d; background: #dcfce7; }
+.pos-batch-badge--low         { color: #b45309; background: #fef3c7; }
+.pos-batch-badge--expired     { color: #b91c1c; background: #fee2e2; }
+
+/* Wider than the usual psc-dropdown so all 6 columns fit comfortably. */
+.pos-batch-dropdown { min-width: 480px; }
+.pos-batch-list     { max-height: 320px; }
 
 /* Loading spinner inside search input */
 .psc-loading-icon {
@@ -2331,6 +2417,19 @@ td.psc-cell {
 .pos-theme .psc-create-row:hover,
 .pos-theme .psc-create-row--hl { background: var(--pdt-accent-dim); }
 .pos-theme .psc-create-icon { background: var(--pdt-accent); }
+
+/* ── Batch picker — dark ─────────────────────────────────────────────── */
+.pos-theme .pos-batch-head   { color: var(--pdt-text-4); border-bottom-color: var(--pdt-border); }
+.pos-theme .pos-batch-query  { color: var(--pdt-text-3); border-bottom-color: var(--pdt-border); }
+.pos-theme .pos-batch-col-no { color: var(--pdt-text); }
+.pos-theme .pos-batch-col-exp,
+.pos-theme .pos-batch-col-stock,
+.pos-theme .pos-batch-col-rack,
+.pos-theme .pos-batch-col-price { color: var(--pdt-text-3); }
+.pos-theme .pos-batch-row--recommended:not(.psc-option--hl) { background: var(--pdt-overlay-03); }
+.pos-theme .pos-batch-badge--recommended { color: #4ade80; background: rgba(74,222,128,.15); }
+.pos-theme .pos-batch-badge--low         { color: #fbbf24; background: rgba(251,191,36,.15); }
+.pos-theme .pos-batch-badge--expired     { color: #f87171; background: rgba(248,113,113,.15); }
 .pos-theme .psc-create-label { color: var(--pdt-accent); }
 .pos-theme .psc-create-name { color: var(--pdt-text); }
 
@@ -2782,6 +2881,31 @@ td.psc-cell {
   .psc-option-name { font-size: 14px; }
   .psc-empty     { padding: 18px 14px; font-size: 13px; }
   .psc-create-row { padding: 12px 14px; }
+
+  /* Batch picker: 6 grid columns don't fit a phone width — stack into two
+     lines per row instead: "Batch No ... Status" on top, then
+     "Exp · Stock · Rack · Price" grouped together below. */
+  .pos-batch-dropdown { min-width: 0; width: calc(100vw - 16px) !important; left: 8px !important; }
+  .pos-batch-head { display: none; } /* column headers meaningless once stacked */
+  .pos-batch-row {
+    display:     flex;
+    flex-wrap:   wrap;
+    align-items: center;
+    column-gap:  8px;
+    padding:     12px 14px;
+  }
+  .pos-batch-col-no     { order: 1; font-size: 14px; flex: 1 1 auto; }
+  .pos-batch-col-status { order: 2; margin-left: auto; }
+  .pos-batch-col-meta {
+    display:    flex;    /* no longer "contents" once mobile takes over */
+    order:      3;
+    flex-basis: 100%;    /* forces this whole group onto its own line */
+    gap:        6px;
+    font-size:  12px;
+  }
+  .pos-batch-col-exp::after,
+  .pos-batch-col-stock::after,
+  .pos-batch-col-rack::after { content: "·"; margin-left: 6px; color: var(--text-4); }
 }
 
 /* ══════════════════════════════════════════════════════════════════════════════
