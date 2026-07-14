@@ -87,12 +87,13 @@ export interface StockBatch {
   qty_available: number
   purchase_rate: number
   sales_rate:   number
-  // Optional — only shown in the batch picker when the backend actually
-  // sends it. Several possible field-name spellings are accepted since
-  // this isn't standardized in the API yet.
-  rack_location?: string
-  location?:      string
-  rack?:          string
+  // Optional — not guaranteed to be sent by every backend deployment yet.
+  // The Batch Selection popup shows whichever of these is present (if
+  // any) and falls back to "—" otherwise; see utils/batch.ts:getRackLocation.
+  rack_location?:  string | null
+  location?:       string | null
+  shelf_location?: string | null
+  bin_location?:   string | null
 }
 
 // ─── Parties ──────────────────────────────────────────────────────────────────

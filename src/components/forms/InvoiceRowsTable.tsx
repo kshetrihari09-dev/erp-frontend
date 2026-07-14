@@ -15,6 +15,7 @@ import { fmt, calcRowAmount } from '@/utils'
 import type { Product } from '@/types'
 import ProductSearchCell from './ProductSearchCell'
 import BatchSelect from './BatchSelect'
+import QtyGate from './QtyGate'
 
 /* ── Public types ─────────────────────────────────────────────────────────── */
 
@@ -59,16 +60,6 @@ export default function InvoiceRowsTable({
   showExpiry = true, showBatch = true,
 }: Props) {
   const firstRowRef = useRef<boolean>(true)
-  const qtyRefs = useRef<Record<number, HTMLInputElement | null>>({})
-
-  /** After a batch is resolved (picked manually, or auto-filled because
-   *  the product only had one batch), send focus straight to that row's
-   *  Quantity field so billing stays fast — no click needed. */
-  function handleBatchDone(idx: number) {
-    // Same tick the popup closes / the row updates — a rAF gives React one
-    // paint to settle so the qty input is actually there to focus.
-    requestAnimationFrame(() => qtyRefs.current[idx]?.focus())
-  }
 
   /* ── Row update helper (unchanged logic) ──────────────────────────────── */
   function update(idx: number, key: keyof InvoiceRow, val: unknown) {
@@ -129,9 +120,10 @@ export default function InvoiceRowsTable({
       return { ...updated, amount, cc_amount }
     })
     onChange(next)
-    // Nothing to focus here anymore — BatchSelect notices the new
-    // product_id itself and opens its own popup (or auto-fills a lone
-    // batch) without any help from this handler. See handleBatchDone.
+    // Batch selection now happens automatically: BatchSelect (below)
+    // notices the new product_id and either auto-picks a lone batch,
+    // opens the batch picker for multiple, or shows "No batches
+    // available" — whichever it is, it also owns moving focus onward.
   }
 
   /* ── Quick-created product: add to master list (deduped) ─────────────── */
@@ -152,7 +144,6 @@ export default function InvoiceRowsTable({
     // Only fire when not inside the ProductSearchCell (it handles its own Enter)
     const target = e.target as HTMLElement
     if (target.classList.contains('psc-input') || target.classList.contains('psc-trigger')) return
-    if (target.classList.contains('pos-batch-trigger')) return
     if (e.key === 'Enter' && idx === rows.length - 1) {
       e.preventDefault()
       onChange([...rows, newRow()])
@@ -218,11 +209,11 @@ export default function InvoiceRowsTable({
                 {showBatch && (
                   <td>
                     <BatchSelect
-                      className="pos-batch-input"
+                      className="pos-cell-input"
                       productId={row.product_id}
+                      productName={row.product_name}
                       value={row.batch_no}
                       onSelect={batch => handleBatchSelect(idx, batch)}
-                      onDone={() => handleBatchDone(idx)}
                     />
                   </td>
                 )}
@@ -241,13 +232,12 @@ export default function InvoiceRowsTable({
 
                 {/* ── Qty ───────────────────────────────────────────── */}
                 <td>
-                  <input
-                    ref={el => { qtyRefs.current[idx] = el }}
-                    type="number"
+                  <QtyGate
                     className="pos-cell-input pos-cell-num"
+                    productId={row.product_id}
                     value={row.qty ?? ''}
                     min={1}
-                    onChange={e => update(idx, 'qty', e.target.value === '' ? '' : Number(e.target.value))}
+                    onChange={v => update(idx, 'qty', v)}
                   />
                 </td>
 

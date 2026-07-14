@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useForm } from 'react-hook-form'
 import { FilePlus, List, Printer, ChevronDown, Plus } from 'lucide-react'
 import ScanButton from '@/components/scanner/ScanButton'
@@ -12,6 +12,7 @@ import {
 import InvoiceRowsTable, { newRow, type InvoiceRow } from '@/components/forms/InvoiceRowsTable'
 import ProductSearchCell from '@/components/forms/ProductSearchCell'
 import BatchSelect from '@/components/forms/BatchSelect'
+import QtyGate from '@/components/forms/QtyGate'
 import { fmt, fmtDate, calcRowAmount } from '@/utils'
 import { PAYMENT_MODES } from '@/constants'
 import type { Product, Party, Purchase } from '@/types'
@@ -43,20 +44,18 @@ export default function PurchasePage() {
 
   // Mobile: which rows have Batch/Expiry expanded
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set())
-  // Mobile card Qty inputs — BatchSelect focuses these once a batch is
-  // resolved, same idea as the desktop table's qtyRefs in InvoiceRowsTable.tsx.
-  const mobileQtyRefs = useRef<Record<number, HTMLInputElement | null>>({})
 
   // ── Scanner ───────────────────────────────────────────────────────────
+  // Batch left blank — BatchSelect resolves it for this row (auto-pick a
+  // lone batch, open the picker for several) the same way it does for a
+  // product chosen by search or keyboard, so a scan never silently locks
+  // in a batch without the user confirming it.
   const handleScanResult = useCallback((result: ScanResult) => {
     const p   = result.product
     const row = newRow()
     row.product_id   = p.id
     row.product_name = p.name
     row.rate         = p.purchase_rate
-    // batch_no/expiry deliberately left blank — BatchSelect fetches this
-    // product's real stock batches and opens its own picker automatically,
-    // same as picking a product by search (see BatchSelect.tsx).
     setRows(prev => {
       const last = prev[prev.length - 1]
       if (last && !last.product_id) return [...prev.slice(0, -1), row]
@@ -302,10 +301,6 @@ export default function PurchasePage() {
                         onChange={p => {
                           const { amount } = reCalc({ rate: Number(p.purchase_rate) })
                           updateRow({ product_id: p.id, product_name: p.name, rate: p.purchase_rate, amount, cc_amount: 0, batch_no: '', expiry: '' })
-                          // Reveal the Batch field immediately — BatchSelect
-                          // mounts as soon as this section is expanded and
-                          // opens its own popup the moment batches load.
-                          setExpandedRows(prev => new Set(prev).add(idx))
                         }}
                         onCreated={p => setProducts(prev => prev.some(x => x.id === p.id) ? prev : [...prev, p])}
                       />
@@ -315,13 +310,11 @@ export default function PurchasePage() {
                     <div className="pmic-fields-3">
                       <div className="pmic-field">
                         <label>Qty</label>
-                        <input
-                          ref={el => { mobileQtyRefs.current[idx] = el }}
-                          type="number" inputMode="numeric" min={0} step="1"
+                        <QtyGate
+                          productId={row.product_id}
                           value={row.qty === 0 ? '' : row.qty}
-                          placeholder="0"
-                          onChange={e => {
-                            const qty = e.target.value === '' ? 0 : Number(e.target.value)
+                          onChange={v => {
+                            const qty = v === '' ? 0 : v
                             updateRow({ qty, ...reCalc({ qty }) })
                           }}
                         />
@@ -374,12 +367,12 @@ export default function PurchasePage() {
                           <label>Batch</label>
                           <BatchSelect
                             productId={row.product_id}
+                            productName={row.product_name}
                             value={row.batch_no}
                             onSelect={batch => updateRow({
                               batch_no: batch.batch_no || '',
                               expiry:   batch.expiry_date || batch.expiry || '',
                             })}
-                            onDone={() => requestAnimationFrame(() => mobileQtyRefs.current[idx]?.focus())}
                           />
                         </div>
                         <div className="pmic-field">
