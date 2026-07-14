@@ -857,6 +857,26 @@ select.erp-input option { background: var(--surface); color: var(--text); }
   background:    #fef2f2;
 }
 
+/* ── New Customer/Supplier (+) button beside the party selector ─────────── */
+.pos-party-add-btn {
+  flex-shrink:    0;
+  width:          38px;
+  display:        flex;
+  align-items:    center;
+  justify-content:center;
+  border-radius:  var(--radius-sm);
+  border:         1px solid var(--border-2);
+  background:     var(--brand-light, #eff6ff);
+  color:          var(--brand);
+  cursor:         pointer;
+  transition:     all .14s;
+}
+.pos-party-add-btn:hover {
+  background: var(--brand);
+  color:      #fff;
+  border-color: var(--brand);
+}
+
 /* ── Add row button ─────────────────────────────────────────────────────── */
 .pos-add-row-btn {
   display:       flex;
@@ -1339,6 +1359,27 @@ td.psc-cell {
 }
 .qam-required { color: #ef4444; margin-left: 2px; }
 .qam-optional { font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--text-4); }
+
+/* ── Per-field validation message (Quick Add Party) ─────────────────────── */
+.qam-field-error {
+  font-size:  11px;
+  color:      #dc2626;
+  margin-top: 4px;
+}
+
+/* ── "Manage Customers/Suppliers" link (Quick Add Party) ────────────────── */
+.qam-manage-link {
+  display:        inline-flex;
+  align-items:    center;
+  gap:            6px;
+  margin-top:     2px;
+  font-size:      12px;
+  font-weight:    600;
+  color:          var(--brand);
+  text-decoration:none;
+  width:          fit-content;
+}
+.qam-manage-link:hover { text-decoration: underline; }
 
 /* ── Prefix-input wrapper (₹ symbol) ────────────────────────────────────── */
 .qam-input-prefix {

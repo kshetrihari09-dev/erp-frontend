@@ -20,7 +20,7 @@ import {
   Printer, FilePlus, List, FileText, ShoppingCart,
   CalendarDays, CreditCard, User, MapPin, Hash,
   Phone as PhoneIcon, ChevronDown, AlertCircle,
-  CheckCircle2, RotateCcw, Save, Plus,
+  CheckCircle2, RotateCcw, Save, Plus, UserPlus,
 } from 'lucide-react'
 import { salesAPI, partiesAPI, productsAPI } from '@/services/api'
 import useUIStore from '@/store/uiStore'
@@ -32,6 +32,7 @@ import InvoiceRowsTable, { newRow, type InvoiceRow } from '@/components/forms/In
 import ProductSearchCell from '@/components/forms/ProductSearchCell'
 import BatchSelect from '@/components/forms/BatchSelect'
 import QtyGate from '@/components/forms/QtyGate'
+import QuickAddPartyModal from '@/components/forms/QuickAddPartyModal'
 import { fmt, fmtDate, calcRowAmount } from '@/utils'
 import { PrintPreviewModal } from '@/components/print'
 import type { PrintData } from '@/components/print'
@@ -125,6 +126,7 @@ export default function SalesPage() {
 
   const [confirmPost,   setConfirmPost]   = useState(false)
   const [confirmCancel, setConfirmCancel] = useState<string | null>(null)
+  const [showNewCustomer, setShowNewCustomer] = useState(false)
 
   // ── Scanner ─────────────────────────────────────────────────────────────
   // Batch is intentionally left blank here: BatchSelect (rendered for this
@@ -367,16 +369,27 @@ export default function SalesPage() {
                   {/* Party selector — now required (see onSubmit validation below) */}
                   <div className="pos-span2">
                     <FieldLabel icon={<User size={11}/>}>Party <span style={{ color: 'var(--danger,#dc2626)' }}>*</span></FieldLabel>
-                    <div className="relative">
-                      <select className="erp-input pos-select" required {...register('customer_id')}>
-                        <option value="">Select a customer…</option>
-                        {customers.map(c => (
-                          <option key={c.id} value={c.id}>
-                            {c.code ? `${c.code} - ` : ''}{c.name}
-                          </option>
-                        ))}
-                      </select>
-                      <ChevronDown size={13} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-4)]" />
+                    <div className="flex gap-2 items-stretch">
+                      <div className="relative flex-1">
+                        <select className="erp-input pos-select" required {...register('customer_id')}>
+                          <option value="">Select a customer…</option>
+                          {customers.map(c => (
+                            <option key={c.id} value={c.id}>
+                              {c.code ? `${c.code} - ` : ''}{c.name}
+                            </option>
+                          ))}
+                        </select>
+                        <ChevronDown size={13} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-4)]" />
+                      </div>
+                      <button
+                        type="button"
+                        className="pos-party-add-btn"
+                        onClick={() => setShowNewCustomer(true)}
+                        title="New Customer"
+                        aria-label="New Customer"
+                      >
+                        <UserPlus size={15}/>
+                      </button>
                     </div>
                   </div>
 
@@ -1025,6 +1038,24 @@ export default function SalesPage() {
           onSubmit above), independent of whether the print preview modal
           above is ever opened — see AutoCloudBackup.tsx. */}
       <AutoCloudBackup data={printData} />
+
+      {showNewCustomer && (
+        <QuickAddPartyModal
+          type="customer"
+          existingNames={customers.map(c => c.name)}
+          onClose={() => setShowNewCustomer(false)}
+          onSave={party => {
+            setCustomers(prev => prev.some(x => x.id === party.id) ? prev : [...prev, party])
+            setValue('customer_id', party.id)
+            setShowNewCustomer(false)
+            // No extra focus call needed — the existing customerId watcher
+            // above already collapses the accordion and focuses the
+            // product search the moment customer_id goes from '' to a
+            // real value, regardless of whether that came from the
+            // <select> or from here.
+          }}
+        />
+      )}
 
     </div>
   )

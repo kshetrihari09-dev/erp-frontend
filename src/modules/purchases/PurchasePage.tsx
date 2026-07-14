@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useForm } from 'react-hook-form'
-import { FilePlus, List, Printer, ChevronDown, Plus } from 'lucide-react'
+import { FilePlus, List, Printer, ChevronDown, Plus, Truck } from 'lucide-react'
 import ScanButton from '@/components/scanner/ScanButton'
 import type { ScanResult } from '@/types/scanner'
 import { purchasesAPI, partiesAPI, productsAPI } from '@/services/api'
@@ -13,6 +13,7 @@ import InvoiceRowsTable, { newRow, type InvoiceRow } from '@/components/forms/In
 import ProductSearchCell from '@/components/forms/ProductSearchCell'
 import BatchSelect from '@/components/forms/BatchSelect'
 import QtyGate from '@/components/forms/QtyGate'
+import QuickAddPartyModal from '@/components/forms/QuickAddPartyModal'
 import { fmt, fmtDate, calcRowAmount } from '@/utils'
 import { PAYMENT_MODES } from '@/constants'
 import type { Product, Party, Purchase } from '@/types'
@@ -41,6 +42,7 @@ export default function PurchasePage() {
   const [detailId,   setDetailId]   = useState<string | null>(null)
   const [detail,     setDetail]     = useState<Purchase | null>(null)
   const [confirmCreate, setConfirmCreate] = useState(false)
+  const [showNewSupplier, setShowNewSupplier] = useState(false)
 
   // Mobile: which rows have Batch/Expiry expanded
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set())
@@ -64,7 +66,7 @@ export default function PurchasePage() {
     setProducts(prev => prev.some(x => x.id === p.id) ? prev : [...prev, p as any])
   }, [])
 
-  const { register, handleSubmit, reset, watch } = useForm({
+  const { register, handleSubmit, reset, watch, setValue } = useForm({
     defaultValues: {
       supplier_id: '', date: new Date().toISOString().split('T')[0],
       payment_mode: 'credit', supplier_bill_no: '', notes: '',
@@ -201,12 +203,23 @@ export default function PurchasePage() {
             <div className="pos-customer-grid">
               <div>
                 <label className="pmic-field-label">Supplier</label>
-                <select className="erp-input w-full" {...register('supplier_id')}>
-                  <option value="">Select supplier…</option>
-                  {suppliers.map(s => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
-                </select>
+                <div className="flex gap-2 items-stretch">
+                  <select className="erp-input w-full" {...register('supplier_id')}>
+                    <option value="">Select supplier…</option>
+                    {suppliers.map(s => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    className="pos-party-add-btn"
+                    onClick={() => setShowNewSupplier(true)}
+                    title="New Supplier"
+                    aria-label="New Supplier"
+                  >
+                    <Truck size={15}/>
+                  </button>
+                </div>
               </div>
               <div>
                 <label className="pmic-field-label">Date</label>
@@ -623,6 +636,26 @@ export default function PurchasePage() {
         onNextBill={() => { setPrintData(null); reset(); setRows([newRow()]) }}
       />
       <AutoCloudBackup data={printData} />
+
+      {showNewSupplier && (
+        <QuickAddPartyModal
+          type="supplier"
+          existingNames={suppliers.map(s => s.name)}
+          onClose={() => setShowNewSupplier(false)}
+          onSave={party => {
+            setSuppliers(prev => prev.some(x => x.id === party.id) ? prev : [...prev, party])
+            setValue('supplier_id', party.id)
+            setShowNewSupplier(false)
+            // Purchase has no existing "party selected" watcher to piggy-
+            // back on (Sale does — see SalesPage.tsx), so hand focus on to
+            // the item entry explicitly, same selector BatchSelect/
+            // ProductSearchCell already rely on elsewhere.
+            setTimeout(() => {
+              document.querySelector<HTMLElement>('.psc-input,.psc-trigger')?.focus()
+            }, 50)
+          }}
+        />
+      )}
     </div>
   )
 }

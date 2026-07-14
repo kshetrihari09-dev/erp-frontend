@@ -1,7 +1,6 @@
 
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
-import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Z } from '@/styles/zIndex'
 import {
@@ -18,19 +17,13 @@ import { Button, Modal, Pagination, SkeletonRows, Empty, ConfirmDialog } from '@
 import { useDebounce } from '@/hooks/useDebounce'
 import { fmt, fmtDate } from '@/utils'
 import type { Party, AccountDefault } from '@/types'
-
-// ── Schema ────────────────────────────────────────────────────────────────────
-export const partySchema = z.object({
-  name:            z.string().min(1, 'Name is required'),
-  phone:           z.string().optional(),
-  email:           z.string().email('Invalid email').optional().or(z.literal('')),
-  address:         z.string().optional(),
-  pan_no:          z.string().optional(),
-  credit_limit:    z.coerce.number().optional(),
-  credit_days:     z.coerce.number().default(30),
-  opening_balance: z.coerce.number().default(0),
-})
-export type PartyForm = z.infer<typeof partySchema>
+// Validation schema now lives in schemas/party.ts (shared with the Quick
+// Create dialog opened from Sale/Purchase). partySchema is re-exported so
+// any existing import of it from this file still works; the inferred
+// type is aliased locally (PartyFormValues) since this file also has a
+// component named `PartyForm` further down.
+import { partySchema, type PartyForm as PartyFormValues } from '@/schemas/party'
+export { partySchema }
 
 // ── Accent colour config ──────────────────────────────────────────────────────
 export interface AccentConfig {
@@ -249,7 +242,7 @@ export function AccountPicker({ value, accounts, onChange, accent }: {
 
 // ── PartyForm ─────────────────────────────────────────────────────────────────
 export function PartyForm({ initial, onClose, onCreate, label, defaultRole, accent }: {
-  initial?: Party | null; onClose: () => void; onCreate: (d: PartyForm) => Promise<void>
+  initial?: Party | null; onClose: () => void; onCreate: (d: PartyFormValues) => Promise<void>
   label: string; defaultRole: string; accent: AccentConfig
 }) {
   const update     = useUpdateParty()
@@ -257,7 +250,7 @@ export function PartyForm({ initial, onClose, onCreate, label, defaultRole, acce
   const { data: allAccounts = [] } = useAccounts({ is_active: true, is_group: false })
   const [ctrlAcct, setCtrlAcct]   = useState<string | null>(initial?.control_account_id ?? null)
 
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<PartyForm>({
+  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<PartyFormValues>({
     resolver: zodResolver(partySchema),
     defaultValues: initial ? {
       name: initial.name, phone: initial.phone || '', email: initial.email || '',
@@ -302,7 +295,7 @@ export function PartyForm({ initial, onClose, onCreate, label, defaultRole, acce
           ['Phone', 'phone', 'text'], ['Email', 'email', 'email'],
           ['PAN / VAT No', 'pan_no', 'text'], ['Credit Limit', 'credit_limit', 'number'],
           ['Credit Days', 'credit_days', 'number'], ['Opening Balance', 'opening_balance', 'number'],
-        ] as [string, keyof PartyForm, string][]).map(([lbl, name, type]) => (
+        ] as [string, keyof PartyFormValues, string][]).map(([lbl, name, type]) => (
           <div key={name as string}>
             <label style={labelStyle}>{lbl}</label>
             <input type={type} style={inputStyle(!!(errors as any)[name])} {...register(name)} />
@@ -535,7 +528,7 @@ export interface PartyPageConfig {
   icon:        React.ReactNode
   kpiLabel:    string        // 'Total Receivable' | 'Total Payable'
   kpiIcon:     React.ReactNode
-  createMutation: () => { mutateAsync: (d: PartyForm) => Promise<any> }
+  createMutation: () => { mutateAsync: (d: PartyFormValues) => Promise<any> }
   listQuery: (params: any) => { data: any; isLoading: boolean }
 }
 
