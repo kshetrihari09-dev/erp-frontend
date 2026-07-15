@@ -81,6 +81,7 @@ export const USER_ROLES = [
 export const QK = {
   PRODUCTS:    'products',
   PRODUCT:     'product',
+  MANUFACTURERS: 'manufacturers',
   CUSTOMERS:   'customers',
   SUPPLIERS:   'suppliers',
   PARTY:       'party',
@@ -120,6 +121,7 @@ export const PATHS = {
   SALES_RETURNS:    '/sales-returns',
   PURCHASE_RETURNS: '/purchase-returns',
   PRODUCTS:   '/products',
+  MANUFACTURERS: '/manufacturers',
   STOCK:      '/stock',
   RECEIVES:   '/receives',
   CUSTOMERS:  '/customers',

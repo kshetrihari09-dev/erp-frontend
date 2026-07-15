@@ -76,6 +76,28 @@ export interface Product {
   created_at?:   string
 }
 
+/**
+ * A manufacturer/brand directory entry for the Product form's Manufacturer
+ * selector. There's no backend Manufacturer table yet — Product only has
+ * a plain `company_name` string column (see Product below). This type is
+ * a client-side "master data" record maintained by services/manufacturers.ts;
+ * only its `name` ever gets written into a product's `company_name` field.
+ */
+export interface Manufacturer {
+  id:             string
+  name:           string
+  short_name?:    string
+  contact_person?:string
+  phone?:         string
+  email?:         string
+  address?:       string
+  website?:       string
+  pan_no?:        string
+  is_active:      boolean
+  notes?:         string
+  created_at:     string
+}
+
 export interface StockBatch {
   id:           string
   product_id:   string

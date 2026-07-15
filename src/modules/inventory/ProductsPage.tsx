@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { Plus, Package, ScanLine, Type } from 'lucide-react'
 import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct } from '@/hooks/useQuery'
 import { Button, Modal, Badge, Pagination, SkeletonRows, Empty, SearchInput, ConfirmDialog } from '@/components/ui'
+import ManufacturerSelect from '@/components/forms/ManufacturerSelect'
 import { useDebounce } from '@/hooks/useDebounce'
 import { fmt } from '@/utils'
 import { PRODUCT_UNITS } from '@/constants'
@@ -36,7 +37,7 @@ function hasCameraSupport(): boolean {
 function ProductForm({ initial, onClose }: { initial?: Product | null; onClose: () => void }) {
   const create = useCreateProduct()
   const update = useUpdateProduct()
-  const { register, handleSubmit, setValue, formState: { errors, isSubmitting } } = useForm<Form>({
+  const { register, handleSubmit, setValue, watch, formState: { errors, isSubmitting } } = useForm<Form>({
     resolver: zodResolver(schema),
     defaultValues: initial ? {
       name: initial.name, generic_name: initial.generic_name || '', company_name: initial.company_name || '',
@@ -111,7 +112,21 @@ function ProductForm({ initial, onClose }: { initial?: Product | null; onClose: 
       <div className="form-grid">
         <div className="span2"><Field label="Product Name *" name="name" /></div>
         <Field label="Generic Name" name="generic_name" />
-        <Field label="Company / Brand" name="company_name" />
+        <div>
+          <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">Manufacturer</label>
+          <ManufacturerSelect
+            value={watch('company_name') || ''}
+            onChange={name => {
+              setValue('company_name', name, { shouldDirty: true, shouldValidate: true })
+              // Return focus to the Product form — the next field in tab
+              // order — once a manufacturer is picked/created, same as
+              // the (+) flows on Sale/Purchase moving on to Quantity.
+              requestAnimationFrame(() => {
+                document.querySelector<HTMLInputElement>('input[name="category"]')?.focus()
+              })
+            }}
+          />
+        </div>
         <Field label="Category" name="category" />
         <div>
           <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">Barcode</label>

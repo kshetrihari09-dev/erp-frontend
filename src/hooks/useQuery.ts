@@ -5,7 +5,10 @@ import {
   productsAPI, salesAPI, purchasesAPI, partiesAPI, accountingAPI,
   reportsAPI, stockAPI, settingsAPI, returnsAPI, receivesAPI, dateAPI,
 } from '@/services/api'
+import * as manufacturersService from '@/services/manufacturers'
+import type { ManufacturerInput } from '@/services/manufacturers'
 import useUIStore from '@/store/uiStore'
+import useAuthStore from '@/store/authStore'
 
 // ─── Helper: extract .data.data from Axios response ──────────────────────────
 const unwrap = <T>(res: { data: { data: T } }) => res.data.data
@@ -57,6 +60,67 @@ export function useDeleteProduct() {
     mutationFn: (id: string) => productsAPI.delete(id),
     onSuccess: () => { qc.invalidateQueries({ queryKey: [QK.PRODUCTS] }); success('Product deleted') },
     onError:   (e: { message: string }) => error('Cannot delete', e.message),
+  })
+}
+
+// ─── Manufacturers ──────────────────────────────────────────────────────────
+// Client-side "master data" — see services/manufacturers.ts for why there's
+// no real endpoint yet. Shaped exactly like the API-backed hooks around it
+// (useCustomers/useCreateCustomer etc.) so ManufacturerSelect,
+// QuickAddManufacturerModal, and ManufacturersPage don't need to know or
+// care that it isn't hitting the network.
+function useCompanyId() {
+  return useAuthStore(s => s.company?.id) || 'default'
+}
+
+export function useManufacturers() {
+  const companyId = useCompanyId()
+  return useQuery({
+    queryKey: [QK.MANUFACTURERS, companyId],
+    queryFn: async () => {
+      // Seeds once per company from existing products' company_name
+      // values — reuses productsAPI.list, no new endpoint, and only ever
+      // runs the fetch on the very first load for a given company.
+      await manufacturersService.ensureSeededOnce(companyId, async () => {
+        const res = await productsAPI.list({ limit: 500 })
+        return ((res.data.data || []) as { company_name?: string }[]).map(p => p.company_name)
+      })
+      return manufacturersService.getAll(companyId)
+    },
+  })
+}
+
+export function useCreateManufacturer() {
+  const qc = useQueryClient()
+  const companyId = useCompanyId()
+  const { success, error } = useUIStore()
+  return useMutation({
+    mutationFn: async (input: ManufacturerInput) => manufacturersService.create(companyId, input),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: [QK.MANUFACTURERS, companyId] }); success('Manufacturer created') },
+    onError:   (e: Error) => error('Failed', e.message),
+  })
+}
+
+export function useUpdateManufacturer() {
+  const qc = useQueryClient()
+  const companyId = useCompanyId()
+  const { success, error } = useUIStore()
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<ManufacturerInput> }) =>
+      manufacturersService.update(companyId, id, data),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: [QK.MANUFACTURERS, companyId] }); success('Manufacturer updated') },
+    onError:   (e: Error) => error('Failed', e.message),
+  })
+}
+
+export function useDeleteManufacturer() {
+  const qc = useQueryClient()
+  const companyId = useCompanyId()
+  const { success, error } = useUIStore()
+  return useMutation({
+    mutationFn: async (id: string) => manufacturersService.remove(companyId, id),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: [QK.MANUFACTURERS, companyId] }); success('Manufacturer deleted') },
+    onError:   (e: Error) => error('Cannot delete', e.message),
   })
 }
 
