@@ -36,7 +36,7 @@
  *   - Nothing is auto-opened or auto-selected on product pick, since
  *     typing a new batch is the primary path here, not picking one.
  */
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Search } from 'lucide-react'
 import useProductBatches from '@/hooks/useProductBatches'
 import type { StockBatch } from '@/types'
@@ -77,6 +77,19 @@ export default function BatchSelect({
   productId, productName, value, onSelect, onTextChange, className, tabIndex, mode = 'sale',
 }: Props) {
   const { batches, loading } = useProductBatches(productId)
+
+  // Sale-only safeguard: even though useProductBatches now clears stale
+  // data the instant productId changes (see that file), this is a second,
+  // belt-and-suspenders guarantee specifically for Sale — filter out any
+  // batch whose product_id doesn't match the row's own selected product
+  // before it can ever reach the popup or the auto-select/auto-open
+  // logic below. Purchase's branch further down deliberately keeps using
+  // the raw `batches` array untouched.
+  const saleBatches = useMemo(
+    () => (productId ? batches.filter(b => b.product_id === productId) : []),
+    [batches, productId],
+  )
+
   const [popupOpen, setPopupOpen] = useState(false)
 
   const rootRef      = useRef<HTMLDivElement>(null)
@@ -85,7 +98,7 @@ export default function BatchSelect({
   // than re-firing on every unrelated re-render. Sale mode only.
   const processedRef = useRef<string | undefined>(undefined)
 
-  const selected = batches.find(b => b.batch_no === value)
+  const selected = saleBatches.find(b => b.batch_no === value)
 
   function resolve(batch: StockBatch) {
     onSelect(batch)
@@ -101,15 +114,15 @@ export default function BatchSelect({
     if (processedRef.current === productId) return
     processedRef.current = productId
 
-    if (batches.length === 1) {
-      onSelect(batches[0])
+    if (saleBatches.length === 1) {
+      onSelect(saleBatches[0])
       focusRowQty(rootRef.current)
-    } else if (batches.length > 1) {
+    } else if (saleBatches.length > 1) {
       setPopupOpen(true)
     }
     // 0 batches: nothing to auto-do — the trigger below shows the
     // "No batches available" state and stays disabled.
-  }, [mode, productId, loading, batches]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [mode, productId, loading, saleBatches]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── Purchase: freely-typeable batch number + optional "browse existing" ── */
   if (mode === 'purchase') {
@@ -160,7 +173,7 @@ export default function BatchSelect({
     )
   }
 
-  const noStock = !loading && batches.length === 0
+  const noStock = !loading && saleBatches.length === 0
 
   return (
     <div ref={rootRef} className="bsp-trigger-wrap">
@@ -193,7 +206,7 @@ export default function BatchSelect({
       <BatchSelectionPopup
         open={popupOpen}
         productName={productName}
-        batches={batches}
+        batches={saleBatches}
         selectedBatchNo={value}
         onSelect={resolve}
         onClose={() => setPopupOpen(false)}

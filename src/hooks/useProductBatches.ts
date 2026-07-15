@@ -79,6 +79,13 @@ export default function useProductBatches(productId: string | undefined | null) 
     }
 
     let cancelled = false
+    // Clear immediately rather than leaving the PREVIOUS product's
+    // batches sitting in state while this fetch is in flight — without
+    // this, a consumer reading `batches` between here and the fetch
+    // resolving would see the wrong product's data paired with
+    // loading=true, which is exactly the "batches for the previous
+    // product" bug this hook needs to never produce.
+    setBatches([])
     setLoading(true)
     fetchBatches(productId)
       .then(data => { if (!cancelled && mountedRef.current) { setBatches(data); setLoading(false) } })
