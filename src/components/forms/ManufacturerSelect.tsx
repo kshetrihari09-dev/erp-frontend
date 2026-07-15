@@ -39,6 +39,11 @@ export default function ManufacturerSelect({ value, onChange, placeholder }: Pro
   const [query, setQuery] = useState('')
   const [hl,    setHL]    = useState(0)
   const [showCreate, setShowCreate] = useState(false)
+  // What the user had typed when "Create manufacturer" was triggered.
+  // Captured separately from `query` because close() (called right
+  // before the modal opens) resets `query` to '' — without this the
+  // Quick Add modal would always open with a blank name field.
+  const [createSeed, setCreateSeed] = useState('')
 
   const containerRef = useRef<HTMLDivElement>(null)
   const dropdownRef   = useRef<HTMLDivElement>(null)
@@ -127,6 +132,7 @@ export default function ManufacturerSelect({ value, onChange, placeholder }: Pro
       case 'Enter':
         e.preventDefault()
         if (showCreateRow && hl === createIdx) {
+          setCreateSeed(trimmedQuery)
           close()
           setShowCreate(true)
         } else if (filtered[hl]) {
@@ -210,7 +216,7 @@ export default function ManufacturerSelect({ value, onChange, placeholder }: Pro
                     aria-selected={hl === createIdx}
                     className={`mfg-create-row ${hl === createIdx ? 'mfg-create-row--hl' : ''}`}
                     onMouseEnter={() => setHL(createIdx)}
-                    onMouseDown={e => { e.preventDefault(); close(); setShowCreate(true) }}
+                    onMouseDown={e => { e.preventDefault(); setCreateSeed(trimmedQuery); close(); setShowCreate(true) }}
                   >
                     <Plus size={12} />
                     <span>Create manufacturer "{trimmedQuery}"</span>
@@ -225,7 +231,7 @@ export default function ManufacturerSelect({ value, onChange, placeholder }: Pro
         <button
           type="button"
           className="pos-party-add-btn"
-          onClick={() => setShowCreate(true)}
+          onClick={() => { setCreateSeed(query.trim()); setShowCreate(true) }}
           title="New Manufacturer"
           aria-label="New Manufacturer"
         >
@@ -235,7 +241,7 @@ export default function ManufacturerSelect({ value, onChange, placeholder }: Pro
 
       {showCreate && (
         <QuickAddManufacturerModal
-          initialName={query.trim()}
+          initialName={createSeed}
           existingNames={manufacturers.map(m => m.name)}
           onSave={handleCreated}
           onClose={() => setShowCreate(false)}

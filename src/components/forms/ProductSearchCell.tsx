@@ -56,6 +56,12 @@ export default function ProductSearchCell({
   const [highlighted, setHL]         = useState(0)
   const [loading,     setLoading]    = useState(false)
   const [showCreate,  setShowCreate] = useState(false)
+  // What the user had typed at the moment "Create new product" was
+  // triggered. Captured separately from `query` because closeDropdown()
+  // (called right before the modal opens, to hide the dropdown) resets
+  // `query` to '' — without this, the Quick Add modal would always open
+  // with a blank name field instead of the text the user just typed.
+  const [createSeed,  setCreateSeed] = useState('')
   // Computed on open (and kept in sync on scroll/resize) from the trigger's
   // real getBoundingClientRect(), since the dropdown is portaled straight
   // to document.body — see the root-cause note above openDropdown().
@@ -233,6 +239,7 @@ export default function ProductSearchCell({
         e.preventDefault()
         if (highlighted === createIdx && showCreateRow) {
           // Enter on Create row → open modal
+          setCreateSeed(query.trim())
           closeDropdown()
           setShowCreate(true)
         } else if (results[highlighted]) {
@@ -366,6 +373,7 @@ export default function ProductSearchCell({
                 onMouseEnter={() => setHL(createIdx)}
                 onMouseDown={e => {
                   e.preventDefault()
+                  setCreateSeed(query.trim())
                   closeDropdown()
                   setShowCreate(true)
                 }}
@@ -388,7 +396,7 @@ export default function ProductSearchCell({
       {/* ── Quick-add modal ───────────────────────────────────────────────── */}
       {showCreate && (
         <QuickAddModal
-          initialName={query.trim()}
+          initialName={createSeed}
           onSave={handleCreated}
           onClose={() => setShowCreate(false)}
         />
