@@ -159,6 +159,10 @@ export interface SaleItem {
   product_id:    string
   product_name:  string
   batch_no?:     string
+  /** Exact inventory_batches lot id selected in the Batch Selection popup —
+   *  ensures the backend deducts from that precise batch, not just any lot
+   *  sharing the same batch_no. */
+  batch_id?:     string
   expiry?:       string
   qty:           number
   bonus?:        number

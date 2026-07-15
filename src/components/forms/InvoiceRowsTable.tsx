@@ -24,6 +24,11 @@ export interface InvoiceRow {
   product_id:   string
   product_name: string
   batch_no:     string
+  /** id of the exact inventory_batches lot picked in the Batch Selection
+   *  popup (Sale mode) — lets the backend deduct from that precise batch
+   *  instead of guessing by batch_no, which can repeat across lots.
+   *  Purchase mode doesn't set this (batches are freely typed/new). */
+  batch_id?:    string
   expiry:       string
   qty:          number
   bonus:        number
@@ -36,7 +41,7 @@ export interface InvoiceRow {
 
 export const newRow = (): InvoiceRow => ({
   _id: Math.random(), product_id: '', product_name: '',
-  batch_no: '', expiry: '', qty: 1, bonus: 0, rate: '',
+  batch_no: '', batch_id: undefined, expiry: '', qty: 1, bonus: 0, rate: '',
   discount_pct: 0, cc_pct: 0, amount: 0, cc_amount: 0,
 })
 
@@ -91,10 +96,10 @@ export default function InvoiceRowsTable({
   }
 
   /* ── Batch selected from the dropdown — fills expiry in the same pass ─── */
-  function handleBatchSelect(idx: number, batch: { batch_no?: string; expiry?: string; expiry_date?: string }) {
+  function handleBatchSelect(idx: number, batch: { id?: string; batch_no?: string; expiry?: string; expiry_date?: string }) {
     const next = rows.map((r, i) => {
       if (i !== idx) return r
-      return { ...r, batch_no: batch.batch_no || '', expiry: batch.expiry_date || batch.expiry || '' }
+      return { ...r, batch_no: batch.batch_no || '', batch_id: batch.id || undefined, expiry: batch.expiry_date || batch.expiry || '' }
     })
     onChange(next)
   }
@@ -118,6 +123,7 @@ export default function InvoiceRowsTable({
         // BatchSelect fetches this product's own batches fresh and the
         // user picks again, same as a brand new row.
         batch_no:     '',
+        batch_id:     undefined,
         expiry:       '',
       }
       const { amount, cc_amount } = calcRowAmount({

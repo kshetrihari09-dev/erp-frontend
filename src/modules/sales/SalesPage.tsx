@@ -231,7 +231,7 @@ export default function SalesPage() {
         discount_pct: discountPct, notes: data.notes,
         items: validRows.map(r => ({
           product_id: r.product_id, product_name: r.product_name,
-          batch_no: r.batch_no || undefined, expiry: r.expiry || undefined,
+          batch_no: r.batch_no || undefined, batch_id: r.batch_id || undefined, expiry: r.expiry || undefined,
           qty: Number(r.qty), bonus: Number(r.bonus) || 0,
           rate: Number(r.rate), cc_pct: Number(r.cc_pct) || 0,
           amount: r.amount, cc_amount: r.cc_amount,
