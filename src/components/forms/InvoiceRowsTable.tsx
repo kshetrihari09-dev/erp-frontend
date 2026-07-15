@@ -50,6 +50,11 @@ interface Props {
   showDiscount?: boolean
   showExpiry?:   boolean
   showBatch?:    boolean
+  /** "sale" (default): batch is pick-only from existing stock.
+   *  "purchase": batch is freely typeable (new batches are the normal
+   *  case), with an optional button to browse existing batches — see
+   *  BatchSelect.tsx/QtyGate.tsx for the full rationale. */
+  mode?:         'sale' | 'purchase'
 }
 
 /* ── Component ───────────────────────────────────────────────────────────── */
@@ -57,7 +62,7 @@ interface Props {
 export default function InvoiceRowsTable({
   rows, products, onChange, onProductsChange,
   showBonus = true, showCC = true, showDiscount = false,
-  showExpiry = true, showBatch = true,
+  showExpiry = true, showBatch = true, mode = 'sale',
 }: Props) {
   const firstRowRef = useRef<boolean>(true)
 
@@ -92,6 +97,11 @@ export default function InvoiceRowsTable({
       return { ...r, batch_no: batch.batch_no || '', expiry: batch.expiry_date || batch.expiry || '' }
     })
     onChange(next)
+  }
+
+  /* ── Purchase mode only — batch number typed freely, not picked ───────── */
+  function handleBatchText(idx: number, text: string) {
+    update(idx, 'batch_no', text)
   }
 
   /* ── Product selected from combobox ──────────────────────────────────── */
@@ -214,6 +224,8 @@ export default function InvoiceRowsTable({
                       productName={row.product_name}
                       value={row.batch_no}
                       onSelect={batch => handleBatchSelect(idx, batch)}
+                      onTextChange={text => handleBatchText(idx, text)}
+                      mode={mode}
                     />
                   </td>
                 )}
@@ -237,6 +249,7 @@ export default function InvoiceRowsTable({
                     productId={row.product_id}
                     value={row.qty ?? ''}
                     min={1}
+                    mode={mode}
                     onChange={v => update(idx, 'qty', v)}
                   />
                 </td>

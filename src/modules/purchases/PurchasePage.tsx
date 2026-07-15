@@ -262,6 +262,7 @@ export default function PurchasePage() {
                 onProductsChange={setProducts}
                 showCC={false}
                 showDiscount={false}
+                mode="purchase"
               />
             </div>
 
@@ -326,6 +327,7 @@ export default function PurchasePage() {
                         <QtyGate
                           productId={row.product_id}
                           value={row.qty === 0 ? '' : row.qty}
+                          mode="purchase"
                           onChange={v => {
                             const qty = v === '' ? 0 : v
                             updateRow({ qty, ...reCalc({ qty }) })
@@ -382,10 +384,12 @@ export default function PurchasePage() {
                             productId={row.product_id}
                             productName={row.product_name}
                             value={row.batch_no}
+                            mode="purchase"
                             onSelect={batch => updateRow({
                               batch_no: batch.batch_no || '',
                               expiry:   batch.expiry_date || batch.expiry || '',
                             })}
+                            onTextChange={text => updateRow({ batch_no: text })}
                           />
                         </div>
                         <div className="pmic-field">

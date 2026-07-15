@@ -4,10 +4,19 @@
  * Thin wrapper around the Quantity <input> used in the Sale/Purchase
  * invoice rows. It doesn't add a new validation rule — the existing
  * "qty > 0" check at post time (SalesPage/PurchasePage onSubmit) is
- * untouched. It just disables the field (and explains why) when the
- * row's product has no batches at all, so a user can't type a quantity
- * for a product that has nothing to actually ship/sell — the row then
- * naturally fails the existing rule instead of a new one being added.
+ * untouched.
+ *
+ * Sale (`mode="sale"`, default): disables the field (and explains why)
+ * when the row's product has no existing batches at all, so a user
+ * can't type a quantity for a product that has nothing to actually
+ * ship/sell — the row then naturally fails the existing rule instead of
+ * a new one being added.
+ *
+ * Purchase (`mode="purchase"`): never blocked on batch count. Buying
+ * stock commonly *introduces* a brand-new batch with zero prior stock —
+ * that's the normal case here, not a reason to stop the user typing a
+ * quantity (see BatchSelect.tsx's purchase mode, which is enterable for
+ * the same reason).
  *
  * Carries the `pos-qty-input` class so BatchSelect.tsx can find and
  * focus this exact field after a batch is resolved (Enter/Tab/auto-pick).
@@ -22,13 +31,14 @@ interface Props {
   min?:       number
   step?:      string
   placeholder?: string
+  mode?:      'sale' | 'purchase'
 }
 
 export default function QtyGate({
-  productId, value, onChange, className, min = 1, step, placeholder,
+  productId, value, onChange, className, min = 1, step, placeholder, mode = 'sale',
 }: Props) {
   const { batches, loading } = useProductBatches(productId)
-  const blocked = !!productId && !loading && batches.length === 0
+  const blocked = mode === 'sale' && !!productId && !loading && batches.length === 0
 
   return (
     <input

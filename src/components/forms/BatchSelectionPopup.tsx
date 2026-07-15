@@ -173,7 +173,7 @@ export default function BatchSelectionPopup({
                         {b.batch_no || '—'}
                       </span>
                       <span className="bsp-col bsp-col-expiry">{formatExpiry(b.expiry_date || b.expiry)}</span>
-                      <span className="bsp-col bsp-col-stock">{b.qty_available}</span>
+                      <span className="bsp-col bsp-col-stock">{fmt(b.qty_available)}</span>
                       <span className="bsp-col bsp-col-rack">{rack || '—'}</span>
                       <span className="bsp-col bsp-col-price">{fmt(b.sales_rate)}</span>
                       <span className="bsp-col bsp-col-status">
