@@ -16,6 +16,7 @@ import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { X, Package, Loader2, AlertCircle } from 'lucide-react'
 import { productsAPI } from '@/services/api'
+import ManufacturerSelect from './ManufacturerSelect'
 import type { Product } from '@/types'
 
 interface Props {
@@ -198,10 +199,9 @@ export default function QuickAddModal({ initialName, onSave, onClose }: Props) {
           <div className="qam-row">
             <div className="qam-field">
               <label className="qam-label">Company / Manufacturer</label>
-              <input
-                className="erp-input"
+              <ManufacturerSelect
                 value={form.company_name}
-                onChange={e => set('company_name', e.target.value)}
+                onChange={name => set('company_name', name)}
                 placeholder="e.g. Sun Pharma"
               />
             </div>

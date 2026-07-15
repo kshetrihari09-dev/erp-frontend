@@ -1531,7 +1531,11 @@ td.psc-cell {
 
 .mfg-dropdown {
   position:   fixed;
-  z-index:    var(--z-dropdown);
+  /* Higher than --z-dropdown: this can now be opened from inside
+     QuickAddModal (Sale/Purchase's Quick Add Product dialog), which
+     itself sits at --z-nested-modal — a plain dropdown tier would render
+     underneath that modal's own overlay. */
+  z-index:    var(--z-toast);
   background: var(--surface);
   border:     1.5px solid var(--border);
   border-radius: 10px;
