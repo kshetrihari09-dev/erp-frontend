@@ -22,6 +22,7 @@ import { partiesAPI } from '@/services/api'
 import { partySchema } from '@/schemas/party'
 import { PATHS } from '@/constants'
 import type { Party, PartyType } from '@/types'
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 
 interface Props {
   type:        PartyType            // 'customer' | 'supplier'
@@ -65,16 +66,15 @@ export default function QuickAddPartyModal({ type, existingNames, onSave, onClos
 
   useEffect(() => { nameRef.current?.focus() }, [])
 
-  // Escape closes, matching QuickAddModal's own keyboard behaviour.
-  // Enter-to-save is handled per-field below (not globally), so it
-  // doesn't fire while, e.g., a <select> or button has focus mid-tab.
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  // Esc closes, Ctrl+Enter saves — registering this also suspends the
+  // Sale/Purchase page's own F2..F10 shortcuts while this modal is open
+  // (see hooks/useKeyboardShortcuts.ts). Per-field Enter-to-save stays as
+  // its own local handler below (handleFieldKeyDown) so it doesn't fire
+  // while, e.g., a <select> or button has focus mid-tab.
+  useKeyboardShortcuts([
+    { combo: 'esc', handler: onClose, description: `Close` },
+    { combo: 'ctrl+enter', handler: () => handleSave(), description: `Save ${label.toLowerCase()}` },
+  ])
 
   function set(key: keyof FormState, val: string) {
     setForm(f => ({ ...f, [key]: val }))

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { FilePlus, List, Printer, ChevronDown, Plus, Truck } from 'lucide-react'
 import ScanButton from '@/components/scanner/ScanButton'
@@ -7,9 +7,9 @@ import { purchasesAPI, partiesAPI, productsAPI } from '@/services/api'
 import useUIStore from '@/store/uiStore'
 import {
   Button, Tabs, Modal, Badge, Pagination,
-  SkeletonRows, Alert, Empty, SearchInput, ConfirmDialog,
+  SkeletonRows, Alert, Empty, SearchInput, ConfirmDialog, Kbd,
 } from '@/components/ui'
-import InvoiceRowsTable, { newRow, type InvoiceRow } from '@/components/forms/InvoiceRowsTable'
+import InvoiceRowsTable, { newRow, type InvoiceRow, type InvoiceRowsTableHandle } from '@/components/forms/InvoiceRowsTable'
 import ProductSearchCell from '@/components/forms/ProductSearchCell'
 import BatchSelect from '@/components/forms/BatchSelect'
 import QtyGate from '@/components/forms/QtyGate'
@@ -21,12 +21,15 @@ import PostingStatusBadge from '@/components/PostingStatusBadge'
 import { PrintPreviewModal } from '@/components/print'
 import type { PrintData } from '@/components/print'
 import AutoCloudBackup from '@/components/cloudStorage/AutoCloudBackup'
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 
 const LIMIT = 20
 
 export default function PurchasePage() {
-  const { error, theme } = useUIStore()
+  const { error, info, theme } = useUIStore()
   const [tab, setTab] = useState('new')
+  const tableRef = useRef<InvoiceRowsTableHandle>(null)
+
 
   const [suppliers,  setSuppliers]  = useState<Party[]>([])
   const [products,   setProducts]   = useState<Product[]>([])
@@ -148,6 +151,50 @@ export default function PurchasePage() {
     setConfirmCreate(true)
   }
 
+  /** Same reset shape as onNextBill below — factored out so Ctrl+N can
+   *  trigger it without needing a completed purchase first. */
+  function clearForm() {
+    setPrintData(null)
+    reset()
+    setRows([newRow()])
+  }
+
+  /* ── Keyboard shortcuts (New Purchase tab only) ────────────────────────
+   * See hooks/useKeyboardShortcuts.ts. Popups (Quick Add modals, Batch
+   * Selection, Print Preview) each register their own scope, so these
+   * automatically go quiet while any of them is open. */
+  useKeyboardShortcuts([
+    { combo: 'f2',       description: 'Product search',      handler: () => tableRef.current?.focusProductSearch() },
+    { combo: 'ctrl+f',   description: 'Product search',      handler: () => tableRef.current?.focusProductSearch() },
+    { combo: 'f3',       description: 'Supplier search',     handler: () => document.getElementById('pur-supplier-select')?.focus() },
+    { combo: 'f4',       description: 'Batch selection',     handler: () => tableRef.current?.openBatchSelect() },
+    { combo: 'ctrl+b',   description: 'Batch selection',     handler: () => tableRef.current?.openBatchSelect() },
+    { combo: 'f5',       description: 'New product',         handler: () => tableRef.current?.openCreateProduct() },
+    { combo: 'f6',       description: 'New supplier',        handler: () => setShowNewSupplier(true) },
+    {
+      combo: 'f7', description: 'Apply discount',
+      // Purchase invoices don't carry an invoice-level discount % field
+      // (showDiscount={false} on InvoiceRowsTable) — say so rather than
+      // silently doing nothing.
+      handler: () => info('No discount field', "Purchase invoices don't have a discount %."),
+    },
+    { combo: 'f8',       description: 'Payment mode',        handler: () => document.getElementById('pur-payment-mode-select')?.focus() },
+    { combo: 'f9',       description: 'Save transaction',    handler: handleCreateClick },
+    { combo: 'ctrl+s',   description: 'Save',                handler: handleCreateClick },
+    {
+      combo: 'f10', description: 'Print invoice',
+      handler: () => { if (!printData) info('Nothing to print yet', 'Post a purchase first.'); },
+    },
+    {
+      combo: 'ctrl+p', description: 'Print',
+      handler: () => { if (!printData) info('Nothing to print yet', 'Post a purchase first.'); },
+    },
+    { combo: 'ctrl+n',     description: 'New bill',            handler: clearForm },
+    { combo: 'ctrl+l',     description: 'Clear current bill',  handler: () => setRows([newRow()]) },
+    { combo: 'ctrl+d',     description: 'Delete current line', handler: () => tableRef.current?.deleteRow() },
+    { combo: 'ctrl+enter', description: 'Add new row',         handler: () => tableRef.current?.addRow() },
+  ], { enabled: tab === 'new' })
+
   const tabList = [
     { id: 'new',  label: 'New Purchase',  icon: <FilePlus size={14}/> },
     { id: 'list', label: 'All Purchases', icon: <List    size={14}/> },
@@ -204,7 +251,7 @@ export default function PurchasePage() {
               <div>
                 <label className="pmic-field-label">Supplier</label>
                 <div className="flex gap-2 items-stretch">
-                  <select className="erp-input w-full" {...register('supplier_id')}>
+                  <select id="pur-supplier-select" className="erp-input w-full" {...register('supplier_id')}>
                     <option value="">Select supplier…</option>
                     {suppliers.map(s => (
                       <option key={s.id} value={s.id}>{s.name}</option>
@@ -214,7 +261,7 @@ export default function PurchasePage() {
                     type="button"
                     className="pos-party-add-btn"
                     onClick={() => setShowNewSupplier(true)}
-                    title="New Supplier"
+                    title="New Supplier (F6)"
                     aria-label="New Supplier"
                   >
                     <Truck size={15}/>
@@ -226,8 +273,8 @@ export default function PurchasePage() {
                 <input type="date" className="erp-input w-full" {...register('date')} />
               </div>
               <div>
-                <label className="pmic-field-label">Payment Mode</label>
-                <select className="erp-input w-full" {...register('payment_mode')}>
+                <label className="pmic-field-label" title="Shortcut: F8">Payment Mode <Kbd>F8</Kbd></label>
+                <select id="pur-payment-mode-select" className="erp-input w-full" {...register('payment_mode')}>
                   {PAYMENT_MODES.map(m => (
                     <option key={m.value} value={m.value}>{m.label}</option>
                   ))}
@@ -256,6 +303,7 @@ export default function PurchasePage() {
             {/* Desktop table */}
             <div className="purchase-table-wrap">
               <InvoiceRowsTable
+                ref={tableRef}
                 rows={rows}
                 products={products}
                 onChange={setRows}
@@ -420,7 +468,7 @@ export default function PurchasePage() {
 
           {/* Desktop action bar */}
           <div className="inv-desktop-action flex justify-end mb-4">
-            <Button variant="primary" size="lg" loading={saving} onClick={handleCreateClick}>
+            <Button variant="primary" size="lg" loading={saving} onClick={handleCreateClick} title="Create Purchase (F9 / Ctrl+S)">
               <FilePlus size={15}/> Create Purchase
             </Button>
           </div>

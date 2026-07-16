@@ -9,11 +9,11 @@
  * is unchanged from the previous version.
  */
 
-import { useRef, useEffect, useCallback } from 'react'
+import { useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import { fmt, calcRowAmount } from '@/utils'
 import type { Product } from '@/types'
-import ProductSearchCell from './ProductSearchCell'
+import ProductSearchCell, { type ProductSearchCellHandle } from './ProductSearchCell'
 import BatchSelect from './BatchSelect'
 import QtyGate from './QtyGate'
 
@@ -45,6 +45,18 @@ export const newRow = (): InvoiceRow => ({
   discount_pct: 0, cc_pct: 0, amount: 0, cc_amount: 0,
 })
 
+/** Imperative API for keyboard-shortcut integration (see
+ *  hooks/useKeyboardShortcuts.ts). `idx` defaults to the row containing
+ *  document.activeElement, falling back to the last row — i.e. "whichever
+ *  row the user is currently working on". */
+export interface InvoiceRowsTableHandle {
+  focusProductSearch: (idx?: number) => void
+  openCreateProduct:  (idx?: number) => void
+  openBatchSelect:    (idx?: number) => void
+  deleteRow:          (idx?: number) => void
+  addRow:             () => void
+}
+
 interface Props {
   rows:          InvoiceRow[]
   products:      Product[]
@@ -64,12 +76,14 @@ interface Props {
 
 /* ── Component ───────────────────────────────────────────────────────────── */
 
-export default function InvoiceRowsTable({
+const InvoiceRowsTable = forwardRef<InvoiceRowsTableHandle, Props>(function InvoiceRowsTable({
   rows, products, onChange, onProductsChange,
   showBonus = true, showCC = true, showDiscount = false,
   showExpiry = true, showBatch = true, mode = 'sale',
-}: Props) {
+}, ref) {
   const firstRowRef = useRef<boolean>(true)
+  const rowElsRef = useRef<Map<number, HTMLTableRowElement>>(new Map())
+  const pscRefsRef = useRef<Map<number, ProductSearchCellHandle>>(new Map())
 
   /* ── Row update helper (unchanged logic) ──────────────────────────────── */
   function update(idx: number, key: keyof InvoiceRow, val: unknown) {
@@ -155,6 +169,35 @@ export default function InvoiceRowsTable({
     onChange(next.length ? next : [newRow()])
   }
 
+  /** "Current row" = the row containing document.activeElement, falling
+   *  back to the last row — matches where a keyboard-driven user's
+   *  attention actually is. */
+  function resolveIdx(idx?: number): number {
+    if (idx !== undefined) return idx
+    const active = document.activeElement
+    if (active instanceof Node) {
+      for (const [i, el] of rowElsRef.current) {
+        if (el.contains(active)) return i
+      }
+    }
+    return rows.length - 1
+  }
+
+  useImperativeHandle(ref, () => ({
+    focusProductSearch: (idx) => pscRefsRef.current.get(resolveIdx(idx))?.focus(),
+    openCreateProduct:  (idx) => pscRefsRef.current.get(resolveIdx(idx))?.openCreate(),
+    openBatchSelect:    (idx) => {
+      const rowEl = rowElsRef.current.get(resolveIdx(idx))
+      // Sale mode's real trigger is .bsp-trigger; Purchase mode's "browse
+      // existing batches" button next to the free-text batch input is
+      // .pos-party-add-btn (see BatchSelect.tsx) — try both.
+      const btn = rowEl?.querySelector<HTMLButtonElement>('.bsp-trigger:not([disabled]), .pos-party-add-btn:not([disabled])')
+      btn?.click()
+    },
+    deleteRow: (idx) => removeRow(resolveIdx(idx)),
+    addRow,
+  }), [rows])
+
   /* ── Enter key on last row → add row ─────────────────────────────────── */
   function handleRowKeyDown(e: React.KeyboardEvent, idx: number) {
     // Only fire when not inside the ProductSearchCell (it handles its own Enter)
@@ -208,11 +251,16 @@ export default function InvoiceRowsTable({
           </thead>
           <tbody>
             {rows.map((row, idx) => (
-              <tr key={row._id} onKeyDown={e => handleRowKeyDown(e, idx)}>
+              <tr
+                key={row._id}
+                ref={el => { if (el) rowElsRef.current.set(idx, el); else rowElsRef.current.delete(idx) }}
+                onKeyDown={e => handleRowKeyDown(e, idx)}
+              >
 
                 {/* ── Product combobox ──────────────────────────────── */}
                 <td className="psc-cell">
                   <ProductSearchCell
+                    ref={el => { if (el) pscRefsRef.current.set(idx, el); else pscRefsRef.current.delete(idx) }}
                     value={row.product_id}
                     products={products}
                     onChange={p => handleProductSelect(idx, p)}
@@ -358,4 +406,6 @@ export default function InvoiceRowsTable({
       </div>
     </div>
   )
-}
+})
+
+export default InvoiceRowsTable

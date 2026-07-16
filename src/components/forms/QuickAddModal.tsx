@@ -18,6 +18,7 @@ import { X, Package, Loader2, AlertCircle } from 'lucide-react'
 import { productsAPI } from '@/services/api'
 import ManufacturerSelect from './ManufacturerSelect'
 import type { Product } from '@/types'
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 
 interface Props {
   initialName: string
@@ -71,14 +72,13 @@ export default function QuickAddModal({ initialName, onSave, onClose }: Props) {
     nameRef.current?.select()
   }, [])
 
-  // Escape closes modal
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  // Esc closes, Ctrl+Enter saves — registering this also suspends the
+  // Sale/Purchase page's own F2..F10 shortcuts while this modal is open
+  // (see hooks/useKeyboardShortcuts.ts).
+  useKeyboardShortcuts([
+    { combo: 'esc', handler: onClose, description: 'Close' },
+    { combo: 'ctrl+enter', handler: () => handleSave(), description: 'Save product' },
+  ])
 
   function set(key: keyof FormState, val: string) {
     setForm(f => ({ ...f, [key]: val }))

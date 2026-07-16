@@ -28,6 +28,7 @@ import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Maximize2, X, CheckCircle2 } from 'lucide-react'
 import { fmt, fmtDate } from '@/utils'
+import { useShortcutScope } from '@/hooks/useKeyboardShortcuts'
 import { htmlToPdfBlob } from '@/utils/htmlToPdfBlob'
 import { uploadDocumentToCloud } from '@/components/cloudStorage/CloudBackupButton'
 import useUIStore from '@/store/uiStore'
@@ -90,6 +91,13 @@ export default function PrintPreviewModal({
   const { print, downloadPDF } = usePrint()
   const printRef        = useRef<HTMLDivElement>(null)
   const { isMobile, isTablet, isDesktop } = usePrintResponsive()
+
+  // This modal already has its own Ctrl+P/Enter/Esc handling below —
+  // unchanged. This just registers its presence in the shared shortcut
+  // scope stack while open, so the underlying Sale/Purchase page's F10/
+  // Ctrl+P shortcuts go quiet instead of double-firing alongside these
+  // (see hooks/useKeyboardShortcuts.ts).
+  useShortcutScope(open)
 
   // Initialise size from template setting; user can override per-print
   const [size,       setSize]       = useState<PrintSize>(() => tplSizeToPrintSize(tpl.paperSize))

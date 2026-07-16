@@ -29,7 +29,7 @@
  */
 
 import {
-  useState, useRef, useEffect, useCallback,
+  useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle,
   type KeyboardEvent,
 } from 'react'
 import { createPortal } from 'react-dom'
@@ -47,9 +47,17 @@ interface Props {
   tabIndex?:  number
 }
 
-export default function ProductSearchCell({
+/** Imperative API for keyboard-shortcut integration (see hooks/useKeyboardShortcuts.ts).
+ *  Lets a page trigger "focus product search" (F2/Ctrl+F) or "create new
+ *  product" (F5) for a specific row without needing to know its internals. */
+export interface ProductSearchCellHandle {
+  focus:      () => void
+  openCreate: () => void
+}
+
+const ProductSearchCell = forwardRef<ProductSearchCellHandle, Props>(function ProductSearchCell({
   value, products, onChange, onCreated, autoFocus, tabIndex,
-}: Props) {
+}, ref) {
   const [query,       setQuery]      = useState('')
   const [results,     setResults]    = useState<Product[]>([])
   const [open,        setOpen]       = useState(false)
@@ -73,6 +81,13 @@ export default function ProductSearchCell({
   const dropdownRef  = useRef<HTMLDivElement>(null) // the portaled dropdown — lives outside containerRef in the DOM
   const debounceRef  = useRef<ReturnType<typeof setTimeout> | null>(null)
   const abortRef     = useRef<AbortController | null>(null)
+
+  useImperativeHandle(ref, () => ({
+    focus: () => inputRef.current?.focus(),
+    // Bypass the dropdown entirely — same seeding fix as the click/Enter
+    // paths above, just triggered externally (e.g. the F5 shortcut).
+    openCreate: () => { setCreateSeed(query.trim()); setShowCreate(true) },
+  }), [query])
 
   // Display name for current value
   const selectedName = products.find(p => p.id === value)?.name ?? ''
@@ -403,7 +418,9 @@ export default function ProductSearchCell({
       )}
     </div>
   )
-}
+})
+
+export default ProductSearchCell
 
 /**
  * Highlight only the prefix portion of the product name.

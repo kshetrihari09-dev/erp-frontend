@@ -13,6 +13,7 @@ import { X, Factory, AlertCircle, ExternalLink } from 'lucide-react'
 import { useCreateManufacturer, useUpdateManufacturer } from '@/hooks/useQuery'
 import { PATHS } from '@/constants'
 import type { Manufacturer } from '@/types'
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 
 interface Props {
   initialName?:    string
@@ -55,11 +56,13 @@ export default function QuickAddManufacturerModal({ initialName, initial, existi
 
   useEffect(() => { nameRef.current?.focus() }, [])
 
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  // Esc closes, Ctrl+Enter saves — registering this also suspends the
+  // page's own F-key shortcuts while this modal is open (see
+  // hooks/useKeyboardShortcuts.ts).
+  useKeyboardShortcuts([
+    { combo: 'esc', handler: onClose, description: 'Close' },
+    { combo: 'ctrl+enter', handler: () => handleSave(), description: 'Save manufacturer' },
+  ])
 
   function set<K extends keyof FormState>(key: K, val: FormState[K]) {
     setForm(f => ({ ...f, [key]: val }))

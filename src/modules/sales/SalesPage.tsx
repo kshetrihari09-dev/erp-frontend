@@ -26,9 +26,9 @@ import { salesAPI, partiesAPI, productsAPI } from '@/services/api'
 import useUIStore from '@/store/uiStore'
 import {
   Button, Tabs, Modal, Badge, Pagination,
-  SkeletonRows, Empty, SearchInput, ConfirmDialog,
+  SkeletonRows, Empty, SearchInput, ConfirmDialog, Kbd,
 } from '@/components/ui'
-import InvoiceRowsTable, { newRow, type InvoiceRow } from '@/components/forms/InvoiceRowsTable'
+import InvoiceRowsTable, { newRow, type InvoiceRow, type InvoiceRowsTableHandle } from '@/components/forms/InvoiceRowsTable'
 import ProductSearchCell from '@/components/forms/ProductSearchCell'
 import BatchSelect from '@/components/forms/BatchSelect'
 import QtyGate from '@/components/forms/QtyGate'
@@ -40,6 +40,7 @@ import AutoCloudBackup from '@/components/cloudStorage/AutoCloudBackup'
 import { PAYMENT_MODES } from '@/constants'
 import type { Product, Party, Sale } from '@/types'
 import PostingStatusBadge from '@/components/PostingStatusBadge'
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 
 const LIMIT = 20
 
@@ -98,7 +99,7 @@ function SummaryRow({
    MAIN PAGE
 ═══════════════════════════════════════════════════════════════════════════ */
 export default function SalesPage() {
-  const { success, error, theme } = useUIStore()
+  const { success, error, info, theme } = useUIStore()
   const [tab, setTab] = useState('new')
 
   const [customers, setCustomers] = useState<Party[]>([])
@@ -111,6 +112,7 @@ export default function SalesPage() {
   const [loading, setLoading] = useState(false)
 
   const [rows,        setRows]        = useState<InvoiceRow[]>([newRow()])
+  const tableRef = useRef<InvoiceRowsTableHandle>(null)
   const [saving,      setSaving]      = useState(false)
   const [flash,       setFlash]       = useState<{ type: 'success'|'danger'; msg: string } | null>(null)
   const [lastInvDate, setLastInvDate] = useState<string | null>(null)
@@ -276,6 +278,39 @@ export default function SalesPage() {
     setConfirmPost(true)
   }
 
+  /* ── Keyboard shortcuts (New Invoice tab only) ─────────────────────────
+   * See hooks/useKeyboardShortcuts.ts for the shared manager. Popups
+   * (Quick Add modals, Batch Selection, Print Preview) each register their
+   * own scope, so these automatically go quiet while any of them is open —
+   * nothing here needs an "is a modal open" check. */
+  useKeyboardShortcuts([
+    { combo: 'f2',         description: 'Product search',    handler: () => tableRef.current?.focusProductSearch() },
+    { combo: 'ctrl+f',     description: 'Product search',    handler: () => tableRef.current?.focusProductSearch() },
+    { combo: 'f3',         description: 'Customer search',   handler: () => document.getElementById('pos-customer-select')?.focus() },
+    { combo: 'f4',         description: 'Batch selection',   handler: () => tableRef.current?.openBatchSelect() },
+    { combo: 'ctrl+b',     description: 'Batch selection',   handler: () => tableRef.current?.openBatchSelect() },
+    { combo: 'f5',         description: 'New product',       handler: () => tableRef.current?.openCreateProduct() },
+    { combo: 'f6',         description: 'New customer',      handler: () => setShowNewCustomer(true) },
+    { combo: 'f7',         description: 'Apply discount',    handler: () => document.getElementById('pos-discount-input')?.focus() },
+    { combo: 'f8',         description: 'Payment',           handler: () => document.getElementById('pos-tender-input')?.focus() },
+    { combo: 'f9',         description: 'Save transaction',  handler: handlePostClick },
+    { combo: 'ctrl+s',     description: 'Save',              handler: handlePostClick },
+    {
+      combo: 'f10', description: 'Print invoice',
+      handler: () => { if (!printData) info('Nothing to print yet', 'Post a sale first.'); },
+      // PrintPreviewModal auto-opens (and grabs the scope) the instant
+      // printData is set — this only needs to handle "no invoice yet".
+    },
+    {
+      combo: 'ctrl+p', description: 'Print',
+      handler: () => { if (!printData) info('Nothing to print yet', 'Post a sale first.'); },
+    },
+    { combo: 'ctrl+n',       description: 'New bill',          handler: clearForm },
+    { combo: 'ctrl+l',       description: 'Clear current bill', handler: () => setRows([newRow()]) },
+    { combo: 'ctrl+d',       description: 'Delete current line', handler: () => tableRef.current?.deleteRow() },
+    { combo: 'ctrl+enter',   description: 'Add new row',       handler: () => tableRef.current?.addRow() },
+  ], { enabled: tab === 'new' })
+
   const tabList = [
     { id: 'new',  label: 'New Invoice',  icon: <FilePlus size={14}/> },
     { id: 'list', label: 'All Invoices', icon: <List size={14}/> },
@@ -371,7 +406,7 @@ export default function SalesPage() {
                     <FieldLabel icon={<User size={11}/>}>Party <span style={{ color: 'var(--danger,#dc2626)' }}>*</span></FieldLabel>
                     <div className="flex gap-2 items-stretch">
                       <div className="relative flex-1">
-                        <select className="erp-input pos-select" required {...register('customer_id')}>
+                        <select id="pos-customer-select" className="erp-input pos-select" required {...register('customer_id')}>
                           <option value="">Select a customer…</option>
                           {customers.map(c => (
                             <option key={c.id} value={c.id}>
@@ -385,7 +420,7 @@ export default function SalesPage() {
                         type="button"
                         className="pos-party-add-btn"
                         onClick={() => setShowNewCustomer(true)}
-                        title="New Customer"
+                        title="New Customer (F6)"
                         aria-label="New Customer"
                       >
                         <UserPlus size={15}/>
@@ -477,12 +512,18 @@ export default function SalesPage() {
               <div className="flex items-center gap-3">
                 <ScanButton context="sales" onResult={handleScanResult} />
                 {/* pos-kbd-hints: hidden on mobile via CSS addendum */}
-                <div className="pos-kbd-hints flex items-center gap-3 text-xs text-[var(--text-4)]">
+                <div className="pos-kbd-hints flex items-center gap-3 text-xs text-[var(--text-4)]" title="F2 Product · F3 Customer · F4 Batch · F5 New Product · F6 New Customer · F7 Discount · F8 Payment · F9 Save · F10 Print · Esc Close">
                   <span className="flex items-center gap-1">
-                    <kbd className="pos-kbd">↵</kbd> Add row
+                    <Kbd>F2</Kbd> Product
                   </span>
                   <span className="flex items-center gap-1">
-                    <kbd className="pos-kbd">Tab</kbd> Next field
+                    <Kbd>F9</Kbd> Save
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Kbd>↵</Kbd> Add row
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Kbd>Tab</Kbd> Next field
                   </span>
                 </div>
               </div>
@@ -491,6 +532,7 @@ export default function SalesPage() {
             {/* Desktop table — hidden on mobile */}
             <div className="pos-table-wrap pos-desktop-only">
               <InvoiceRowsTable
+                ref={tableRef}
                 rows={rows}
                 products={products}
                 onChange={setRows}
@@ -703,9 +745,10 @@ export default function SalesPage() {
                   </div>
                   <div className="space-y-3">
                     <div>
-                      <div className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-4)] mb-1">Discount %</div>
+                      <div className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-4)] mb-1" title="Shortcut: F7">Discount % <Kbd>F7</Kbd></div>
                       <div className="flex items-center gap-1.5">
                         <input
+                          id="pos-discount-input"
                           type="number" className="erp-input pmic-billing-input text-right"
                           step="0.01" min="0" max="100"
                           {...register('discount_pct')}
@@ -730,8 +773,9 @@ export default function SalesPage() {
                   </div>
                   <div className="space-y-3">
                     <div>
-                      <div className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-4)] mb-1">Tender Amount</div>
+                      <div className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-4)] mb-1" title="Shortcut: F8">Tender Amount <Kbd>F8</Kbd></div>
                       <input
+                        id="pos-tender-input"
                         type="number" className="erp-input pmic-billing-input text-right"
                         step="0.01" min="0" placeholder="0.00"
                         value={tender}
@@ -763,16 +807,16 @@ export default function SalesPage() {
               MOBILE:  hidden via CSS (.pos-desktop-actions)
           ════════════════════════════════════════════════════════════ */}
           <div className="pos-desktop-actions flex items-center justify-between pt-1 pb-2">
-            <button type="button" onClick={clearForm} className="pos-action-btn pos-action-btn--clear">
+            <button type="button" onClick={clearForm} className="pos-action-btn pos-action-btn--clear" title="Clear (Ctrl+N)">
               <RotateCcw size={14}/> Clear
             </button>
             <div className="flex items-center gap-2">
-              <button type="button" onClick={saveDraft} className="pos-action-btn pos-action-btn--draft">
+              <button type="button" onClick={saveDraft} className="pos-action-btn pos-action-btn--draft" title="Save Draft">
                 <Save size={14}/> Save Draft
               </button>
               <button
                 type="button" onClick={handlePostClick} disabled={saving}
-                className="pos-action-btn pos-action-btn--post"
+                className="pos-action-btn pos-action-btn--post" title="Post Invoice (F9 / Ctrl+S)"
               >
                 {saving ? <span className="pos-spinner"/> : <FileText size={14}/>}
                 {saving ? 'Posting…' : 'Post Invoice'}

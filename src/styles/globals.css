@@ -140,7 +140,13 @@ input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
 /* ── SIDEBAR — Always dark, premium ──────────────────────────────────── */
 .sidebar {
   position: fixed; top: 0; left: 0; bottom: 0;
-  z-index: var(--z-sidebar);
+  /* Was var(--z-sidebar) (200) — that's below --z-dropdown (1000),
+     --z-fab (1100), and --z-mobile-bar (1150), so on mobile the open
+     sidebar (and its backdrop) got visually punched through by the
+     Sales/POS page's sticky total bar, fixed bottom action bar, and
+     floating "+" button. The sidebar acts as a drawer on mobile, so it
+     belongs on the --z-drawer tier, above all in-page overlay chrome. */
+  z-index: var(--z-drawer);
   background: var(--sidebar-bg);
   width:100%;
   display: flex; flex-direction: column;
@@ -604,8 +610,14 @@ select.erp-input option { background: var(--surface); color: var(--text); }
 
 /* ─── Print styles ─────────────────────────────────────────────────────────── */
 @media print {
-  /* Hide ALL page UI — show only the injected #erp-print-root */
-  body > *:not(#erp-print-root) { display: none !important; }
+  /* Hide ALL page UI — show only the injected #erp-print-root.
+     Scoped with :has() so this only fires when the invoice Print Preview
+     modal has actually injected #erp-print-root into the body. Without
+     this guard, the rule below applied on every print regardless of
+     page — including Trial Balance (#tb-print-area) and Ledger
+     (plain window.print() + .no-print), which don't use #erp-print-root
+     at all, so their prints came out completely blank. */
+  body:has(#erp-print-root) > *:not(#erp-print-root) { display: none !important; }
 
   #erp-print-root {
     display: block !important;
@@ -920,7 +932,8 @@ select.erp-input option { background: var(--surface); color: var(--text); }
 }
 
 /* ── Keyboard shortcut hints ────────────────────────────────────────────── */
-.pos-kbd {
+.pos-kbd,
+.erp-kbd {
   display:       inline-flex;
   align-items:   center;
   justify-content: center;

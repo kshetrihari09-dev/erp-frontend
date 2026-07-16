@@ -24,6 +24,7 @@ import { Search, PackageX } from 'lucide-react'
 import type { StockBatch } from '@/types'
 import { fmt } from '@/utils'
 import { formatExpiry, getBatchStatus, getRackLocation, pickFEFORecommended } from '@/utils/batch'
+import { useShortcutScope } from '@/hooks/useKeyboardShortcuts'
 
 interface Props {
   open:             boolean
@@ -40,8 +41,16 @@ export default function BatchSelectionPopup({
   const [query, setQuery] = useState('')
   const [hl,    setHL]    = useState(0)
 
+  // This popup already has its own local (non-global) Enter/Esc/arrow-key
+  // handling below — nothing about that changes. This just registers its
+  // presence in the shared shortcut scope stack while open, so the Sale/
+  // Purchase page's F2..F10 shortcuts underneath it automatically go quiet
+  // instead of firing through the popup (see hooks/useKeyboardShortcuts.ts).
+  useShortcutScope(open)
+
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef  = useRef<HTMLUListElement>(null)
+
 
   const recommended = useMemo(() => pickFEFORecommended(batches), [batches])
 

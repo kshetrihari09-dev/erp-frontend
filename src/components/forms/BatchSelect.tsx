@@ -143,7 +143,7 @@ export default function BatchSelect({
             style={{ width: 30 }}
             disabled={!productId || loading}
             onClick={() => setPopupOpen(true)}
-            title="Browse existing batches for this product"
+            title="Browse existing batches for this product (F4)"
             aria-label="Browse existing batches"
           >
             <Search size={13} />

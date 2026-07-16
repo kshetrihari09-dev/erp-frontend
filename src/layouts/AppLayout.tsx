@@ -198,7 +198,7 @@ export default function AppLayout() {
       {/* ── Mobile backdrop ─── */}
       {isMobile && mobileOpen && (
         <div
-          className="fixed inset-0 z-[calc(var(--z-sidebar)-10)] bg-black/40 backdrop-blur-sm"
+          className="fixed inset-0 z-[calc(var(--z-drawer)-10)] bg-black/40 backdrop-blur-sm"
           onClick={() => setMobileOpen(false)}
         />
       )}

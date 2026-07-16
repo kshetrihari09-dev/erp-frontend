@@ -1,5 +1,6 @@
 import { forwardRef, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from 'react'
 import { cn, statusColor } from '@/utils'
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 
 // ─── Button ───────────────────────────────────────────────────────────────────
 type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost' | 'outline' | 'success'
@@ -248,6 +249,11 @@ const modalSizes = {
 }
 
 export function Modal({ open, onClose, title, children, size = 'md', footer }: ModalProps) {
+  // Esc closes — also suspends page-level shortcuts underneath while open
+  // (see hooks/useKeyboardShortcuts.ts). Hook must run unconditionally
+  // (before the `if (!open)` early return), gated via `enabled`.
+  useKeyboardShortcuts([{ combo: 'esc', handler: onClose, description: 'Close' }], { enabled: open })
+
   if (!open) return null
   return (
     <div
@@ -354,6 +360,14 @@ export function SectionHeader({ children }: { children: ReactNode }) {
 // ─── Divider ──────────────────────────────────────────────────────────────────
 export function Divider({ className }: { className?: string }) {
   return <div className={cn('h-px bg-[var(--border)] my-3', className)} />
+}
+
+/** Small keyboard-shortcut hint badge, e.g. <Kbd>F2</Kbd> or <Kbd>Ctrl+S</Kbd>.
+ *  Reuses the same visual style as the existing .pos-kbd hints (see
+ *  globals.css) so it's consistent wherever it's dropped in — tooltips,
+ *  menu items, button titles, help overlays. */
+export function Kbd({ children, className }: { children: ReactNode; className?: string }) {
+  return <kbd className={cn('erp-kbd', className)}>{children}</kbd>
 }
 
 // ─── Toggle Switch ────────────────────────────────────────────────────────────
