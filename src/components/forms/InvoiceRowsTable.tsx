@@ -150,14 +150,20 @@ const InvoiceRowsTable = forwardRef<InvoiceRowsTableHandle, Props>(function Invo
       return { ...updated, amount, cc_amount }
     })
     onChange(next)
-    // Move on automatically — same destination logic as Tab (see
-    // focusNextAfterProduct below), just triggered right away instead of
-    // waiting for an explicit Tab press. Deferred one frame because this
-    // row's BatchSelect hasn't re-rendered for the new product_id yet at
-    // the point onChange() returns (state updates apply on the next
-    // render, not synchronously) — so checking immediately would still
-    // see the previous product's trigger state.
-    requestAnimationFrame(() => focusNextAfterProduct(idx))
+    // Purchase mode's Batch field is a plain free-text input with no
+    // internal "is it ready yet" logic of its own, so we still move focus
+    // to it here (deferred a frame so the DOM reflects the new product_id
+    // first). Sale mode is different: BatchSelect.tsx already reacts to
+    // its own `productId`/`loading`/`saleBatches` state the moment they
+    // settle — auto-selecting a lone batch (and focusing Qty itself) or
+    // auto-opening the picker popup (which focuses its own search input).
+    // Having this function ALSO reach into the DOM for Sale mode raced
+    // that internal effect — it could catch the trigger mid-transition,
+    // decide there was nothing to do, and never look again, leaving focus
+    // stranded. Sale mode's focus is now owned entirely by BatchSelect.
+    if (mode === 'purchase') {
+      requestAnimationFrame(() => focusNextAfterProduct(idx))
+    }
   }
 
   /* ── Quick-created product: add to master list (deduped) ─────────────── */
@@ -208,20 +214,25 @@ const InvoiceRowsTable = forwardRef<InvoiceRowsTableHandle, Props>(function Invo
     const target = e.target as HTMLElement
     const inProductField = target.classList.contains('psc-input') || target.classList.contains('psc-trigger')
 
-    // Product → Batch: BatchSelect's trigger button is disabled while its
-    // batches are still being fetched (see BatchSelect.tsx), so a Tab
-    // pressed in that (very common — right after picking a product) window
-    // was natively skipped by the browser, landing on Expiry instead of
-    // Batch. Take Tab over here and wait for the fetch to settle before
-    // moving focus, instead of racing it.
+    // Product → Batch: always suppress the browser's native Tab-out here,
+    // regardless of mode — the destination isn't ready to receive focus
+    // the instant this handler runs (Sale's batches are still being
+    // fetched; Purchase's DOM hasn't re-rendered with the new product_id
+    // yet either).
     if (inProductField && e.key === 'Tab' && !e.shiftKey) {
       e.preventDefault()
-      // Deferred one frame — same reason as handleProductSelect's call
-      // below: calling this immediately races the state update from the
-      // product selection (onChange hasn't applied to the DOM yet), so
-      // the Batch trigger for the just-picked product doesn't exist yet
-      // and the fallback focus silently lands nowhere useful.
-      requestAnimationFrame(() => focusNextAfterProduct(idx))
+      // Purchase: its free-text Batch input isn't gated by anything async
+      // (only by whether a product is picked at all) — move to it once
+      // the DOM reflects the new product_id, a frame from now.
+      // Sale: nothing to do here. handleProductSelect fires from the same
+      // product_id change (Tab, Enter, mouse, barcode, OCR, quick-add —
+      // all funnel through it) and BatchSelect.tsx's own effect reacts
+      // once its batch fetch settles — auto-selecting a lone batch and
+      // focusing Qty, or auto-opening the picker popup which focuses
+      // itself. Duplicating that here raced it (see handleProductSelect).
+      if (mode === 'purchase') {
+        requestAnimationFrame(() => focusNextAfterProduct(idx))
+      }
       return
     }
 
@@ -232,38 +243,24 @@ const InvoiceRowsTable = forwardRef<InvoiceRowsTableHandle, Props>(function Invo
     }
   }
 
-  /** Resolve Tab's destination after the Product field instead of racing
-   *  BatchSelect's async fetch. Once it settles:
-   *   - 0 batches → the trigger stays permanently disabled ("No batches
-   *     available") and BatchSelect does nothing further, so we land on
-   *     Qty ourselves.
-   *   - 1 batch → BatchSelect auto-selects it AND focuses Qty itself
-   *     (before we ever see the trigger become enabled) — we do nothing.
-   *   - 2+ batches → BatchSelect auto-opens the Batch Selection popup
-   *     itself — we do nothing, so we don't steal focus back out of it.
-   *  Purchase mode's free-text batch input isn't gated by an async fetch
-   *  (only by whether a product is picked at all), so it resolves on the
-   *  very first check. */
-  function focusNextAfterProduct(idx: number, attemptsLeft = 30) {
+  /** Purchase-mode-only now: moves focus to the free-text Batch input
+   *  after a product is picked (Sale mode's equivalent step is owned
+   *  entirely by BatchSelect.tsx's own effect — see the call sites above).
+   *  Purchase's Batch input isn't gated by any async fetch, only by
+   *  whether a product is picked at all, so a single check (post-render,
+   *  thanks to the caller's requestAnimationFrame) is always enough —
+   *  no polling required. */
+  function focusNextAfterProduct(idx: number) {
     const rowEl = rowElsRef.current.get(idx)
     if (!rowEl) return
 
-    const freeInput = rowEl.querySelector<HTMLInputElement>('.bsp-trigger-wrap input') // purchase mode
-    if (freeInput) {
-      (freeInput.disabled ? rowEl.querySelector<HTMLInputElement>('.pos-qty-input') : freeInput)?.focus()
-      return
-    }
+    const freeInput = rowEl.querySelector<HTMLInputElement>('.bsp-trigger-wrap input')
+    if (freeInput && !freeInput.disabled) { freeInput.focus(); return }
 
-    const trigger = rowEl.querySelector<HTMLButtonElement>('.bsp-trigger')
-    if (!trigger) { rowEl.querySelector<HTMLInputElement>('.pos-qty-input')?.focus(); return } // no Batch column at all
-
-    if (trigger.textContent === 'Loading…' && attemptsLeft > 0) {
-      setTimeout(() => focusNextAfterProduct(idx, attemptsLeft - 1), 20)
-      return
-    }
-
-    // Settled — only the "0 batches" outcome is still our job (see above).
-    if (trigger.disabled) rowEl.querySelector<HTMLInputElement>('.pos-qty-input')?.focus()
+    // Defensive fallback only — shouldn't normally be reached in Purchase
+    // mode, but avoids leaving focus stranded if the Batch column is ever
+    // hidden (showBatch=false) or the input is unexpectedly still disabled.
+    rowEl.querySelector<HTMLInputElement>('.pos-qty-input')?.focus()
   }
 
   /* ── Totals ──────────────────────────────────────────────────────────── */
