@@ -150,10 +150,14 @@ const InvoiceRowsTable = forwardRef<InvoiceRowsTableHandle, Props>(function Invo
       return { ...updated, amount, cc_amount }
     })
     onChange(next)
-    // Batch selection now happens automatically: BatchSelect (below)
-    // notices the new product_id and either auto-picks a lone batch,
-    // opens the batch picker for multiple, or shows "No batches
-    // available" — whichever it is, it also owns moving focus onward.
+    // Move on automatically — same destination logic as Tab (see
+    // focusNextAfterProduct below), just triggered right away instead of
+    // waiting for an explicit Tab press. Deferred one frame because this
+    // row's BatchSelect hasn't re-rendered for the new product_id yet at
+    // the point onChange() returns (state updates apply on the next
+    // render, not synchronously) — so checking immediately would still
+    // see the previous product's trigger state.
+    requestAnimationFrame(() => focusNextAfterProduct(idx))
   }
 
   /* ── Quick-created product: add to master list (deduped) ─────────────── */
