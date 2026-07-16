@@ -216,7 +216,12 @@ const InvoiceRowsTable = forwardRef<InvoiceRowsTableHandle, Props>(function Invo
     // moving focus, instead of racing it.
     if (inProductField && e.key === 'Tab' && !e.shiftKey) {
       e.preventDefault()
-      focusNextAfterProduct(idx)
+      // Deferred one frame — same reason as handleProductSelect's call
+      // below: calling this immediately races the state update from the
+      // product selection (onChange hasn't applied to the DOM yet), so
+      // the Batch trigger for the just-picked product doesn't exist yet
+      // and the fallback focus silently lands nowhere useful.
+      requestAnimationFrame(() => focusNextAfterProduct(idx))
       return
     }
 
