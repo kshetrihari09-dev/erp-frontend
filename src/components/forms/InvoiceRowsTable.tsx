@@ -202,11 +202,59 @@ const InvoiceRowsTable = forwardRef<InvoiceRowsTableHandle, Props>(function Invo
   function handleRowKeyDown(e: React.KeyboardEvent, idx: number) {
     // Only fire when not inside the ProductSearchCell (it handles its own Enter)
     const target = e.target as HTMLElement
-    if (target.classList.contains('psc-input') || target.classList.contains('psc-trigger')) return
+    const inProductField = target.classList.contains('psc-input') || target.classList.contains('psc-trigger')
+
+    // Product → Batch: BatchSelect's trigger button is disabled while its
+    // batches are still being fetched (see BatchSelect.tsx), so a Tab
+    // pressed in that (very common — right after picking a product) window
+    // was natively skipped by the browser, landing on Expiry instead of
+    // Batch. Take Tab over here and wait for the fetch to settle before
+    // moving focus, instead of racing it.
+    if (inProductField && e.key === 'Tab' && !e.shiftKey) {
+      e.preventDefault()
+      focusNextAfterProduct(idx)
+      return
+    }
+
+    if (inProductField) return
     if (e.key === 'Enter' && idx === rows.length - 1) {
       e.preventDefault()
       onChange([...rows, newRow()])
     }
+  }
+
+  /** Resolve Tab's destination after the Product field instead of racing
+   *  BatchSelect's async fetch. Once it settles:
+   *   - 0 batches → the trigger stays permanently disabled ("No batches
+   *     available") and BatchSelect does nothing further, so we land on
+   *     Qty ourselves.
+   *   - 1 batch → BatchSelect auto-selects it AND focuses Qty itself
+   *     (before we ever see the trigger become enabled) — we do nothing.
+   *   - 2+ batches → BatchSelect auto-opens the Batch Selection popup
+   *     itself — we do nothing, so we don't steal focus back out of it.
+   *  Purchase mode's free-text batch input isn't gated by an async fetch
+   *  (only by whether a product is picked at all), so it resolves on the
+   *  very first check. */
+  function focusNextAfterProduct(idx: number, attemptsLeft = 30) {
+    const rowEl = rowElsRef.current.get(idx)
+    if (!rowEl) return
+
+    const freeInput = rowEl.querySelector<HTMLInputElement>('.bsp-trigger-wrap input') // purchase mode
+    if (freeInput) {
+      (freeInput.disabled ? rowEl.querySelector<HTMLInputElement>('.pos-qty-input') : freeInput)?.focus()
+      return
+    }
+
+    const trigger = rowEl.querySelector<HTMLButtonElement>('.bsp-trigger')
+    if (!trigger) { rowEl.querySelector<HTMLInputElement>('.pos-qty-input')?.focus(); return } // no Batch column at all
+
+    if (trigger.textContent === 'Loading…' && attemptsLeft > 0) {
+      setTimeout(() => focusNextAfterProduct(idx, attemptsLeft - 1), 20)
+      return
+    }
+
+    // Settled — only the "0 batches" outcome is still our job (see above).
+    if (trigger.disabled) rowEl.querySelector<HTMLInputElement>('.pos-qty-input')?.focus()
   }
 
   /* ── Totals ──────────────────────────────────────────────────────────── */
