@@ -30,6 +30,9 @@ export default function VouchersTab({ onCount, openSignal }: VouchersTabProps = 
   const [loading,  setLoading]  = useState(false)
   const [modal,    setModal]    = useState(false)
   const [detail,   setDetail]   = useState<Voucher | null>(null)
+  // Print preview for an existing voucher row (separate from VoucherForm's
+  // own printData below, which is only for a voucher just created there).
+  const [printData, setPrintData] = useState<PrintData | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -181,6 +184,13 @@ export default function VouchersTab({ onCount, openSignal }: VouchersTabProps = 
       <Modal open={modal} onClose={() => setModal(false)} title="Create Voucher" size="xl">
         <VoucherForm onClose={() => { setModal(false); load() }} />
       </Modal>
+
+      {/* Print preview for an existing voucher row */}
+      <PrintPreviewModal
+        data={printData}
+        open={!!printData}
+        onClose={() => setPrintData(null)}
+      />
     </div>
   )
 }
