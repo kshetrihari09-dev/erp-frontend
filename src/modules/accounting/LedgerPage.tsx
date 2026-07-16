@@ -34,6 +34,28 @@ const LABEL_STYLE: React.CSSProperties = {
   marginBottom: 6, fontFamily: 'var(--font-mono)',
 }
 
+// ── Print CSS ───────────────────────────────────────────────────────────────
+// The generic @media print rule in globals.css only hides the sidebar/topbar/
+// buttons — it never overrides the --text/--surface CSS variables, so
+// printing this page while dark mode is active came out as light-grey text
+// on a white sheet: unreadable. Scoping our own print area (same approach as
+// TrialBalTab.tsx's #tb-print-area) forces real black-on-white regardless of
+// the active theme, and hides filter/search/pagination chrome that has no
+// business on paper.
+const PRINT_CSS = `
+@media print {
+  body * { visibility: hidden !important; }
+  #ldg-print-area, #ldg-print-area * { visibility: visible !important; }
+  #ldg-print-area { position: fixed; inset: 0; padding: 24px; background: #fff; color: #000; }
+  #ldg-print-area * { color: #000 !important; background: transparent !important; box-shadow: none !important; }
+  #ldg-no-print { display: none !important; }
+  table { page-break-inside: auto; }
+  tr { page-break-inside: avoid; page-break-after: auto; }
+  thead { display: table-header-group; }
+  tfoot { display: table-footer-group; }
+}
+`
+
 // ── Animated number ───────────────────────────────────────────────────────────
 function AnimatedNumber({ value, prefix = '₹' }: { value: number; prefix?: string }) {
   const [displayed, setDisplayed] = useState(0)
@@ -252,6 +274,27 @@ export default function LedgerPage() {
     setDateTo(new Date().toISOString().split('T')[0])
   }
 
+  /** Printing while paginated used to only capture whatever page was
+   *  currently on screen — a 3-page ledger would print page 1 and quietly
+   *  drop the other two. There's no separate print-only render to keep in
+   *  sync with the on-screen table, so instead we temporarily widen the
+   *  page size to show every filtered row, print that, then restore
+   *  exactly what the user had — same style-injection pattern as
+   *  TrialBalTab's handlePrint, just also covering pagination. */
+  function handlePrint() {
+    const s = document.createElement('style'); s.innerHTML = PRINT_CSS; document.head.appendChild(s)
+    const prevRowsPerPage = rowsPerPage
+    const prevPage = page
+    setRowsPerPage(Math.max(filteredRows.length, 1))
+    setPage(1)
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      window.print()
+      setRowsPerPage(prevRowsPerPage)
+      setPage(prevPage)
+      setTimeout(() => document.head.removeChild(s), 2000)
+    }))
+  }
+
   const rows         = ledgerData?.rows ?? []
   const party        = ledgerData?.party ?? parties.find(p => p.id === partyId)
   const closingBal   = Number(ledgerData?.closingBalance ?? 0)
@@ -295,10 +338,10 @@ export default function LedgerPage() {
   const balColor = closingBal > 0 ? 'var(--green)' : closingBal < 0 ? 'var(--red)' : 'var(--text-3)'
 
   return (
-    <div style={{ minHeight: '100vh' }}>
+    <div id="ldg-print-area" style={{ minHeight: '100vh' }}>
 
       {/* ── Filter Card ─────────────────────────────────────────────────────── */}
-      <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}
+      <motion.div id="ldg-no-print" initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}
         style={{ ...CARD, padding: '18px 20px', marginBottom: 16 }}
       >
         <div className="ldg-filter-row" style={{ display: 'flex', alignItems: 'flex-end', gap: 12, flexWrap: 'wrap' }}>
@@ -352,7 +395,7 @@ export default function LedgerPage() {
             <SecBtn onClick={reset}><RotateCcw size={13} /> Reset</SecBtn>
             {rows.length > 0 && (
               <>
-                <SecBtn onClick={() => window.print()}><Printer size={13} /> Print</SecBtn>
+                <SecBtn onClick={handlePrint}><Printer size={13} /> Print</SecBtn>
                 <SecBtn onClick={() => downloadCSV(rows, `ledger-${party?.name || partyId}`)}><Download size={13} /> Export</SecBtn>
               </>
             )}
@@ -413,7 +456,7 @@ export default function LedgerPage() {
                   </div>
                 </div>
                 {/* Chart panel */}
-                <div className="ldg-chart-panel" style={{ padding: '18px 22px', width: 300, minWidth: 200 }}>
+                <div id="ldg-no-print" className="ldg-chart-panel" style={{ padding: '18px 22px', width: 300, minWidth: 200 }}>
                   <div style={{ ...LABEL_STYLE, marginBottom: 10 }}><Activity size={10} /> Balance Trend</div>
                   {loading
                     ? <div style={{ height: 80, borderRadius: 10, background: 'var(--surface-3)' }} />
@@ -424,7 +467,7 @@ export default function LedgerPage() {
             </motion.div>
 
             {/* KPI row */}
-            <div className="ldg-kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
+            <div id="ldg-no-print" className="ldg-kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
               {loading ? (
                 Array.from({ length: 4 }).map((_, i) => <SkeletonKpi key={i} />)
               ) : (
@@ -441,7 +484,7 @@ export default function LedgerPage() {
             </div>
 
             {/* Secondary tiles */}
-            <div className="ldg-stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 10 }}>
+            <div id="ldg-no-print" className="ldg-stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 10 }}>
               {[
                 { icon: <Activity size={13} style={{ color: 'var(--text-3)' }} />,   label: 'Transactions', value: dataRows.length },
                 { icon: <FileText  size={13} style={{ color: '#3b82f6' }} />,         label: 'Invoices',     value: salesRows.length },
@@ -464,7 +507,7 @@ export default function LedgerPage() {
             style={{ ...CARD, overflow: 'hidden' }}>
 
             {/* Toolbar */}
-            <div className="ldg-toolbar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '12px 18px', borderBottom: '1px solid var(--border)', flexWrap: 'wrap' }}>
+            <div id="ldg-no-print" className="ldg-toolbar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '12px 18px', borderBottom: '1px solid var(--border)', flexWrap: 'wrap' }}>
               <div className="ldg-toolbar-search-wrap" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <div className="ldg-search-input-wrap" style={{ position: 'relative' }}>
                   <Search size={13} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-4)', pointerEvents: 'none' }} />
@@ -619,7 +662,7 @@ export default function LedgerPage() {
 
             {/* Pagination */}
             {!loading && filteredRows.length > rowsPerPage && (
-              <div className="ldg-pagination" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 18px', borderTop: '1px solid var(--border)', flexWrap: 'wrap', gap: 10 }}>
+              <div id="ldg-no-print" className="ldg-pagination" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 18px', borderTop: '1px solid var(--border)', flexWrap: 'wrap', gap: 10 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-3)' }}>
                   <span>Rows per page:</span>
                   <select className="erp-input" style={{ width: 64, padding: '4px 6px', fontSize: 12 }}
