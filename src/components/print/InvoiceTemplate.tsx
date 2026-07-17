@@ -294,7 +294,8 @@ const InvoiceTemplate = forwardRef<HTMLDivElement, {
             <tr>
               <th style={{ ...s.th, width: '24px', textAlign: 'center' }}>#</th>
               <th style={{ ...s.th, textAlign: 'left' }}>Item</th>
-              {!isThermal && tpl.showBatch  && <th style={{ ...s.th, width: '90px' }}>Batch/Exp</th>}
+              {!isThermal && tpl.showBatch  && <th style={{ ...s.th, width: '65px' }}>Batch</th>}
+              {!isThermal && tpl.showExpiry && <th style={{ ...s.th, width: '65px' }}>Expiry</th>}
               <th style={{ ...s.th, width: '40px', textAlign: 'right' }}>Qty</th>
               {!isThermal && tpl.showBonus  && <th style={{ ...s.th, width: '40px', textAlign: 'right' }}>Bonus</th>}
               <th style={{ ...s.th, width: '70px', textAlign: 'right' }}>Rate</th>
@@ -309,16 +310,17 @@ const InvoiceTemplate = forwardRef<HTMLDivElement, {
                 <td style={s.td}>
                   <div style={{ fontWeight: '500', color: '#000' }}>{item.product_name}</div>
                   {isThermal && tpl.showBatch && item.batch_no && (
-                    <div style={{ fontSize: '8px', color: '#555' }}>
-                      {item.batch_no}{item.expiry ? ` Exp:${item.expiry}` : ''}
-                    </div>
+                    <div style={{ fontSize: '8px', color: '#555' }}>Batch: {item.batch_no}</div>
+                  )}
+                  {isThermal && tpl.showExpiry && item.expiry && (
+                    <div style={{ fontSize: '8px', color: '#555' }}>Exp: {item.expiry}</div>
                   )}
                 </td>
                 {!isThermal && tpl.showBatch && (
-                  <td style={s.td}>
-                    <div style={{ color: '#000' }}>{item.batch_no || '—'}</div>
-                    {item.expiry && <div style={{ fontSize: '9px', color: '#555' }}>{item.expiry}</div>}
-                  </td>
+                  <td style={s.td}>{item.batch_no || '—'}</td>
+                )}
+                {!isThermal && tpl.showExpiry && (
+                  <td style={s.td}>{item.expiry || '—'}</td>
                 )}
                 <td style={{ ...s.td, textAlign: 'right' }}>{item.qty}</td>
                 {!isThermal && tpl.showBonus && (

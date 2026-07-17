@@ -78,28 +78,16 @@ export function usePrint() {
         #erp-print-root {
           display: block !important;
           font-family: 'Segoe UI', Arial, sans-serif;
-          color: #000 !important;
           background: #fff !important;
           font-size: ${size === 'a4' ? '12pt' : '9pt'};
         }
         #erp-print-root * {
-          color: #000 !important;
-          border-color: #000 !important;
-          background-color: transparent !important;
           -webkit-print-color-adjust: exact;
           print-color-adjust: exact;
         }
         #erp-print-root table {
           border-collapse: collapse;
           width: 100%;
-        }
-        #erp-print-root th, #erp-print-root td {
-          border: 1px solid #000 !important;
-          padding: 4px 6px;
-        }
-        #erp-print-root thead tr {
-          background: #f0f0f0 !important;
-          -webkit-print-color-adjust: exact;
         }
         .no-print { display: none !important; }
       }

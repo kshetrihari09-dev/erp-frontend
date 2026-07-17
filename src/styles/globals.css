@@ -626,20 +626,18 @@ select.erp-input option { background: var(--surface); color: var(--text); }
     margin: 0 !important;
     padding: 0 !important;
     background: #fff !important;
-    color: #000 !important;
   }
 
-  /* Force black text everywhere in print */
+  /* Preserve the template's own colors (accent, tints, green/red totals)
+     instead of forcing everything to black — this keeps print output
+     identical to what the preview modal shows. */
   #erp-print-root * {
-    color: #000 !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
 
   /* Table borders */
   #erp-print-root table { border-collapse: collapse !important; }
-  #erp-print-root th,
-  #erp-print-root td { border: 1px solid #000 !important; }
 
   /* Avoid row splits */
   tr { page-break-inside: avoid; }

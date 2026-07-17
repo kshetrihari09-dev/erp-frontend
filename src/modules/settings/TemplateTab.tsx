@@ -149,7 +149,8 @@ export default function TemplateTab() {
           {/* ── Columns ────────────────────────────────────────────────── */}
           <SectionHead>Invoice Columns</SectionHead>
           <div className="tpl-group">
-            <ToggleRow label="Batch & Expiry"  value={tpl.showBatch}  onChange={v => set('showBatch', v)}  description="Show batch number and expiry date" />
+            <ToggleRow label="Batch Number"    value={tpl.showBatch}  onChange={v => set('showBatch', v)}  description="Show batch number column" />
+            <ToggleRow label="Expiry Date"     value={tpl.showExpiry} onChange={v => set('showExpiry', v)} description="Show expiry date column" />
             <ToggleRow label="Bonus Column"    value={tpl.showBonus}  onChange={v => set('showBonus', v)}  description="Show free/bonus quantity column" />
             <ToggleRow label="CC % / Amount"   value={tpl.showCC}     onChange={v => set('showCC', v)}     description="Show credit charge columns" />
           </div>
