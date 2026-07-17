@@ -87,6 +87,10 @@ export default function AppLayout() {
   const [notifOpen, setNotifOpen] = useState(false)
   const notifBoxRef = useRef<HTMLDivElement>(null)
 
+  // Profile dropdown
+  const [profileOpen, setProfileOpen] = useState(false)
+  const profileBoxRef = useRef<HTMLDivElement>(null)
+
   const searchResults = useMemo(() => {
     const q = searchQuery.trim().toLowerCase()
     if (!q) return []
@@ -103,6 +107,9 @@ export default function AppLayout() {
       }
       if (notifBoxRef.current && !notifBoxRef.current.contains(e.target as Node)) {
         setNotifOpen(false)
+      }
+      if (profileBoxRef.current && !profileBoxRef.current.contains(e.target as Node)) {
+        setProfileOpen(false)
       }
     }
     document.addEventListener('mousedown', onClick)
@@ -507,10 +514,58 @@ export default function AppLayout() {
               {theme === 'dark' ? <Sun size={16}/> : <Moon size={16}/>}
             </button>
             {/* User badge */}
-            <div className="hidden md:flex items-center gap-2 text-sm text-[var(--text-3)]">
-              <div className="w-7 h-7 bg-brand rounded-lg flex items-center justify-center text-white text-xs font-bold">
-                {initials(user?.name)}
-              </div>
+            <div ref={profileBoxRef} className="relative">
+              <button
+                onClick={() => setProfileOpen((v) => !v)}
+                className="hidden md:flex items-center gap-2 text-sm text-[var(--text-3)]"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, borderRadius: 8 }}
+                title={user?.name || 'Account'}
+                aria-label="Account menu"
+                aria-haspopup="true"
+                aria-expanded={profileOpen}
+              >
+                <div className="w-7 h-7 bg-brand rounded-lg flex items-center justify-center text-white text-xs font-bold">
+                  {initials(user?.name)}
+                </div>
+              </button>
+              {profileOpen && (
+                <div className="topbar-dropdown" style={{ right: 0, left: 'auto', minWidth: 200 }}>
+                  <div className="topbar-dropdown-header">
+                    <div className="min-w-0">
+                      <div className="topbar-dropdown-title truncate">{user?.name || 'Account'}</div>
+                      {user?.email && (
+                        <div style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 1 }} className="truncate">
+                          {user.email}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="topbar-dropdown-list" style={{ padding: 4 }}>
+                    <div
+                      className="topbar-notif-item"
+                      onClick={() => { setProfileOpen(false); navigate(PATHS.SETTINGS) }}
+                    >
+                      <span className="topbar-notif-icon" style={{ background: 'var(--surface-2)', color: 'var(--text-3)' }}>
+                        <Settings size={14}/>
+                      </span>
+                      <div className="min-w-0">
+                        <div className="topbar-notif-title">Settings</div>
+                      </div>
+                    </div>
+                    <div
+                      className="topbar-notif-item"
+                      onClick={() => { setProfileOpen(false); handleLogout() }}
+                    >
+                      <span className="topbar-notif-icon" style={{ background: 'var(--red-50)', color: 'var(--red)' }}>
+                        <LogOut size={14}/>
+                      </span>
+                      <div className="min-w-0">
+                        <div className="topbar-notif-title">Log out</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </header>
