@@ -16,38 +16,42 @@ import { todayBS as computeTodayBS } from '@/utils/nepaliDate'
 import { authAPI, reportsAPI } from '@/services/api'
 import ToastContainer from '@/components/shared/ToastContainer'
 
-const SIDEBAR_W  = 256
+const SIDEBAR_W       = 260
+const SIDEBAR_W_COLL  = 72
 const MOBILE_BP  = 768
 
 // ─── Nav structure ────────────────────────────────────────────────────────────
+// Same routes, labels, icons, and alert keys as before — only the section
+// groupings/headers changed, to match the ERP-standard grouping (Dashboard,
+// Sales, Purchase, Inventory, Accounting, Reports, Administration).
 const NAV = [
-  { section: 'OVERVIEW' },
-  { to: PATHS.DASHBOARD,  label: 'Dashboard',     icon: <LayoutDashboard size={19} strokeWidth={1.8}/> },
+  { section: 'DASHBOARD' },
+  { to: PATHS.DASHBOARD,  label: 'Dashboard',     icon: <LayoutDashboard size={20} strokeWidth={1.8}/> },
 
-  { section: 'TRANSACTIONS' },
-  { to: PATHS.SALES,      label: 'Sales / POS',   icon: <ShoppingCart    size={19} strokeWidth={1.8}/>, alertKey: 'due' },
-  { to: PATHS.PURCHASE,   label: 'Purchase',       icon: <ShoppingBag     size={19} strokeWidth={1.8}/> },
-  { to: PATHS.SALES_RETURNS,    label: 'Sales Returns',    icon: <RotateCcw       size={19} strokeWidth={1.8}/> },
-  { to: PATHS.PURCHASE_RETURNS, label: 'Purchase Returns', icon: <RotateCcw       size={19} strokeWidth={1.8}/> },
+  { section: 'SALES' },
+  { to: PATHS.SALES,      label: 'Sales / POS',   icon: <ShoppingCart    size={20} strokeWidth={1.8}/>, alertKey: 'due' },
+  { to: PATHS.SALES_RETURNS,    label: 'Sales Returns',    icon: <RotateCcw       size={20} strokeWidth={1.8}/> },
+  { to: PATHS.CUSTOMERS,  label: 'Customers',      icon: <Users           size={20} strokeWidth={1.8}/> },
+
+  { section: 'PURCHASE' },
+  { to: PATHS.PURCHASE,   label: 'Purchase',       icon: <ShoppingBag     size={20} strokeWidth={1.8}/> },
+  { to: PATHS.PURCHASE_RETURNS, label: 'Purchase Returns', icon: <RotateCcw       size={20} strokeWidth={1.8}/> },
+  { to: PATHS.SUPPLIERS,  label: 'Suppliers',      icon: <Truck           size={20} strokeWidth={1.8}/> },
 
   { section: 'INVENTORY' },
-  { to: PATHS.PRODUCTS,   label: 'Products',       icon: <Package         size={19} strokeWidth={1.8}/>, alertKey: 'lowStock' },
-  { to: PATHS.RECEIVES,   label: 'Receive Stock',  icon: <Download        size={19} strokeWidth={1.8}/> },
+  { to: PATHS.PRODUCTS,   label: 'Products',       icon: <Package         size={20} strokeWidth={1.8}/>, alertKey: 'lowStock' },
+  { to: PATHS.RECEIVES,   label: 'Receive Stock',  icon: <Download        size={20} strokeWidth={1.8}/> },
 
-  { section: 'PARTIES' },
-  { to: PATHS.CUSTOMERS,  label: 'Customers',      icon: <Users           size={19} strokeWidth={1.8}/> },
-  { to: PATHS.SUPPLIERS,  label: 'Suppliers',      icon: <Truck           size={19} strokeWidth={1.8}/> },
+  { section: 'ACCOUNTING' },
+  { to: PATHS.ACCOUNTING,    label: 'Accounting',     icon: <BookOpen           size={20} strokeWidth={1.8}/> },
+  { to: PATHS.ACCOUNT_SETUP, label: 'Account Setup',  icon: <SlidersHorizontal  size={20} strokeWidth={1.8}/> },
+  { to: PATHS.LEDGER,        label: 'Ledger',         icon: <BookCopy           size={20} strokeWidth={1.8}/> },
 
-  { section: 'FINANCE' },
-  { to: PATHS.ACCOUNTING,    label: 'Accounting',     icon: <BookOpen           size={19} strokeWidth={1.8}/> },
-  { to: PATHS.ACCOUNT_SETUP, label: 'Account Setup',  icon: <SlidersHorizontal  size={19} strokeWidth={1.8}/> },
-  { to: PATHS.LEDGER,        label: 'Ledger',         icon: <BookCopy           size={19} strokeWidth={1.8}/> },
+  { section: 'REPORTS' },
+  { to: PATHS.REPORTS,    label: 'Reports',        icon: <FileBarChart    size={20} strokeWidth={1.8}/> },
 
-  { section: 'ANALYTICS' },
-  { to: PATHS.REPORTS,    label: 'Reports',        icon: <FileBarChart    size={19} strokeWidth={1.8}/> },
-
-  { section: 'SYSTEM' },
-  { to: PATHS.SETTINGS,   label: 'Settings',       icon: <Settings        size={19} strokeWidth={1.8}/> },
+  { section: 'ADMINISTRATION' },
+  { to: PATHS.SETTINGS,   label: 'Settings',       icon: <Settings        size={20} strokeWidth={1.8}/> },
 ] as const
 
 type NavEntry = { section: string } | { to: string; label: string; icon: React.ReactNode; alertKey?: string }
@@ -158,11 +162,11 @@ export default function AppLayout() {
 
   const sidebarStyle = isMobile
     ? { transform: mobileOpen ? 'translateX(0)' : 'translateX(-100%)', width: SIDEBAR_W }
-    : { width: collapsed ? 64 : SIDEBAR_W }
+    : { width: collapsed ? SIDEBAR_W_COLL : SIDEBAR_W }
 
   const mainStyle = isMobile
     ? { marginLeft: 0 }
-    : { marginLeft: collapsed ? 64 : SIDEBAR_W }
+    : { marginLeft: collapsed ? SIDEBAR_W_COLL : SIDEBAR_W }
 
   const pageTitle = Object.entries({
     [PATHS.DASHBOARD]:  'Dashboard',
@@ -213,7 +217,7 @@ export default function AppLayout() {
       {/* ── SIDEBAR ─── */}
       <aside
         className="sidebar"
-        style={{ ...sidebarStyle, transition: 'width 260ms cubic-bezier(.4,0,.2,1), transform 260ms cubic-bezier(.4,0,.2,1)' }}
+        style={{ ...sidebarStyle, transition: 'width 300ms cubic-bezier(.4,0,.2,1), transform 300ms cubic-bezier(.4,0,.2,1)' }}
       >
         {/* Logo */}
         <div className="sidebar-logo" style={{ overflow: 'hidden' }}>
@@ -244,7 +248,8 @@ export default function AppLayout() {
           {isMobile && (
             <button
               onClick={() => setMobileOpen(false)}
-              className="ml-auto text-white/50 hover:text-white"
+              className="ml-auto"
+              style={{ color: 'var(--sidebar-text-sec)' }}
             >
               <X size={18}/>
             </button>
@@ -271,7 +276,14 @@ export default function AppLayout() {
         <nav className="sidebar-nav flex-1">
           {NAV_TYPED.map((item, i) => {
             if ('section' in item) {
-              return null
+              // Section header — collapsed to a thin divider when the
+              // sidebar is collapsed, since the uppercase label has no
+              // room to render at 72px.
+              return collapsed ? (
+                i === 0 ? null : <div key={`sec-${i}`} style={{ height: 1, background: 'var(--sidebar-line)', margin: '10px 12px' }} />
+              ) : (
+                <div key={`sec-${i}`} className="nav-section-label">{item.section}</div>
+              )
             }
             const badge = item.alertKey === 'lowStock' ? alerts.lowStock : 0
             return (
@@ -311,12 +323,18 @@ export default function AppLayout() {
         {!collapsed && (alerts.lowStock > 0 || alerts.expiry > 0) && (
           <div className="px-3 pb-2">
             {alerts.lowStock > 0 && (
-              <div className="flex items-center gap-2 text-amber-400 text-xs bg-amber-400/10 px-3 py-1.5 rounded-lg mb-1">
+              <div
+                className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg mb-1 font-medium"
+                style={{ color: 'var(--amber)', background: 'var(--amber-50)' }}
+              >
                 <AlertTriangle size={12}/> {alerts.lowStock} low stock
               </div>
             )}
             {alerts.expiry > 0 && (
-              <div className="flex items-center gap-2 text-red-400 text-xs bg-red-400/10 px-3 py-1.5 rounded-lg">
+              <div
+                className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg font-medium"
+                style={{ color: 'var(--red)', background: 'var(--red-50)' }}
+              >
                 <AlertTriangle size={12}/> {alerts.expiry} near expiry
               </div>
             )}
@@ -328,8 +346,8 @@ export default function AppLayout() {
           <div
             className="sidebar-user"
             style={{ justifyContent: collapsed ? 'center' : undefined }}
-            onClick={handleLogout}
-            title="Logout"
+            onClick={() => { if (collapsed) navigate(PATHS.SETTINGS) }}
+            title={collapsed ? user?.name : undefined}
           >
             <div className="sidebar-avatar flex-shrink-0">
               {initials(user?.name)}
@@ -337,11 +355,30 @@ export default function AppLayout() {
             {!collapsed && (
               <div className="min-w-0">
                 <div className="sidebar-user-name truncate">{user?.name}</div>
-                <div className="sidebar-user-role">{user?.role}</div>
+                <div className="sidebar-user-role truncate">{user?.role}</div>
               </div>
             )}
-            {!collapsed && <LogOut size={14} className="ml-auto opacity-50 flex-shrink-0"/>}
           </div>
+          {!collapsed && (
+            <div className="sidebar-footer-actions">
+              <button
+                className="sidebar-footer-btn"
+                onClick={() => navigate(PATHS.SETTINGS)}
+                title="Settings"
+                aria-label="Settings"
+              >
+                <Settings size={13}/> Settings
+              </button>
+              <button
+                className="sidebar-footer-btn danger"
+                onClick={handleLogout}
+                title="Log out"
+                aria-label="Log out"
+              >
+                <LogOut size={13}/> Logout
+              </button>
+            </div>
+          )}
         </div>
       </aside>
 

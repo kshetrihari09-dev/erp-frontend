@@ -73,16 +73,24 @@
   --text-3: #64748b;
   --text-4: #94a3b8;
 
-  /* Sidebar — always dark */
-  --sidebar-bg:      #0B1220;
-  --sidebar-bg-2:    #0d1526;
-  --sidebar-text:    rgba(148,163,184,.85);
-  --sidebar-act:     rgba(37,99,235,.18);
-  --sidebar-hover:   rgba(255,255,255,.055);
-  --sidebar-line:    rgba(255,255,255,.07);
-  --sidebar-accent:  #2563EB;
-  --sidebar-active-text: #ffffff;
-  --sidebar-active-icon: #7DB0FF;
+  /* Sidebar — premium LIGHT MODE defaults (CSS-variable driven so a future
+     dark theme can override these tokens without touching any component). */
+  --sidebar-w-collapsed: 72px;
+  --sidebar-bg:        #FFFFFF;
+  --sidebar-bg-2:      #FFFFFF;
+  --sidebar-border:    #E5E7EB;
+  --sidebar-text:      #374151;
+  --sidebar-text-sec:  #6B7280;
+  --sidebar-hover:     #F3F4F6;
+  --sidebar-act:       #EEF4FF;
+  --sidebar-line:      #E5E7EB;
+  --sidebar-accent:    #2563EB;
+  --sidebar-active-text: #2563EB;
+  --sidebar-active-icon: #2563EB;
+  --sidebar-shadow:    0 1px 2px rgba(16,24,40,.04), 0 8px 24px -12px rgba(16,24,40,.08);
+  --sidebar-active-shadow: 0 1px 2px rgba(37,99,235,.06), 0 1px 0 rgba(37,99,235,.04) inset;
+  --sidebar-scrollbar-thumb: transparent;
+  --sidebar-scrollbar-thumb-hover: #D1D5DB;
 
   --shadow-sm:  0 1px 2px rgba(0,0,0,.05);
   --shadow:     0 4px 12px rgba(0,0,0,.08), 0 1px 3px rgba(0,0,0,.05);
@@ -126,6 +134,23 @@
   --topbar-warn-bg:   rgba(245,158,11,.15);
   --topbar-danger-bg: rgba(239,68,68,.15);
   --topbar-surface:   rgba(17,24,39,.9);
+
+  /* Sidebar — dark-mode token overrides. Components read the same
+     --sidebar-* variables in both themes, so no component/JSX changes
+     are needed to support dark mode later — only these tokens flip. */
+  --sidebar-bg:        #111827;
+  --sidebar-bg-2:      #0f1a2e;
+  --sidebar-border:    rgba(255,255,255,.08);
+  --sidebar-text:      #CBD5E1;
+  --sidebar-text-sec:  #94A3B8;
+  --sidebar-hover:     rgba(255,255,255,.06);
+  --sidebar-act:       rgba(37,99,235,.16);
+  --sidebar-line:      rgba(255,255,255,.08);
+  --sidebar-active-text: #7DB0FF;
+  --sidebar-active-icon: #7DB0FF;
+  --sidebar-shadow:    0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.5);
+  --sidebar-active-shadow: inset 0 0 0 1px rgba(59,130,246,.28), 0 0 20px -6px rgba(37,99,235,.55);
+  --sidebar-scrollbar-thumb-hover: rgba(255,255,255,.18);
 }
 
 /* ─────────────────────────────────────────────
@@ -155,7 +180,10 @@ input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
 ───────────────────────────────────────────── */
 .app-layout { display: flex; min-height: 100vh; }
 
-/* ── SIDEBAR — Always dark, premium ──────────────────────────────────── */
+/* ── SIDEBAR — Premium light mode, theme-able via CSS variables ────────
+   Every color below reads from a --sidebar-* custom property (defined in
+   :root / .dark above) rather than a hardcoded value, so a future theme
+   only has to change tokens — never this component's markup or CSS. */
 .sidebar {
   position: fixed; top: 0; left: 0; bottom: 0;
   /* Was var(--z-sidebar) (200) — that's below --z-dropdown (1000),
@@ -165,149 +193,152 @@ input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
      floating "+" button. The sidebar acts as a drawer on mobile, so it
      belongs on the --z-drawer tier, above all in-page overlay chrome. */
   z-index: var(--z-drawer);
-  background: linear-gradient(180deg, var(--sidebar-bg) 0%, var(--sidebar-bg-2) 100%);
+  background: var(--sidebar-bg);
   width:100%;
   display: flex; flex-direction: column;
   overflow-y: auto; overflow-x: hidden;
-  border-right: 1px solid rgba(255,255,255,.05);
-  box-shadow: 1px 0 0 rgba(0,0,0,.15);
+  border-right: 1px solid var(--sidebar-border);
+  box-shadow: var(--sidebar-shadow);
 }
-.sidebar::-webkit-scrollbar { width: 0; }
+/* Thin custom scrollbar — invisible at rest, appears on hover/scroll */
+.sidebar::-webkit-scrollbar { width: 5px; }
+.sidebar::-webkit-scrollbar-track { background: transparent; }
+.sidebar::-webkit-scrollbar-thumb { background: transparent; border-radius: 99px; }
+.sidebar:hover::-webkit-scrollbar-thumb { background: var(--sidebar-scrollbar-thumb-hover); }
+.sidebar { scrollbar-width: thin; scrollbar-color: transparent transparent; }
+.sidebar:hover { scrollbar-color: var(--sidebar-scrollbar-thumb-hover) transparent; }
 
 .sidebar-logo {
-  padding: 18px 16px 16px;
+  padding: 20px 18px 18px;
   border-bottom: 1px solid var(--sidebar-line);
-  display: flex; align-items: center; gap: 11px;
-  min-height: 62px; flex-shrink: 0;
+  display: flex; align-items: center; gap: 12px;
+  min-height: 68px; flex-shrink: 0;
   position: relative;
 }
 .sidebar-logo-icon {
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
-  width: 34px; height: 34px;
+  width: 36px; height: 36px;
   background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
   border-radius: 10px;
-  box-shadow: 0 0 0 1px rgba(255,255,255,.08) inset, 0 4px 14px rgba(37,99,235,.45);
+  box-shadow: 0 0 0 1px rgba(255,255,255,.08) inset, 0 4px 14px rgba(37,99,235,.28);
   transition: box-shadow var(--transition-med), transform var(--transition-med);
 }
 .sidebar-logo:hover .sidebar-logo-icon {
-  box-shadow: 0 0 0 1px rgba(255,255,255,.12) inset, 0 4px 18px rgba(37,99,235,.6);
+  box-shadow: 0 0 0 1px rgba(255,255,255,.12) inset, 0 4px 18px rgba(37,99,235,.4);
 }
 .sidebar-logo-name {
-  font-size: 14.5px; font-weight: 700; color: #f8fafc;
+  font-size: 15px; font-weight: 700; color: var(--text);
   letter-spacing: -.02em; line-height: 1.2;
   font-family: var(--font-display);
 }
 .sidebar-logo-sub {
-  font-size: 8.5px; color: rgba(148,163,184,.55);
+  font-size: 8.5px; color: var(--sidebar-text-sec);
   font-family: var(--font-mono); letter-spacing: .18em;
   margin-top: 2px; text-transform: uppercase;
 }
 
 .sidebar-collapse-btn {
-  position: absolute; top: 50%; right: 13px; transform: translateY(-50%);
+  position: absolute; top: 50%; right: 14px; transform: translateY(-50%);
   width: 27px; height: 27px;
-  background: rgba(255,255,255,.06);
-  border: 1px solid rgba(255,255,255,.1);
+  background: var(--surface);
+  border: 1px solid var(--sidebar-border);
   border-radius: 99px;
   display: flex; align-items: center; justify-content: center;
-  cursor: pointer; color: rgba(203,213,225,.8); z-index: 10;
+  cursor: pointer; color: var(--sidebar-text-sec); z-index: 10;
   transition: background var(--transition-fast), color var(--transition-fast),
               border-color var(--transition-fast), box-shadow var(--transition-fast),
               transform var(--transition-fast);
-  box-shadow: 0 2px 6px rgba(0,0,0,.35);
+  box-shadow: 0 1px 3px rgba(16,24,40,.08);
 }
 .sidebar-collapse-btn:hover {
   background: var(--brand); color: #fff; border-color: var(--brand);
-  box-shadow: 0 0 0 4px rgba(37,99,235,.15), 0 2px 10px rgba(37,99,235,.5);
+  box-shadow: 0 0 0 4px rgba(37,99,235,.12), 0 2px 10px rgba(37,99,235,.35);
   transform: translateY(-50%) scale(1.06);
 }
 .sidebar-collapse-btn:active { transform: translateY(-50%) scale(.96); }
 
 /* Nav sections */
 .nav-section-label {
-  font-size: 9px; font-weight: 700; letter-spacing: .14em;
-  color: rgba(100,116,139,.65); text-transform: uppercase;
-  padding: 12px 14px 4px; font-family: var(--font-mono);
+  font-size: 10.5px; font-weight: 700; letter-spacing: .1em;
+  color: var(--sidebar-text-sec); text-transform: uppercase;
+  padding: 18px 16px 6px; font-family: var(--font);
 }
+.nav-section-label:first-child { padding-top: 14px; }
 
-.sidebar-nav { padding: 4px 10px; flex: 1; }
+.sidebar-nav { padding: 6px 12px; flex: 1; }
 
 .nav-link {
-  display: flex; align-items: center; gap: 10px;
-  padding: 8px 11px; margin-bottom: 2px;
+  display: flex; align-items: center; gap: 12px;
+  padding: 9px 12px; margin-bottom: 3px;
   color: var(--sidebar-text);
-  font-size: 13px; font-weight: 500; cursor: pointer;
-  border-radius: 9px;
-  transition: background-color var(--transition-fast), color var(--transition-fast),
-              box-shadow var(--transition-fast), transform var(--transition-fast);
-  text-decoration: none; min-height: 38px; position: relative;
+  font-size: 14px; font-weight: 500; cursor: pointer;
+  border-radius: 11px;
+  transition: background-color 200ms cubic-bezier(.4,0,.2,1), color 200ms cubic-bezier(.4,0,.2,1),
+              box-shadow 200ms cubic-bezier(.4,0,.2,1);
+  text-decoration: none; min-height: 40px; position: relative;
 }
 .nav-link:hover  {
-  color: #e8eef7;
+  color: var(--text-2);
   background: var(--sidebar-hover);
-  transform: translateX(1px);
 }
 .nav-link.active {
   color: var(--sidebar-active-text);
-  background: linear-gradient(135deg, rgba(59,130,246,.24), rgba(37,99,235,.10));
+  background: var(--sidebar-act);
   font-weight: 600;
-  box-shadow: inset 0 0 0 1px rgba(59,130,246,.28), 0 0 20px -6px rgba(37,99,235,.55);
-  text-shadow: 0 0 14px rgba(96,165,250,.4);
-  transition: background var(--transition-med), color var(--transition-med),
-              box-shadow var(--transition-med), text-shadow var(--transition-med);
+  box-shadow: var(--sidebar-active-shadow);
+  transition: background 200ms cubic-bezier(.4,0,.2,1), color 200ms cubic-bezier(.4,0,.2,1),
+              box-shadow 200ms cubic-bezier(.4,0,.2,1);
 }
 .nav-link.active .nav-icon { color: var(--sidebar-active-icon); }
-.nav-link.active:hover { transform: none; }
 
-/* Active indicator — 4px accent bar with soft glow */
+/* Active indicator — left accent border */
 .nav-link.active::before {
   content: '';
-  position: absolute; left: -10px; top: 50%; transform: translateY(-50%);
-  width: 4px; height: 22px;
-  background: linear-gradient(180deg, #60a5fa, var(--brand));
+  position: absolute; left: -12px; top: 50%; transform: translateY(-50%);
+  width: 3px; height: 22px;
+  background: var(--brand);
   border-radius: 0 4px 4px 0;
-  box-shadow: 0 0 10px rgba(37,99,235,.65);
 }
 
 .nav-icon {
   display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0; width: 22px; height: 22px;
-  opacity: .82;
-  transition: opacity var(--transition-fast), color var(--transition-fast);
+  flex-shrink: 0; width: 20px; height: 20px;
+  color: var(--sidebar-text-sec);
+  transition: color var(--transition-fast);
 }
-.nav-link:hover .nav-icon { opacity: .95; }
-.nav-link.active .nav-icon { opacity: 1; }
+.nav-link:hover .nav-icon { color: var(--text-2); }
+.nav-link.active .nav-icon { color: var(--sidebar-active-icon); }
 .nav-label { flex: 1; }
 .nav-badge {
   margin-left: auto;
-  background: linear-gradient(135deg, #f87171, #ef4444);
+  background: var(--red);
   color: #fff;
   font-size: 9.5px; font-weight: 700; font-family: var(--font-mono);
   padding: 2px 6.5px;
   border-radius: 99px; min-width: 18px; text-align: center;
   letter-spacing: .01em;
-  box-shadow: 0 0 0 1px rgba(255,255,255,.1) inset, 0 2px 6px rgba(239,68,68,.45);
+  box-shadow: 0 0 0 1px rgba(255,255,255,.6) inset, 0 2px 6px rgba(239,68,68,.35);
 }
 
 .sidebar-footer {
-  padding: 10px;
+  padding: 12px;
   border-top: 1px solid var(--sidebar-line);
   flex-shrink: 0;
 }
 .sidebar-user {
   display: flex; align-items: center; gap: 10px;
-  background: rgba(255,255,255,.045);
-  border: 1px solid rgba(255,255,255,.07);
-  border-radius: 10px;
-  padding: 8px 10px; cursor: pointer;
+  background: var(--surface-2);
+  border: 1px solid var(--sidebar-border);
+  border-radius: 12px;
+  padding: 9px 10px; cursor: pointer;
   transition: background var(--transition-fast), border-color var(--transition-fast),
               box-shadow var(--transition-fast);
 }
 .sidebar-user:hover {
-  background: rgba(255,255,255,.08);
-  border-color: rgba(255,255,255,.12);
-  box-shadow: 0 2px 10px rgba(0,0,0,.25);
+  background: var(--sidebar-hover);
+  border-color: var(--sidebar-border);
+  box-shadow: 0 2px 8px rgba(16,24,40,.06);
 }
 .sidebar-avatar {
   width: 32px; height: 32px;
@@ -315,13 +346,35 @@ input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
   border-radius: 9px;
   display: flex; align-items: center; justify-content: center;
   font-size: 11.5px; font-weight: 700; color: #fff; flex-shrink: 0;
-  box-shadow: 0 0 0 1px rgba(255,255,255,.1) inset, 0 2px 10px rgba(37,99,235,.45);
+  box-shadow: 0 0 0 1px rgba(255,255,255,.1) inset, 0 2px 10px rgba(37,99,235,.35);
 }
-.sidebar-user-name { color: #eef2f8; font-size: 12.5px; font-weight: 600; letter-spacing: -.005em; }
+.sidebar-user-name { color: var(--text); font-size: 12.5px; font-weight: 600; letter-spacing: -.005em; }
 .sidebar-user-role {
-  color: rgba(148,163,184,.75); font-size: 9.5px;
-  font-family: var(--font-mono); text-transform: uppercase; letter-spacing: .07em;
+  color: var(--sidebar-text-sec); font-size: 10px;
+  text-transform: uppercase; letter-spacing: .06em;
   margin-top: 1px;
+}
+.sidebar-footer-actions {
+  display: flex; align-items: center; gap: 6px; margin-top: 8px;
+}
+.sidebar-footer-btn {
+  flex: 1;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 7px 8px;
+  background: transparent;
+  border: 1px solid var(--sidebar-border);
+  border-radius: 9px;
+  color: var(--sidebar-text-sec);
+  font-size: 11.5px; font-weight: 600;
+  cursor: pointer;
+  transition: background 200ms cubic-bezier(.4,0,.2,1), color 200ms cubic-bezier(.4,0,.2,1),
+              border-color 200ms cubic-bezier(.4,0,.2,1);
+}
+.sidebar-footer-btn:hover {
+  background: var(--sidebar-hover); color: var(--text-2); border-color: var(--sidebar-border);
+}
+.sidebar-footer-btn.danger:hover {
+  background: var(--red-50); color: var(--red); border-color: rgba(220,38,38,.2);
 }
 
 /* ── TOPBAR ──────────────────────────────────────────────────────────── */
