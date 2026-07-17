@@ -474,7 +474,7 @@ export default function AppLayout() {
                             className="topbar-notif-item"
                             onClick={() => { setNotifOpen(false); navigate(PATHS.PRODUCTS) }}
                           >
-                            <span className="topbar-notif-icon" style={{ background: 'var(--amber-50)', color: 'var(--amber)' }}>
+                            <span className="topbar-notif-icon" style={{ background: 'var(--topbar-warn-bg)', color: 'var(--amber)' }}>
                               <PackageX size={14}/>
                             </span>
                             <div className="min-w-0">
@@ -488,7 +488,7 @@ export default function AppLayout() {
                             className="topbar-notif-item"
                             onClick={() => { setNotifOpen(false); navigate(PATHS.PRODUCTS) }}
                           >
-                            <span className="topbar-notif-icon" style={{ background: 'var(--red-50)', color: 'var(--red)' }}>
+                            <span className="topbar-notif-icon" style={{ background: 'var(--topbar-danger-bg)', color: 'var(--red)' }}>
                               <CalendarClock size={14}/>
                             </span>
                             <div className="min-w-0">

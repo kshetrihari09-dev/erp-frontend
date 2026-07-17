@@ -92,6 +92,15 @@
   --transition: .18s cubic-bezier(.4,0,.2,1);
   --transition-fast: .15s cubic-bezier(.4,0,.2,1);
   --transition-med:  .2s cubic-bezier(.4,0,.2,1);
+
+  /* Navbar-scoped notification chip backgrounds — theme-aware (the
+     global --amber-50 / --red-50 tokens stay fixed pastel across
+     themes since badges/alerts elsewhere rely on that; the topbar
+     notification icons use these dedicated tokens instead so they can
+     shift to a translucent tint in dark mode). */
+  --topbar-warn-bg:   #fffbeb;
+  --topbar-danger-bg: #fef2f2;
+  --topbar-surface:   rgba(255,255,255,.9);
 }
 
 /* ── DARK MODE — Premium deep navy ──────────────────────────────────── */
@@ -113,6 +122,10 @@
   --shadow-md:  0 8px 32px rgba(0,0,0,.6), 0 2px 8px rgba(0,0,0,.4);
   --shadow-lg:  0 20px 60px rgba(0,0,0,.7), 0 4px 16px rgba(0,0,0,.5);
   --shadow-glow:0 0 32px rgba(37,99,235,.3);
+
+  --topbar-warn-bg:   rgba(245,158,11,.15);
+  --topbar-danger-bg: rgba(239,68,68,.15);
+  --topbar-surface:   rgba(17,24,39,.9);
 }
 
 /* ─────────────────────────────────────────────
@@ -317,14 +330,17 @@ input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
   height: var(--topbar-h); min-height: var(--topbar-h);
   display: flex; align-items: center; gap: 14px;
   padding: 0 24px;
-  background: var(--surface);
+  background: var(--topbar-surface);
   border-bottom: 1px solid var(--border);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(14px) saturate(1.4);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  box-shadow: 0 1px 0 rgba(15,23,42,.03), 0 6px 20px -8px rgba(15,23,42,.06);
+  transition: background var(--transition-med), border-color var(--transition-med),
+              box-shadow var(--transition-med);
 }
 .dark .topbar {
-  background: rgba(17,24,39,.78);
   border-bottom: 1px solid rgba(255,255,255,.06);
+  box-shadow: 0 1px 0 rgba(0,0,0,.4), 0 8px 24px -8px rgba(0,0,0,.5);
 }
 
 /* Topbar search */
@@ -335,12 +351,14 @@ input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
   border-radius: 10px;
   padding: 0 13px;
   height: 36px; width: 280px;
+  box-shadow: inset 0 1px 2px rgba(15,23,42,.035);
   transition: border-color var(--transition-fast), box-shadow var(--transition-fast),
               background var(--transition-fast), width var(--transition-med);
 }
 .dark .topbar-search {
   background: rgba(255,255,255,.045);
   border-color: rgba(255,255,255,.08);
+  box-shadow: inset 0 1px 2px rgba(0,0,0,.25);
 }
 .topbar-search:focus-within {
   border-color: var(--brand);
@@ -395,6 +413,7 @@ input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
   z-index: var(--z-dropdown);
   max-height: 280px; overflow-y: auto;
 }
+.dark .topbar-search-results { border-color: rgba(255,255,255,.09); }
 .topbar-search-section-label {
   font-size: 10px; font-weight: 700; letter-spacing: .08em;
   color: var(--text-4); text-transform: uppercase;
@@ -420,6 +439,7 @@ input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
   overflow: hidden;
   animation: dropdownIn .16s cubic-bezier(.4,0,.2,1);
 }
+.dark .topbar-dropdown { border-color: rgba(255,255,255,.09); }
 @keyframes dropdownIn {
   from { opacity: 0; transform: translateY(-4px) scale(.98); }
   to   { opacity: 1; transform: translateY(0) scale(1); }
