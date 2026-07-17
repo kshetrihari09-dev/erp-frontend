@@ -289,6 +289,7 @@ export interface DashboardStats {
   total_products:     number
   cash_balance?:      number
   bank_balance?:      number
+  payment_modes?:     Array<{ name: string; total: number; count: number; percent: number }>
 }
 
 export interface PnLReport {
