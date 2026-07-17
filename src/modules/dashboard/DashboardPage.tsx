@@ -202,14 +202,14 @@ export default function DashboardPage() {
                 </div>
                 <div className="dash-greeting-stat-label">Revenue</div>
               </div>
-              <div style={{ width: 1, background: 'rgba(255,255,255,.1)', alignSelf: 'stretch' }}/>
+              <div style={{ width: 1, background: 'rgba(255,255,255,.28)', alignSelf: 'stretch' }}/>
               <div>
                 <div className="dash-greeting-stat-val" style={{ fontSize: 16 }}>
                   {loading ? '—' : stats?.today?.sales_count || 0}
                 </div>
                 <div className="dash-greeting-stat-label">Invoices</div>
               </div>
-              <div style={{ width: 1, background: 'rgba(255,255,255,.1)', alignSelf: 'stretch' }}/>
+              <div style={{ width: 1, background: 'rgba(255,255,255,.28)', alignSelf: 'stretch' }}/>
               <div>
                 <div className="dash-greeting-stat-val" style={{ fontSize: 16, color: (stats?.low_stock_items || 0) > 0 ? '#F59E0B' : '#fff' }}>
                   {loading ? '—' : stats?.low_stock_items || 0}
@@ -223,15 +223,15 @@ export default function DashboardPage() {
               onClick={() => navigate(PATHS.SALES)}
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
-                background: '#2563EB', color: '#fff', border: 'none',
+                background: '#fff', color: '#1D4ED8', border: 'none',
                 borderRadius: 9, padding: '8px 16px',
                 fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                boxShadow: '0 0 16px rgba(37,99,235,.45)',
+                boxShadow: '0 4px 14px rgba(15,23,42,.18)',
                 transition: 'transform .15s, box-shadow .15s',
                 flexShrink: 0, whiteSpace: 'nowrap',
               }}
-              onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.04)'; e.currentTarget.style.boxShadow = '0 0 24px rgba(37,99,235,.6)' }}
-              onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = '0 0 16px rgba(37,99,235,.45)' }}
+              onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.04)'; e.currentTarget.style.boxShadow = '0 6px 18px rgba(15,23,42,.24)' }}
+              onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = '0 4px 14px rgba(15,23,42,.18)' }}
             >
               <Zap size={13}/> New Invoice
             </button>
