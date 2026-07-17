@@ -330,16 +330,16 @@ input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
   height: var(--topbar-h); min-height: var(--topbar-h);
   display: flex; align-items: center; gap: 14px;
   padding: 0 24px;
-  background: linear-gradient(180deg, rgba(255,255,255,.97) 0%, rgba(250,251,253,.93) 100%);
+  background: var(--surface);
   border-bottom: 1px solid var(--border);
-  backdrop-filter: blur(14px) saturate(1.4);
-  -webkit-backdrop-filter: blur(14px) saturate(1.4);
   box-shadow: 0 1px 0 rgba(15,23,42,.04), 0 8px 24px -12px rgba(15,23,42,.10);
   transition: background var(--transition-med), border-color var(--transition-med),
               box-shadow var(--transition-med);
 }
 .dark .topbar {
   background: var(--topbar-surface);
+  backdrop-filter: blur(14px) saturate(1.4);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
   border-bottom: 1px solid rgba(255,255,255,.06);
   box-shadow: 0 1px 0 rgba(0,0,0,.4), 0 8px 24px -8px rgba(0,0,0,.5);
 }
