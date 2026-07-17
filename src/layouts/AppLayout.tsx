@@ -22,32 +22,32 @@ const MOBILE_BP  = 768
 // ─── Nav structure ────────────────────────────────────────────────────────────
 const NAV = [
   { section: 'OVERVIEW' },
-  { to: PATHS.DASHBOARD,  label: 'Dashboard',     icon: <LayoutDashboard size={17} strokeWidth={1.8}/> },
+  { to: PATHS.DASHBOARD,  label: 'Dashboard',     icon: <LayoutDashboard size={18} strokeWidth={1.8}/> },
 
   { section: 'TRANSACTIONS' },
-  { to: PATHS.SALES,      label: 'Sales / POS',   icon: <ShoppingCart    size={17} strokeWidth={1.8}/>, alertKey: 'due' },
-  { to: PATHS.PURCHASE,   label: 'Purchase',       icon: <ShoppingBag     size={17} strokeWidth={1.8}/> },
-  { to: PATHS.SALES_RETURNS,    label: 'Sales Returns',    icon: <RotateCcw       size={17} strokeWidth={1.8}/> },
-  { to: PATHS.PURCHASE_RETURNS, label: 'Purchase Returns', icon: <RotateCcw       size={17} strokeWidth={1.8}/> },
+  { to: PATHS.SALES,      label: 'Sales / POS',   icon: <ShoppingCart    size={18} strokeWidth={1.8}/>, alertKey: 'due' },
+  { to: PATHS.PURCHASE,   label: 'Purchase',       icon: <ShoppingBag     size={18} strokeWidth={1.8}/> },
+  { to: PATHS.SALES_RETURNS,    label: 'Sales Returns',    icon: <RotateCcw       size={18} strokeWidth={1.8}/> },
+  { to: PATHS.PURCHASE_RETURNS, label: 'Purchase Returns', icon: <RotateCcw       size={18} strokeWidth={1.8}/> },
 
   { section: 'INVENTORY' },
-  { to: PATHS.PRODUCTS,   label: 'Products',       icon: <Package         size={17} strokeWidth={1.8}/>, alertKey: 'lowStock' },
-  { to: PATHS.RECEIVES,   label: 'Receive Stock',  icon: <Download        size={17} strokeWidth={1.8}/> },
+  { to: PATHS.PRODUCTS,   label: 'Products',       icon: <Package         size={18} strokeWidth={1.8}/>, alertKey: 'lowStock' },
+  { to: PATHS.RECEIVES,   label: 'Receive Stock',  icon: <Download        size={18} strokeWidth={1.8}/> },
 
   { section: 'PARTIES' },
-  { to: PATHS.CUSTOMERS,  label: 'Customers',      icon: <Users           size={17} strokeWidth={1.8}/> },
-  { to: PATHS.SUPPLIERS,  label: 'Suppliers',      icon: <Truck           size={17} strokeWidth={1.8}/> },
+  { to: PATHS.CUSTOMERS,  label: 'Customers',      icon: <Users           size={18} strokeWidth={1.8}/> },
+  { to: PATHS.SUPPLIERS,  label: 'Suppliers',      icon: <Truck           size={18} strokeWidth={1.8}/> },
 
   { section: 'FINANCE' },
-  { to: PATHS.ACCOUNTING,    label: 'Accounting',     icon: <BookOpen           size={17} strokeWidth={1.8}/> },
-  { to: PATHS.ACCOUNT_SETUP, label: 'Account Setup',  icon: <SlidersHorizontal  size={17} strokeWidth={1.8}/> },
-  { to: PATHS.LEDGER,        label: 'Ledger',         icon: <BookCopy           size={17} strokeWidth={1.8}/> },
+  { to: PATHS.ACCOUNTING,    label: 'Accounting',     icon: <BookOpen           size={18} strokeWidth={1.8}/> },
+  { to: PATHS.ACCOUNT_SETUP, label: 'Account Setup',  icon: <SlidersHorizontal  size={18} strokeWidth={1.8}/> },
+  { to: PATHS.LEDGER,        label: 'Ledger',         icon: <BookCopy           size={18} strokeWidth={1.8}/> },
 
   { section: 'ANALYTICS' },
-  { to: PATHS.REPORTS,    label: 'Reports',        icon: <FileBarChart    size={17} strokeWidth={1.8}/> },
+  { to: PATHS.REPORTS,    label: 'Reports',        icon: <FileBarChart    size={18} strokeWidth={1.8}/> },
 
   { section: 'SYSTEM' },
-  { to: PATHS.SETTINGS,   label: 'Settings',       icon: <Settings        size={17} strokeWidth={1.8}/> },
+  { to: PATHS.SETTINGS,   label: 'Settings',       icon: <Settings        size={18} strokeWidth={1.8}/> },
 ] as const
 
 type NavEntry = { section: string } | { to: string; label: string; icon: React.ReactNode; alertKey?: string }
@@ -271,7 +271,12 @@ export default function AppLayout() {
         <nav className="sidebar-nav flex-1">
           {NAV_TYPED.map((item, i) => {
             if ('section' in item) {
-              return null
+              if (collapsed) return i === 0 ? null : <div key={`sep-${i}`} className="nav-section-sep" />
+              return (
+                <div key={`sec-${i}`} className="nav-section-label" style={{ marginTop: i === 0 ? 0 : undefined }}>
+                  {item.section}
+                </div>
+              )
             }
             const badge = item.alertKey === 'lowStock' ? alerts.lowStock : 0
             return (
@@ -309,15 +314,15 @@ export default function AppLayout() {
 
         {/* Alerts strip */}
         {!collapsed && (alerts.lowStock > 0 || alerts.expiry > 0) && (
-          <div className="px-3 pb-2">
+          <div className="px-3 pb-2.5 flex flex-col gap-1.5">
             {alerts.lowStock > 0 && (
-              <div className="flex items-center gap-2 text-amber-400 text-xs bg-amber-400/10 px-3 py-1.5 rounded-lg mb-1">
-                <AlertTriangle size={12}/> {alerts.lowStock} low stock
+              <div className="flex items-center gap-2 text-amber-300 text-[11.5px] font-medium bg-amber-400/10 border border-amber-400/20 px-3 py-1.5 rounded-full">
+                <AlertTriangle size={13} className="flex-shrink-0"/> {alerts.lowStock} low stock
               </div>
             )}
             {alerts.expiry > 0 && (
-              <div className="flex items-center gap-2 text-red-400 text-xs bg-red-400/10 px-3 py-1.5 rounded-lg">
-                <AlertTriangle size={12}/> {alerts.expiry} near expiry
+              <div className="flex items-center gap-2 text-red-300 text-[11.5px] font-medium bg-red-400/10 border border-red-400/20 px-3 py-1.5 rounded-full">
+                <AlertTriangle size={13} className="flex-shrink-0"/> {alerts.expiry} near expiry
               </div>
             )}
           </div>

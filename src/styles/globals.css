@@ -147,200 +147,292 @@ input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
      floating "+" button. The sidebar acts as a drawer on mobile, so it
      belongs on the --z-drawer tier, above all in-page overlay chrome. */
   z-index: var(--z-drawer);
-  background: var(--sidebar-bg);
+  background: linear-gradient(180deg, #0c1526 0%, var(--sidebar-bg) 100%);
   width:100%;
   display: flex; flex-direction: column;
   overflow-y: auto; overflow-x: hidden;
-  border-right: 1px solid rgba(255,255,255,.04);
+  border-right: 1px solid rgba(255,255,255,.06);
+  box-shadow: 1px 0 0 rgba(0,0,0,.2), 4px 0 24px rgba(0,0,0,.18);
 }
 .sidebar::-webkit-scrollbar { width: 0; }
 
 .sidebar-logo {
-  padding: 18px 16px 16px;
+  padding: 18px 16px;
   border-bottom: 1px solid var(--sidebar-line);
-  display: flex; align-items: center; gap: 10px;
-  min-height: 66px; flex-shrink: 0;
+  display: flex; align-items: center; gap: 11px;
+  min-height: 64px; flex-shrink: 0;
   position: relative;
 }
 .sidebar-logo-icon {
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
-  width: 34px; height: 34px;
+  width: 36px; height: 36px;
   background: linear-gradient(135deg, #2563EB 0%, #1d4ed8 100%);
-  border-radius: 10px;
-  box-shadow: 0 0 16px rgba(37,99,235,.4);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 0 0 1px rgba(255,255,255,.08) inset, 0 4px 14px rgba(37,99,235,.45);
 }
 .sidebar-logo-name {
-  font-size: 14px; font-weight: 700; color: #f8fafc;
-  letter-spacing: -.02em; line-height: 1.2;
+  font-size: 14.5px; font-weight: 700; color: #f8fafc;
+  letter-spacing: -.02em; line-height: 1.25;
   font-family: var(--font-display);
 }
 .sidebar-logo-sub {
-  font-size: 8.5px; color: rgba(148,163,184,.5);
+  font-size: 8.5px; color: rgba(148,163,184,.55);
   font-family: var(--font-mono); letter-spacing: .18em;
   margin-top: 2px; text-transform: uppercase;
 }
 
 .sidebar-collapse-btn {
-  position: absolute; top: 50%; right: 13px; transform: translateY(-50%);
-  width: 26px; height: 26px;
-  background: #1e293b;
-  border: 1px solid rgba(255,255,255,.1);
-  border-radius: 99px;
+  position: absolute; top: 50%; right: 12px; transform: translateY(-50%);
+  width: 28px; height: 28px;
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: var(--radius-sm);
   display: flex; align-items: center; justify-content: center;
-  cursor: pointer; color: rgba(148,163,184,.7); z-index: 10;
-  transition: all var(--transition);
-  box-shadow: 0 2px 8px rgba(0,0,0,.4);
+  cursor: pointer; color: rgba(203,213,225,.85); z-index: 10;
+  transition: background var(--transition), color var(--transition), border-color var(--transition), box-shadow var(--transition), transform var(--transition);
+  box-shadow: 0 1px 3px rgba(0,0,0,.3);
 }
 .sidebar-collapse-btn:hover {
   background: var(--brand); color: #fff; border-color: var(--brand);
-  box-shadow: 0 0 12px rgba(37,99,235,.4);
+  box-shadow: 0 0 0 4px rgba(37,99,235,.16), 0 4px 12px rgba(37,99,235,.4);
+  transform: translateY(-50%) scale(1.04);
 }
+.sidebar-collapse-btn:active { transform: translateY(-50%) scale(.96); }
 
 /* Nav sections */
 .nav-section-label {
-  font-size: 9px; font-weight: 700; letter-spacing: .14em;
-  color: rgba(100,116,139,.6); text-transform: uppercase;
-  padding: 14px 16px 5px; font-family: var(--font-mono);
+  font-size: 9.5px; font-weight: 700; letter-spacing: .13em;
+  color: rgba(100,116,139,.65); text-transform: uppercase;
+  padding: 16px 14px 6px; margin-top: 2px; font-family: var(--font-mono);
+}
+.nav-section-sep {
+  height: 1px; margin: 8px 12px; background: var(--sidebar-line);
 }
 
-.sidebar-nav { padding: 6px 8px; flex: 1; }
+.sidebar-nav { padding: 4px 10px 10px; flex: 1; }
 
 .nav-link {
-  display: flex; align-items: center; gap: 9px;
-  padding: 8px 10px; margin-bottom: 1px;
+  display: flex; align-items: center; gap: 11px;
+  padding: 9px 12px; margin-bottom: 2px;
   color: var(--sidebar-text);
   font-size: 13px; font-weight: 500; cursor: pointer;
-  border-radius: 10px;
-  transition: all .14s ease;
+  border-radius: var(--radius-sm);
+  transition: background .18s cubic-bezier(.4,0,.2,1), color .18s cubic-bezier(.4,0,.2,1),
+              box-shadow .18s cubic-bezier(.4,0,.2,1), padding-left .18s cubic-bezier(.4,0,.2,1);
   text-decoration: none; min-height: 38px; position: relative;
 }
 .nav-link:hover  {
-  color: #e2e8f0;
+  color: #f1f5f9;
   background: var(--sidebar-hover);
 }
 .nav-link.active {
   color: #fff;
-  background: rgba(37,99,235,.2);
+  background: linear-gradient(90deg, rgba(37,99,235,.22) 0%, rgba(37,99,235,.10) 100%);
   font-weight: 600;
-  box-shadow: inset 0 0 0 1px rgba(37,99,235,.3);
+  box-shadow: inset 0 0 0 1px rgba(37,99,235,.28), 0 0 18px rgba(37,99,235,.14);
+  padding-left: 16px;
 }
 .nav-link.active .nav-icon { color: #60a5fa; }
 
-/* Active indicator dot */
+/* Active indicator — 4px glowing accent bar */
 .nav-link.active::before {
   content: '';
-  position: absolute; left: -8px; top: 50%; transform: translateY(-50%);
-  width: 3px; height: 20px;
-  background: var(--brand);
-  border-radius: 0 3px 3px 0;
+  position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+  width: 4px; height: 22px;
+  background: linear-gradient(180deg, #60a5fa, var(--brand));
+  border-radius: 0 4px 4px 0;
+  box-shadow: 0 0 10px rgba(37,99,235,.65);
 }
 
 .nav-icon {
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0; width: 20px; height: 20px;
   opacity: .8;
+  transition: opacity .18s ease, color .18s ease;
 }
 .nav-link.active .nav-icon { opacity: 1; }
 .nav-label { flex: 1; }
 .nav-badge {
-  margin-left: auto; background: #EF4444; color: #fff;
-  font-size: 9px; font-family: var(--font-mono); padding: 1px 5px;
-  border-radius: 99px; min-width: 17px; text-align: center;
-  box-shadow: 0 0 8px rgba(239,68,68,.5);
+  margin-left: auto;
+  background: linear-gradient(135deg, #f87171, #ef4444);
+  color: #fff;
+  font-size: 10px; font-weight: 700; font-family: var(--font-mono); padding: 2px 6px;
+  border-radius: 99px; min-width: 18px; text-align: center; line-height: 1.4;
+  box-shadow: 0 0 0 1px rgba(255,255,255,.08) inset, 0 0 10px rgba(239,68,68,.45);
 }
 
 .sidebar-footer {
-  padding: 10px 8px;
+  padding: 12px 10px;
   border-top: 1px solid var(--sidebar-line);
   flex-shrink: 0;
 }
 .sidebar-user {
-  display: flex; align-items: center; gap: 9px;
-  background: rgba(255,255,255,.05);
-  border: 1px solid rgba(255,255,255,.06);
-  border-radius: 10px;
+  display: flex; align-items: center; gap: 10px;
+  background: rgba(255,255,255,.045);
+  border: 1px solid rgba(255,255,255,.07);
+  border-radius: var(--radius-sm);
   padding: 8px 10px; cursor: pointer;
-  transition: all var(--transition);
+  transition: background var(--transition), border-color var(--transition), transform var(--transition);
 }
 .sidebar-user:hover {
-  background: rgba(255,255,255,.09);
-  border-color: rgba(255,255,255,.1);
+  background: rgba(255,255,255,.08);
+  border-color: rgba(255,255,255,.12);
+  transform: translateY(-1px);
 }
 .sidebar-avatar {
-  width: 30px; height: 30px;
+  width: 32px; height: 32px;
   background: linear-gradient(135deg, #2563EB, #7C3AED);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   display: flex; align-items: center; justify-content: center;
-  font-size: 11px; font-weight: 700; color: #fff; flex-shrink: 0;
-  box-shadow: 0 2px 8px rgba(37,99,235,.4);
+  font-size: 11.5px; font-weight: 700; color: #fff; flex-shrink: 0;
+  box-shadow: 0 0 0 2px rgba(255,255,255,.08), 0 2px 8px rgba(37,99,235,.4);
 }
-.sidebar-user-name { color: #e2e8f0; font-size: 12px; font-weight: 600; }
+.sidebar-user-name { color: #f1f5f9; font-size: 12.5px; font-weight: 600; letter-spacing: -.01em; }
 .sidebar-user-role {
-  color: rgba(100,116,139,.8); font-size: 9.5px;
-  font-family: var(--font-mono); text-transform: uppercase; letter-spacing: .06em;
+  color: rgba(148,163,184,.75); font-size: 9.5px;
+  font-family: var(--font-mono); text-transform: uppercase; letter-spacing: .07em;
+  margin-top: 1px;
 }
 
 /* ── TOPBAR ──────────────────────────────────────────────────────────── */
 .topbar {
   position: sticky; top: 0; z-index: var(--z-sticky);
   height: var(--topbar-h); min-height: var(--topbar-h);
-  display: flex; align-items: center; gap: 12px;
-  padding: 0 24px;
+  display: flex; align-items: center; gap: 14px;
+  padding: 0 28px;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
 }
 .dark .topbar {
-  background: rgba(17,24,39,.8);
-  border-bottom: 1px solid rgba(255,255,255,.05);
+  background: rgba(17,24,39,.82);
+  border-bottom: 1px solid rgba(255,255,255,.06);
 }
 
 /* Topbar search */
 .topbar-search {
-  display: flex; align-items: center; gap: 8px;
+  display: flex; align-items: center; gap: 9px;
   background: var(--surface-2);
   border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 0 12px;
-  height: 34px; width: 240px;
-  transition: all var(--transition);
+  border-radius: var(--radius-sm);
+  padding: 0 13px;
+  height: 38px; width: 300px;
+  transition: border-color var(--transition), box-shadow var(--transition), background var(--transition);
 }
 .dark .topbar-search {
   background: rgba(255,255,255,.05);
-  border-color: rgba(255,255,255,.07);
+  border-color: rgba(255,255,255,.08);
 }
 .topbar-search:focus-within {
   border-color: var(--brand);
-  box-shadow: 0 0 0 3px rgba(37,99,235,.12);
+  box-shadow: 0 0 0 3px rgba(37,99,235,.14);
   background: var(--surface);
 }
 .topbar-search input {
   flex: 1; border: none; background: transparent;
-  font-size: 12.5px; color: var(--text-3); outline: none;
+  font-size: 13px; color: var(--text-2); outline: none;
 }
 .topbar-search input::placeholder { color: var(--text-4); }
 
 /* Topbar icon button */
 .topbar-btn {
-  width: 34px; height: 34px;
+  width: 36px; height: 36px;
   display: flex; align-items: center; justify-content: center;
-  border-radius: 9px;
+  border-radius: var(--radius-sm);
   color: var(--text-3);
   background: transparent;
   border: 1px solid transparent;
-  cursor: pointer; transition: all .14s;
+  cursor: pointer; transition: background .18s ease, color .18s ease, border-color .18s ease, transform .18s ease;
+  position: relative;
 }
 .topbar-btn:hover {
   color: var(--text);
   background: var(--surface-3);
   border-color: var(--border);
+  transform: translateY(-1px);
 }
+.topbar-btn:active { transform: translateY(0); }
 .dark .topbar-btn:hover {
-  background: rgba(255,255,255,.06);
-  border-color: rgba(255,255,255,.08);
+  background: rgba(255,255,255,.07);
+  border-color: rgba(255,255,255,.09);
 }
+.topbar-btn-dot {
+  position: absolute; top: 7px; right: 7px;
+  width: 8px; height: 8px; border-radius: 50%;
+  background: linear-gradient(135deg, #f87171, #ef4444);
+  box-shadow: 0 0 0 2px var(--surface), 0 0 8px rgba(239,68,68,.6);
+}
+.dark .topbar-btn-dot { box-shadow: 0 0 0 2px #111827, 0 0 8px rgba(239,68,68,.6); }
+
+/* ── Topbar dropdown panels (notifications / profile / search results) ── */
+.topbar-dropdown {
+  position: absolute; top: calc(100% + 10px); left: 0;
+  width: 320px; max-width: calc(100vw - 32px);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  z-index: var(--z-dropdown);
+  overflow: hidden;
+  animation: dropdownIn .16s cubic-bezier(.4,0,.2,1);
+}
+.dark .topbar-dropdown { background: #111827; border-color: rgba(255,255,255,.08); }
+@keyframes dropdownIn {
+  from { opacity: 0; transform: translateY(-4px) scale(.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.topbar-dropdown-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.dark .topbar-dropdown-header { border-bottom-color: rgba(255,255,255,.07); }
+.topbar-dropdown-title { font-size: 13px; font-weight: 700; color: var(--text); letter-spacing: -.01em; }
+.topbar-dropdown-list { max-height: 320px; overflow-y: auto; padding: 6px; }
+.topbar-dropdown-empty {
+  padding: 22px 14px; text-align: center;
+  font-size: 12.5px; color: var(--text-4);
+}
+.topbar-notif-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 9px 8px; border-radius: var(--radius-sm);
+  cursor: pointer; transition: background .16s ease;
+}
+.topbar-notif-item:hover { background: var(--surface-3); }
+.dark .topbar-notif-item:hover { background: rgba(255,255,255,.06); }
+.topbar-notif-icon {
+  width: 30px; height: 30px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: var(--radius-sm);
+}
+.topbar-notif-title { font-size: 12.5px; font-weight: 600; color: var(--text-2); line-height: 1.35; }
+.topbar-notif-sub { font-size: 11px; color: var(--text-4); margin-top: 1px; }
+
+/* Topbar search results */
+.topbar-search-results {
+  position: absolute; top: calc(100% + 8px); left: 0; right: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  z-index: var(--z-dropdown);
+  overflow: hidden;
+  animation: dropdownIn .16s cubic-bezier(.4,0,.2,1);
+}
+.dark .topbar-search-results { background: #111827; border-color: rgba(255,255,255,.08); }
+.topbar-search-section-label {
+  font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--text-4); padding: 10px 14px 4px;
+}
+.topbar-search-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 14px; font-size: 12.5px; font-weight: 500; color: var(--text-2);
+  cursor: pointer; transition: background .16s ease;
+}
+.topbar-search-item:hover { background: var(--surface-3); }
+.dark .topbar-search-item:hover { background: rgba(255,255,255,.06); }
 
 .page-content { flex: 1; padding: 24px 28px; min-height: calc(100vh - var(--topbar-h)); }
 
@@ -355,6 +447,15 @@ input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
 }
 @media (max-width: 640px) {
   .bleed-header { margin-left: -10px; margin-right: -10px; padding-left: 10px; padding-right: 10px; }
+}
+
+/* ── Sidebar / topbar responsiveness (tablet & mobile) ─────────────────── */
+@media (max-width: 1023px) {
+  .topbar-search { width: 220px; }
+}
+@media (max-width: 767px) {
+  .topbar { padding: 0 14px; gap: 10px; }
+  .topbar-dropdown, .topbar-search-results { width: 280px; }
 }
 
 /* ── PAGE STRUCTURE ──────────────────────────────────────────────────── */
