@@ -23,6 +23,12 @@ interface UIState {
   setTheme: (t: 'light' | 'dark') => void
   toggleTheme: () => void
 
+  // Date display mode (AD = Gregorian, BS = Bikram Sambat) — display-only,
+  // never affects what's stored/sent to the API.
+  dateMode: 'AD' | 'BS'
+  setDateMode: (m: 'AD' | 'BS') => void
+  toggleDateMode: () => void
+
   // Toasts
   toasts: Toast[]
   addToast:    (t: Omit<Toast, 'id'>) => void
@@ -57,6 +63,11 @@ const useUIStore = create<UIState>()(
         set({ theme: next })
       },
 
+      // Date display mode
+      dateMode: 'AD',
+      setDateMode: (dateMode) => set({ dateMode }),
+      toggleDateMode: () => set((s) => ({ dateMode: s.dateMode === 'AD' ? 'BS' : 'AD' })),
+
       // Toasts
       toasts: [],
       addToast: (t) => {
@@ -79,7 +90,7 @@ const useUIStore = create<UIState>()(
     }),
     {
       name: STORAGE_KEYS.THEME,
-      partialize: (s) => ({ sidebarCollapsed: s.sidebarCollapsed, theme: s.theme }),
+      partialize: (s) => ({ sidebarCollapsed: s.sidebarCollapsed, theme: s.theme, dateMode: s.dateMode }),
     }
   )
 )

@@ -67,13 +67,14 @@ const SEARCHABLE_NAV = NAV_TYPED.filter(
 // ─── Main layout ──────────────────────────────────────────────────────────────
 export default function AppLayout() {
   const { user, company, logout } = useAuthStore()
-  const { theme, toggleTheme, sidebarCollapsed, toggleSidebar, setSidebarCollapsed } = useUIStore()
+  const { theme, toggleTheme, sidebarCollapsed, toggleSidebar, setSidebarCollapsed, dateMode, toggleDateMode } = useUIStore()
   const navigate  = useNavigate()
   const location  = useLocation()
 
   const [isMobile, setIsMobile]   = useState(() => window.innerWidth < MOBILE_BP)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [todayBS, setTodayBS]     = useState('')
+  const [todayAD, setTodayAD]     = useState('')
   const [alerts, setAlerts]       = useState({ lowStock: 0, expiry: 0 })
   const [hoveredNav, setHoveredNav] = useState<string | null>(null)
 
@@ -137,6 +138,7 @@ export default function AppLayout() {
   // /date/today just to get a value we can derive here directly.
   useEffect(() => {
     setTodayBS(computeTodayBS())
+    setTodayAD(new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }))
   }, [])
 
   const handleLogout = useCallback(async () => {
@@ -359,6 +361,35 @@ export default function AppLayout() {
             )}
            
           </div>
+
+          {/* AD / BS date toggler */}
+          {(todayAD || todayBS) && (
+            <button
+              onClick={toggleDateMode}
+              className="topbar-btn"
+              title={`Switch to ${dateMode === 'AD' ? 'Bikram Sambat' : 'Gregorian'} date`}
+              aria-label="Toggle AD/BS date"
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                width: 'auto', padding: '0 10px',
+                fontSize: 11.5, fontWeight: 600,
+                color: 'var(--text-3)', whiteSpace: 'nowrap',
+                marginLeft: isMobile ? 0 : 10, flexShrink: 0,
+              }}
+            >
+              <CalendarDays size={13}/>
+              <span>{dateMode === 'AD' ? todayAD : todayBS}</span>
+              <span
+                style={{
+                  fontSize: 9.5, fontWeight: 800, letterSpacing: .3,
+                  color: 'var(--brand)', background: 'var(--brand-50, rgba(37,99,235,.1))',
+                  borderRadius: 4, padding: '1px 5px',
+                }}
+              >
+                {dateMode}
+              </span>
+            </button>
+          )}
 
           {/* Quick search — client-side filter over existing nav routes */}
           {!isMobile && (
