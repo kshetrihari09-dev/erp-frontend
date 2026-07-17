@@ -32,6 +32,7 @@ import useUIStore from '@/store/uiStore'
 import useAuthStore from '@/store/authStore'
 import useTemplateStore from '@/store/templateStore'
 import InvoiceTemplate, { type PrintData } from '@/components/print/InvoiceTemplate'
+import { adToBS } from '@/utils/nepaliDate'
 
 interface Props {
   data: PrintData | null
@@ -68,7 +69,9 @@ export default function AutoCloudBackup({ data, enabled = true }: Props) {
   const lastBackedUp = useRef<string | null>(null)
   const [renderData, setRenderData] = useState<PrintData | null>(null)
 
-  const printData: PrintData | null = data ? { ...data, company: data.company ?? company } : null
+  const printData: PrintData | null = data
+    ? { ...data, company: data.company ?? company, dateBS: data.dateBS ?? adToBS(data.date) }
+    : null
 
   // Step 1: as soon as a new voucher comes in, mount the off-screen
   // template for it. Split from the actual upload (below) because the

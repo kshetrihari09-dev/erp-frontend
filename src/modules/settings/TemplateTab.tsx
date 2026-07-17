@@ -14,13 +14,15 @@ import {
 import useTemplateStore, { DEFAULT_TPL, type TemplateConfig } from '@/store/templateStore'
 import InvoiceTemplate, { type PrintData } from '@/components/print/InvoiceTemplate'
 import { usePrint } from '@/components/print/usePrint'
+import { adToBS } from '@/utils/nepaliDate'
 
 /* ── Demo print data for live preview ──────────────────────────────────── */
+const DEMO_AD_DATE = new Date().toISOString().split('T')[0]
 const DEMO_DATA: PrintData = {
   voucherNo:    'INV-2081-0042',
   type:         'SALE',
-  date:         new Date().toISOString().split('T')[0],
-  dateBS:       '2081-03-15',
+  date:         DEMO_AD_DATE,
+  dateBS:       adToBS(DEMO_AD_DATE), // was hardcoded to a stale '2081-03-15' regardless of the actual current date
   partyName:    'Bishal Prahamic Upchar Kendra',
   partyAddress: 'Badsudawa, Butwal',
   partyPhone:   '071-540123',

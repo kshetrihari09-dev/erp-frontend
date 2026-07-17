@@ -28,6 +28,7 @@ import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Maximize2, X, CheckCircle2 } from 'lucide-react'
 import { fmt, fmtDate } from '@/utils'
+import { adToBS } from '@/utils/nepaliDate'
 import { useShortcutScope } from '@/hooks/useKeyboardShortcuts'
 import { htmlToPdfBlob } from '@/utils/htmlToPdfBlob'
 import { uploadDocumentToCloud } from '@/components/cloudStorage/CloudBackupButton'
@@ -111,7 +112,16 @@ export default function PrintPreviewModal({
   // Mobile is always a fullscreen, app-like modal
   const effectiveFullscreen = isMobile || fullscreen
 
-  const printData: PrintData | null = data ? { ...data, company: data.company ?? company } : null
+  // dateBS was never populated by any print call site before this, so the
+  // "Show Bikram Sambat Date" template toggle had no effect on real
+  // invoices/vouchers — only on the hardcoded demo preview in Settings.
+  // Computing it once here, centrally, means every page that opens this
+  // modal gets it automatically instead of each needing its own BS
+  // conversion. A page can still pass its own dateBS explicitly (kept
+  // via ?? ) if it ever needs something other than the default.
+  const printData: PrintData | null = data
+    ? { ...data, company: data.company ?? company, dateBS: data.dateBS ?? adToBS(data.date) }
+    : null
 
   useEffect(() => {
     if (open && autoprint && printData) {

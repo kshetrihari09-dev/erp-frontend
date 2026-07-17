@@ -10,8 +10,9 @@ import {
 } from 'lucide-react'
 import useAuthStore from '@/store/authStore'
 import useUIStore from '@/store/uiStore'
-import { PATHS, STORAGE_KEYS } from '@/constants'
+import { PATHS } from '@/constants'
 import { initials, cn } from '@/utils'
+import { todayBS as computeTodayBS } from '@/utils/nepaliDate'
 import { authAPI, reportsAPI } from '@/services/api'
 import ToastContainer from '@/components/shared/ToastContainer'
 
@@ -131,14 +132,11 @@ export default function AppLayout() {
     }).catch(() => {})
   }, [])
 
-  // BS date
+  // BS date — computed locally now that nepali-date-converter is
+  // available client-side, instead of a separate authenticated fetch to
+  // /date/today just to get a value we can derive here directly.
   useEffect(() => {
-    fetch('/api/v1/date/today', {
-      headers: { Authorization: `Bearer ${localStorage.getItem(STORAGE_KEYS.TOKEN)}` }
-    })
-      .then(r => r.json())
-      .then(d => setTodayBS(d?.data?.bs || ''))
-      .catch(() => {})
+    setTodayBS(computeTodayBS())
   }, [])
 
   const handleLogout = useCallback(async () => {
