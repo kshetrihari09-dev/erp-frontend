@@ -266,12 +266,24 @@ export default function LoginPage() {
   const [otpLoading, setOtpLoad]    = useState(false)
   const [timer, setTimer]           = useState(0)
   const [toast, setToast]           = useState('')
+  const [rememberMe, setRememberMe] = useState(true)
   const timerRef = useRef<ReturnType<typeof setInterval>|null>(null)
 
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<PwForm>({
+  const { register, handleSubmit, setValue, formState: { errors, isSubmitting } } = useForm<PwForm>({
     resolver: zodResolver(pwSchema),
     defaultValues: { email: '', password: '' },
   })
+
+  // Remember me — pre-fill last remembered email (password is never stored)
+  useEffect(() => {
+    const saved = localStorage.getItem('erp_remembered_email')
+    if (saved) {
+      setValue('email', saved)
+      setRememberMe(true)
+    } else {
+      setRememberMe(false)
+    }
+  }, [setValue])
 
   const startTimer = useCallback(() => {
     setTimer(60)
@@ -293,6 +305,8 @@ export default function LoginPage() {
       const tok  = body.token || (body as any).access_token
       if (!tok) throw new Error('No token received')
       if (body.refresh_token) localStorage.setItem('erp_refresh_token', body.refresh_token)
+      if (rememberMe) localStorage.setItem('erp_remembered_email', data.email)
+      else localStorage.removeItem('erp_remembered_email')
       setAuth({ token:tok, user:body.user, company:body.company })
       const from = (location.state as any)?.from?.pathname || PATHS.DASHBOARD
       navigate(from, { replace:true })
@@ -440,7 +454,8 @@ export default function LoginPage() {
 
                     <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
                       <label style={{ display:'flex', alignItems:'center', gap:8, cursor:'pointer', color:'rgba(255,255,255,0.4)', fontSize:13 }}>
-                        <input type="checkbox" style={{ accentColor:'#6366f1', width:14, height:14 }}/> Remember me
+                        <input type="checkbox" checked={rememberMe} onChange={e=>setRememberMe(e.target.checked)}
+                          style={{ accentColor:'#6366f1', width:14, height:14 }}/> Remember me
                       </label>
                       <button type="button" style={{ background:'none', border:'none', cursor:'pointer', color:'#a5b4fc', fontSize:13, fontWeight:500 }}>
                         Forgot password?
