@@ -741,6 +741,17 @@ export default function SalesPage() {
             </div>
 
             <div className={`pos-accordion-body ${billingOpen ? 'pos-accordion-body--open' : 'pos-accordion-body--closed'}`}>
+              {/* Totals breakdown — mobile only. On desktop this same
+                  breakdown already lives in the sidebar Total Payable card
+                  (.pos-total-card-desktop); showing it again here too would
+                  duplicate it, since that card is hidden on mobile. */}
+              <div className="pos-mobile-only w-full space-y-0.5 mb-4">
+                <SummaryRow label="Sub Total"     value={fmt(subtotal)} />
+                <SummaryRow label="Discount"      value={`-${fmt(discountAmt)}`} muted={discountAmt === 0} />
+                <SummaryRow label="Round Off"     value={`${roundOff >= 0 ? '+' : '-'}${fmt(Math.abs(roundOff))}`} muted={roundOff === 0} />
+                <SummaryRow label="Total Payable" value={fmt(grandTotal)} highlight large />
+              </div>
+
               {/* Grid — IDENTICAL to original */}
               <div className="pos-billing-grid">
 
