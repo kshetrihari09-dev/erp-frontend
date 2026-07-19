@@ -99,7 +99,15 @@ export default function PurchasePage() {
   }, [detailId])
 
   // Subtotal for mobile sticky bar
-  const subtotal = rows.reduce((s, r) => s + r.amount, 0)
+  const subtotal   = rows.reduce((s, r) => s + r.amount, 0)
+  // ── Round Off — display only; the authoritative value is computed
+  // server-side (same nearest-whole-number rule) and saved with the bill.
+  // Shown here so the on-screen Grand Total matches what gets posted.
+  // When subtotal is already a whole number, roundOff is 0 and
+  // grandTotal === subtotal — Grand Total only changes when a round off
+  // is actually applied.
+  const roundOff   = Math.round((Math.round(subtotal) - subtotal) * 100) / 100
+  const grandTotal = Math.round(subtotal)
 
   // ── Submit ────────────────────────────────────────────────────────────
   const onSubmit = handleSubmit(async (data) => {
@@ -138,6 +146,7 @@ export default function PurchasePage() {
           rate: Number(r.rate), amount: Number(r.amount),
         })),
         netTotal:   saved.net_total,
+        roundOff:   Number(saved.round_off) || 0,
         paidAmount: saved.paid_amount,
         dueAmount:  saved.due_amount,
       })
@@ -216,6 +225,7 @@ export default function PurchasePage() {
         rate: Number(it.rate), amount: Number(it.amount),
       })),
       netTotal:   Number(src.net_total),
+      roundOff:   Number(src.round_off) || 0,
       paidAmount: Number(src.paid_amount),
       dueAmount:  Number(src.due_amount),
     })
@@ -466,6 +476,26 @@ export default function PurchasePage() {
             </div>
           </div>
 
+          {/* ── Billing summary — Sub Total / Round Off / Grand Total ──── */}
+          <div className="pos-card mb-4">
+            <div className="w-full space-y-0.5">
+              <div className="flex items-center justify-between py-1">
+                <span className="text-xs font-semibold uppercase tracking-wide text-[var(--text-3)]">Sub Total</span>
+                <span className="font-bold tabular-nums text-sm text-[var(--text)]">{fmt(subtotal)}</span>
+              </div>
+              <div className="flex items-center justify-between py-1">
+                <span className={`text-xs font-semibold uppercase tracking-wide ${roundOff === 0 ? 'text-[var(--text-4)]' : 'text-[var(--text-3)]'}`}>Round Off</span>
+                <span className="font-bold tabular-nums text-sm text-[var(--text)]">
+                  {roundOff >= 0 ? '+' : '-'}{fmt(Math.abs(roundOff))}
+                </span>
+              </div>
+              <div className="flex items-center justify-between py-2 border-t-2 border-[var(--border)] mt-1 pt-3">
+                <span className="text-xs font-semibold uppercase tracking-wide text-[var(--text-3)]">Grand Total</span>
+                <span className="font-bold tabular-nums text-xl text-brand">{fmt(grandTotal)}</span>
+              </div>
+            </div>
+          </div>
+
           {/* Desktop action bar */}
           <div className="inv-desktop-action flex justify-end mb-4">
             <Button variant="primary" size="lg" loading={saving} onClick={handleCreateClick} title="Create Purchase (F9 / Ctrl+S)">
@@ -488,7 +518,7 @@ export default function PurchasePage() {
             >
               {saving
                 ? <><span className="pos-spinner"/> Saving…</>
-                : <><FilePlus size={16}/> Create Purchase — {fmt(subtotal)}</>
+                : <><FilePlus size={16}/> Create Purchase — {fmt(grandTotal)}</>
               }
             </button>
           </div>
@@ -616,6 +646,7 @@ export default function PurchasePage() {
                   rate: Number(it.rate), amount: Number(it.amount),
                 })),
                 netTotal: Number(d.net_total),
+                roundOff: Number(d.round_off) || 0,
                 paidAmount: Number(d.paid_amount),
                 dueAmount: Number(d.due_amount),
               }), 50)
@@ -630,6 +661,7 @@ export default function PurchasePage() {
               {[
                 ['Supplier',  detail.party_name || '—'],
                 ['Date',      fmtDate(detail.date_ad)],
+                ['Round Off', fmt(detail.round_off ?? 0)],
                 ['Net Total', fmt(detail.net_total)],
                 ['Paid',      fmt(detail.paid_amount)],
                 ['Due',       fmt(detail.due_amount)],
@@ -663,6 +695,14 @@ export default function PurchasePage() {
                   ))}
                 </tbody>
                 <tfoot>
+                  {Number(detail.round_off) !== 0 && (
+                    <tr>
+                      <td colSpan={6} className="text-right font-semibold text-xs pr-3 text-[var(--text-3)]">ROUND OFF</td>
+                      <td className="td-right font-semibold text-xs text-[var(--text-3)]">
+                        {Number(detail.round_off) > 0 ? '+' : '−'}{fmt(Math.abs(Number(detail.round_off)))}
+                      </td>
+                    </tr>
+                  )}
                   <tr>
                     <td colSpan={6} className="text-right font-bold text-sm pr-3">NET TOTAL</td>
                     <td className="td-right font-bold text-brand">{fmt(detail.net_total)}</td>

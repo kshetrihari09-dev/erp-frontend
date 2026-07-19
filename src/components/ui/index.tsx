@@ -1,6 +1,7 @@
 import { forwardRef, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from 'react'
 import { cn, statusColor } from '@/utils'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
+import { Z } from '@/styles/zIndex'
 
 // ─── Button ───────────────────────────────────────────────────────────────────
 type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost' | 'outline' | 'success'
@@ -257,9 +258,9 @@ export function Modal({ open, onClose, title, children, size = 'md', footer }: M
   if (!open) return null
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+      className="fixed inset-0 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
       onClick={(e) => e.target === e.currentTarget && onClose()}
-      style={{ animation: 'fadeIn .15s ease' }}
+      style={{ animation: 'fadeIn .15s ease', zIndex: Z.modalBackdrop }}
     >
       <div
         className={cn(
@@ -267,7 +268,7 @@ export function Modal({ open, onClose, title, children, size = 'md', footer }: M
           'max-h-[90vh]',
           modalSizes[size]
         )}
-        style={{ animation: 'slideUp .2s ease' }}
+        style={{ animation: 'slideUp .2s ease', position: 'relative', zIndex: Z.modal }}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">

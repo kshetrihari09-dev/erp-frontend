@@ -160,7 +160,7 @@ function AccountSearchDropdown({
       </button>
 
       {open && (
-        <div className="absolute z-50 top-full left-0 right-0 mt-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl overflow-hidden">
+        <div className="absolute z-[var(--z-dropdown)] top-full left-0 right-0 mt-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl overflow-hidden">
           {/* Search */}
           <div className="p-2 border-b border-slate-100 dark:border-slate-800">
             <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800 rounded-lg px-3 h-8">

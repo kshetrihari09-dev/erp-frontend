@@ -30,6 +30,9 @@ export interface PrintData {
   subtotal?:    number
   discountAmt?: number
   ccAmount?:    number
+  /** Amount added/subtracted to reach a whole-number Grand Total. Positive
+   *  rounds up, negative rounds down. Omitted or 0 → no row is rendered. */
+  roundOff?:    number
   netTotal:     number
   paidAmount?:  number
   dueAmount?:   number
@@ -354,6 +357,14 @@ const InvoiceTemplate = forwardRef<HTMLDivElement, {
             )}
             {(data.ccAmount ?? 0) > 0 && (
               <tr><td style={s.totalLabel}>CC Charge</td><td style={s.totalVal}>{fmt(data.ccAmount)}</td></tr>
+            )}
+            {(data.roundOff ?? 0) !== 0 && (
+              <tr>
+                <td style={s.totalLabel}>Round Off</td>
+                <td style={s.totalVal}>
+                  {(data.roundOff ?? 0) > 0 ? '+' : '−'}{fmt(Math.abs(data.roundOff ?? 0))}
+                </td>
+              </tr>
             )}
             <tr style={s.grandTotal}>
               <td style={{ ...s.totalLabel, paddingTop: '6px', color: accent, fontWeight: 'bold' }}>TOTAL</td>

@@ -187,6 +187,10 @@ export interface Sale {
   discount_amt: number
   cc_amount?:   number
   net_total:    number
+  /** Difference applied to reach a whole-number Grand Total (nearest rupee).
+   *  0 (or absent, for invoices posted before this field existed) means no
+   *  rounding was applied. */
+  round_off?:   number
   paid_amount:  number
   due_amount:   number
   notes?:       string
@@ -216,6 +220,10 @@ export interface Purchase {
   party_name?:   string
   payment_mode:  PaymentMode
   net_total:     number
+  /** Difference applied to reach a whole-number Grand Total (nearest rupee).
+   *  0 (or absent, for bills posted before this field existed) means no
+   *  rounding was applied. */
+  round_off?:    number
   paid_amount:   number
   due_amount:    number
   status:        'active' | 'cancelled'

@@ -204,7 +204,15 @@ export default function SalesPage() {
   const subtotal         = rows.reduce((s, r) => s + r.amount, 0)
   const discountAmt      = subtotal * (discountPct / 100)
   const netTotal         = subtotal - discountAmt
-  const change           = typeof tender === 'number' && tender > 0 ? Math.max(0, tender - netTotal) : 0
+  // ── Round Off — display only; the authoritative value is computed
+  // server-side (same nearest-whole-number rule) and saved with the
+  // invoice. Shown here so the on-screen Grand Total matches what gets
+  // posted. When netTotal is already a whole number, roundOff is 0 and
+  // grandTotal === netTotal — Grand Total only changes when a round off
+  // is actually applied.
+  const roundOff         = Math.round((Math.round(netTotal) - netTotal) * 100) / 100
+  const grandTotal       = Math.round(netTotal)
+  const change            = typeof tender === 'number' && tender > 0 ? Math.max(0, tender - grandTotal) : 0
 
   // Auto-collapse customer accordion + focus product search on mobile
   const prevCustId = useRef(customerId)
@@ -252,6 +260,7 @@ export default function SalesPage() {
           cc_amount: Number(r.cc_amount) || 0, amount: Number(r.amount),
         })),
         subtotal: saved.subtotal, ccAmount: saved.cc_amount,
+        roundOff: Number(saved.round_off) || 0,
         netTotal: saved.net_total, paidAmount: saved.paid_amount, dueAmount: saved.due_amount,
       })
       setFlash({ type: 'success', msg: `Invoice ${saved.invoice_no} posted!` })
@@ -350,7 +359,7 @@ export default function SalesPage() {
           <div className="pos-mobile-total-bar">
             <div>
               <div className="pmb-label">Total Payable</div>
-              <div className="pmb-amount">{fmt(netTotal)}</div>
+              <div className="pmb-amount">{fmt(grandTotal)}</div>
             </div>
             <div className="pmb-meta">
               {rows.filter(r => r.product_id).length} item(s)
@@ -489,11 +498,12 @@ export default function SalesPage() {
               <div className="text-[11px] font-bold uppercase tracking-widest text-brand/80 mb-2">
                 Total Payable
               </div>
-              <div className="pos-total-amount">{fmt(netTotal)}</div>
+              <div className="pos-total-amount">{fmt(grandTotal)}</div>
               <div className="w-full mt-4 space-y-0.5">
                 <SummaryRow label="Sub Total"     value={fmt(subtotal)} />
                 <SummaryRow label="Discount"      value={`-${fmt(discountAmt)}`} muted={discountAmt === 0} />
-                <SummaryRow label="Total Payable" value={fmt(netTotal)} highlight large />
+                <SummaryRow label="Round Off"     value={`${roundOff >= 0 ? '+' : '-'}${fmt(Math.abs(roundOff))}`} muted={roundOff === 0} />
+                <SummaryRow label="Total Payable" value={fmt(grandTotal)} highlight large />
               </div>
             </div>
           </div>
@@ -720,7 +730,7 @@ export default function SalesPage() {
               {/* Mobile only: grand total preview when collapsed */}
               {!billingOpen && (
                 <span className="pos-mobile-only ml-auto font-mono font-bold text-sm text-[var(--text)]">
-                  {fmt(netTotal)}
+                  {fmt(grandTotal)}
                 </span>
               )}
               <ChevronDown
@@ -837,7 +847,7 @@ export default function SalesPage() {
             <button type="button" className="pma-post" onClick={handlePostClick} disabled={saving}>
               {saving
                 ? <><span className="pos-spinner"/> Posting…</>
-                : <><FileText size={16}/> Post Invoice — {fmt(netTotal)}</>
+                : <><FileText size={16}/> Post Invoice — {fmt(grandTotal)}</>
               }
             </button>
           </div>
@@ -899,6 +909,7 @@ export default function SalesPage() {
                                         cc_amount: Number(it.cc_amount)||0, amount: Number(it.amount),
                                       })),
                                       subtotal: Number(d.subtotal||0), ccAmount: Number(d.cc_amount||0),
+                                      roundOff: Number(d.round_off) || 0,
                                       netTotal: Number(d.net_total), paidAmount: Number(d.paid_amount), dueAmount: Number(d.due_amount),
                                     })
                                   } catch (e: any) { error('Print failed', e.message) }
@@ -976,6 +987,7 @@ export default function SalesPage() {
                               cc_amount: Number(it.cc_amount)||0, amount: Number(it.amount),
                             })),
                             subtotal: Number(d.subtotal||0), ccAmount: Number(d.cc_amount||0),
+                            roundOff: Number(d.round_off) || 0,
                             netTotal: Number(d.net_total), paidAmount: Number(d.paid_amount), dueAmount: Number(d.due_amount),
                           })
                         } catch (e: any) { error('Print failed', e.message) }
@@ -1011,6 +1023,7 @@ export default function SalesPage() {
                   cc_amount: Number(it.cc_amount)||0, amount: Number(it.amount),
                 })),
                 netTotal: Number(d.net_total), paidAmount: Number(d.paid_amount), dueAmount: Number(d.due_amount),
+                roundOff: Number(d.round_off) || 0,
               }), 50)
             }}
           >Print Invoice</Button>
@@ -1022,6 +1035,7 @@ export default function SalesPage() {
               {[
                 ['Party', detail.party_name], ['Date', fmtDate(detail.date_ad)],
                 ['Payment', detail.payment_mode], ['Status', ''],
+                ['Round Off', fmt(detail.round_off ?? 0)],
                 ['Net Total', fmt(detail.net_total)], ['Due', fmt(detail.due_amount)],
               ].map(([label, val], i) => (
                 <div key={i} className="bg-[var(--surface-2)] rounded-lg p-3">
@@ -1049,6 +1063,14 @@ export default function SalesPage() {
                   ))}
                 </tbody>
                 <tfoot>
+                  {Number(detail.round_off) !== 0 && (
+                    <tr>
+                      <td colSpan={5} className="text-right font-semibold text-xs pr-3 text-[var(--text-3)]">ROUND OFF</td>
+                      <td className="td-right font-semibold text-xs text-[var(--text-3)]">
+                        {Number(detail.round_off) > 0 ? '+' : '−'}{fmt(Math.abs(Number(detail.round_off)))}
+                      </td>
+                    </tr>
+                  )}
                   <tr>
                     <td colSpan={5} className="text-right font-bold text-sm pr-3">NET TOTAL</td>
                     <td className="td-right font-bold text-brand">{fmt(detail.net_total)}</td>
@@ -1063,7 +1085,7 @@ export default function SalesPage() {
       {/* ── Dialogs — IDENTICAL to original ──────────────────────────── */}
       <ConfirmDialog
         open={confirmPost} onClose={() => setConfirmPost(false)} onConfirm={onSubmit}
-        title="Post Invoice" message={`Post invoice for ${fmt(netTotal)}? This action cannot be undone.`}
+        title="Post Invoice" message={`Post invoice for ${fmt(grandTotal)}? This action cannot be undone.`}
       />
       <ConfirmDialog
         open={!!confirmCancel} onClose={() => setConfirmCancel(null)}
