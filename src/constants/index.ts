@@ -66,7 +66,9 @@ export const VOUCHER_TYPES = [
 ] as const
 
 // ─── Units ────────────────────────────────────────────────────────────────────
-export const PRODUCT_UNITS = ['PCS', 'BOX', 'STRIP', 'BOTTLE', 'TUBE', 'VIAL', 'SACHET', 'KG', 'LTR', 'SHEET'] as const
+// Matches the Quick Add modal's unit list exactly (components/forms/QuickAddModal.tsx)
+// so Product Add and Quick Add always save the identical string value for `unit`.
+export const PRODUCT_UNITS = ['Strip', 'Tablet', 'Capsule', 'Bottle', 'Vial', 'Ampoule', 'Sachet', 'Tube', 'Pcs', 'Box', 'Kg', 'Ltr'] as const
 
 // ─── User roles for dropdown ──────────────────────────────────────────────────
 export const USER_ROLES = [

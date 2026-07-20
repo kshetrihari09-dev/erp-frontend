@@ -7,6 +7,7 @@ import {
 } from '@/services/api'
 import * as manufacturersService from '@/services/manufacturers'
 import type { ManufacturerInput } from '@/services/manufacturers'
+import { createProductWithOpeningStock } from '@/services/productCreation'
 import useUIStore from '@/store/uiStore'
 import useAuthStore from '@/store/authStore'
 
@@ -36,7 +37,7 @@ export function useCreateProduct() {
   const qc = useQueryClient()
   const { success, error } = useUIStore()
   return useMutation({
-    mutationFn: productsAPI.create,
+    mutationFn: createProductWithOpeningStock,
     onSuccess: () => { qc.invalidateQueries({ queryKey: [QK.PRODUCTS] }); success('Product created') },
     onError:   (e: { message: string }) => error('Failed', e.message),
   })

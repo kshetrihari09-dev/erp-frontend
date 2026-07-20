@@ -1,8 +1,7 @@
 import { useState, lazy, Suspense } from 'react'
 import { useForm } from 'react-hook-form'
-import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Plus, Package, ScanLine, Type } from 'lucide-react'
+import { Plus, Package, ScanLine, Type, Boxes } from 'lucide-react'
 import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct } from '@/hooks/useQuery'
 import { Button, Modal, Badge, Pagination, SkeletonRows, Empty, SearchInput, ConfirmDialog } from '@/components/ui'
 import ManufacturerSelect from '@/components/forms/ManufacturerSelect'
@@ -10,25 +9,17 @@ import { useDebounce } from '@/hooks/useDebounce'
 import { fmt } from '@/utils'
 import { PRODUCT_UNITS } from '@/constants'
 import { parseProductOcr } from '@/utils/parseProductOcr'
+import { productSchema, PRODUCT_VAT_OPTIONS, type ProductFormInput } from '@/services/productCreation'
 import type { Product } from '@/types'
 import type { CaptureMode } from '@/hooks/scanner/useProductCapture'
 
 const ProductScanModal = lazy(() => import('@/components/scanner/ProductScanModal'))
 
-const schema = z.object({
-  name:          z.string().min(1, 'Required'),
-  generic_name:  z.string().optional(),
-  company_name:  z.string().optional(),
-  category:      z.string().optional(),
-  barcode:       z.string().optional(),
-  unit:          z.string().default('PCS'),
-  mrp:           z.coerce.number().min(0),
-  sales_rate:    z.coerce.number().min(0),
-  purchase_rate: z.coerce.number().min(0),
-  vat_percent:   z.coerce.number().default(13),
-  min_stock:     z.coerce.number().default(0),
-})
-type Form = z.infer<typeof schema>
+// Product Add and Quick Add (components/forms/QuickAddModal.tsx) both
+// validate against the same shared `productSchema` — see services/productCreation.ts.
+// This keeps the two flows' required fields, defaults, and accepted
+// values identical instead of duplicating the rules here.
+type Form = ProductFormInput
 
 function hasCameraSupport(): boolean {
   return typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia
@@ -38,13 +29,22 @@ function ProductForm({ initial, onClose }: { initial?: Product | null; onClose: 
   const create = useCreateProduct()
   const update = useUpdateProduct()
   const { register, handleSubmit, setValue, watch, formState: { errors, isSubmitting } } = useForm<Form>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(productSchema),
     defaultValues: initial ? {
       name: initial.name, generic_name: initial.generic_name || '', company_name: initial.company_name || '',
       category: initial.category || '', barcode: initial.barcode || '', unit: initial.unit, mrp: initial.mrp,
       sales_rate: initial.sales_rate, purchase_rate: initial.purchase_rate,
-      vat_percent: initial.vat_percent, min_stock: initial.min_stock,
-    } : { unit: 'PCS', vat_percent: 13, min_stock: 0, mrp: 0, sales_rate: 0, purchase_rate: 0, barcode: '' },
+      // GET /products and GET /products/:id return VAT under the raw
+      // `tax_rate` column name; only GET /products/search aliases it to
+      // vat_percent. Fall back through both so Edit shows the real saved value.
+      vat_percent: (initial as any).tax_rate ?? initial.vat_percent ?? 13,
+      min_stock: initial.min_stock,
+    } : {
+      // Same defaults Quick Add has always used, so a product created
+      // without touching these fields is identical either way.
+      unit: 'Strip', vat_percent: 13, min_stock: 50, mrp: 0, sales_rate: '' as any, purchase_rate: 0,
+      barcode: '', opening_stock: '' as any, opening_batch: '', opening_expiry: '',
+    },
   })
 
   const [scanOpen, setScanOpen]   = useState(false)
@@ -74,8 +74,13 @@ function ProductForm({ initial, onClose }: { initial?: Product | null; onClose: 
   }
 
   const onSubmit = handleSubmit(async (data) => {
-    if (initial) await update.mutateAsync({ id: initial.id, data })
-    else         await create.mutateAsync(data)
+    if (initial) {
+      // Editing never touches opening stock — that's a "new product" concept.
+      const { opening_stock, opening_batch, opening_expiry, ...editable } = data as any
+      await update.mutateAsync({ id: initial.id, data: editable })
+    } else {
+      await create.mutateAsync(data)
+    }
     onClose()
   })
 
@@ -154,9 +159,33 @@ function ProductForm({ initial, onClose }: { initial?: Product | null; onClose: 
         <Field label="MRP" name="mrp" type="number" step="0.01" />
         <Field label="Sale Rate" name="sales_rate" type="number" step="0.01" />
         <Field label="Purchase Rate" name="purchase_rate" type="number" step="0.01" />
-        <Field label="VAT %" name="vat_percent" type="number" />
+        <div>
+          <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">VAT %</label>
+          <select className="erp-input" {...register('vat_percent')}>
+            {PRODUCT_VAT_OPTIONS.map(v => <option key={v} value={v}>{v}%</option>)}
+          </select>
+        </div>
         <Field label="Min Stock" name="min_stock" type="number" />
       </div>
+
+      {/* ── Opening Inventory — only shown when creating a new product.
+          Editing an existing product never touches its stock here; that's
+          the Stock page's job. Same fields/behavior as Quick Add's
+          "Opening Stock" section: 0/empty means no batch, no transaction. */}
+      {!initial && (
+        <div className="mt-5 pt-4 border-t border-[var(--border)]">
+          <div className="flex items-center gap-1.5 mb-3 text-xs font-bold uppercase tracking-wide text-[var(--text-3)]">
+            <Boxes size={13} className="text-brand" />
+            Opening Inventory <span className="normal-case font-medium text-[var(--text-4)]">(optional)</span>
+          </div>
+          <div className="form-grid col3">
+            <Field label="Opening Stock" name="opening_stock" type="number" min="0" step="1" placeholder="0" />
+            <Field label="Opening Batch" name="opening_batch" placeholder="B001" />
+            <Field label="Opening Expiry (MM/YY)" name="opening_expiry" placeholder="06/27" />
+          </div>
+        </div>
+      )}
+
       <div className="flex justify-end gap-2 mt-5 pt-4 border-t border-[var(--border)]">
         <Button variant="secondary" onClick={onClose}>Cancel</Button>
         <Button variant="primary" loading={isSubmitting} onClick={onSubmit}>

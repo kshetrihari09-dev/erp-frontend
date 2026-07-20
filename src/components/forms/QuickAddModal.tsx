@@ -2,23 +2,27 @@
  * QuickAddModal.tsx
  *
  * Minimal "quick create" product modal opened from ProductSearchCell.
- * Uses the existing productsAPI.create() — no backend changes.
+ * Product creation (validation + POST /products + opening-stock adjust)
+ * goes through the shared services/productCreation.ts service — the same
+ * one the Product Add page (modules/inventory/ProductsPage.tsx) uses —
+ * so both flows always produce identical database records. This file's
+ * UI/markup/styling/shortcuts are unchanged; only the save logic was
+ * pointed at the shared service instead of calling the API directly.
  *
  * Fields map to POST /products body fields exactly:
  *   name, generic_name, company_name, category, unit,
- *   sales_rate, purchase_rate, mrp, vat_percent (sent as vat_percent),
- *   min_stock
+ *   sales_rate, purchase_rate, mrp, vat_percent, min_stock
  *
- * The "Opening Stock" field calls productsAPI.adjust() after create.
+ * The "Opening Stock" field triggers POST /products/:id/adjust after create.
  */
 
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { X, Package, Loader2, AlertCircle } from 'lucide-react'
-import { productsAPI } from '@/services/api'
 import ManufacturerSelect from './ManufacturerSelect'
 import type { Product } from '@/types'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
+import { validateProductInput, createProductWithOpeningStock, PRODUCT_VAT_OPTIONS } from '@/services/productCreation'
 
 interface Props {
   initialName: string
@@ -27,7 +31,6 @@ interface Props {
 }
 
 const UNITS = ['Strip', 'Tablet', 'Capsule', 'Bottle', 'Vial', 'Ampoule', 'Sachet', 'Tube', 'Pcs', 'Box', 'Kg', 'Ltr']
-const VAT_OPTIONS = [0, 13]
 
 interface FormState {
   name:          string
@@ -87,51 +90,29 @@ export default function QuickAddModal({ initialName, onSave, onClose }: Props) {
   async function handleSave() {
     setError('')
 
-    if (!form.name.trim()) { setError('Product name is required'); return }
-    if (!form.sales_rate || isNaN(Number(form.sales_rate))) {
-      setError('Sales rate is required'); return
-    }
+    const validationError = validateProductInput({
+      name: form.name, sales_rate: form.sales_rate,
+    } as any)
+    if (validationError) { setError(validationError); return }
 
     setSaving(true)
     try {
-      // 1 — Create product (maps exactly to POST /products accepted fields)
-      const res = await productsAPI.create({
-        name:          form.name.trim(),
-        generic_name:  form.generic_name.trim()  || undefined,
-        company_name:  form.company_name.trim()  || undefined,
-        category:      form.category.trim()      || undefined,
-        unit:          form.unit,
-        sales_rate:    Number(form.sales_rate),
-        purchase_rate: Number(form.purchase_rate) || 0,
-        mrp:           Number(form.mrp)           || 0,
-        vat_percent:   Number(form.vat_percent)   || 13,
-        min_stock:     Number(form.min_stock)     || 50,
-      } as any)
-
-      const newProduct: Product = res.data.data
-
-      // 2 — Adjust stock if opening qty provided
-      if (form.opening_stock && Number(form.opening_stock) > 0) {
-        try {
-          await productsAPI.adjust(newProduct.id, {
-            qty:           Number(form.opening_stock),
-            reason:        'Opening stock',
-            batch_no:      form.opening_batch  || undefined,
-            expiry:        form.opening_expiry || undefined,
-            purchase_rate: Number(form.purchase_rate) || 0,
-          } as any)
-        } catch {
-          // Non-fatal — product still created, stock can be adjusted later
-        }
-      }
-
-      // Merge vat_percent into the returned product object since the
-      // backend returns the raw row (which uses vat_percent column)
-      onSave({
-        ...newProduct,
-        vat_percent: Number(form.vat_percent) || 13,
-        sales_rate:  Number(form.sales_rate),
+      const newProduct = await createProductWithOpeningStock({
+        name:           form.name,
+        generic_name:   form.generic_name,
+        company_name:   form.company_name,
+        category:       form.category,
+        unit:           form.unit,
+        mrp:            form.mrp,
+        sales_rate:     form.sales_rate,
+        purchase_rate:  form.purchase_rate,
+        vat_percent:    form.vat_percent,
+        min_stock:      form.min_stock,
+        opening_stock:  form.opening_stock,
+        opening_batch:  form.opening_batch,
+        opening_expiry: form.opening_expiry,
       })
+      onSave(newProduct)
     } catch (e: any) {
       setError(e.message || 'Failed to save product')
     } finally {
@@ -271,7 +252,7 @@ export default function QuickAddModal({ initialName, onSave, onClose }: Props) {
             <div className="qam-field qam-field--xs">
               <label className="qam-label">VAT %</label>
               <select className="erp-input" value={form.vat_percent} onChange={e => set('vat_percent', e.target.value)}>
-                {VAT_OPTIONS.map(v => <option key={v} value={v}>{v}%</option>)}
+                {PRODUCT_VAT_OPTIONS.map(v => <option key={v} value={v}>{v}%</option>)}
               </select>
             </div>
           </div>

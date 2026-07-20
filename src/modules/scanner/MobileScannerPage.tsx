@@ -11,7 +11,8 @@
  * (window.location.origin) since both desktop and mobile hit the same server.
  */
 
-import { useEffect } from 'react'
+import { useEffect, useRef, useCallback } from 'react'
+import type { TouchEvent as ReactTouchEvent } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -63,7 +64,7 @@ export default function MobileScannerPage() {
   const [params] = useSearchParams()
   const token    = params.get('token') || ''
 
-  const { state, videoRef, toggleFlash, selectProduct, rescan } = useMobileScanner({
+  const { state, videoRef, toggleFlash, setZoom, selectProduct, rescan } = useMobileScanner({
     token,
     apiBase: getApiBase(),
   })
@@ -124,11 +125,41 @@ export default function MobileScannerPage() {
   const showDrawer   = state.status === 'matches' || state.status === 'submitting'
   const scanMethod   = state.lastBarcode ? 'barcode' : 'ocr'
 
+  // ── Pinch-to-zoom — same pattern as LocalScannerView.tsx ────────────────────
+  const pinchStartDist = useRef<number | null>(null)
+  const pinchStartZoom = useRef(1)
+  const touchDistance = (touches: ReactTouchEvent['touches']) => {
+    const [a, b] = [touches[0], touches[1]]
+    return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY)
+  }
+  const handleTouchStart = useCallback((e: ReactTouchEvent) => {
+    if (e.touches.length === 2 && state.zoomSupported) {
+      pinchStartDist.current = touchDistance(e.touches)
+      pinchStartZoom.current = state.zoom
+    }
+  }, [state.zoomSupported, state.zoom])
+  const handleTouchMove = useCallback((e: ReactTouchEvent) => {
+    if (e.touches.length === 2 && pinchStartDist.current) {
+      e.preventDefault()
+      const ratio = touchDistance(e.touches) / pinchStartDist.current
+      const range = state.zoomMax - state.zoomMin
+      setZoom(pinchStartZoom.current + (ratio - 1) * range)
+    }
+  }, [state.zoomMax, state.zoomMin, setZoom])
+  const handleTouchEnd = useCallback((e: ReactTouchEvent) => {
+    if (e.touches.length < 2) pinchStartDist.current = null
+  }, [])
+
   return (
     <div className="fixed inset-0 bg-black flex flex-col overflow-hidden">
 
       {/* ── Camera view ──────────────────────────────────────────────────── */}
-      <div className="relative flex-1 overflow-hidden bg-black">
+      <div
+        className="relative flex-1 overflow-hidden bg-black"
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
         <video
           ref={videoRef}
           playsInline muted autoPlay
@@ -139,6 +170,29 @@ export default function MobileScannerPage() {
 
         {/* Scan frame */}
         {(state.status === 'scanning') && <ScanFrame mode={state.mode} />}
+
+        {/* Zoom slider — mirrors LocalScannerView.tsx; hidden entirely when
+            the phone's camera doesn't report a zoom capability. */}
+        {state.zoomSupported && !showDrawer && (
+          <div className="absolute right-3 flex flex-col items-center gap-1.5" style={{ top: '50%', transform: 'translateY(-50%)' }}>
+            <span className="text-white/80 text-[10px] font-bold bg-black/40 backdrop-blur-md px-1.5 py-0.5 rounded-full">
+              {state.zoom.toFixed(1)}×
+            </span>
+            <div className="h-32 w-8 flex items-center justify-center">
+              <input
+                type="range"
+                aria-label="Camera zoom"
+                min={state.zoomMin}
+                max={state.zoomMax}
+                step={state.zoomStep}
+                value={state.zoom}
+                onChange={e => setZoom(Number(e.target.value))}
+                className="accent-blue-500"
+                style={{ width: '112px', transform: 'rotate(-90deg)' }}
+              />
+            </div>
+          </div>
+        )}
 
         {/* Top bar */}
         <div className="absolute top-0 left-0 right-0 flex items-center justify-between p-4">

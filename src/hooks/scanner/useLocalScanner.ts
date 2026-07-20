@@ -88,6 +88,13 @@ export interface LocalScannerState {
   lastBarcode: string | null
   lastOcrText: string | null
   lastResult:  ScanResult | null
+  // Zoom — only meaningful once zoomMax > zoomMin (i.e. the device/browser
+  // actually reports a zoom capability on the active camera track).
+  zoomSupported: boolean
+  zoomMin:       number
+  zoomMax:       number
+  zoomStep:      number
+  zoom:          number
 }
 
 interface Options {
@@ -100,6 +107,7 @@ const INITIAL_STATE: LocalScannerState = {
   status: 'requesting-permission', mode: 'idle', matches: [],
   error: null, notice: null, flashOn: false, facingMode: 'environment',
   ocrProgress: 0, lastBarcode: null, lastOcrText: null, lastResult: null,
+  zoomSupported: false, zoomMin: 1, zoomMax: 1, zoomStep: 0.1, zoom: 1,
 }
 
 export default function useLocalScanner({ onResult, active }: Options) {
@@ -133,12 +141,47 @@ export default function useLocalScanner({ onResult, active }: Options) {
   const startCamera = useCallback(async (facingMode: 'environment' | 'user' = 'environment'): Promise<boolean> => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: facingMode }, width: { ideal: 1280 }, height: { ideal: 720 } },
+        video: {
+          facingMode: { ideal: facingMode },
+          width:  { ideal: 1280 },
+          height: { ideal: 720 },
+          // Continuous autofocus matters a lot for barcode reliability:
+          // without it, some devices default to a fixed/far focus distance
+          // and a close-up barcode never comes into focus, so ZXing never
+          // gets a decodable frame no matter how long the loop runs.
+          // Not all browsers support this as a getUserMedia constraint
+          // (Chrome/Android does; Safari mostly doesn't) — advanced
+          // constraints that aren't understood are ignored rather than
+          // rejected, so this is safe to always request.
+          advanced: [{ focusMode: 'continuous' } as any],
+        },
         audio: false,
       })
       if (!mountedRef.current) { stream.getTracks().forEach(t => t.stop()); return false }
       streamRef.current = stream
       await attachStream()
+      // Some browsers only accept focusMode via applyConstraints after the
+      // stream is live, not in the initial getUserMedia request — try both.
+      try {
+        const track = stream.getVideoTracks()[0] as any
+        if (track?.getCapabilities?.()?.focusMode?.includes?.('continuous')) {
+          await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] })
+        }
+        const caps = track?.getCapabilities?.()
+        if (caps?.zoom && caps.zoom.max > caps.zoom.min) {
+          const current = track.getSettings?.()?.zoom ?? caps.zoom.min
+          setState(s => ({
+            ...s,
+            zoomSupported: true,
+            zoomMin:  caps.zoom.min,
+            zoomMax:  caps.zoom.max,
+            zoomStep: caps.zoom.step || 0.1,
+            zoom:     current,
+          }))
+        } else {
+          setState(s => ({ ...s, zoomSupported: false, zoomMin: 1, zoomMax: 1, zoom: 1 }))
+        }
+      } catch {}
       return true
     } catch (err: any) {
       if (!mountedRef.current) return false
@@ -181,6 +224,24 @@ export default function useLocalScanner({ onResult, active }: Options) {
       setState(s => ({ ...s, flashOn: next }))
     } catch {}
   }, [state.flashOn])
+
+  // ── Zoom ───────────────────────────────────────────────────────────────────
+  // A small barcode far from the lens is one of the most common reasons a
+  // scan "just won't pick up" — letting the user zoom in gives ZXing a
+  // larger, clearer barcode image to decode instead of a tiny one lost in
+  // a wide frame. Same capability-gated applyConstraints pattern as torch
+  // above; devices/browsers that don't report a zoom range simply never
+  // set zoomSupported, and the UI hides the control entirely.
+  const setZoom = useCallback(async (value: number) => {
+    const track = streamRef.current?.getVideoTracks()[0] as any
+    const caps  = track?.getCapabilities?.()
+    if (!caps?.zoom) return
+    const clamped = Math.min(caps.zoom.max, Math.max(caps.zoom.min, value))
+    try {
+      await track.applyConstraints({ advanced: [{ zoom: clamped }] })
+      setState(s => ({ ...s, zoom: clamped }))
+    } catch {}
+  }, [])
 
   // ── Camera switch (front / back) ────────────────────────────────────────────
   const switchCamera = useCallback(async () => {
@@ -526,7 +587,7 @@ export default function useLocalScanner({ onResult, active }: Options) {
 
   return {
     state, videoRef, containerRef,
-    toggleFlash, switchCamera, setMode,
+    toggleFlash, switchCamera, setMode, setZoom,
     selectProduct, rescan, retryPermission, scanImageFile,
   }
 }

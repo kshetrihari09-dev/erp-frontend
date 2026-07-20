@@ -44,6 +44,11 @@ export interface MobileScannerState {
   ocrProgress: number
   lastBarcode: string | null
   lastOcrText: string | null
+  zoomSupported: boolean
+  zoomMin:       number
+  zoomMax:       number
+  zoomStep:      number
+  zoom:          number
 }
 
 interface Options {
@@ -55,6 +60,7 @@ export default function useMobileScanner({ token, apiBase }: Options) {
   const [state, setState] = useState<MobileScannerState>({
     status: 'connecting', mode: 'idle', context: null, matches: [],
     error: null, flashOn: false, ocrProgress: 0, lastBarcode: null, lastOcrText: null,
+    zoomSupported: false, zoomMin: 1, zoomMax: 1, zoomStep: 0.1, zoom: 1,
   })
 
   const videoRef      = useRef<HTMLVideoElement | null>(null)
@@ -83,12 +89,34 @@ export default function useMobileScanner({ token, apiBase }: Options) {
   const startCamera = useCallback(async (): Promise<boolean> => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+        video: {
+          facingMode: { ideal: 'environment' },
+          width:  { ideal: 1280 },
+          height: { ideal: 720 },
+          // See useLocalScanner.ts — continuous autofocus is what makes
+          // close-up barcodes reliably decodable in the first place.
+          advanced: [{ focusMode: 'continuous' } as any],
+        },
         audio: false,
       })
       if (!mountedRef.current) { stream.getTracks().forEach(t => t.stop()); return false }
       streamRef.current = stream
       if (videoRef.current) { videoRef.current.srcObject = stream; await videoRef.current.play() }
+      try {
+        const track = stream.getVideoTracks()[0] as any
+        if (track?.getCapabilities?.()?.focusMode?.includes?.('continuous')) {
+          await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] })
+        }
+        const caps = track?.getCapabilities?.()
+        if (caps?.zoom && caps.zoom.max > caps.zoom.min) {
+          const current = track.getSettings?.()?.zoom ?? caps.zoom.min
+          setState(s => ({
+            ...s, zoomSupported: true,
+            zoomMin: caps.zoom.min, zoomMax: caps.zoom.max, zoomStep: caps.zoom.step || 0.1,
+            zoom: current,
+          }))
+        }
+      } catch {}
       return true
     } catch {
       if (mountedRef.current) setState(s => ({ ...s, status: 'error', error: 'Camera access denied. Please allow camera and try again.' }))
@@ -113,6 +141,17 @@ export default function useMobileScanner({ token, apiBase }: Options) {
       setState(s => ({ ...s, flashOn: next }))
     } catch {}
   }, [state.flashOn])
+
+  const setZoom = useCallback(async (value: number) => {
+    const track = streamRef.current?.getVideoTracks()[0] as any
+    const caps  = track?.getCapabilities?.()
+    if (!caps?.zoom) return
+    const clamped = Math.min(caps.zoom.max, Math.max(caps.zoom.min, value))
+    try {
+      await track.applyConstraints({ advanced: [{ zoom: clamped }] })
+      setState(s => ({ ...s, zoom: clamped }))
+    } catch {}
+  }, [])
 
   // ── Product search ─────────────────────────────────────────────────────────
   const searchBarcode = useCallback(async (code: string): Promise<MobileProduct[]> => {
@@ -297,5 +336,5 @@ export default function useMobileScanner({ token, apiBase }: Options) {
     return () => { active = false }
   }, [state.status]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  return { state, videoRef, toggleFlash, selectProduct, rescan }
+  return { state, videoRef, toggleFlash, setZoom, selectProduct, rescan }
 }

@@ -15,6 +15,7 @@
  */
 
 import { useRef, useState, useCallback } from 'react'
+import type { TouchEvent as ReactTouchEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
@@ -57,9 +58,43 @@ export default function LocalScannerView({ open, context, onResult, onClose, onU
   }, [onResult, onClose])
 
   const {
-    state, videoRef, containerRef, toggleFlash, switchCamera, setMode,
+    state, videoRef, containerRef, toggleFlash, switchCamera, setMode, setZoom,
     selectProduct, rescan, retryPermission, scanImageFile,
   } = useLocalScanner({ context, onResult: handleResult, active: open })
+
+  // ── Pinch-to-zoom ──────────────────────────────────────────────────────────
+  // Two-finger pinch on the camera preview adjusts zoom, in addition to the
+  // slider below (for precision / non-touch devices). Purely additive: does
+  // nothing when the device/browser doesn't report a zoom capability.
+  const pinchStartDist = useRef<number | null>(null)
+  const pinchStartZoom = useRef(1)
+
+  const touchDistance = (touches: ReactTouchEvent['touches']) => {
+    const [a, b] = [touches[0], touches[1]]
+    return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY)
+  }
+
+  const handleTouchStart = useCallback((e: ReactTouchEvent) => {
+    if (e.touches.length === 2 && state.zoomSupported) {
+      pinchStartDist.current = touchDistance(e.touches)
+      pinchStartZoom.current = state.zoom
+    }
+  }, [state.zoomSupported, state.zoom])
+
+  const handleTouchMove = useCallback((e: ReactTouchEvent) => {
+    if (e.touches.length === 2 && pinchStartDist.current) {
+      e.preventDefault()
+      const dist  = touchDistance(e.touches)
+      const ratio = dist / pinchStartDist.current
+      const range = state.zoomMax - state.zoomMin
+      const next  = pinchStartZoom.current + (ratio - 1) * range
+      setZoom(next)
+    }
+  }, [state.zoomMax, state.zoomMin, setZoom])
+
+  const handleTouchEnd = useCallback((e: ReactTouchEvent) => {
+    if (e.touches.length < 2) pinchStartDist.current = null
+  }, [])
 
   // One vibration pulse the moment matches are found (device support only)
   if (state.status === 'matches' && !vibratedRef.current) {
@@ -155,7 +190,13 @@ export default function LocalScannerView({ open, context, onResult, onClose, onU
 
         {/* ── Camera + scanning UI ─────────────────────────────────────────── */}
         {(state.status === 'scanning' || state.status === 'matches' || state.status === 'submitting' || state.status === 'done') && (
-          <div ref={containerRef} className="relative flex-1 overflow-hidden bg-black">
+          <div
+            ref={containerRef}
+            className="relative flex-1 overflow-hidden bg-black"
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+          >
             <video
               ref={videoRef}
               playsInline muted autoPlay
@@ -229,6 +270,34 @@ export default function LocalScannerView({ open, context, onResult, onClose, onU
             {state.status === 'scanning' && (
               <div className="absolute bottom-[132px] left-0 right-0 flex justify-center pointer-events-none">
                 <ModeBadge mode={state.mode} ocrProgress={state.ocrProgress} />
+              </div>
+            )}
+
+            {/* Zoom slider — only rendered when the active camera track
+                actually reports a zoom range. Pinch-to-zoom (handlers on
+                the container above) works alongside it for touch devices;
+                this gives a precise, discoverable control either way. */}
+            {state.zoomSupported && !showDrawer && (
+              <div
+                className="absolute right-3 flex flex-col items-center gap-1.5"
+                style={{ top: '50%', transform: 'translateY(-50%)' }}
+              >
+                <span className="text-white/80 text-[10px] font-bold bg-black/40 backdrop-blur-md px-1.5 py-0.5 rounded-full">
+                  {state.zoom.toFixed(1)}×
+                </span>
+                <div className="h-32 w-8 flex items-center justify-center">
+                  <input
+                    type="range"
+                    aria-label="Camera zoom"
+                    min={state.zoomMin}
+                    max={state.zoomMax}
+                    step={state.zoomStep}
+                    value={state.zoom}
+                    onChange={e => setZoom(Number(e.target.value))}
+                    className="accent-blue-500"
+                    style={{ width: '112px', transform: 'rotate(-90deg)' }}
+                  />
+                </div>
               </div>
             )}
 
