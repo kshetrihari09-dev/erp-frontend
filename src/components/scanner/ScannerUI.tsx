@@ -8,34 +8,43 @@
  */
 import { motion } from 'framer-motion'
 import { SCAN_BOX_WIDTH, SCAN_BOX_HEIGHT } from '@/utils/ocrImage'
-import { BARCODE_SCAN_SIZE } from '@/utils/barcodeFrame'
+import { BARCODE_SCAN_WIDTH, BARCODE_SCAN_HEIGHT } from '@/utils/barcodeFrame'
 
-// ── Barcode scan overlay (circular) ──────────────────────────────────────────
+// ── Barcode scan overlay (rectangular) ───────────────────────────────────────
 // The single, shared visual guide for barcode mode on BOTH scanners — the
-// exact circle diameter here is BARCODE_SCAN_SIZE, the same constant
-// useBarcodeEngine's decode loop crops from the video (via
+// exact rectangle size here is BARCODE_SCAN_WIDTH/HEIGHT, the same
+// constants useBarcodeEngine's decode loop crops from the video (via
 // captureBarcodeFrame in barcodeFrame.ts), so what's lit up on screen is
 // always exactly the region actually being decoded.
-export function BarcodeCircleOverlay({ found = false }: { found?: boolean }) {
+export function BarcodeRectOverlay({ found = false }: { found?: boolean }) {
   return (
     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
       <div
-        className="relative rounded-full"
+        className="relative rounded-2xl"
         style={{
-          width: BARCODE_SCAN_SIZE,
-          height: BARCODE_SCAN_SIZE,
+          width: BARCODE_SCAN_WIDTH,
+          height: BARCODE_SCAN_HEIGHT,
           boxShadow: '0 0 0 9999px rgba(0,0,0,0.55)',
         }}
       >
         <div
-          className={`absolute inset-0 rounded-full border-2 transition-colors duration-200 ${
-            found ? 'border-green-400/90' : 'border-white/80'
+          className={`absolute inset-0 rounded-2xl border-2 transition-colors duration-200 ${
+            found ? 'border-green-400/90' : 'border-white/40'
           }`}
         />
+        {/* Corner marks — classic barcode-scanner viewfinder styling */}
+        {!found && [
+          'top-0 left-0 border-t-2 border-l-2 rounded-tl-2xl',
+          'top-0 right-0 border-t-2 border-r-2 rounded-tr-2xl',
+          'bottom-0 left-0 border-b-2 border-l-2 rounded-bl-2xl',
+          'bottom-0 right-0 border-b-2 border-r-2 rounded-br-2xl',
+        ].map((cls, i) => (
+          <div key={i} className={`absolute w-7 h-7 border-white/90 ${cls}`} />
+        ))}
         {!found && (
           <motion.div
             className="absolute left-3 right-3 h-0.5 rounded-full bg-blue-400/80 shadow-lg shadow-blue-400/50"
-            animate={{ top: ['16%', '82%', '16%'] }}
+            animate={{ top: ['12%', '86%', '12%'] }}
             transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
           />
         )}

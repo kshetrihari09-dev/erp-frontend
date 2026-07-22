@@ -7,7 +7,7 @@
  * with a decoded value lives here exactly once:
  *
  *   - the <video> element + pinch-to-zoom handlers
- *   - the circular scan guide (BarcodeCircleOverlay)
+ *   - the rectangular scan guide (BarcodeRectOverlay)
  *   - the zoom slider
  *   - the top glass bar: close, flash toggle (only if the device reports
  *     torch support), switch camera
@@ -21,7 +21,7 @@
  * Callers still own their own bottom controls (mode toggles, gallery
  * button, capture button, matches drawer, crop step, etc.) via `children`,
  * and decide which scan guide to show via `scanOverlay` — barcode mode
- * uses BarcodeCircleOverlay everywhere; a caller in a different capture
+ * uses BarcodeRectOverlay everywhere; a caller in a different capture
  * mode (e.g. OCR) can swap in its own guide without duplicating any of the
  * chrome above.
  */
@@ -53,7 +53,7 @@ interface Props {
   onRetryPermission: () => void
 
   title?: string
-  scanOverlay?: ReactNode   // e.g. <BarcodeCircleOverlay /> — omit to show none
+  scanOverlay?: ReactNode   // e.g. <BarcodeRectOverlay /> — omit to show none
   showTopBar?: boolean
 
   success?:      boolean

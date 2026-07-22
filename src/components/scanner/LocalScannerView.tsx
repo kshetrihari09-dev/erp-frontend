@@ -29,7 +29,7 @@ import {
 } from 'lucide-react'
 import useLocalScanner from '@/hooks/scanner/useLocalScanner'
 import type { ScanResult } from '@/types/scanner'
-import { ScanFrame, ModeBadge, ProductCard, BarcodeCircleOverlay } from './ScannerUI'
+import { ScanFrame, ModeBadge, ProductCard, BarcodeRectOverlay } from './ScannerUI'
 import BarcodeScannerView from './BarcodeScannerView'
 import { Z } from '@/styles/zIndex'
 
@@ -113,7 +113,7 @@ export default function LocalScannerView({ open, context, onResult, onClose, onU
           onSwitchCamera={switchCamera}
           onClose={onClose}
           onRetryPermission={retryPermission}
-          scanOverlay={state.status === 'scanning' ? (state.mode === 'barcode' ? <BarcodeCircleOverlay /> : <ScanFrame mode={state.mode} />) : undefined}
+          scanOverlay={state.status === 'scanning' ? (state.mode === 'barcode' ? <BarcodeRectOverlay /> : <ScanFrame mode={state.mode} />) : undefined}
           success={state.status === 'done'}
           successLabel="Added!"
           deniedExtra={

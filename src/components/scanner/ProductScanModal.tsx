@@ -32,7 +32,7 @@ import {
 } from 'lucide-react'
 import useProductCapture, { type CaptureMode } from '@/hooks/scanner/useProductCapture'
 import CropOverlay from './CropOverlay'
-import { BarcodeCircleOverlay } from './ScannerUI'
+import { BarcodeRectOverlay } from './ScannerUI'
 import BarcodeScannerView from './BarcodeScannerView'
 import { Z } from '@/styles/zIndex'
 
@@ -110,7 +110,7 @@ export default function ProductScanModal({ open, initialMode, onBarcode, onOcrTe
           scanOverlay={
             !showDrawer
               ? (mode === 'barcode'
-                  ? <BarcodeCircleOverlay />
+                  ? <BarcodeRectOverlay />
                   : (
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                       <div className="border-2 rounded-2xl border-purple-400/80" style={{ width: '84%', height: '55%' }} />
