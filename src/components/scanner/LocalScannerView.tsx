@@ -14,8 +14,7 @@
  * cost nothing until a user actually opens the scanner.
  */
 
-import { useRef, useState, useCallback } from 'react'
-import type { TouchEvent as ReactTouchEvent } from 'react'
+import { useRef, useState, useCallback, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
@@ -23,8 +22,10 @@ import {
   CheckCircle2, AlertCircle, CameraOff, RotateCcw, Smartphone, Loader2,
 } from 'lucide-react'
 import useLocalScanner from '@/hooks/scanner/useLocalScanner'
+import useCameraZoom from '@/hooks/scanner/useCameraZoom'
 import type { ScanResult } from '@/types/scanner'
 import { ScanFrame, ModeBadge, ProductCard } from './ScannerUI'
+import ZoomControl from './ZoomControl'
 import { Z } from '@/styles/zIndex'
 
 // Full-screen scanner overlay — see src/styles/zIndex.ts for the app-wide
@@ -58,41 +59,29 @@ export default function LocalScannerView({ open, context, onResult, onClose, onU
   }, [onResult, onClose])
 
   const {
-    state, videoRef, containerRef, toggleFlash, switchCamera, setMode, setZoom,
+    state, videoRef, containerRef, toggleFlash, switchCamera, setMode, setZoom, getVideoTrack,
     selectProduct, rescan, retryPermission, scanImageFile,
   } = useLocalScanner({ context, onResult: handleResult, active: open })
 
-  // ── Pinch-to-zoom ──────────────────────────────────────────────────────────
-  // Two-finger pinch on the camera preview adjusts zoom, in addition to the
-  // slider below (for precision / non-touch devices). Digital zoom (see
-  // useLocalScanner.ts), so this works on every device — no hardware
-  // capability check needed.
-  const pinchStartDist = useRef<number | null>(null)
-  const pinchStartZoom = useRef(1)
+  // ── Modern camera-style zoom ────────────────────────────────────────────────
+  // Hardware zoom (MediaStreamTrack.applyConstraints) when the active track
+  // supports it, hybrid digital zoom layered on top / as a full fallback
+  // otherwise. Pinch, wheel, double-tap-to-cycle-presets, and +/- buttons
+  // all funnel through this one hook; it only ever calls the existing
+  // setZoom() for the CSS/crop portion, so the barcode-decode loop and its
+  // crop math in useLocalScanner.ts are completely unchanged.
+  const zoomEngine = useCameraZoom({
+    getTrack: getVideoTrack,
+    onDigitalZoom: setZoom,
+    active: open,
+  })
 
-  const touchDistance = (touches: ReactTouchEvent['touches']) => {
-    const [a, b] = [touches[0], touches[1]]
-    return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY)
-  }
-
-  const handleTouchStart = useCallback((e: ReactTouchEvent) => {
-    if (e.touches.length === 2 && state.zoomSupported) {
-      pinchStartDist.current = touchDistance(e.touches)
-      pinchStartZoom.current = state.zoom
-    }
-  }, [state.zoomSupported, state.zoom])
-
-  const handleTouchMove = useCallback((e: ReactTouchEvent) => {
-    if (e.touches.length === 2 && pinchStartDist.current) {
-      e.preventDefault()
-      const ratio = touchDistance(e.touches) / pinchStartDist.current
-      setZoom(pinchStartZoom.current * ratio)
-    }
-  }, [setZoom])
-
-  const handleTouchEnd = useCallback((e: ReactTouchEvent) => {
-    if (e.touches.length < 2) pinchStartDist.current = null
-  }, [])
+  // Re-probe hardware zoom capability once the camera is actually live,
+  // and again on every camera switch (front/back tracks can differ).
+  useEffect(() => {
+    if (state.status === 'scanning') zoomEngine.refresh()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.status, state.facingMode])
 
   // One vibration pulse the moment matches are found (device support only)
   if (state.status === 'matches' && !vibratedRef.current) {
@@ -191,15 +180,17 @@ export default function LocalScannerView({ open, context, onResult, onClose, onU
           <div
             ref={containerRef}
             className="relative flex-1 overflow-hidden bg-black"
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
+            onTouchStart={zoomEngine.bind.onTouchStart}
+            onTouchMove={zoomEngine.bind.onTouchMove}
+            onTouchEnd={zoomEngine.bind.onTouchEnd}
+            onWheel={zoomEngine.bind.onWheel}
+            onDoubleClick={zoomEngine.bind.onDoubleClick}
           >
-            <video
+            <motion.video
               ref={videoRef}
               playsInline muted autoPlay
               className="absolute inset-0 w-full h-full object-cover"
-              style={{ transform: `scale(${state.zoom})`, transformOrigin: 'center' }}
+              style={{ scale: zoomEngine.scaleSpring, transformOrigin: 'center' }}
             />
             <div className="absolute inset-0 bg-gradient-to-b from-black/55 via-transparent to-black/65 pointer-events-none" />
 
@@ -272,33 +263,21 @@ export default function LocalScannerView({ open, context, onResult, onClose, onU
               </div>
             )}
 
-            {/* Zoom slider — only rendered when the active camera track
-                actually reports a zoom range. Pinch-to-zoom (handlers on
-                the container above) works alongside it for touch devices;
-                this gives a precise, discoverable control either way. */}
-            {state.zoomSupported && !showDrawer && (
-              <div
-                className="absolute right-3 flex flex-col items-center gap-1.5"
-                style={{ top: '50%', transform: 'translateY(-50%)' }}
-              >
-                <span className="text-white/80 text-[10px] font-bold bg-black/40 backdrop-blur-md px-1.5 py-0.5 rounded-full">
-                  {state.zoom.toFixed(1)}×
-                </span>
-                <div className="h-32 w-8 flex items-center justify-center">
-                  <input
-                    type="range"
-                    aria-label="Camera zoom"
-                    min={state.zoomMin}
-                    max={state.zoomMax}
-                    step={state.zoomStep}
-                    value={state.zoom}
-                    onChange={e => setZoom(Number(e.target.value))}
-                    className="accent-blue-500"
-                    style={{ width: '112px', transform: 'rotate(-90deg)' }}
-                  />
-                </div>
-              </div>
-            )}
+            {/* Floating circular zoom control + transient center indicator —
+                see ZoomControl.tsx / useCameraZoom.ts. Pinch, mouse wheel,
+                double-tap-to-cycle-presets (handlers on the container
+                above) all work alongside it. */}
+            <ZoomControl
+              totalZoom={zoomEngine.totalZoom}
+              min={zoomEngine.min}
+              max={zoomEngine.max}
+              hwSupported={zoomEngine.hwSupported}
+              showIndicator={zoomEngine.showIndicator}
+              onZoomIn={zoomEngine.zoomIn}
+              onZoomOut={zoomEngine.zoomOut}
+              onPreset={zoomEngine.cyclePreset}
+              visible={!showDrawer}
+            />
 
             {/* ── Bottom controls ────────────────────────────────────────── */}
             {!showDrawer && (

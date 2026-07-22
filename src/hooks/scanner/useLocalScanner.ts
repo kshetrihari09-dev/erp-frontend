@@ -110,8 +110,13 @@ interface Options {
 }
 
 const ZOOM_MIN = 1
-const ZOOM_MAX = 3
-const ZOOM_STEP = 0.1
+// NOTE: this is now the *digital-portion* ceiling only — see
+// useCameraZoom.ts, which owns the total (hardware + digital) zoom range
+// shown to the user and feeds this hook only the CSS-scale remainder via
+// setZoom(). Widened + made continuous (0.01) to support that hybrid
+// range without ever clipping it.
+const ZOOM_MAX = 8
+const ZOOM_STEP = 0.01
 
 const INITIAL_STATE: LocalScannerState = {
   status: 'requesting-permission', mode: 'idle', matches: [],
@@ -601,9 +606,16 @@ export default function useLocalScanner({ onResult, active }: Options) {
     attachStream()
   }, [active, state.status, attachStream])
 
+  // Read-only accessor for the live camera track — used by
+  // useCameraZoom.ts (in the view layer) to probe/apply hardware zoom.
+  // Does not participate in any scanning/decode logic.
+  const getVideoTrack = useCallback((): MediaStreamTrack | null => {
+    return streamRef.current?.getVideoTracks()[0] ?? null
+  }, [])
+
   return {
     state, videoRef, containerRef,
-    toggleFlash, switchCamera, setMode, setZoom,
+    toggleFlash, switchCamera, setMode, setZoom, getVideoTrack,
     selectProduct, rescan, retryPermission, scanImageFile,
   }
 }
