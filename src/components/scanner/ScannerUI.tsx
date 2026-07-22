@@ -8,6 +8,41 @@
  */
 import { motion } from 'framer-motion'
 import { SCAN_BOX_WIDTH, SCAN_BOX_HEIGHT } from '@/utils/ocrImage'
+import { BARCODE_SCAN_SIZE } from '@/utils/barcodeFrame'
+
+// ── Barcode scan overlay (circular) ──────────────────────────────────────────
+// The single, shared visual guide for barcode mode on BOTH scanners — the
+// exact circle diameter here is BARCODE_SCAN_SIZE, the same constant
+// useBarcodeEngine's decode loop crops from the video (via
+// captureBarcodeFrame in barcodeFrame.ts), so what's lit up on screen is
+// always exactly the region actually being decoded.
+export function BarcodeCircleOverlay({ found = false }: { found?: boolean }) {
+  return (
+    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+      <div
+        className="relative rounded-full"
+        style={{
+          width: BARCODE_SCAN_SIZE,
+          height: BARCODE_SCAN_SIZE,
+          boxShadow: '0 0 0 9999px rgba(0,0,0,0.55)',
+        }}
+      >
+        <div
+          className={`absolute inset-0 rounded-full border-2 transition-colors duration-200 ${
+            found ? 'border-green-400/90' : 'border-white/80'
+          }`}
+        />
+        {!found && (
+          <motion.div
+            className="absolute left-3 right-3 h-0.5 rounded-full bg-blue-400/80 shadow-lg shadow-blue-400/50"
+            animate={{ top: ['16%', '82%', '16%'] }}
+            transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
+          />
+        )}
+      </div>
+    </div>
+  )
+}
 
 // ── Scan frame overlay ────────────────────────────────────────────────────────
 // The box below is drawn at the exact same pixel size (SCAN_BOX_WIDTH x

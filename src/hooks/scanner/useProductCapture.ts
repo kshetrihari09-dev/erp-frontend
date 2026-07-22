@@ -2,23 +2,30 @@
  * useProductCapture.ts
  *
  * Camera engine for the "Product Setup" scanner — distinct from
- * useLocalScanner (which looks up EXISTING products for billing).
- * This one is for CREATING a product: it never calls the product-lookup
+ * useLocalScanner (which looks up EXISTING products for billing). This
+ * one is for CREATING a product: it never calls the product-lookup
  * endpoints. It only extracts raw signal from the camera:
  *
- *   - 'barcode' mode: continuously decodes with @zxing/browser (same
- *     approach/interval as the billing scanner) and returns the decoded
- *     string the moment one is found — the caller drops it straight into
- *     the Barcode field.
+ *   - 'barcode' mode: continuously decodes and returns the decoded string
+ *     the moment one is found — the caller drops it straight into the
+ *     Barcode field.
  *   - 'label' mode: on demand (user taps Capture), grabs the current video
  *     frame and runs Tesseract.js OCR once, returning the raw text for the
  *     caller to parse and let the user review before applying to the form.
  *
- * Both tesseract.js and @zxing/browser are dynamically imported so they
- * cost nothing until a user actually opens this scanner.
+ * All camera/zoom/flash/camera-switch/barcode-decode concerns now come
+ * from the shared useBarcodeEngine hook (see useBarcodeEngine.ts) — the
+ * exact same engine the billing scanner (useLocalScanner.ts) uses — so
+ * both scanners are guaranteed identical camera init, autofocus, zoom,
+ * flash, and decode behavior/performance. This file only adds what's
+ * specific to product creation: the label-capture → crop → OCR flow.
+ *
+ * tesseract.js is dynamically imported so it costs nothing until a user
+ * actually captures a label.
  */
 
 import { useState, useRef, useCallback, useEffect } from 'react'
+import useBarcodeEngine from './useBarcodeEngine'
 import { preprocessForOcr } from '@/utils/ocrImage'
 
 export type CaptureMode   = 'barcode' | 'label'
@@ -45,7 +52,14 @@ export interface CaptureState {
   error:       string | null
   ocrProgress: number
   cropSource:  CropSource | null
-  zoom:        number
+  // Camera state mirrored from the shared engine — see useBarcodeEngine.ts.
+  flashOn:        boolean
+  flashSupported: boolean
+  facingMode:     'environment' | 'user'
+  zoom:           number
+  zoomMin:        number
+  zoomMax:        number
+  zoomStep:       number
 }
 
 interface Options {
@@ -55,21 +69,8 @@ interface Options {
   onOcrText:    (text: string) => void
 }
 
-const BARCODE_INTERVAL_MS = 300
-
-// Digital zoom range. Deliberately NOT tied to MediaTrackConstraints.zoom —
-// that hardware capability is unreliable (most webcams and a lot of phone
-// cameras never report it via getUserMedia at all, so a control gated on
-// it simply never appears for most people) and, even when present, each
-// applyConstraints() call is an async round-trip to the camera driver that
-// visibly stutters when driven by a slider or a pinch gesture. A CSS scale
-// on the <video> element plus a matching center-crop of the capture canvas
-// works identically on every device/browser, updates purely synchronously
-// (so it's always smooth), and actually improves barcode-decode quality —
-// the cropped region is what gets handed to ZXing, not just a cosmetic
-// zoomed preview.
-export const MIN_ZOOM = 1
-export const MAX_ZOOM = 3
+// Re-exported so ProductScanModal's zoom slider keeps working unchanged.
+export { ZOOM_MIN as MIN_ZOOM, ZOOM_MAX as MAX_ZOOM } from './useBarcodeEngine'
 
 // Find text anywhere in the image with no layout assumptions — appropriate
 // for a product label/box, which is mostly logos/graphics with a few
@@ -165,115 +166,62 @@ function detectTextRegion(canvas: HTMLCanvasElement): CropRect | null {
 }
 
 export default function useProductCapture({ active, mode, onBarcode, onOcrText }: Options) {
+  const engine = useBarcodeEngine()
+  const { videoRef, containerRef } = engine
+
   const [state, setState] = useState<CaptureState>({
-    status: 'requesting-permission', mode, error: null, ocrProgress: 0, cropSource: null, zoom: MIN_ZOOM,
+    status: 'requesting-permission', mode, error: null, ocrProgress: 0, cropSource: null,
+    flashOn: false, flashSupported: false, facingMode: 'environment',
+    zoom: engine.state.zoom, zoomMin: engine.state.zoomMin, zoomMax: engine.state.zoomMax, zoomStep: engine.state.zoomStep,
   })
 
-  const videoRef    = useRef<HTMLVideoElement | null>(null)
-  const streamRef   = useRef<MediaStream | null>(null)
-  const barcodeTimer = useRef<ReturnType<typeof setInterval> | null>(null)
-  const mountedRef  = useRef(true)
+  const mountedRef = useRef(true)
 
-  // The barcode-decode interval (below) is created once per scanner session
-  // and must always read the *current* zoom without being torn down and
-  // recreated on every slider tick — that recreation is exactly the kind of
-  // churn that causes visible stutter. A ref mirror sidesteps it entirely.
-  const zoomRef = useRef(MIN_ZOOM)
-  useEffect(() => { zoomRef.current = state.zoom }, [state.zoom])
+  // Zoom mirrored into a ref for the OCR capture path's synchronous
+  // canvas math (captureFrame) — parity with the engine's own internal
+  // zoomRef, just a thin local mirror.
+  const zoomRef = useRef(engine.state.zoom)
+  useEffect(() => { zoomRef.current = engine.state.zoom }, [engine.state.zoom])
 
-  const setZoom = useCallback((value: number) => {
-    const clamped = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value))
-    setState(s => (s.zoom === clamped ? s : { ...s, zoom: clamped }))
-  }, [])
+  // ── Mirror the shared engine's camera state into this hook's state so
+  //    ProductScanModal keeps reading a single, familiar `state` shape ──────
+  useEffect(() => {
+    setState(s => ({
+      ...s,
+      flashOn:        engine.state.flashOn,
+      flashSupported: engine.state.flashSupported,
+      facingMode:     engine.state.facingMode,
+      zoom:           engine.state.zoom,
+      zoomMin:        engine.state.zoomMin,
+      zoomMax:        engine.state.zoomMax,
+      zoomStep:       engine.state.zoomStep,
+    }))
+  }, [engine.state.flashOn, engine.state.flashSupported, engine.state.facingMode, engine.state.zoom, engine.state.zoomMin, engine.state.zoomMax, engine.state.zoomStep])
+
+  const setZoom = useCallback((value: number) => engine.setZoom(value), [engine])
+  const toggleFlash = useCallback(() => engine.toggleFlash(), [engine])
 
   useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; revokePendingUrl() } }, [])
 
-  const stopBarcodeLoop = useCallback(() => {
-    if (barcodeTimer.current) { clearInterval(barcodeTimer.current); barcodeTimer.current = null }
-  }, [])
-
   const stopCamera = useCallback(() => {
-    stopBarcodeLoop()
-    streamRef.current?.getTracks().forEach(t => t.stop())
-    streamRef.current = null
-  }, [stopBarcodeLoop])
+    engine.closeCamera()
+  }, [engine])
 
-  // Attaches the current stream to the <video> element if it isn't already
-  // attached. Split out from startCamera (and also called defensively — see
-  // the effect below) because the <video> element doesn't exist yet at the
-  // exact moment getUserMedia() resolves: the modal only renders <video>
-  // once status flips to 'ready', but startCamera() runs while status is
-  // still 'requesting-permission'. If the stream is captured but never
-  // attached, videoRef.current stays null/stale and the barcode loop and
-  // OCR capture both silently do nothing forever (same failure mode fixed
-  // previously in useLocalScanner).
-  const attachStream = useCallback(async () => {
-    const video  = videoRef.current
-    const stream = streamRef.current
-    if (!video || !stream || video.srcObject === stream) return
-    video.srcObject = stream
-    try { await video.play() } catch {}
-  }, [])
+  // ── Barcode detection — delegates the actual decode loop to the shared
+  //    engine; this callback is purely "what to do with a decoded code" ─────
+  const handleBarcodeDetected = useCallback((code: string) => {
+    onBarcode(code)
+  }, [onBarcode])
 
-  const startCamera = useCallback(async (): Promise<boolean> => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
-        audio: false,
-      })
-      if (!mountedRef.current) { stream.getTracks().forEach(t => t.stop()); return false }
-      streamRef.current = stream
-      await attachStream()
-      return true
-    } catch (err: any) {
-      if (!mountedRef.current) return false
-      if (err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError') {
-        setState(s => ({ ...s, status: 'denied', error: 'Camera access was denied.' }))
-      } else if (err?.name === 'NotFoundError' || err?.name === 'DevicesNotFoundError') {
-        setState(s => ({ ...s, status: 'error', error: 'No camera found on this device.' }))
-      } else {
-        setState(s => ({ ...s, status: 'error', error: 'Could not start the camera. Please try again.' }))
-      }
-      return false
-    }
-  }, [])
+  const startBarcodeLoop = useCallback(() => {
+    engine.startScanning(handleBarcodeDetected)
+  }, [engine, handleBarcodeDetected])
 
-  const startBarcodeLoop = useCallback(async () => {
-    const { BrowserMultiFormatReader } = await import('@zxing/browser')
-    const reader = new BrowserMultiFormatReader()
-
-    barcodeTimer.current = setInterval(async () => {
-      if (!videoRef.current || videoRef.current.readyState < 2 || !mountedRef.current) return
-      try {
-        const video = videoRef.current
-        const vw = video.videoWidth  || 640
-        const vh = video.videoHeight || 480
-        const z  = zoomRef.current
-
-        const canvas = document.createElement('canvas')
-        canvas.width  = vw
-        canvas.height = vh
-        const ctx = canvas.getContext('2d')!
-        if (z > 1) {
-          // Same centered region the CSS-scaled <video> is visually
-          // showing the user — draw it stretched to full canvas size so
-          // ZXing gets a larger, clearer barcode image, not a smaller one.
-          const cropW = vw / z, cropH = vh / z
-          const cropX = (vw - cropW) / 2, cropY = (vh - cropH) / 2
-          ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, vw, vh)
-        } else {
-          ctx.drawImage(video, 0, 0)
-        }
-        const result = await reader.decodeFromCanvas(canvas)
-        const code   = result?.getText()
-        if (!code || !mountedRef.current) return
-        stopBarcodeLoop()
-        onBarcode(code)
-      } catch {
-        // NotFoundException on frames with no barcode — expected, keep looping
-      }
-    }, BARCODE_INTERVAL_MS)
-  }, [onBarcode, stopBarcodeLoop])
+  const switchCamera = useCallback(async () => {
+    await engine.switchCamera()
+    // engine.switchCamera() restarts the barcode decode loop itself if it
+    // was active before the switch — nothing else to do here.
+  }, [engine])
 
   // Holds the full-resolution, un-preprocessed frame/image while the user
   // adjusts the crop box. Not in React state because it's a large pixel
@@ -348,7 +296,7 @@ export default function useProductCapture({ active, mode, onBarcode, onOcrText }
       pendingUrlRef.current = url
       setState(s => ({ ...s, status: 'cropping', error: null, cropSource: { url, naturalWidth: canvas.width, naturalHeight: canvas.height, suggested } }))
     }, 'image/jpeg', 0.92)
-  }, [revokePendingUrl])
+  }, [revokePendingUrl, videoRef])
 
   // ── Same, but from a gallery-picked image instead of the live feed ──────
   const selectFileForCrop = useCallback(async (file: File) => {
@@ -402,18 +350,17 @@ export default function useProductCapture({ active, mode, onBarcode, onOcrText }
 
   const retryPermission = useCallback(async () => {
     setState(s => ({ ...s, status: 'requesting-permission', error: null }))
-    const ok = await startCamera()
+    const ok = await engine.retryPermission()
     if (ok && mountedRef.current) {
-      await attachStream()
       setState(s => ({ ...s, status: 'ready' }))
-      if (mode === 'barcode') await startBarcodeLoop()
+      if (mode === 'barcode') startBarcodeLoop()
     }
-  }, [startCamera, startBarcodeLoop, attachStream, mode])
+  }, [engine, startBarcodeLoop, mode])
 
   // ── Switch between barcode / label without re-requesting permission ─────
   useEffect(() => {
     if (!active || state.status !== 'ready') return
-    stopBarcodeLoop()
+    engine.stopScanning()
     setState(s => ({ ...s, mode, status: 'ready', error: null }))
     if (mode === 'barcode') startBarcodeLoop()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -423,7 +370,11 @@ export default function useProductCapture({ active, mode, onBarcode, onOcrText }
   useEffect(() => {
     if (!active) {
       stopCamera()
-      setState({ status: 'requesting-permission', mode, error: null, ocrProgress: 0, cropSource: null, zoom: MIN_ZOOM })
+      setState(s => ({
+        status: 'requesting-permission', mode, error: null, ocrProgress: 0, cropSource: null,
+        flashOn: false, flashSupported: false, facingMode: 'environment',
+        zoom: 1, zoomMin: s.zoomMin, zoomMax: s.zoomMax, zoomStep: s.zoomStep,
+      }))
       return
     }
 
@@ -431,20 +382,27 @@ export default function useProductCapture({ active, mode, onBarcode, onOcrText }
     setState(s => ({ ...s, status: 'requesting-permission', error: null }))
 
     async function init() {
-      const ok = await startCamera()
+      const ok = await engine.openCamera('environment')
       if (cancelled || !mountedRef.current || !ok) return
-      // Belt-and-suspenders: attachStream() already ran inside startCamera,
-      // but we re-check here too before flipping to 'ready' and kicking
-      // off the barcode loop.
-      await attachStream()
       setState(s => ({ ...s, status: 'ready' }))
-      if (mode === 'barcode') await startBarcodeLoop()
+      if (mode === 'barcode') startBarcodeLoop()
     }
     init()
 
     return () => { cancelled = true; stopCamera() }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active])
+
+  // ── Map the engine's camera status onto this hook's status while the
+  //    camera itself hasn't finished opening yet (denied/error) ──────────────
+  useEffect(() => {
+    if (!active) return
+    if (engine.state.cameraStatus === 'denied') {
+      setState(s => (s.status === 'denied' ? s : { ...s, status: 'denied', error: engine.state.error }))
+    } else if (engine.state.cameraStatus === 'error') {
+      setState(s => (s.status === 'error' ? s : { ...s, status: 'error', error: engine.state.error }))
+    }
+  }, [active, engine.state.cameraStatus, engine.state.error])
 
   // ── Defensive re-attach ──────────────────────────────────────────────────
   // Runs whenever the scanner is active and status changes. If the <video>
@@ -454,8 +412,13 @@ export default function useProductCapture({ active, mode, onBarcode, onOcrText }
   // preview stays blank" bug.
   useEffect(() => {
     if (!active) return
-    attachStream()
-  }, [active, state.status, attachStream])
+    engine.attachStream()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, state.status])
 
-  return { state, videoRef, captureFrame, selectFileForCrop, confirmCrop, cancelCrop, retryPermission, setZoom }
+  return {
+    state, videoRef, containerRef,
+    captureFrame, selectFileForCrop, confirmCrop, cancelCrop,
+    retryPermission, setZoom, toggleFlash, switchCamera,
+  }
 }

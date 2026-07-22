@@ -1,31 +1,36 @@
 /**
  * LocalScannerView.tsx
  *
- * The new default scanner entry point: full-screen camera opens instantly,
- * scanning starts automatically (barcode → OCR fallback, exactly as before),
- * and a result is returned the moment a match is picked — no QR, no second
- * device, no waiting screen.
+ * The default scanner entry point for Sales/Purchase: full-screen camera
+ * opens instantly, scanning starts automatically (barcode → OCR fallback),
+ * and a result is returned the moment a match is picked — no QR, no
+ * second device, no waiting screen.
  *
- * The QR / cross-device flow (ScannerModal + useScannerSession) is untouched
- * and still available — via the "Use Another Device" affordance here, which
- * simply closes this view and opens that existing modal.
+ * All camera chrome — the video, circular scan overlay, top glass bar
+ * (close/flash/switch camera), zoom slider, permission/error/loading
+ * states, and the success check animation — is now the single shared
+ * BarcodeScannerView component (see BarcodeScannerView.tsx), the exact
+ * same component ProductScanModal (Product Add's scanner) renders. Only
+ * what's specific to billing lookups lives here: the OCR mode badge, the
+ * "no match yet" notice, the barcode/OCR mode toggle, and the matches
+ * bottom sheet.
  *
- * Lazy-loaded from ScanButton so it (and its zxing/tesseract dependencies)
- * cost nothing until a user actually opens the scanner.
+ * The QR / cross-device flow (ScannerModal + useScannerSession) is
+ * untouched and still available — via the "Use Another Device" affordance
+ * here, which simply closes this view and opens that existing modal.
  */
 
-import { useRef, useState, useCallback, useEffect } from 'react'
+import { useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
-  X, Zap, ZapOff, RefreshCw, ImageIcon, ScanLine, Type,
-  CheckCircle2, AlertCircle, CameraOff, RotateCcw, Smartphone, Loader2,
+  X, ImageIcon, ScanLine, Type,
+  RotateCcw, Smartphone, Loader2,
 } from 'lucide-react'
 import useLocalScanner from '@/hooks/scanner/useLocalScanner'
-import useCameraZoom from '@/hooks/scanner/useCameraZoom'
 import type { ScanResult } from '@/types/scanner'
-import { ScanFrame, ModeBadge, ProductCard } from './ScannerUI'
-import ZoomControl from './ZoomControl'
+import { ScanFrame, ModeBadge, ProductCard, BarcodeCircleOverlay } from './ScannerUI'
+import BarcodeScannerView from './BarcodeScannerView'
 import { Z } from '@/styles/zIndex'
 
 // Full-screen scanner overlay — see src/styles/zIndex.ts for the app-wide
@@ -46,7 +51,6 @@ function vibrate(pattern: number | number[]) {
 }
 
 export default function LocalScannerView({ open, context, onResult, onClose, onUseAnotherDevice }: Props) {
-  const [showSettingsHelp, setShowSettingsHelp] = useState(false)
   const galleryInputRef = useRef<HTMLInputElement>(null)
   const vibratedRef      = useRef(false)
 
@@ -59,29 +63,9 @@ export default function LocalScannerView({ open, context, onResult, onClose, onU
   }, [onResult, onClose])
 
   const {
-    state, videoRef, containerRef, toggleFlash, switchCamera, setMode, setZoom, getVideoTrack,
+    state, videoRef, containerRef, toggleFlash, switchCamera, setMode, setZoom,
     selectProduct, rescan, retryPermission, scanImageFile,
   } = useLocalScanner({ context, onResult: handleResult, active: open })
-
-  // ── Modern camera-style zoom ────────────────────────────────────────────────
-  // Hardware zoom (MediaStreamTrack.applyConstraints) when the active track
-  // supports it, hybrid digital zoom layered on top / as a full fallback
-  // otherwise. Pinch, wheel, double-tap-to-cycle-presets, and +/- buttons
-  // all funnel through this one hook; it only ever calls the existing
-  // setZoom() for the CSS/crop portion, so the barcode-decode loop and its
-  // crop math in useLocalScanner.ts are completely unchanged.
-  const zoomEngine = useCameraZoom({
-    getTrack: getVideoTrack,
-    onDigitalZoom: setZoom,
-    active: open,
-  })
-
-  // Re-probe hardware zoom capability once the camera is actually live,
-  // and again on every camera switch (front/back tracks can differ).
-  useEffect(() => {
-    if (state.status === 'scanning') zoomEngine.refresh()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.status, state.facingMode])
 
   // One vibration pulse the moment matches are found (device support only)
   if (state.status === 'matches' && !vibratedRef.current) {
@@ -94,6 +78,14 @@ export default function LocalScannerView({ open, context, onResult, onClose, onU
   if (!open) return null
 
   const showDrawer = state.status === 'matches' || state.status === 'submitting'
+  // BarcodeScannerView renders the camera whenever the shared engine
+  // reports 'ready' — map every one of this hook's "camera is up" states
+  // onto that, mirroring the engine's own CameraStatus type.
+  const cameraStatus =
+    state.status === 'denied' ? 'denied' :
+    state.status === 'error'  ? 'error'  :
+    state.status === 'requesting-permission' ? 'requesting-permission' :
+    'ready'
 
   return createPortal(
     <AnimatePresence>
@@ -108,227 +100,101 @@ export default function LocalScannerView({ open, context, onResult, onClose, onU
           zIndex: SCANNER_Z_INDEX,
         }}
       >
-        {/* ── Denied permission ────────────────────────────────────────────── */}
-        {state.status === 'denied' && (
-          <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
-            <div className="w-16 h-16 rounded-2xl bg-red-500/15 flex items-center justify-center mb-4">
-              <CameraOff size={28} className="text-red-400" />
+        <BarcodeScannerView
+          cameraStatus={cameraStatus}
+          error={state.error}
+          videoRef={videoRef}
+          containerRef={containerRef}
+          zoom={state.zoom} zoomMin={state.zoomMin} zoomMax={state.zoomMax} zoomStep={state.zoomStep}
+          onZoomChange={setZoom}
+          showZoomSlider={!showDrawer}
+          flashOn={state.flashOn} flashSupported={state.flashSupported}
+          onToggleFlash={toggleFlash}
+          onSwitchCamera={switchCamera}
+          onClose={onClose}
+          onRetryPermission={retryPermission}
+          scanOverlay={state.status === 'scanning' ? (state.mode === 'barcode' ? <BarcodeCircleOverlay /> : <ScanFrame mode={state.mode} />) : undefined}
+          success={state.status === 'done'}
+          successLabel="Added!"
+          deniedExtra={
+            <button
+              onClick={onUseAnotherDevice}
+              className="flex items-center justify-center gap-2 px-5 py-2.5 text-slate-400 text-xs font-medium mt-1"
+            >
+              <Smartphone size={13} /> Use Another Device Instead
+            </button>
+          }
+        >
+          {/* ── Extra overlays specific to this scanner (mode badge, notice) ── */}
+          {state.status === 'scanning' && (
+            <div className="absolute bottom-[132px] left-0 right-0 flex justify-center pointer-events-none">
+              <ModeBadge mode={state.mode} ocrProgress={state.ocrProgress} />
             </div>
-            <p className="text-white font-bold text-lg mb-2">Camera access needed</p>
-            <p className="text-slate-400 text-sm leading-relaxed mb-6 max-w-xs">
-              We need permission to use your camera to scan barcodes and medicine packaging.
-            </p>
-            <div className="flex flex-col gap-2.5 w-full max-w-[240px]">
-              <button
-                onClick={retryPermission}
-                className="flex items-center justify-center gap-2 px-5 py-3 bg-blue-600 text-white rounded-xl font-semibold text-sm"
-              >
-                <RotateCcw size={14} /> Try Again
-              </button>
-              <button
-                onClick={() => setShowSettingsHelp(v => !v)}
-                className="flex items-center justify-center gap-2 px-5 py-3 bg-white/10 text-white rounded-xl font-semibold text-sm"
-              >
-                Open Camera Settings
-              </button>
+          )}
+
+          {state.status === 'scanning' && state.notice && (
+            <motion.div
+              key="notice"
+              initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+              className="absolute left-0 right-0 flex justify-center pointer-events-none"
+              style={{ top: '58%' }}
+            >
+              <div className="px-3 py-1.5 rounded-full bg-black/70 backdrop-blur-md text-white/90 text-xs font-medium">
+                {state.notice}
+              </div>
+            </motion.div>
+          )}
+
+          {/* ── Bottom controls (mode toggle, gallery, "use another device") ── */}
+          {!showDrawer && (
+            <div
+              key="bottom-controls"
+              className="absolute bottom-0 left-0 right-0 flex flex-col items-center gap-3 px-4 pb-2"
+              style={{ paddingBottom: 'max(14px, env(safe-area-inset-bottom, 0px))' }}
+            >
               <button
                 onClick={onUseAnotherDevice}
-                className="flex items-center justify-center gap-2 px-5 py-2.5 text-slate-400 text-xs font-medium mt-1"
+                className="flex items-center gap-1.5 px-3.5 py-1.5 bg-white/10 backdrop-blur-md rounded-full text-white/80 text-xs font-medium"
               >
-                <Smartphone size={13} /> Use Another Device Instead
-              </button>
-            </div>
-            {showSettingsHelp && (
-              <div className="mt-5 max-w-xs text-xs text-slate-400 bg-white/5 border border-white/10 rounded-xl p-3.5 text-left leading-relaxed">
-                Your browser blocks apps from opening settings directly. Look for a camera/lock icon
-                in your address bar, or go to your browser/phone Settings → Site or App Permissions →
-                Camera, and allow access for this app.
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ── Hard error (no camera device, etc.) ─────────────────────────── */}
-        {state.status === 'error' && (
-          <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
-            <div className="w-16 h-16 rounded-2xl bg-red-500/15 flex items-center justify-center mb-4">
-              <AlertCircle size={28} className="text-red-400" />
-            </div>
-            <p className="text-white font-bold text-lg mb-2">Scanner error</p>
-            <p className="text-slate-400 text-sm leading-relaxed mb-6 max-w-xs">{state.error}</p>
-            <div className="flex flex-col gap-2.5 w-full max-w-[240px]">
-              <button onClick={rescan} className="flex items-center justify-center gap-2 px-5 py-3 bg-blue-600 text-white rounded-xl font-semibold text-sm">
-                <RotateCcw size={14} /> Try Again
-              </button>
-              <button onClick={onUseAnotherDevice} className="flex items-center justify-center gap-2 px-5 py-2.5 text-slate-400 text-xs font-medium">
-                <Smartphone size={13} /> Use Another Device Instead
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ── Requesting permission (camera opening) ──────────────────────── */}
-        {state.status === 'requesting-permission' && (
-          <div className="flex-1 flex flex-col items-center justify-center gap-3">
-            <Loader2 size={26} className="text-blue-400 animate-spin" />
-            <p className="text-white/70 text-sm">Opening camera…</p>
-          </div>
-        )}
-
-        {/* ── Camera + scanning UI ─────────────────────────────────────────── */}
-        {(state.status === 'scanning' || state.status === 'matches' || state.status === 'submitting' || state.status === 'done') && (
-          <div
-            ref={containerRef}
-            className="relative flex-1 overflow-hidden bg-black"
-            onTouchStart={zoomEngine.bind.onTouchStart}
-            onTouchMove={zoomEngine.bind.onTouchMove}
-            onTouchEnd={zoomEngine.bind.onTouchEnd}
-            onWheel={zoomEngine.bind.onWheel}
-            onDoubleClick={zoomEngine.bind.onDoubleClick}
-          >
-            <motion.video
-              ref={videoRef}
-              playsInline muted autoPlay
-              className="absolute inset-0 w-full h-full object-cover"
-              style={{ scale: zoomEngine.scaleSpring, transformOrigin: 'center' }}
-            />
-            <div className="absolute inset-0 bg-gradient-to-b from-black/55 via-transparent to-black/65 pointer-events-none" />
-
-            {state.status === 'scanning' && <ScanFrame mode={state.mode} />}
-
-            {/* Transient "no match yet" feedback — scanning keeps going,
-                this just reassures the user something is happening
-                without interrupting the loop or requiring any action. */}
-            <AnimatePresence>
-              {state.status === 'scanning' && state.notice && (
-                <motion.div
-                  initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                  className="absolute left-0 right-0 flex justify-center pointer-events-none"
-                  style={{ top: '58%' }}
-                >
-                  <div className="px-3 py-1.5 rounded-full bg-black/70 backdrop-blur-md text-white/90 text-xs font-medium">
-                    {state.notice}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Success overlay */}
-            {state.status === 'done' && (
-              <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center gap-3">
-                <motion.div
-                  initial={{ scale: 0 }} animate={{ scale: 1 }}
-                  transition={{ type: 'spring', duration: 0.4 }}
-                  className="w-20 h-20 rounded-full bg-green-500 flex items-center justify-center shadow-lg shadow-green-500/40"
-                >
-                  <CheckCircle2 size={38} className="text-white" />
-                </motion.div>
-                <p className="text-white font-bold text-base">Added!</p>
-              </div>
-            )}
-
-            {/* ── Top glass bar ──────────────────────────────────────────── */}
-            <div className="absolute top-0 left-0 right-0 flex items-center justify-between p-3.5"
-                 style={{ paddingTop: 'max(14px, env(safe-area-inset-top, 0px))' }}>
-              <button
-                onClick={onClose}
-                aria-label="Close scanner"
-                className="w-10 h-10 rounded-full bg-white/15 backdrop-blur-md flex items-center justify-center text-white active:scale-90 transition-transform"
-              >
-                <X size={18} />
+                <Smartphone size={12} /> Use Another Device
               </button>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center justify-center gap-3">
                 <button
-                  onClick={toggleFlash}
-                  aria-label="Toggle flash"
-                  className="w-10 h-10 rounded-full bg-white/15 backdrop-blur-md flex items-center justify-center text-white active:scale-90 transition-transform"
+                  onClick={() => galleryInputRef.current?.click()}
+                  aria-label="Scan from gallery"
+                  className="w-12 h-12 rounded-full bg-white/12 backdrop-blur-md flex items-center justify-center text-white active:scale-90 transition-transform"
                 >
-                  {state.flashOn ? <ZapOff size={17} /> : <Zap size={17} />}
+                  <ImageIcon size={19} />
                 </button>
                 <button
-                  onClick={switchCamera}
-                  aria-label="Switch camera"
-                  className="w-10 h-10 rounded-full bg-white/15 backdrop-blur-md flex items-center justify-center text-white active:scale-90 transition-transform"
+                  onClick={() => setMode('barcode')}
+                  aria-label="Barcode mode"
+                  className={`w-14 h-14 rounded-full flex items-center justify-center transition-transform active:scale-90 ${
+                    state.mode === 'barcode' ? 'bg-blue-600 text-white' : 'bg-white/15 backdrop-blur-md text-white'
+                  }`}
                 >
-                  <RefreshCw size={16} />
+                  <ScanLine size={22} />
                 </button>
-              </div>
-            </div>
-
-            {/* Mode badge */}
-            {state.status === 'scanning' && (
-              <div className="absolute bottom-[132px] left-0 right-0 flex justify-center pointer-events-none">
-                <ModeBadge mode={state.mode} ocrProgress={state.ocrProgress} />
-              </div>
-            )}
-
-            {/* Floating circular zoom control + transient center indicator —
-                see ZoomControl.tsx / useCameraZoom.ts. Pinch, mouse wheel,
-                double-tap-to-cycle-presets (handlers on the container
-                above) all work alongside it. */}
-            <ZoomControl
-              totalZoom={zoomEngine.totalZoom}
-              min={zoomEngine.min}
-              max={zoomEngine.max}
-              hwSupported={zoomEngine.hwSupported}
-              showIndicator={zoomEngine.showIndicator}
-              onZoomIn={zoomEngine.zoomIn}
-              onZoomOut={zoomEngine.zoomOut}
-              onPreset={zoomEngine.cyclePreset}
-              visible={!showDrawer}
-            />
-
-            {/* ── Bottom controls ────────────────────────────────────────── */}
-            {!showDrawer && (
-              <div
-                className="absolute bottom-0 left-0 right-0 flex flex-col items-center gap-3 px-4 pb-2"
-                style={{ paddingBottom: 'max(14px, env(safe-area-inset-bottom, 0px))' }}
-              >
                 <button
-                  onClick={onUseAnotherDevice}
-                  className="flex items-center gap-1.5 px-3.5 py-1.5 bg-white/10 backdrop-blur-md rounded-full text-white/80 text-xs font-medium"
+                  onClick={() => setMode('ocr')}
+                  aria-label="OCR mode"
+                  className={`w-12 h-12 rounded-full flex items-center justify-center transition-transform active:scale-90 ${
+                    state.mode === 'ocr' ? 'bg-purple-600 text-white' : 'bg-white/12 backdrop-blur-md text-white'
+                  }`}
                 >
-                  <Smartphone size={12} /> Use Another Device
+                  <Type size={19} />
                 </button>
-
-                <div className="flex items-center justify-center gap-3">
-                  <button
-                    onClick={() => galleryInputRef.current?.click()}
-                    aria-label="Scan from gallery"
-                    className="w-12 h-12 rounded-full bg-white/12 backdrop-blur-md flex items-center justify-center text-white active:scale-90 transition-transform"
-                  >
-                    <ImageIcon size={19} />
-                  </button>
-                  <button
-                    onClick={() => setMode('barcode')}
-                    aria-label="Barcode mode"
-                    className={`w-14 h-14 rounded-full flex items-center justify-center transition-transform active:scale-90 ${
-                      state.mode === 'barcode' ? 'bg-blue-600 text-white' : 'bg-white/15 backdrop-blur-md text-white'
-                    }`}
-                  >
-                    <ScanLine size={22} />
-                  </button>
-                  <button
-                    onClick={() => setMode('ocr')}
-                    aria-label="OCR mode"
-                    className={`w-12 h-12 rounded-full flex items-center justify-center transition-transform active:scale-90 ${
-                      state.mode === 'ocr' ? 'bg-purple-600 text-white' : 'bg-white/12 backdrop-blur-md text-white'
-                    }`}
-                  >
-                    <Type size={19} />
-                  </button>
-                </div>
-
-                <input
-                  ref={galleryInputRef}
-                  type="file" accept="image/*" className="hidden"
-                  onChange={e => { const f = e.target.files?.[0]; if (f) scanImageFile(f); e.target.value = '' }}
-                />
               </div>
-            )}
-          </div>
-        )}
+
+              <input
+                ref={galleryInputRef}
+                type="file" accept="image/*" className="hidden"
+                onChange={e => { const f = e.target.files?.[0]; if (f) scanImageFile(f); e.target.value = '' }}
+              />
+            </div>
+          )}
+        </BarcodeScannerView>
 
         {/* ── Matches bottom sheet ─────────────────────────────────────────── */}
         <AnimatePresence>
