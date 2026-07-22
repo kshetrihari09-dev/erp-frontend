@@ -64,8 +64,9 @@ export default function LocalScannerView({ open, context, onResult, onClose, onU
 
   // ── Pinch-to-zoom ──────────────────────────────────────────────────────────
   // Two-finger pinch on the camera preview adjusts zoom, in addition to the
-  // slider below (for precision / non-touch devices). Purely additive: does
-  // nothing when the device/browser doesn't report a zoom capability.
+  // slider below (for precision / non-touch devices). Digital zoom (see
+  // useLocalScanner.ts), so this works on every device — no hardware
+  // capability check needed.
   const pinchStartDist = useRef<number | null>(null)
   const pinchStartZoom = useRef(1)
 
@@ -84,13 +85,10 @@ export default function LocalScannerView({ open, context, onResult, onClose, onU
   const handleTouchMove = useCallback((e: ReactTouchEvent) => {
     if (e.touches.length === 2 && pinchStartDist.current) {
       e.preventDefault()
-      const dist  = touchDistance(e.touches)
-      const ratio = dist / pinchStartDist.current
-      const range = state.zoomMax - state.zoomMin
-      const next  = pinchStartZoom.current + (ratio - 1) * range
-      setZoom(next)
+      const ratio = touchDistance(e.touches) / pinchStartDist.current
+      setZoom(pinchStartZoom.current * ratio)
     }
-  }, [state.zoomMax, state.zoomMin, setZoom])
+  }, [setZoom])
 
   const handleTouchEnd = useCallback((e: ReactTouchEvent) => {
     if (e.touches.length < 2) pinchStartDist.current = null
@@ -201,6 +199,7 @@ export default function LocalScannerView({ open, context, onResult, onClose, onU
               ref={videoRef}
               playsInline muted autoPlay
               className="absolute inset-0 w-full h-full object-cover"
+              style={{ transform: `scale(${state.zoom})`, transformOrigin: 'center' }}
             />
             <div className="absolute inset-0 bg-gradient-to-b from-black/55 via-transparent to-black/65 pointer-events-none" />
 

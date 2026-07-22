@@ -88,8 +88,14 @@ export interface LocalScannerState {
   lastBarcode: string | null
   lastOcrText: string | null
   lastResult:  ScanResult | null
-  // Zoom — only meaningful once zoomMax > zoomMin (i.e. the device/browser
-  // actually reports a zoom capability on the active camera track).
+  // Zoom — digital (CSS scale + matching canvas crop), not tied to
+  // MediaTrackConstraints.zoom. See setZoom below for why: hardware zoom
+  // is unreliable (most devices never report the capability at all) and
+  // each applyConstraints() call is an async round-trip that visibly
+  // stutters when driven by a slider/pinch. zoomSupported is therefore
+  // always true here — kept as a field so LocalScannerView doesn't need
+  // an unrelated prop-shape change — and zoomMin/Max/Step are fixed
+  // constants rather than a probed hardware range.
   zoomSupported: boolean
   zoomMin:       number
   zoomMax:       number
@@ -103,11 +109,15 @@ interface Options {
   active:   boolean   // whether the scanner view is currently open
 }
 
+const ZOOM_MIN = 1
+const ZOOM_MAX = 3
+const ZOOM_STEP = 0.1
+
 const INITIAL_STATE: LocalScannerState = {
   status: 'requesting-permission', mode: 'idle', matches: [],
   error: null, notice: null, flashOn: false, facingMode: 'environment',
   ocrProgress: 0, lastBarcode: null, lastOcrText: null, lastResult: null,
-  zoomSupported: false, zoomMin: 1, zoomMax: 1, zoomStep: 0.1, zoom: 1,
+  zoomSupported: true, zoomMin: ZOOM_MIN, zoomMax: ZOOM_MAX, zoomStep: ZOOM_STEP, zoom: ZOOM_MIN,
 }
 
 export default function useLocalScanner({ onResult, active }: Options) {
@@ -167,21 +177,10 @@ export default function useLocalScanner({ onResult, active }: Options) {
         if (track?.getCapabilities?.()?.focusMode?.includes?.('continuous')) {
           await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] })
         }
-        const caps = track?.getCapabilities?.()
-        if (caps?.zoom && caps.zoom.max > caps.zoom.min) {
-          const current = track.getSettings?.()?.zoom ?? caps.zoom.min
-          setState(s => ({
-            ...s,
-            zoomSupported: true,
-            zoomMin:  caps.zoom.min,
-            zoomMax:  caps.zoom.max,
-            zoomStep: caps.zoom.step || 0.1,
-            zoom:     current,
-          }))
-        } else {
-          setState(s => ({ ...s, zoomSupported: false, zoomMin: 1, zoomMax: 1, zoom: 1 }))
-        }
       } catch {}
+      // Reset digital zoom to 1x on every fresh camera start (new session
+      // or camera switch) so it doesn't carry over unexpectedly.
+      setState(s => ({ ...s, zoom: ZOOM_MIN }))
       return true
     } catch (err: any) {
       if (!mountedRef.current) return false
@@ -225,22 +224,24 @@ export default function useLocalScanner({ onResult, active }: Options) {
     } catch {}
   }, [state.flashOn])
 
+  // Mirrors state.zoom for the barcode-decode interval's closure (see
+  // startBarcodeLoop below) — that interval is created once per session and
+  // must always read the *current* zoom without being torn down/recreated
+  // on every slider tick, which would itself cause stutter.
+  const zoomRef = useRef(ZOOM_MIN)
+  useEffect(() => { zoomRef.current = state.zoom }, [state.zoom])
+
   // ── Zoom ───────────────────────────────────────────────────────────────────
   // A small barcode far from the lens is one of the most common reasons a
   // scan "just won't pick up" — letting the user zoom in gives ZXing a
   // larger, clearer barcode image to decode instead of a tiny one lost in
-  // a wide frame. Same capability-gated applyConstraints pattern as torch
-  // above; devices/browsers that don't report a zoom range simply never
-  // set zoomSupported, and the UI hides the control entirely.
-  const setZoom = useCallback(async (value: number) => {
-    const track = streamRef.current?.getVideoTracks()[0] as any
-    const caps  = track?.getCapabilities?.()
-    if (!caps?.zoom) return
-    const clamped = Math.min(caps.zoom.max, Math.max(caps.zoom.min, value))
-    try {
-      await track.applyConstraints({ advanced: [{ zoom: clamped }] })
-      setState(s => ({ ...s, zoom: clamped }))
-    } catch {}
+  // a wide frame. Pure synchronous state update (CSS scale on <video> +
+  // matching canvas crop in the decode loop) — no async camera round-trip,
+  // so dragging the slider or pinching is always smooth, and it works
+  // identically on every device regardless of hardware zoom support.
+  const setZoom = useCallback((value: number) => {
+    const clamped = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, value))
+    setState(s => (s.zoom === clamped ? s : { ...s, zoom: clamped }))
   }, [])
 
   // ── Camera switch (front / back) ────────────────────────────────────────────
@@ -485,10 +486,25 @@ export default function useLocalScanner({ onResult, active }: Options) {
     barcodeTimer.current = setInterval(async () => {
       if (!videoRef.current || videoRef.current.readyState < 2 || !mountedRef.current) return
       try {
+        const video = videoRef.current
+        const vw = video.videoWidth  || 640
+        const vh = video.videoHeight || 480
+        const z  = zoomRef.current
+
         const canvas = document.createElement('canvas')
-        canvas.width  = videoRef.current.videoWidth  || 640
-        canvas.height = videoRef.current.videoHeight || 480
-        canvas.getContext('2d')!.drawImage(videoRef.current, 0, 0)
+        canvas.width  = vw
+        canvas.height = vh
+        const ctx = canvas.getContext('2d')!
+        if (z > 1) {
+          // Same centered region the CSS-scaled <video> is visually
+          // showing the user — draw it stretched to full canvas size so
+          // ZXing gets a larger, clearer barcode image, not a smaller one.
+          const cropW = vw / z, cropH = vh / z
+          const cropX = (vw - cropW) / 2, cropY = (vh - cropH) / 2
+          ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, vw, vh)
+        } else {
+          ctx.drawImage(video, 0, 0)
+        }
         const result = await reader.decodeFromCanvas(canvas)
         const code   = result?.getText()
         if (!code || !mountedRef.current) return

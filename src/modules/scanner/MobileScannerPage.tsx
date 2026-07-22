@@ -142,10 +142,9 @@ export default function MobileScannerPage() {
     if (e.touches.length === 2 && pinchStartDist.current) {
       e.preventDefault()
       const ratio = touchDistance(e.touches) / pinchStartDist.current
-      const range = state.zoomMax - state.zoomMin
-      setZoom(pinchStartZoom.current + (ratio - 1) * range)
+      setZoom(pinchStartZoom.current * ratio)
     }
-  }, [state.zoomMax, state.zoomMin, setZoom])
+  }, [setZoom])
   const handleTouchEnd = useCallback((e: ReactTouchEvent) => {
     if (e.touches.length < 2) pinchStartDist.current = null
   }, [])
@@ -164,6 +163,7 @@ export default function MobileScannerPage() {
           ref={videoRef}
           playsInline muted autoPlay
           className="absolute inset-0 w-full h-full object-cover"
+          style={{ transform: `scale(${state.zoom})`, transformOrigin: 'center' }}
         />
         {/* Vignette overlay */}
         <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/60 pointer-events-none" />
@@ -171,8 +171,9 @@ export default function MobileScannerPage() {
         {/* Scan frame */}
         {(state.status === 'scanning') && <ScanFrame mode={state.mode} />}
 
-        {/* Zoom slider — mirrors LocalScannerView.tsx; hidden entirely when
-            the phone's camera doesn't report a zoom capability. */}
+        {/* Zoom slider — pure digital zoom, always available (see
+            useMobileScanner.ts for why this isn't gated on hardware
+            zoom support). Pinch-to-zoom above works alongside it. */}
         {state.zoomSupported && !showDrawer && (
           <div className="absolute right-3 flex flex-col items-center gap-1.5" style={{ top: '50%', transform: 'translateY(-50%)' }}>
             <span className="text-white/80 text-[10px] font-bold bg-black/40 backdrop-blur-md px-1.5 py-0.5 rounded-full">

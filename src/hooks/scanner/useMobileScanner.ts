@@ -44,6 +44,9 @@ export interface MobileScannerState {
   ocrProgress: number
   lastBarcode: string | null
   lastOcrText: string | null
+  // Digital zoom — see useLocalScanner.ts / useProductCapture.ts for why
+  // this isn't tied to MediaTrackConstraints.zoom (unreliable capability,
+  // async-and-stuttery to apply). Always available here.
   zoomSupported: boolean
   zoomMin:       number
   zoomMax:       number
@@ -56,11 +59,15 @@ interface Options {
   apiBase: string   // http://192.168.1.10:5000/api/v1
 }
 
+const ZOOM_MIN = 1
+const ZOOM_MAX = 3
+const ZOOM_STEP = 0.1
+
 export default function useMobileScanner({ token, apiBase }: Options) {
   const [state, setState] = useState<MobileScannerState>({
     status: 'connecting', mode: 'idle', context: null, matches: [],
     error: null, flashOn: false, ocrProgress: 0, lastBarcode: null, lastOcrText: null,
-    zoomSupported: false, zoomMin: 1, zoomMax: 1, zoomStep: 0.1, zoom: 1,
+    zoomSupported: true, zoomMin: ZOOM_MIN, zoomMax: ZOOM_MAX, zoomStep: ZOOM_STEP, zoom: ZOOM_MIN,
   })
 
   const videoRef      = useRef<HTMLVideoElement | null>(null)
@@ -107,16 +114,8 @@ export default function useMobileScanner({ token, apiBase }: Options) {
         if (track?.getCapabilities?.()?.focusMode?.includes?.('continuous')) {
           await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] })
         }
-        const caps = track?.getCapabilities?.()
-        if (caps?.zoom && caps.zoom.max > caps.zoom.min) {
-          const current = track.getSettings?.()?.zoom ?? caps.zoom.min
-          setState(s => ({
-            ...s, zoomSupported: true,
-            zoomMin: caps.zoom.min, zoomMax: caps.zoom.max, zoomStep: caps.zoom.step || 0.1,
-            zoom: current,
-          }))
-        }
       } catch {}
+      setState(s => ({ ...s, zoom: ZOOM_MIN }))
       return true
     } catch {
       if (mountedRef.current) setState(s => ({ ...s, status: 'error', error: 'Camera access denied. Please allow camera and try again.' }))
@@ -142,16 +141,15 @@ export default function useMobileScanner({ token, apiBase }: Options) {
     } catch {}
   }, [state.flashOn])
 
-  const setZoom = useCallback(async (value: number) => {
-    const track = streamRef.current?.getVideoTracks()[0] as any
-    const caps  = track?.getCapabilities?.()
-    if (!caps?.zoom) return
-    const clamped = Math.min(caps.zoom.max, Math.max(caps.zoom.min, value))
-    try {
-      await track.applyConstraints({ advanced: [{ zoom: clamped }] })
-      setState(s => ({ ...s, zoom: clamped }))
-    } catch {}
+  const setZoom = useCallback((value: number) => {
+    const clamped = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, value))
+    setState(s => (s.zoom === clamped ? s : { ...s, zoom: clamped }))
   }, [])
+
+  // Mirrors state.zoom for the barcode/OCR interval closures, which are
+  // created once per session and must always read the *current* zoom.
+  const zoomRef = useRef(ZOOM_MIN)
+  useEffect(() => { zoomRef.current = state.zoom }, [state.zoom])
 
   // ── Product search ─────────────────────────────────────────────────────────
   const searchBarcode = useCallback(async (code: string): Promise<MobileProduct[]> => {
@@ -216,10 +214,22 @@ export default function useMobileScanner({ token, apiBase }: Options) {
     barcodeTimer.current = setInterval(async () => {
       if (!videoRef.current || videoRef.current.readyState < 2 || !mountedRef.current) return
       try {
+        const video = videoRef.current
+        const vw = video.videoWidth  || 640
+        const vh = video.videoHeight || 480
+        const z  = zoomRef.current
+
         const canvas = document.createElement('canvas')
-        canvas.width  = videoRef.current.videoWidth  || 640
-        canvas.height = videoRef.current.videoHeight || 480
-        canvas.getContext('2d')!.drawImage(videoRef.current, 0, 0)
+        canvas.width  = vw
+        canvas.height = vh
+        const ctx = canvas.getContext('2d')!
+        if (z > 1) {
+          const cropW = vw / z, cropH = vh / z
+          const cropX = (vw - cropW) / 2, cropY = (vh - cropH) / 2
+          ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, vw, vh)
+        } else {
+          ctx.drawImage(video, 0, 0)
+        }
         const result = await reader.decodeFromCanvas(canvas)
         const code   = result?.getText()
         if (!code || !mountedRef.current) return

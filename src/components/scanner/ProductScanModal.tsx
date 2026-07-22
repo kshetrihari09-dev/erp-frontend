@@ -17,13 +17,14 @@
  */
 
 import { useRef, useState, useCallback } from 'react'
+import type { TouchEvent as ReactTouchEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   X, Zap, ScanLine, Type, CameraOff, AlertCircle,
   RotateCcw, Loader2, ImageIcon, CheckCircle2,
 } from 'lucide-react'
-import useProductCapture, { type CaptureMode } from '@/hooks/scanner/useProductCapture'
+import useProductCapture, { type CaptureMode, MIN_ZOOM, MAX_ZOOM } from '@/hooks/scanner/useProductCapture'
 import CropOverlay from './CropOverlay'
 import { Z } from '@/styles/zIndex'
 
@@ -51,8 +52,40 @@ export default function ProductScanModal({ open, initialMode, onBarcode, onOcrTe
     onOcrText(text)
   }, [onOcrText])
 
-  const { state, videoRef, captureFrame, selectFileForCrop, confirmCrop, cancelCrop, retryPermission } =
+  const { state, videoRef, captureFrame, selectFileForCrop, confirmCrop, cancelCrop, retryPermission, setZoom } =
     useProductCapture({ active: open, mode, onBarcode: handleBarcode, onOcrText: handleOcrText })
+
+  // ── Pinch-to-zoom ──────────────────────────────────────────────────────────
+  // setZoom() is a plain synchronous state update (see useProductCapture.ts —
+  // deliberately not tied to async hardware zoom constraints), so tracking
+  // it 1:1 with the pinch gesture on every touchmove is inherently smooth:
+  // no network/driver round-trip ever sits between the finger and the frame.
+  const pinchStartDist = useRef<number | null>(null)
+  const pinchStartZoom = useRef(MIN_ZOOM)
+
+  const touchDistance = (touches: ReactTouchEvent['touches']) => {
+    const [a, b] = [touches[0], touches[1]]
+    return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY)
+  }
+
+  const handleTouchStart = useCallback((e: ReactTouchEvent) => {
+    if (e.touches.length === 2) {
+      pinchStartDist.current = touchDistance(e.touches)
+      pinchStartZoom.current = state.zoom
+    }
+  }, [state.zoom])
+
+  const handleTouchMove = useCallback((e: ReactTouchEvent) => {
+    if (e.touches.length === 2 && pinchStartDist.current) {
+      e.preventDefault()
+      const ratio = touchDistance(e.touches) / pinchStartDist.current
+      setZoom(pinchStartZoom.current * ratio)
+    }
+  }, [setZoom])
+
+  const handleTouchEnd = useCallback((e: ReactTouchEvent) => {
+    if (e.touches.length < 2) pinchStartDist.current = null
+  }, [])
 
   if (!open) return null
 
@@ -111,8 +144,18 @@ export default function ProductScanModal({ open, initialMode, onBarcode, onOcrTe
 
         {/* ── Camera view ───────────────────────────────────────────────── */}
         {state.status === 'ready' && (
-          <div className="relative flex-1 overflow-hidden bg-black">
-            <video ref={videoRef} playsInline muted autoPlay className="absolute inset-0 w-full h-full object-cover" />
+          <div
+            className="relative flex-1 overflow-hidden bg-black"
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+          >
+            <video
+              ref={videoRef}
+              playsInline muted autoPlay
+              className="absolute inset-0 w-full h-full object-cover"
+              style={{ transform: `scale(${state.zoom})`, transformOrigin: 'center' }}
+            />
             <div className="absolute inset-0 bg-gradient-to-b from-black/55 via-transparent to-black/65 pointer-events-none" />
 
             {/* Frame guide */}
@@ -143,6 +186,33 @@ export default function ProductScanModal({ open, initialMode, onBarcode, onOcrTe
                 </div>
               </div>
             )}
+
+            {/* Zoom slider — pure digital zoom (CSS scale + matching canvas
+                crop in useProductCapture.ts), so unlike hardware zoom it
+                needs no capability check and is always available here.
+                Pinch-to-zoom (handlers on the container above) works
+                alongside it for touch devices. */}
+            <div
+              className="absolute right-3 flex flex-col items-center gap-1.5"
+              style={{ top: '50%', transform: 'translateY(-50%)' }}
+            >
+              <span className="text-white/80 text-[10px] font-bold bg-black/40 backdrop-blur-md px-1.5 py-0.5 rounded-full">
+                {state.zoom.toFixed(1)}×
+              </span>
+              <div className="h-32 w-8 flex items-center justify-center">
+                <input
+                  type="range"
+                  aria-label="Camera zoom"
+                  min={MIN_ZOOM}
+                  max={MAX_ZOOM}
+                  step={0.1}
+                  value={state.zoom}
+                  onChange={e => setZoom(Number(e.target.value))}
+                  className="accent-blue-500"
+                  style={{ width: '112px', transform: 'rotate(-90deg)' }}
+                />
+              </div>
+            </div>
 
             {/* Bottom controls */}
             <div className="absolute bottom-0 left-0 right-0 flex flex-col items-center gap-3 px-4 pb-2"

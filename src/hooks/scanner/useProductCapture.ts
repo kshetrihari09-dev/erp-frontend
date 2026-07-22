@@ -45,6 +45,7 @@ export interface CaptureState {
   error:       string | null
   ocrProgress: number
   cropSource:  CropSource | null
+  zoom:        number
 }
 
 interface Options {
@@ -55,6 +56,20 @@ interface Options {
 }
 
 const BARCODE_INTERVAL_MS = 300
+
+// Digital zoom range. Deliberately NOT tied to MediaTrackConstraints.zoom —
+// that hardware capability is unreliable (most webcams and a lot of phone
+// cameras never report it via getUserMedia at all, so a control gated on
+// it simply never appears for most people) and, even when present, each
+// applyConstraints() call is an async round-trip to the camera driver that
+// visibly stutters when driven by a slider or a pinch gesture. A CSS scale
+// on the <video> element plus a matching center-crop of the capture canvas
+// works identically on every device/browser, updates purely synchronously
+// (so it's always smooth), and actually improves barcode-decode quality —
+// the cropped region is what gets handed to ZXing, not just a cosmetic
+// zoomed preview.
+export const MIN_ZOOM = 1
+export const MAX_ZOOM = 3
 
 // Find text anywhere in the image with no layout assumptions — appropriate
 // for a product label/box, which is mostly logos/graphics with a few
@@ -151,13 +166,25 @@ function detectTextRegion(canvas: HTMLCanvasElement): CropRect | null {
 
 export default function useProductCapture({ active, mode, onBarcode, onOcrText }: Options) {
   const [state, setState] = useState<CaptureState>({
-    status: 'requesting-permission', mode, error: null, ocrProgress: 0, cropSource: null,
+    status: 'requesting-permission', mode, error: null, ocrProgress: 0, cropSource: null, zoom: MIN_ZOOM,
   })
 
   const videoRef    = useRef<HTMLVideoElement | null>(null)
   const streamRef   = useRef<MediaStream | null>(null)
   const barcodeTimer = useRef<ReturnType<typeof setInterval> | null>(null)
   const mountedRef  = useRef(true)
+
+  // The barcode-decode interval (below) is created once per scanner session
+  // and must always read the *current* zoom without being torn down and
+  // recreated on every slider tick — that recreation is exactly the kind of
+  // churn that causes visible stutter. A ref mirror sidesteps it entirely.
+  const zoomRef = useRef(MIN_ZOOM)
+  useEffect(() => { zoomRef.current = state.zoom }, [state.zoom])
+
+  const setZoom = useCallback((value: number) => {
+    const clamped = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value))
+    setState(s => (s.zoom === clamped ? s : { ...s, zoom: clamped }))
+  }, [])
 
   useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; revokePendingUrl() } }, [])
 
@@ -218,10 +245,25 @@ export default function useProductCapture({ active, mode, onBarcode, onOcrText }
     barcodeTimer.current = setInterval(async () => {
       if (!videoRef.current || videoRef.current.readyState < 2 || !mountedRef.current) return
       try {
+        const video = videoRef.current
+        const vw = video.videoWidth  || 640
+        const vh = video.videoHeight || 480
+        const z  = zoomRef.current
+
         const canvas = document.createElement('canvas')
-        canvas.width  = videoRef.current.videoWidth  || 640
-        canvas.height = videoRef.current.videoHeight || 480
-        canvas.getContext('2d')!.drawImage(videoRef.current, 0, 0)
+        canvas.width  = vw
+        canvas.height = vh
+        const ctx = canvas.getContext('2d')!
+        if (z > 1) {
+          // Same centered region the CSS-scaled <video> is visually
+          // showing the user — draw it stretched to full canvas size so
+          // ZXing gets a larger, clearer barcode image, not a smaller one.
+          const cropW = vw / z, cropH = vh / z
+          const cropX = (vw - cropW) / 2, cropY = (vh - cropH) / 2
+          ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, vw, vh)
+        } else {
+          ctx.drawImage(video, 0, 0)
+        }
         const result = await reader.decodeFromCanvas(canvas)
         const code   = result?.getText()
         if (!code || !mountedRef.current) return
@@ -280,10 +322,22 @@ export default function useProductCapture({ active, mode, onBarcode, onOcrText }
   // ── Freeze a live camera frame and hand it to the user for cropping ──────
   const captureFrame = useCallback(() => {
     if (!videoRef.current || videoRef.current.readyState < 2 || !mountedRef.current) return
+    const video = videoRef.current
+    const vw = video.videoWidth  || 640
+    const vh = video.videoHeight || 480
+    const z  = zoomRef.current
+
     const canvas = document.createElement('canvas')
-    canvas.width  = videoRef.current.videoWidth  || 640
-    canvas.height = videoRef.current.videoHeight || 480
-    canvas.getContext('2d')!.drawImage(videoRef.current, 0, 0)
+    canvas.width  = vw
+    canvas.height = vh
+    const ctx = canvas.getContext('2d')!
+    if (z > 1) {
+      const cropW = vw / z, cropH = vh / z
+      const cropX = (vw - cropW) / 2, cropY = (vh - cropH) / 2
+      ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, vw, vh)
+    } else {
+      ctx.drawImage(video, 0, 0)
+    }
 
     revokePendingUrl()
     pendingCanvasRef.current = canvas
@@ -369,7 +423,7 @@ export default function useProductCapture({ active, mode, onBarcode, onOcrText }
   useEffect(() => {
     if (!active) {
       stopCamera()
-      setState({ status: 'requesting-permission', mode, error: null, ocrProgress: 0, cropSource: null })
+      setState({ status: 'requesting-permission', mode, error: null, ocrProgress: 0, cropSource: null, zoom: MIN_ZOOM })
       return
     }
 
@@ -403,5 +457,5 @@ export default function useProductCapture({ active, mode, onBarcode, onOcrText }
     attachStream()
   }, [active, state.status, attachStream])
 
-  return { state, videoRef, captureFrame, selectFileForCrop, confirmCrop, cancelCrop, retryPermission }
+  return { state, videoRef, captureFrame, selectFileForCrop, confirmCrop, cancelCrop, retryPermission, setZoom }
 }
