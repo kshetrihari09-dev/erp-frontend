@@ -2,10 +2,11 @@
  * BatchSelectionPopup.tsx
  *
  * The popup opened automatically by BatchSelect.tsx the moment a row's
- * product has more than one batch available. Shows every batch for that
+ * product has one or more batches available. Shows every batch for that
  * product with expiry, remaining stock, rack/shelf location (if the
- * backend sends one), selling price, and a status badge — and highlights
- * the FEFO-recommended batch without ever auto-selecting it.
+ * backend sends one), selling price, and a status badge — and pre-
+ * highlights the FEFO-recommended batch (or the sole batch, if there's
+ * only one) without ever auto-confirming it for the user.
  *
  * Keyboard:
  *   Type       instantly filters the list (batch no. / rack location)
@@ -15,6 +16,21 @@
  *              (BatchSelect.tsx does the actual focus move after onSelect)
  *   Escape     close without selecting
  *
+ * Mouse:
+ *   Single click   just moves the highlight (same as hover/arrow keys)
+ *   Double click   selects the batch, same as pressing Enter on it
+ *
+ * The row opens already highlighting the FEFO-recommended batch (the
+ * earliest-expiring one that isn't expired and has stock), so for the
+ * common case Enter alone confirms it — including the single-batch case,
+ * where the popup still opens (rather than silently auto-picking) so the
+ * batch/expiry/stock/rate are always visible for a quick check.
+ *
+ * Expired or zero-stock batches are still listed (so it's clear why one
+ * isn't available) but can't be selected — Enter/double-click on one is
+ * a no-op. This is a UI-level safeguard only; it doesn't change or
+ * replace any backend stock/expiry validation.
+ *
  * Nothing here touches pricing, tax, or stock calculations — it only
  * displays StockBatch records that were already fetched elsewhere.
  */
@@ -23,7 +39,7 @@ import { createPortal } from 'react-dom'
 import { Search, PackageX } from 'lucide-react'
 import type { StockBatch } from '@/types'
 import { fmt } from '@/utils'
-import { formatExpiry, getBatchStatus, getRackLocation, pickFEFORecommended } from '@/utils/batch'
+import { formatExpiry, getBatchStatus, getRackLocation, isExpired, pickFEFORecommended } from '@/utils/batch'
 import { useShortcutScope } from '@/hooks/useKeyboardShortcuts'
 
 interface Props {
@@ -63,13 +79,16 @@ export default function BatchSelectionPopup({
     )
   }, [batches, query])
 
-  /* Reset + focus the search box every time the popup opens */
+  /* Reset + focus the search box every time the popup opens — and
+   * pre-highlight the FEFO-recommended batch (or the only batch, when
+   * there's just one) so Enter alone confirms it without any arrowing. */
   useEffect(() => {
     if (!open) return
     setQuery('')
-    setHL(0)
+    const idx = recommended ? batches.findIndex(b => b.id === recommended.id) : 0
+    setHL(idx >= 0 ? idx : 0)
     requestAnimationFrame(() => inputRef.current?.focus())
-  }, [open])
+  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { setHL(0) }, [query])
 
@@ -80,8 +99,16 @@ export default function BatchSelectionPopup({
 
   if (!open) return null
 
+  /** Expired or zero-stock batches are shown but can't be picked — this
+   *  is a UI-level guard only, on top of whatever the backend already
+   *  enforces at posting time. */
+  function isSelectable(b: StockBatch) {
+    return !isExpired(b) && Number(b.qty_available) > 0
+  }
+
   function choose(b?: StockBatch) {
     if (!b) return
+    if (!isSelectable(b)) return
     onSelect(b)
   }
 
@@ -164,19 +191,27 @@ export default function BatchSelectionPopup({
                   const status        = getBatchStatus(b, recommended?.id)
                   const isRecommended = !!recommended && b.id === recommended.id
                   const rack          = getRackLocation(b)
+                  const selectable    = isSelectable(b)
                   return (
                     <li
                       key={b.id}
                       role="option"
                       aria-selected={i === hl}
+                      aria-disabled={!selectable}
+                      title={selectable ? undefined : (isExpired(b) ? 'Expired — cannot be sold' : 'Out of stock')}
                       className={[
                         'bsp-row',
                         i === hl ? 'bsp-row--hl' : '',
                         isRecommended ? 'bsp-row--recommended' : '',
                         b.batch_no === selectedBatchNo ? 'bsp-row--current' : '',
+                        !selectable ? 'bsp-row--disabled' : '',
                       ].filter(Boolean).join(' ')}
                       onMouseEnter={() => setHL(i)}
-                      onMouseDown={e => { e.preventDefault(); choose(b) }}
+                      // Single click only moves the highlight (same as
+                      // hover/arrow keys) — double-click confirms, same
+                      // as pressing Enter on the highlighted row.
+                      onClick={() => setHL(i)}
+                      onDoubleClick={() => choose(b)}
                     >
                       <span className="bsp-col bsp-col-batch">
                         {b.batch_no || '—'}
@@ -201,6 +236,7 @@ export default function BatchSelectionPopup({
           <span><kbd className="bsp-kbd">↑↓</kbd> Navigate</span>
           <span><kbd className="bsp-kbd">Enter</kbd> Select</span>
           <span><kbd className="bsp-kbd">Tab</kbd> Select + Next</span>
+          <span>Double-click Select</span>
           <span><kbd className="bsp-kbd">Esc</kbd> Close</span>
         </div>
       </div>

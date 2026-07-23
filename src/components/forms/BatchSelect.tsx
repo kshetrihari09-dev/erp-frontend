@@ -12,14 +12,23 @@
  *                     too — see QtyGate.tsx — so the row can't be
  *                     posted, using the existing qty>0 validation rather
  *                     than a new rule.)
- *       1 batch    -> auto-selected immediately. Batch + Expiry fill in,
- *                     the popup never opens, focus jumps straight to Qty.
+ *       1 batch    -> BatchSelectionPopup opens automatically with that
+ *                     batch pre-highlighted, so the user just needs to
+ *                     press Enter or double-click it to confirm — the
+ *                     batch, expiry, stock and rate are always shown for
+ *                     a quick sanity check before it's locked in, even
+ *                     when there's only one option.
  *       2+ batches -> BatchSelectionPopup opens automatically. The FEFO
- *                     batch is highlighted but NOT auto-selected — the
- *                     user always picks manually for a multi-batch row.
- *   - Picking a batch (click, Enter, or Tab in the popup) fills
+ *                     batch is pre-highlighted (Enter selects it
+ *                     immediately) but the user is always free to
+ *                     arrow/click to a different one.
+ *   - Picking a batch (Enter, double-click, or Tab in the popup) fills
  *     Batch + Expiry, closes the popup, and moves focus to this row's
  *     Quantity field.
+ *   - Expired or out-of-stock batches are shown (so the reason a batch
+ *     is unavailable is visible) but can't be picked — Enter/double-click
+ *     on one is a no-op. This is a UI safeguard only; all real stock/
+ *     expiry validation still happens exactly where it always has.
  *   - You can't sell a batch that doesn't exist yet, so typing a batch
  *     number freely isn't offered in this mode.
  *
@@ -106,7 +115,7 @@ export default function BatchSelect({
     focusRowQty(rootRef.current)
   }
 
-  /* ── Sale: auto-open / auto-select the moment a product resolves batches ─── */
+  /* ── Sale: auto-open the popup the moment a product resolves batches ───── */
   useEffect(() => {
     if (mode !== 'sale') return
     if (!productId) { processedRef.current = undefined; return }
@@ -114,14 +123,14 @@ export default function BatchSelect({
     if (processedRef.current === productId) return
     processedRef.current = productId
 
-    if (saleBatches.length === 1) {
-      onSelect(saleBatches[0])
-      focusRowQty(rootRef.current)
-    } else if (saleBatches.length > 1) {
-      setPopupOpen(true)
-    }
+    // Every product with at least one batch opens the popup — one batch
+    // just means the list has exactly one (pre-highlighted) row to
+    // confirm with Enter/double-click, rather than skipping the popup.
     // 0 batches: nothing to auto-do — the trigger below shows the
     // "No batches available" state and stays disabled.
+    if (saleBatches.length >= 1) {
+      setPopupOpen(true)
+    }
   }, [mode, productId, loading, saleBatches]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── Purchase: freely-typeable batch number + optional "browse existing" ── */

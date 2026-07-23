@@ -1964,6 +1964,9 @@ td.psc-cell {
 
 .bsp-list { list-style: none; margin: 0; padding: 0; }
 
+bsp-row--disabled { cursor: not-allowed; opacity: .55; }
+.bsp-list .bsp-row.bsp-row--disabled:hover { background: transparent; }
+.bsp-row--disabled.bsp-row--hl { background: var(--surface-2); }
 /* ── Row (grid: batch | expiry | stock | rack | price | status) ──────────── */
 .bsp-row {
   display:               grid;
