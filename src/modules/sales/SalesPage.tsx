@@ -22,7 +22,7 @@ import {
   Phone as PhoneIcon, ChevronDown, AlertCircle,
   CheckCircle2, RotateCcw, Save, Plus, UserPlus,
 } from 'lucide-react'
-import { salesAPI, partiesAPI, productsAPI } from '@/services/api'
+import { salesAPI, partiesAPI, productsAPI, authAPI } from '@/services/api'
 import useUIStore from '@/store/uiStore'
 import {
   Button, Tabs, Modal, Badge, Pagination,
@@ -96,31 +96,58 @@ function SummaryRow({
 }
 
 /* ── EditablePaymentMode — Sales List inline editor ─────────────────────────
- * UI-only enhancement. Badge → click → compact dropdown + Save/Cancel.
- * Calls the dedicated PUT /sales/:id/payment-mode endpoint, which updates
- * only that one column server-side. This component never recalculates
- * totals, and never touches stock, accounting, vouchers, tax, or discounts —
- * it only ever sends/receives `payment_mode`. */
+ * UI-only enhancement. Badge → password confirm → compact dropdown +
+ * Save/Cancel. Calls the dedicated PUT /sales/:id/payment-mode endpoint,
+ * which updates only that one column server-side. This component never
+ * recalculates totals, and never touches stock, accounting, vouchers, tax,
+ * or discounts — it only ever sends/receives `payment_mode`.
+ *
+ * Edit mode is password-protected: clicking the badge opens a step-up
+ * password prompt (POST /auth/verify-password, checked against the
+ * CURRENT logged-in user's own password) before the dropdown appears. */
 function EditablePaymentMode({
   sale, onSaved,
 }: { sale: Sale; onSaved: (id: string, mode: string) => void }) {
-  const { success, error } = useUIStore()
+  const { success, error }      = useUIStore()
+  const [confirming, setConfirming] = useState(false) // password modal open
+  const [password,   setPassword]   = useState('')
+  const [pwError,    setPwError]    = useState('')
+  const [verifying,  setVerifying]  = useState(false)
+
   const [editing, setEditing] = useState(false)
   const [value,   setValue]   = useState<string>(sale.payment_mode)
   const [saving,  setSaving]  = useState(false)
 
-  if (!editing) {
-    return (
-      <Badge
-        status={sale.payment_mode}
-        className="cursor-pointer hover:opacity-70"
-        onClick={(e: React.MouseEvent) => {
-          e.stopPropagation()
-          setValue(sale.payment_mode)
-          setEditing(true)
-        }}
-      />
-    )
+  const openConfirm = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setPassword('')
+    setPwError('')
+    setConfirming(true)
+  }
+
+  const closeConfirm = (e?: React.MouseEvent) => {
+    e?.stopPropagation()
+    setConfirming(false)
+    setPassword('')
+    setPwError('')
+  }
+
+  const confirmPassword = async (e?: React.MouseEvent) => {
+    e?.stopPropagation()
+    if (!password) { setPwError('Enter your password'); return }
+    setVerifying(true)
+    setPwError('')
+    try {
+      await authAPI.verifyPassword(password)
+      setConfirming(false)
+      setPassword('')
+      setValue(sale.payment_mode)
+      setEditing(true)
+    } catch (e: any) {
+      setPwError(e.message || 'Incorrect password')
+    } finally {
+      setVerifying(false)
+    }
   }
 
   const cancelEdit = (e?: React.MouseEvent) => {
@@ -145,6 +172,50 @@ function EditablePaymentMode({
     } finally {
       setSaving(false)
     }
+  }
+
+  const passwordModal = (
+    <Modal
+      open={confirming}
+      onClose={closeConfirm}
+      title="Confirm your password"
+      size="sm"
+      footer={
+        <>
+          <Button type="button" variant="secondary" size="sm" disabled={verifying} onClick={closeConfirm}>
+            Cancel
+          </Button>
+          <Button type="button" variant="primary" size="sm" disabled={verifying} onClick={confirmPassword}>
+            {verifying ? <Spinner size={12}/> : 'Confirm'}
+          </Button>
+        </>
+      }
+    >
+      <p className="text-[13px] text-[var(--text-3)] mb-3">
+        Changing Payment Mode is a protected action. Re-enter your password to edit invoice {sale.invoice_no}.
+      </p>
+      <input
+        type="password"
+        className="erp-input w-full"
+        placeholder="Password"
+        autoFocus
+        value={password}
+        disabled={verifying}
+        onClick={e => e.stopPropagation()}
+        onChange={e => { setPassword(e.target.value); setPwError('') }}
+        onKeyDown={e => { if (e.key === 'Enter') confirmPassword() }}
+      />
+      {pwError && <p className="text-[12px] text-red-600 mt-2">{pwError}</p>}
+    </Modal>
+  )
+
+  if (!editing) {
+    return (
+      <>
+        <Badge status={sale.payment_mode} className="cursor-pointer hover:opacity-70" onClick={openConfirm}/>
+        {passwordModal}
+      </>
+    )
   }
 
   return (
@@ -230,7 +301,7 @@ export default function SalesPage() {
   const { register, handleSubmit, reset, watch, setValue } = useForm({
     defaultValues: {
       customer_id: '', date: new Date().toISOString().split('T')[0],
-      payment_mode: 'cash', discount_pct: 0, notes: '',
+      payment_mode: 'credit', discount_pct: 0, notes: '',
     },
   })
 
@@ -354,7 +425,7 @@ export default function SalesPage() {
   function saveDraft() { setFlash({ type: 'success', msg: 'Draft saved locally.' }) }
 
   function clearForm() {
-    reset({ customer_id: '', date: new Date().toISOString().split('T')[0], payment_mode: 'cash', discount_pct: 0, notes: '' })
+    reset({ customer_id: '', date: new Date().toISOString().split('T')[0], payment_mode: 'credit', discount_pct: 0, notes: '' })
     setRows([newRow()]); setTender(''); setFlash(null); setCustomerOpen(true)
   }
 
@@ -1192,7 +1263,7 @@ export default function SalesPage() {
         onClose={() => { setPrintData(null); setFlash(null) }}
         onNextBill={() => {
           setPrintData(null); setFlash(null); setRows([newRow()]); setTender('')
-          reset({ customer_id: '', date: new Date().toISOString().split('T')[0], payment_mode: 'cash', discount_pct: 0, notes: '' })
+          reset({ customer_id: '', date: new Date().toISOString().split('T')[0], payment_mode: 'credit', discount_pct: 0, notes: '' })
         }}
       />
       {/* Fires automatically the moment a sale posts (printData is set in

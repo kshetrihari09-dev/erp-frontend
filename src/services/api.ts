@@ -51,6 +51,9 @@ export const authAPI = {
   changePassword: (data: { current_password: string; new_password: string }) =>
     http.put('/auth/change-password', data),
   refresh: (data: { refresh_token: string }) => http.post('/auth/refresh', data),
+  /** Step-up confirmation: checks the current session's user's password. No tokens issued. */
+  verifyPassword: (password: string) =>
+    http.post<ApiResponse<{ message: string }>>('/auth/verify-password', { password }),
 
   // ── Multi-channel OTP ─────────────────────────────────────────────────────
   sendOTP: (data: SendOTPParams) =>
