@@ -232,10 +232,10 @@ const InvoiceRowsTable = forwardRef<InvoiceRowsTableHandle, Props>(function Invo
    *   - 0 batches → the trigger stays permanently disabled ("No batches
    *     available") and BatchSelect does nothing further, so we land on
    *     Qty ourselves.
-   *   - 1 batch → BatchSelect auto-selects it AND focuses Qty itself
-   *     (before we ever see the trigger become enabled) — we do nothing.
-   *   - 2+ batches → BatchSelect auto-opens the Batch Selection popup
-   *     itself — we do nothing, so we don't steal focus back out of it.
+   *   - 1+ batches → BatchSelect auto-opens the Batch Selection popup
+   *     itself (pre-highlighting the sole/FEFO batch) — we do nothing,
+   *     so we don't steal focus back out of it. Focus only reaches Qty
+   *     once the user actually confirms a batch in the popup.
    *  Purchase mode's free-text batch input isn't gated by an async fetch
    *  (only by whether a product is picked at all), so it resolves on the
    *  very first check. */

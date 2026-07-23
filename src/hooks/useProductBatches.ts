@@ -64,29 +64,55 @@ export function invalidateBatchCache(productId?: string) {
 export default function useProductBatches(productId: string | undefined | null) {
   const [batches, setBatches] = useState<StockBatch[]>([])
   const [loading, setLoading] = useState(false)
-  const mountedRef = useRef(true)
+  const mountedRef  = useRef(true)
+  // Tracks which productId `batches`/`loading` currently describe, so a
+  // prop change can be caught and reacted to SYNCHRONOUSLY during render
+  // instead of in an effect.
+  //
+  // ROOT CAUSE this fixes: previously the "clear + start loading" reset
+  // only happened inside a `useEffect(() => {...}, [productId])`. Effects
+  // run AFTER the render commits, but any OTHER hook in the same
+  // component that also depends on `productId` (e.g. BatchSelect.tsx's
+  // auto-open-the-popup effect) fires in that same effect pass, reading
+  // whatever `loading`/`batches` this hook returned during THAT render —
+  // which, for exactly one render, was still the PREVIOUS product's
+  // settled `loading: false` paired with the NEW productId. That looked
+  // indistinguishable from "fetch already finished, zero batches", so
+  // the popup's auto-open effect concluded there was nothing to open —
+  // even though a real fetch for the new product hadn't started yet.
+  //
+  // Resetting here, in the render body, closes that window: React
+  // detects the state update during render and re-renders immediately
+  // with the corrected values before anything commits or any effect
+  // (including a caller's) ever sees the stale pairing.
+  const trackedIdRef = useRef<string | undefined | null>(productId)
+
+  if (trackedIdRef.current !== productId) {
+    trackedIdRef.current = productId
+    if (!productId) {
+      setBatches([])
+      setLoading(false)
+    } else {
+      const cached = cache.get(productId)
+      if (isFresh(cached)) {
+        setBatches(cached.data)
+        setLoading(false)
+      } else {
+        setBatches([])
+        setLoading(true)
+      }
+    }
+  }
 
   useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false } }, [])
 
   useEffect(() => {
-    if (!productId) { setBatches([]); setLoading(false); return }
+    if (!productId) return
 
     const cached = cache.get(productId)
-    if (isFresh(cached)) {
-      setBatches(cached.data)
-      setLoading(false)
-      return
-    }
+    if (isFresh(cached)) return // already applied synchronously above
 
     let cancelled = false
-    // Clear immediately rather than leaving the PREVIOUS product's
-    // batches sitting in state while this fetch is in flight — without
-    // this, a consumer reading `batches` between here and the fetch
-    // resolving would see the wrong product's data paired with
-    // loading=true, which is exactly the "batches for the previous
-    // product" bug this hook needs to never produce.
-    setBatches([])
-    setLoading(true)
     fetchBatches(productId)
       .then(data => { if (!cancelled && mountedRef.current) { setBatches(data); setLoading(false) } })
       .catch(() => { if (!cancelled && mountedRef.current) { setBatches([]); setLoading(false) } })
