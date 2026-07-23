@@ -22,7 +22,7 @@ import {
   Phone as PhoneIcon, ChevronDown, AlertCircle,
   CheckCircle2, RotateCcw, Save, Plus, UserPlus,
 } from 'lucide-react'
-import { salesAPI, partiesAPI, productsAPI, authAPI } from '@/services/api'
+import { salesAPI, partiesAPI, productsAPI } from '@/services/api'
 import useUIStore from '@/store/uiStore'
 import {
   Button, Tabs, Modal, Badge, Pagination,
@@ -34,6 +34,11 @@ import BatchSelect from '@/components/forms/BatchSelect'
 import QtyGate from '@/components/forms/QtyGate'
 import QuickAddPartyModal from '@/components/forms/QuickAddPartyModal'
 import { fmt, fmtDate, calcRowAmount } from '@/utils'
+import DiscountReviewModal from '@/components/forms/discount/DiscountReviewModal'
+import {
+  computeItemDiscounts, computeTotals, emptyDiscount, validRows as validDiscountRows,
+  type DiscountScope, type DiscountEntry,
+} from '@/components/forms/discount/discountUtils'
 import { PrintPreviewModal } from '@/components/print'
 import type { PrintData } from '@/components/print'
 import AutoCloudBackup from '@/components/cloudStorage/AutoCloudBackup'
@@ -96,58 +101,31 @@ function SummaryRow({
 }
 
 /* ── EditablePaymentMode — Sales List inline editor ─────────────────────────
- * UI-only enhancement. Badge → password confirm → compact dropdown +
- * Save/Cancel. Calls the dedicated PUT /sales/:id/payment-mode endpoint,
- * which updates only that one column server-side. This component never
- * recalculates totals, and never touches stock, accounting, vouchers, tax,
- * or discounts — it only ever sends/receives `payment_mode`.
- *
- * Edit mode is password-protected: clicking the badge opens a step-up
- * password prompt (POST /auth/verify-password, checked against the
- * CURRENT logged-in user's own password) before the dropdown appears. */
+ * UI-only enhancement. Badge → click → compact dropdown + Save/Cancel.
+ * Calls the dedicated PUT /sales/:id/payment-mode endpoint, which updates
+ * only that one column server-side. This component never recalculates
+ * totals, and never touches stock, accounting, vouchers, tax, or discounts —
+ * it only ever sends/receives `payment_mode`. */
 function EditablePaymentMode({
   sale, onSaved,
 }: { sale: Sale; onSaved: (id: string, mode: string) => void }) {
-  const { success, error }      = useUIStore()
-  const [confirming, setConfirming] = useState(false) // password modal open
-  const [password,   setPassword]   = useState('')
-  const [pwError,    setPwError]    = useState('')
-  const [verifying,  setVerifying]  = useState(false)
-
+  const { success, error } = useUIStore()
   const [editing, setEditing] = useState(false)
   const [value,   setValue]   = useState<string>(sale.payment_mode)
   const [saving,  setSaving]  = useState(false)
 
-  const openConfirm = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    setPassword('')
-    setPwError('')
-    setConfirming(true)
-  }
-
-  const closeConfirm = (e?: React.MouseEvent) => {
-    e?.stopPropagation()
-    setConfirming(false)
-    setPassword('')
-    setPwError('')
-  }
-
-  const confirmPassword = async (e?: React.MouseEvent) => {
-    e?.stopPropagation()
-    if (!password) { setPwError('Enter your password'); return }
-    setVerifying(true)
-    setPwError('')
-    try {
-      await authAPI.verifyPassword(password)
-      setConfirming(false)
-      setPassword('')
-      setValue(sale.payment_mode)
-      setEditing(true)
-    } catch (e: any) {
-      setPwError(e.message || 'Incorrect password')
-    } finally {
-      setVerifying(false)
-    }
+  if (!editing) {
+    return (
+      <Badge
+        status={sale.payment_mode}
+        className="cursor-pointer hover:opacity-70"
+        onClick={(e: React.MouseEvent) => {
+          e.stopPropagation()
+          setValue(sale.payment_mode)
+          setEditing(true)
+        }}
+      />
+    )
   }
 
   const cancelEdit = (e?: React.MouseEvent) => {
@@ -172,50 +150,6 @@ function EditablePaymentMode({
     } finally {
       setSaving(false)
     }
-  }
-
-  const passwordModal = (
-    <Modal
-      open={confirming}
-      onClose={closeConfirm}
-      title="Confirm your password"
-      size="sm"
-      footer={
-        <>
-          <Button type="button" variant="secondary" size="sm" disabled={verifying} onClick={closeConfirm}>
-            Cancel
-          </Button>
-          <Button type="button" variant="primary" size="sm" disabled={verifying} onClick={confirmPassword}>
-            {verifying ? <Spinner size={12}/> : 'Confirm'}
-          </Button>
-        </>
-      }
-    >
-      <p className="text-[13px] text-[var(--text-3)] mb-3">
-        Changing Payment Mode is a protected action. Re-enter your password to edit invoice {sale.invoice_no}.
-      </p>
-      <input
-        type="password"
-        className="erp-input w-full"
-        placeholder="Password"
-        autoFocus
-        value={password}
-        disabled={verifying}
-        onClick={e => e.stopPropagation()}
-        onChange={e => { setPassword(e.target.value); setPwError('') }}
-        onKeyDown={e => { if (e.key === 'Enter') confirmPassword() }}
-      />
-      {pwError && <p className="text-[12px] text-red-600 mt-2">{pwError}</p>}
-    </Modal>
-  )
-
-  if (!editing) {
-    return (
-      <>
-        <Badge status={sale.payment_mode} className="cursor-pointer hover:opacity-70" onClick={openConfirm}/>
-        {passwordModal}
-      </>
-    )
   }
 
   return (
@@ -273,9 +207,18 @@ export default function SalesPage() {
   const [billingOpen,  setBillingOpen]  = useState(true)
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set())
 
-  const [confirmPost,   setConfirmPost]   = useState(false)
   const [confirmCancel, setConfirmCancel] = useState<string | null>(null)
   const [showNewCustomer, setShowNewCustomer] = useState(false)
+
+  // ── Discount Review workflow ────────────────────────────────────────────
+  // Next (F12) opens the review popup; the popup's own Post Invoice button
+  // is what actually posts (see onSubmit below). Only one scope is active
+  // at a time — see handleDiscountScopeChange for the "clear on switch" rule.
+  const [discountScope,     setDiscountScope]     = useState<DiscountScope>('invoice')
+  const [invoiceDiscount,   setInvoiceDiscount]   = useState<DiscountEntry>(emptyDiscount())
+  const [companyDiscounts,  setCompanyDiscounts]  = useState<Record<string, DiscountEntry>>({})
+  const [productDiscounts,  setProductDiscounts]  = useState<Record<number, DiscountEntry>>({})
+  const [discountModalOpen, setDiscountModalOpen] = useState(false)
 
   // ── Scanner ─────────────────────────────────────────────────────────────
   // Batch is intentionally left blank here: BatchSelect (rendered for this
@@ -301,7 +244,7 @@ export default function SalesPage() {
   const { register, handleSubmit, reset, watch, setValue } = useForm({
     defaultValues: {
       customer_id: '', date: new Date().toISOString().split('T')[0],
-      payment_mode: 'credit', discount_pct: 0, notes: '',
+      payment_mode: 'cash', notes: '',
     },
   })
 
@@ -349,22 +292,25 @@ export default function SalesPage() {
       }).catch(() => {})
   }, [])
 
-  // ── Calculations — ALL UNCHANGED ──────────────────────────────────────
-  const discountPct      = Number(watch('discount_pct')) || 0
+  // ── Calculations ─────────────────────────────────────────────────────
   const customerId       = watch('customer_id')
   const currentPayMode   = watch('payment_mode')
   const selectedCustomer = customers.find(c => c.id === customerId)
   const subtotal         = rows.reduce((s, r) => s + r.amount, 0)
-  const discountAmt      = subtotal * (discountPct / 100)
-  const netTotal         = subtotal - discountAmt
+
+  // Discount — resolved per the active scope (Invoice / Company / Product)
+  // into a per-line discount_pct, exactly what gets posted to the backend.
+  // See discountUtils.ts for the full rationale.
+  const { totalDiscount: discountAmt } = computeItemDiscounts(
+    rows, products, discountScope, invoiceDiscount, companyDiscounts, productDiscounts,
+  )
   // ── Round Off — display only; the authoritative value is computed
   // server-side (same nearest-whole-number rule) and saved with the
   // invoice. Shown here so the on-screen Grand Total matches what gets
   // posted. When netTotal is already a whole number, roundOff is 0 and
   // grandTotal === netTotal — Grand Total only changes when a round off
   // is actually applied.
-  const roundOff         = Math.round((Math.round(netTotal) - netTotal) * 100) / 100
-  const grandTotal       = Math.round(netTotal)
+  const { roundOff, grandTotal } = computeTotals(rows, discountAmt)
   const change            = typeof tender === 'number' && tender > 0 ? Math.max(0, tender - grandTotal) : 0
 
   // Auto-collapse customer accordion + focus product search on mobile
@@ -388,29 +334,39 @@ export default function SalesPage() {
     }
     setSaving(true); setFlash(null)
     try {
+      // Resolve the final per-line discount_pct from whichever scope is
+      // active (Invoice / Company / Product) — see discountUtils.ts.
+      const { pctById } = computeItemDiscounts(
+        rows, products, discountScope, invoiceDiscount, companyDiscounts, productDiscounts,
+      )
       const res = await salesAPI.create({
         party_id: data.customer_id || undefined,
         date_ad: data.date, payment_mode: data.payment_mode,
-        discount_pct: discountPct, notes: data.notes,
+        notes: data.notes,
         items: validRows.map(r => ({
           product_id: r.product_id, product_name: r.product_name,
           batch_no: r.batch_no || undefined, batch_id: r.batch_id || undefined, expiry: r.expiry || undefined,
           qty: Number(r.qty), bonus: Number(r.bonus) || 0,
           rate: Number(r.rate), cc_pct: Number(r.cc_pct) || 0,
           amount: r.amount, cc_amount: r.cc_amount,
+          discount_pct: pctById[r._id] || 0,
         })),
       })
-      const saved = res.data.data
+      const saved      = res.data.data
+      // Prefer the server's saved items (already carrying the applied
+      // discount_pct/amount) so the print preview matches exactly what was
+      // posted; validRows is only a fallback for older/unexpected responses.
+      const savedItems: any[] = Array.isArray(saved.items) && saved.items.length ? saved.items : validRows
       setPrintData({
         voucherNo: saved.invoice_no, type: 'SALE',
         date: saved.date_ad || saved.date_bs || data.date,
         paymentMode: saved.payment_mode,
         partyName: customers.find(c => c.id === data.customer_id)?.name,
-        items: validRows.map(r => ({
-          product_name: r.product_name, batch_no: r.batch_no, expiry: r.expiry,
-          qty: Number(r.qty), bonus: Number(r.bonus) || 0, rate: Number(r.rate),
-          discount_pct: Number(r.discount_pct) || 0, cc_pct: Number(r.cc_pct) || 0,
-          cc_amount: Number(r.cc_amount) || 0, amount: Number(r.amount),
+        items: savedItems.map((it: any) => ({
+          product_name: it.product_name, batch_no: it.batch_no, expiry: it.expiry,
+          qty: Number(it.qty), bonus: Number(it.bonus) || 0, rate: Number(it.rate),
+          discount_pct: Number(it.discount_pct) || 0, cc_pct: Number(it.cc_pct) || 0,
+          cc_amount: Number(it.cc_amount) || 0, amount: Number(it.amount),
         })),
         subtotal: saved.subtotal, ccAmount: saved.cc_amount,
         roundOff: Number(saved.round_off) || 0,
@@ -418,6 +374,9 @@ export default function SalesPage() {
       })
       setFlash({ type: 'success', msg: `Invoice ${saved.invoice_no} posted!` })
       reset(); setRows([newRow()]); setTender('')
+      setDiscountModalOpen(false)
+      setDiscountScope('invoice'); setInvoiceDiscount(emptyDiscount())
+      setCompanyDiscounts({}); setProductDiscounts({})
     } catch (e: any) { setFlash({ type: 'danger', msg: e.message }) }
     finally { setSaving(false) }
   })
@@ -425,8 +384,11 @@ export default function SalesPage() {
   function saveDraft() { setFlash({ type: 'success', msg: 'Draft saved locally.' }) }
 
   function clearForm() {
-    reset({ customer_id: '', date: new Date().toISOString().split('T')[0], payment_mode: 'credit', discount_pct: 0, notes: '' })
+    reset({ customer_id: '', date: new Date().toISOString().split('T')[0], payment_mode: 'cash', notes: '' })
     setRows([newRow()]); setTender(''); setFlash(null); setCustomerOpen(true)
+    setDiscountModalOpen(false)
+    setDiscountScope('invoice'); setInvoiceDiscount(emptyDiscount())
+    setCompanyDiscounts({}); setProductDiscounts({})
   }
 
   async function cancelSale(id: string) {
@@ -434,10 +396,40 @@ export default function SalesPage() {
     catch (e: any) { error('Cannot cancel', e.message) }
   }
 
-  function handlePostClick() {
-    const v = rows.filter(r => r.product_id && Number(r.qty) > 0)
+  // "Next (F12)" — validates the invoice itself (same checks onSubmit used
+  // to run before posting), then opens the Discount Review popup. The
+  // Sale page no longer posts directly; the popup's own Post Invoice
+  // button is what actually calls onSubmit.
+  function handleNextClick() {
+    const v = validDiscountRows(rows)
     if (!v.length) { setFlash({ type: 'danger', msg: 'Add at least one product' }); return }
-    setConfirmPost(true)
+    if (!customerId) { setFlash({ type: 'danger', msg: 'Select a customer before posting the sale' }); setCustomerOpen(true); return }
+    setFlash(null)
+    setDiscountModalOpen(true)
+  }
+
+  // Changing the discount scope clears any previously entered discount
+  // values (per the spec) — but only asks for confirmation if something
+  // would actually be lost.
+  function handleDiscountScopeChange(next: DiscountScope) {
+    if (next === discountScope) return
+    const hasEntries =
+      invoiceDiscount.value > 0 ||
+      Object.values(companyDiscounts).some(d => d.value > 0) ||
+      Object.values(productDiscounts).some(d => d.value > 0)
+    if (hasEntries && !window.confirm('Switching discount scope will clear the discount values you\'ve entered. Continue?')) {
+      return
+    }
+    setInvoiceDiscount(emptyDiscount())
+    setCompanyDiscounts({})
+    setProductDiscounts({})
+    setDiscountScope(next)
+  }
+
+  function handleClearDiscount() {
+    if (discountScope === 'invoice') setInvoiceDiscount(emptyDiscount())
+    else if (discountScope === 'company') setCompanyDiscounts({})
+    else setProductDiscounts({})
   }
 
   /* ── Keyboard shortcuts (New Invoice tab only) ─────────────────────────
@@ -453,10 +445,11 @@ export default function SalesPage() {
     { combo: 'ctrl+b',     description: 'Batch selection',   handler: () => tableRef.current?.openBatchSelect() },
     { combo: 'f5',         description: 'New product',       handler: () => tableRef.current?.openCreateProduct() },
     { combo: 'f6',         description: 'New customer',      handler: () => setShowNewCustomer(true) },
-    { combo: 'f7',         description: 'Apply discount',    handler: () => document.getElementById('pos-discount-input')?.focus() },
+    { combo: 'f7',         description: 'Apply discount',    handler: handleNextClick },
     { combo: 'f8',         description: 'Payment',           handler: () => document.getElementById('pos-tender-input')?.focus() },
-    { combo: 'f9',         description: 'Save transaction',  handler: handlePostClick },
-    { combo: 'ctrl+s',     description: 'Save',              handler: handlePostClick },
+    { combo: 'f9',         description: 'Next',              handler: handleNextClick },
+    { combo: 'ctrl+s',     description: 'Next',              handler: handleNextClick },
+    { combo: 'f12',        description: 'Next',              handler: handleNextClick },
     {
       combo: 'f10', description: 'Print invoice',
       handler: () => { if (!printData) info('Nothing to print yet', 'Post a sale first.'); },
@@ -908,7 +901,10 @@ export default function SalesPage() {
               {/* Grid — IDENTICAL to original */}
               <div className="pos-billing-grid">
 
-                {/* Discount block — IDENTICAL to original */}
+                {/* Discount Scope selector — replaces the old inline % input.
+                    Actual discount values are entered in the Discount
+                    Review popup (Next / F7 / F12) once the invoice is
+                    complete. Only one scope can be active at a time. */}
                 <div className="pos-summary-block">
                   <div className="pos-summary-block-icon" style={{ background: '#fef3c7' }}>
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -917,17 +913,24 @@ export default function SalesPage() {
                       <circle cx="11" cy="11" r="1.5" fill="#d97706" opacity=".5"/>
                     </svg>
                   </div>
-                  <div className="space-y-3">
+                  <div className="space-y-3 w-full">
                     <div>
-                      <div className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-4)] mb-1" title="Shortcut: F7">Discount % <Kbd>F7</Kbd></div>
-                      <div className="flex items-center gap-1.5">
-                        <input
-                          id="pos-discount-input"
-                          type="number" className="erp-input pmic-billing-input text-right"
-                          step="0.01" min="0" max="100"
-                          {...register('discount_pct')}
-                        />
-                        <span className="text-sm text-[var(--text-3)] font-medium">%</span>
+                      <div className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-4)] mb-1" title="Shortcut: F7">Discount Scope <Kbd>F7</Kbd></div>
+                      <div className="flex gap-1.5 flex-wrap">
+                        {([
+                          { id: 'invoice', label: 'Invoice' },
+                          { id: 'company', label: 'Company / Manufacturer' },
+                          { id: 'product', label: 'Product' },
+                        ] as const).map(opt => (
+                          <button
+                            key={opt.id}
+                            type="button"
+                            onClick={() => handleDiscountScopeChange(opt.id)}
+                            className={`pos-mode-pill ${discountScope === opt.id ? 'pos-mode-pill--active' : ''}`}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
                       </div>
                     </div>
                     <div>
@@ -989,11 +992,11 @@ export default function SalesPage() {
                 <Save size={14}/> Save Draft
               </button>
               <button
-                type="button" onClick={handlePostClick} disabled={saving}
-                className="pos-action-btn pos-action-btn--post" title="Post Invoice (F9 / Ctrl+S)"
+                type="button" onClick={handleNextClick} disabled={saving}
+                className="pos-action-btn pos-action-btn--post" title="Next — Review Discount (F12)"
               >
                 {saving ? <span className="pos-spinner"/> : <FileText size={14}/>}
-                {saving ? 'Posting…' : 'Post Invoice'}
+                {saving ? 'Posting…' : 'Next (F12)'}
               </button>
             </div>
           </div>
@@ -1008,10 +1011,10 @@ export default function SalesPage() {
             <button type="button" className="pma-draft" onClick={saveDraft} title="Save Draft">
               <Save size={20}/>
             </button>
-            <button type="button" className="pma-post" onClick={handlePostClick} disabled={saving}>
+            <button type="button" className="pma-post" onClick={handleNextClick} disabled={saving}>
               {saving
                 ? <><span className="pos-spinner"/> Posting…</>
-                : <><FileText size={16}/> Post Invoice — {fmt(grandTotal)}</>
+                : <><FileText size={16}/> Next — {fmt(grandTotal)}</>
               }
             </button>
           </div>
@@ -1249,9 +1252,22 @@ export default function SalesPage() {
       </Modal>
 
       {/* ── Dialogs — IDENTICAL to original ──────────────────────────── */}
-      <ConfirmDialog
-        open={confirmPost} onClose={() => setConfirmPost(false)} onConfirm={onSubmit}
-        title="Post Invoice" message={`Post invoice for ${fmt(grandTotal)}? This action cannot be undone.`}
+      <DiscountReviewModal
+        open={discountModalOpen}
+        onClose={() => setDiscountModalOpen(false)}
+        scope={discountScope}
+        rows={rows}
+        products={products}
+        subtotal={subtotal}
+        invoiceDiscount={invoiceDiscount}
+        onInvoiceDiscountChange={setInvoiceDiscount}
+        companyDiscounts={companyDiscounts}
+        onCompanyDiscountChange={(key, entry) => setCompanyDiscounts(prev => ({ ...prev, [key]: entry }))}
+        productDiscounts={productDiscounts}
+        onProductDiscountChange={(rowId, entry) => setProductDiscounts(prev => ({ ...prev, [rowId]: entry }))}
+        onClearAll={handleClearDiscount}
+        onPost={onSubmit}
+        posting={saving}
       />
       <ConfirmDialog
         open={!!confirmCancel} onClose={() => setConfirmCancel(null)}
@@ -1263,7 +1279,9 @@ export default function SalesPage() {
         onClose={() => { setPrintData(null); setFlash(null) }}
         onNextBill={() => {
           setPrintData(null); setFlash(null); setRows([newRow()]); setTender('')
-          reset({ customer_id: '', date: new Date().toISOString().split('T')[0], payment_mode: 'credit', discount_pct: 0, notes: '' })
+          reset({ customer_id: '', date: new Date().toISOString().split('T')[0], payment_mode: 'cash', notes: '' })
+          setDiscountScope('invoice'); setInvoiceDiscount(emptyDiscount())
+          setCompanyDiscounts({}); setProductDiscounts({})
         }}
       />
       {/* Fires automatically the moment a sale posts (printData is set in
