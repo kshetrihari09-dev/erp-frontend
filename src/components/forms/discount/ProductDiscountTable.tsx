@@ -44,6 +44,14 @@ export default function ProductDiscountTable({ rows, productRows, onChange }: Pr
 
           <div className="drv-table-wrap">
             <table className="erp-table drv-table">
+              <colgroup>
+                <col style={{ width: '24%' }} />
+                <col style={{ width: '16%' }} />
+                <col style={{ width: '8%' }} />
+                <col style={{ width: '13%' }} />
+                <col style={{ width: '25%' }} />
+                <col style={{ width: '14%' }} />
+              </colgroup>
               <thead>
                 <tr>
                   <th>Product</th><th>Company</th>
@@ -54,8 +62,12 @@ export default function ProductDiscountTable({ rows, productRows, onChange }: Pr
               <tbody>
                 {filtered.map((pr, i) => (
                   <tr key={pr.row._id}>
-                    <td className="font-semibold" data-card-title>{pr.row.product_name}</td>
-                    <td className="text-[var(--text-3)]" data-label="Company">{pr.company}</td>
+                    <td className="font-semibold" data-card-title>
+                      <span className="drv-truncate" title={pr.row.product_name}>{pr.row.product_name}</span>
+                    </td>
+                    <td className="text-[var(--text-3)]" data-label="Company">
+                      <span className="drv-truncate" title={pr.company}>{pr.company}</span>
+                    </td>
                     <td className="td-right td-mono" data-label="Qty">{pr.row.qty}</td>
                     <td className="td-right td-mono" data-label="Amount">{fmt(pr.row.amount)}</td>
                     <td data-label="Discount">

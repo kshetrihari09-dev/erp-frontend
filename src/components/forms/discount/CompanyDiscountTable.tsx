@@ -31,6 +31,12 @@ export default function CompanyDiscountTable({ rows, groups, onChange }: Props) 
         <div className="drv-content">
           <div className="drv-table-wrap">
             <table className="erp-table drv-table">
+              <colgroup>
+                <col style={{ width: '34%' }} />
+                <col style={{ width: '20%' }} />
+                <col style={{ width: '28%' }} />
+                <col style={{ width: '18%' }} />
+              </colgroup>
               <thead>
                 <tr>
                   <th>Company</th>
@@ -42,7 +48,9 @@ export default function CompanyDiscountTable({ rows, groups, onChange }: Props) 
               <tbody>
                 {groups.map((g, i) => (
                   <tr key={g.key}>
-                    <td className="font-semibold" data-card-title>{g.label}</td>
+                    <td className="font-semibold" data-card-title>
+                      <span className="drv-truncate" title={g.label}>{g.label}</span>
+                    </td>
                     <td className="td-right td-mono" data-label="Invoice Amount">{fmt(g.subtotal)}</td>
                     <td data-label="Discount">
                       <div className="drv-cell-input">
