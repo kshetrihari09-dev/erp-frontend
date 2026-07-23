@@ -26,7 +26,7 @@ import { salesAPI, partiesAPI, productsAPI } from '@/services/api'
 import useUIStore from '@/store/uiStore'
 import {
   Button, Tabs, Modal, Badge, Pagination,
-  SkeletonRows, Empty, SearchInput, ConfirmDialog, Kbd,
+  SkeletonRows, Empty, SearchInput, ConfirmDialog, Kbd, Spinner,
 } from '@/components/ui'
 import InvoiceRowsTable, { newRow, type InvoiceRow, type InvoiceRowsTableHandle } from '@/components/forms/InvoiceRowsTable'
 import ProductSearchCell from '@/components/forms/ProductSearchCell'
@@ -91,6 +91,82 @@ function SummaryRow({
       <span className={`font-bold tabular-nums ${large ? 'text-xl text-brand' : highlight ? 'text-base text-brand' : 'text-sm text-[var(--text)]'}`}>
         {value}
       </span>
+    </div>
+  )
+}
+
+/* ── EditablePaymentMode — Sales List inline editor ─────────────────────────
+ * UI-only enhancement. Badge → click → compact dropdown + Save/Cancel.
+ * Calls the dedicated PUT /sales/:id/payment-mode endpoint, which updates
+ * only that one column server-side. This component never recalculates
+ * totals, and never touches stock, accounting, vouchers, tax, or discounts —
+ * it only ever sends/receives `payment_mode`. */
+function EditablePaymentMode({
+  sale, onSaved,
+}: { sale: Sale; onSaved: (id: string, mode: string) => void }) {
+  const { success, error } = useUIStore()
+  const [editing, setEditing] = useState(false)
+  const [value,   setValue]   = useState<string>(sale.payment_mode)
+  const [saving,  setSaving]  = useState(false)
+
+  if (!editing) {
+    return (
+      <Badge
+        status={sale.payment_mode}
+        className="cursor-pointer hover:opacity-70"
+        onClick={(e: React.MouseEvent) => {
+          e.stopPropagation()
+          setValue(sale.payment_mode)
+          setEditing(true)
+        }}
+      />
+    )
+  }
+
+  const cancelEdit = (e?: React.MouseEvent) => {
+    e?.stopPropagation()
+    setValue(sale.payment_mode)
+    setEditing(false)
+  }
+
+  const saveEdit = async (e?: React.MouseEvent) => {
+    e?.stopPropagation()
+    // Unchanged value — exit edit mode without an API call.
+    if (value === sale.payment_mode) { setEditing(false); return }
+    setSaving(true)
+    try {
+      const res     = await salesAPI.updatePaymentMode(sale.id, value)
+      const updated = res.data?.data?.payment_mode ?? value
+      onSaved(sale.id, updated)
+      setEditing(false)
+      success('Payment mode updated', `Invoice ${sale.invoice_no} is now ${updated}.`)
+    } catch (e: any) {
+      error('Update failed', e.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-1 flex-wrap" onClick={e => e.stopPropagation()}>
+      <select
+        className="erp-input"
+        style={{ height: 28, padding: '2px 6px', fontSize: 12, minWidth: 90 }}
+        value={value}
+        disabled={saving}
+        autoFocus
+        onChange={e => setValue(e.target.value)}
+      >
+        {PAYMENT_MODES.map(m => (
+          <option key={m.value} value={m.value}>{m.label}</option>
+        ))}
+      </select>
+      <Button type="button" variant="primary" size="sm" disabled={saving} onClick={saveEdit}>
+        {saving ? <Spinner size={12}/> : 'Save'}
+      </Button>
+      <Button type="button" variant="secondary" size="sm" disabled={saving} onClick={cancelEdit}>
+        Cancel
+      </Button>
     </div>
   )
 }
@@ -174,6 +250,12 @@ export default function SalesPage() {
   }, [page, search])
 
   useEffect(() => { if (tab === 'list') loadList() }, [tab, loadList])
+
+  // Patches the one changed field locally so the list doesn't need a full
+  // reload after an inline Payment Mode edit in the Sales List.
+  const handlePaymentModeSaved = useCallback((id: string, mode: string) => {
+    setSales(prev => prev.map(s => s.id === id ? { ...s, payment_mode: mode as Sale['payment_mode'] } : s))
+  }, [])
 
   useEffect(() => {
     if (!detailId) { setDetail(null); return }
@@ -899,7 +981,9 @@ export default function SalesPage() {
                             <td className="td-right">{fmt(s.net_total)}</td>
                             <td className="td-right text-green-700">{fmt(s.paid_amount)}</td>
                             <td className={`td-right ${Number(s.due_amount) > 0 ? 'text-amber-600' : ''}`}>{fmt(s.due_amount)}</td>
-                            <td><Badge status={s.payment_mode}/></td>
+                            <td onClick={e => e.stopPropagation()}>
+                              <EditablePaymentMode sale={s} onSaved={handlePaymentModeSaved}/>
+                            </td>
                             <td><Badge status={s.status}/></td>
                             <td onClick={e => e.stopPropagation()}>
                               <PostingStatusBadge sourceType="SALE" sourceId={s.id} compact/>
@@ -969,7 +1053,7 @@ export default function SalesPage() {
 
                   {/* Chips row: mode, status, paid, due */}
                   <div className="sil-card-chips">
-                    <Badge status={s.payment_mode}/>
+                    <EditablePaymentMode sale={s} onSaved={handlePaymentModeSaved}/>
                     <Badge status={s.status}/>
                     {Number(s.paid_amount) > 0 && (
                       <span className="sil-chip sil-chip-paid">Paid {fmt(s.paid_amount)}</span>

@@ -94,6 +94,12 @@ export const salesAPI = {
   }) => http.post<ApiResponse<Sale>>('/sales', data),
   cancel: (id: string, data?: { reason?: string }) => http.put(`/sales/${id}/cancel`, data || {}),
   stats:  (params?: Params) => http.get<ApiResponse<DashboardStats>>('/sales/summary/stats', { params }),
+  /**
+   * Sales List inline edit — updates ONLY payment_mode on an existing sale.
+   * Does not touch totals, stock, accounting, or vouchers.
+   */
+  updatePaymentMode: (id: string, payment_mode: string) =>
+    http.put<ApiResponse<Sale>>(`/sales/${id}/payment-mode`, { payment_mode }),
 }
 
 // ─── Purchases ────────────────────────────────────────────────────────────────

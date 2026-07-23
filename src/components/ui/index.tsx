@@ -1,4 +1,4 @@
-import { forwardRef, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from 'react'
+import { forwardRef, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type MouseEvent } from 'react'
 import { cn, statusColor } from '@/utils'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 import { Z } from '@/styles/zIndex'
@@ -126,10 +126,10 @@ export const Textarea = forwardRef<HTMLTextAreaElement, React.TextareaHTMLAttrib
 Textarea.displayName = 'Textarea'
 
 // ─── Badge ────────────────────────────────────────────────────────────────────
-export function Badge({ status, children, className }: { status?: string; children?: ReactNode; className?: string }) {
+export function Badge({ status, children, className, onClick }: { status?: string; children?: ReactNode; className?: string; onClick?: (e: MouseEvent<HTMLSpanElement>) => void }) {
   const cls = status ? statusColor(status) : ''
   return (
-    <span className={cn('badge', cls, className)}>
+    <span className={cn('badge', cls, className)} onClick={onClick}>
       {children || status}
     </span>
   )
