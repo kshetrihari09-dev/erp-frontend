@@ -21,50 +21,56 @@ export default function InvoiceDiscountPanel({ rows, subtotal, discount, onChang
 
   return (
     <div className="drv-panel">
-      <div className="drv-field-row">
-        <div className="drv-field">
-          <label className="drv-label">Discount Type</label>
-          <div className="drv-type-toggle">
-            <button
-              type="button"
-              id="discount-review-first-field"
-              className={`drv-type-btn ${discount.type === 'percentage' ? 'drv-type-btn--active' : ''}`}
-              onClick={() => onChange({ ...discount, type: 'percentage' })}
-            >
-              Percentage (%)
-            </button>
-            <button
-              type="button"
-              className={`drv-type-btn ${discount.type === 'fixed' ? 'drv-type-btn--active' : ''}`}
-              onClick={() => onChange({ ...discount, type: 'fixed' })}
-            >
-              Fixed Amount (Rs.)
-            </button>
+      <div className="drv-layout">
+        <div className="drv-content">
+          <div className="drv-field-row">
+            <div className="drv-field">
+              <label className="drv-label">Discount Type</label>
+              <div className="drv-type-toggle">
+                <button
+                  type="button"
+                  id="discount-review-first-field"
+                  className={`drv-type-btn ${discount.type === 'percentage' ? 'drv-type-btn--active' : ''}`}
+                  onClick={() => onChange({ ...discount, type: 'percentage' })}
+                >
+                  Percentage (%)
+                </button>
+                <button
+                  type="button"
+                  className={`drv-type-btn ${discount.type === 'fixed' ? 'drv-type-btn--active' : ''}`}
+                  onClick={() => onChange({ ...discount, type: 'fixed' })}
+                >
+                  Fixed Amount (Rs.)
+                </button>
+              </div>
+            </div>
+            <div className="drv-field">
+              <label className="drv-label">Discount Value</label>
+              <input
+                type="number" min={0} step="0.01"
+                className="erp-input drv-value-input"
+                value={discount.value === 0 ? '' : discount.value}
+                placeholder="0"
+                onChange={e => {
+                  const raw = e.target.value === '' ? 0 : Number(e.target.value)
+                  const value = discount.type === 'percentage' ? clampPct(raw) : clampFixed(raw, subtotal)
+                  onChange({ ...discount, value })
+                }}
+              />
+            </div>
           </div>
         </div>
-        <div className="drv-field">
-          <label className="drv-label">Discount Value</label>
-          <input
-            type="number" min={0} step="0.01"
-            className="erp-input drv-value-input"
-            value={discount.value === 0 ? '' : discount.value}
-            placeholder="0"
-            onChange={e => {
-              const raw = e.target.value === '' ? 0 : Number(e.target.value)
-              const value = discount.type === 'percentage' ? clampPct(raw) : clampFixed(raw, subtotal)
-              onChange({ ...discount, value })
-            }}
+
+        <div className="drv-sidebar">
+          <DiscountSummaryCard
+            subtotal={subtotal}
+            discountTotal={discountAmount}
+            discountLabel="Invoice Discount"
+            roundOff={roundOff}
+            grandTotal={grandTotal}
           />
         </div>
       </div>
-
-      <DiscountSummaryCard
-        subtotal={subtotal}
-        discountTotal={discountAmount}
-        discountLabel="Invoice Discount"
-        roundOff={roundOff}
-        grandTotal={grandTotal}
-      />
     </div>
   )
 }

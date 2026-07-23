@@ -38,65 +38,71 @@ export default function ProductDiscountTable({ rows, productRows, onChange }: Pr
 
   return (
     <div className="drv-panel">
-      <SearchInput value={search} onChange={setSearch} placeholder="Search product or company…" className="mb-3" />
+      <div className="drv-layout">
+        <div className="drv-content">
+          <SearchInput value={search} onChange={setSearch} placeholder="Search product or company…" className="mb-3" />
 
-      <div className="drv-table-wrap">
-        <table className="erp-table drv-table">
-          <thead>
-            <tr>
-              <th>Product</th><th>Company</th>
-              <th className="td-right">Qty</th><th className="td-right">Amount</th>
-              <th>Discount</th><th className="td-right">Discount Amount</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((pr, i) => (
-              <tr key={pr.row._id}>
-                <td className="font-semibold">{pr.row.product_name}</td>
-                <td className="text-[var(--text-3)]">{pr.company}</td>
-                <td className="td-right td-mono">{pr.row.qty}</td>
-                <td className="td-right td-mono">{fmt(pr.row.amount)}</td>
-                <td>
-                  <div className="drv-cell-input">
-                    <input
-                      id={i === 0 ? 'discount-review-first-field' : undefined}
-                      type="number" min={0} step="0.01"
-                      className="erp-input drv-cell-value"
-                      value={pr.discount.value === 0 ? '' : pr.discount.value}
-                      placeholder="0"
-                      onChange={e => {
-                        const raw = e.target.value === '' ? 0 : Number(e.target.value)
-                        const value = pr.discount.type === 'percentage' ? clampPct(raw) : clampFixed(raw, pr.row.amount)
-                        onChange(pr.row._id, { ...pr.discount, value })
-                      }}
-                    />
-                    <select
-                      className="erp-input drv-cell-select"
-                      value={pr.discount.type}
-                      onChange={e => onChange(pr.row._id, { ...pr.discount, type: e.target.value as DiscountEntry['type'] })}
-                    >
-                      <option value="percentage">%</option>
-                      <option value="fixed">Rs.</option>
-                    </select>
-                  </div>
-                </td>
-                <td className="td-right font-semibold td-mono">{fmt(pr.discountAmount)}</td>
-              </tr>
-            ))}
-            {!filtered.length && (
-              <tr><td colSpan={6} className="text-center text-sm text-[var(--text-4)] py-4">No matches.</td></tr>
-            )}
-          </tbody>
-        </table>
+          <div className="drv-table-wrap">
+            <table className="erp-table drv-table">
+              <thead>
+                <tr>
+                  <th>Product</th><th>Company</th>
+                  <th className="td-right">Qty</th><th className="td-right">Amount</th>
+                  <th>Discount</th><th className="td-right">Discount Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((pr, i) => (
+                  <tr key={pr.row._id}>
+                    <td className="font-semibold" data-card-title>{pr.row.product_name}</td>
+                    <td className="text-[var(--text-3)]" data-label="Company">{pr.company}</td>
+                    <td className="td-right td-mono" data-label="Qty">{pr.row.qty}</td>
+                    <td className="td-right td-mono" data-label="Amount">{fmt(pr.row.amount)}</td>
+                    <td data-label="Discount">
+                      <div className="drv-cell-input">
+                        <input
+                          id={i === 0 ? 'discount-review-first-field' : undefined}
+                          type="number" min={0} step="0.01"
+                          className="erp-input drv-cell-value"
+                          value={pr.discount.value === 0 ? '' : pr.discount.value}
+                          placeholder="0"
+                          onChange={e => {
+                            const raw = e.target.value === '' ? 0 : Number(e.target.value)
+                            const value = pr.discount.type === 'percentage' ? clampPct(raw) : clampFixed(raw, pr.row.amount)
+                            onChange(pr.row._id, { ...pr.discount, value })
+                          }}
+                        />
+                        <select
+                          className="erp-input drv-cell-select"
+                          value={pr.discount.type}
+                          onChange={e => onChange(pr.row._id, { ...pr.discount, type: e.target.value as DiscountEntry['type'] })}
+                        >
+                          <option value="percentage">%</option>
+                          <option value="fixed">Rs.</option>
+                        </select>
+                      </div>
+                    </td>
+                    <td className="td-right font-semibold td-mono" data-label="Discount Amount">{fmt(pr.discountAmount)}</td>
+                  </tr>
+                ))}
+                {!filtered.length && (
+                  <tr><td colSpan={6} className="text-center text-sm text-[var(--text-4)] py-4">No matches.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="drv-sidebar">
+          <DiscountSummaryCard
+            subtotal={subtotal}
+            discountTotal={totalDiscount}
+            discountLabel="Total Product Discount"
+            roundOff={roundOff}
+            grandTotal={grandTotal}
+          />
+        </div>
       </div>
-
-      <DiscountSummaryCard
-        subtotal={subtotal}
-        discountTotal={totalDiscount}
-        discountLabel="Total Product Discount"
-        roundOff={roundOff}
-        grandTotal={grandTotal}
-      />
     </div>
   )
 }

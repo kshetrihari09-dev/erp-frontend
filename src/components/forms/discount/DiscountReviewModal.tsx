@@ -88,19 +88,24 @@ export default function DiscountReviewModal({
     <Modal
       open={open} onClose={onClose}
       title={SCOPE_TITLE[scope]}
-      size="lg"
+      size="2xl"
+      fullScreenOnMobile
+      panelClassName="drv-modal-panel"
+      bodyClassName="drv-modal-body"
       footer={
         <>
-          <div className="flex-1 flex items-center gap-2 text-[11px] text-[var(--text-4)]">
+          <div className="drv-kbd-hints flex-1 flex items-center gap-2 text-[11px] text-[var(--text-4)]">
             <Kbd>Tab</Kbd> Next field <Kbd>↑↓</Kbd> Rows <Kbd>Ctrl+Enter</Kbd> Post <Kbd>Esc</Kbd> Back
           </div>
-          <Button variant="secondary" size="sm" onClick={onClose}>Back</Button>
-          <Button variant="outline" size="sm" onClick={onClearAll}>
-            {scope === 'invoice' ? 'Clear' : 'Clear All'}
-          </Button>
-          <Button variant="primary" size="sm" loading={posting} onClick={onPost}>
-            Post Invoice
-          </Button>
+          <div className="drv-footer-actions">
+            <Button variant="secondary" size="sm" onClick={onClose}>Back</Button>
+            <Button variant="outline" size="sm" onClick={onClearAll}>
+              {scope === 'invoice' ? 'Clear' : 'Clear All'}
+            </Button>
+            <Button variant="primary" size="sm" loading={posting} onClick={onPost}>
+              Post Invoice
+            </Button>
+          </div>
         </>
       }
     >

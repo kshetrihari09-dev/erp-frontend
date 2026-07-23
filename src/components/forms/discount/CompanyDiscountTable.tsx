@@ -27,59 +27,65 @@ export default function CompanyDiscountTable({ rows, groups, onChange }: Props) 
 
   return (
     <div className="drv-panel">
-      <div className="drv-table-wrap">
-        <table className="erp-table drv-table">
-          <thead>
-            <tr>
-              <th>Company</th>
-              <th className="td-right">Invoice Amount</th>
-              <th>Discount</th>
-              <th className="td-right">Discount Amount</th>
-            </tr>
-          </thead>
-          <tbody>
-            {groups.map((g, i) => (
-              <tr key={g.key}>
-                <td className="font-semibold">{g.label}</td>
-                <td className="td-right td-mono">{fmt(g.subtotal)}</td>
-                <td>
-                  <div className="drv-cell-input">
-                    <input
-                      id={i === 0 ? 'discount-review-first-field' : undefined}
-                      type="number" min={0} step="0.01"
-                      className="erp-input drv-cell-value"
-                      value={g.discount.value === 0 ? '' : g.discount.value}
-                      placeholder="0"
-                      onChange={e => {
-                        const raw = e.target.value === '' ? 0 : Number(e.target.value)
-                        const value = g.discount.type === 'percentage' ? clampPct(raw) : clampFixed(raw, g.subtotal)
-                        onChange(g.key, { ...g.discount, value })
-                      }}
-                    />
-                    <select
-                      className="erp-input drv-cell-select"
-                      value={g.discount.type}
-                      onChange={e => onChange(g.key, { ...g.discount, type: e.target.value as DiscountEntry['type'] })}
-                    >
-                      <option value="percentage">%</option>
-                      <option value="fixed">Rs.</option>
-                    </select>
-                  </div>
-                </td>
-                <td className="td-right font-semibold td-mono">{fmt(g.discountAmount)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <div className="drv-layout">
+        <div className="drv-content">
+          <div className="drv-table-wrap">
+            <table className="erp-table drv-table">
+              <thead>
+                <tr>
+                  <th>Company</th>
+                  <th className="td-right">Invoice Amount</th>
+                  <th>Discount</th>
+                  <th className="td-right">Discount Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {groups.map((g, i) => (
+                  <tr key={g.key}>
+                    <td className="font-semibold" data-card-title>{g.label}</td>
+                    <td className="td-right td-mono" data-label="Invoice Amount">{fmt(g.subtotal)}</td>
+                    <td data-label="Discount">
+                      <div className="drv-cell-input">
+                        <input
+                          id={i === 0 ? 'discount-review-first-field' : undefined}
+                          type="number" min={0} step="0.01"
+                          className="erp-input drv-cell-value"
+                          value={g.discount.value === 0 ? '' : g.discount.value}
+                          placeholder="0"
+                          onChange={e => {
+                            const raw = e.target.value === '' ? 0 : Number(e.target.value)
+                            const value = g.discount.type === 'percentage' ? clampPct(raw) : clampFixed(raw, g.subtotal)
+                            onChange(g.key, { ...g.discount, value })
+                          }}
+                        />
+                        <select
+                          className="erp-input drv-cell-select"
+                          value={g.discount.type}
+                          onChange={e => onChange(g.key, { ...g.discount, type: e.target.value as DiscountEntry['type'] })}
+                        >
+                          <option value="percentage">%</option>
+                          <option value="fixed">Rs.</option>
+                        </select>
+                      </div>
+                    </td>
+                    <td className="td-right font-semibold td-mono" data-label="Discount Amount">{fmt(g.discountAmount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
 
-      <DiscountSummaryCard
-        subtotal={subtotal}
-        discountTotal={totalDiscount}
-        discountLabel="Total Company Discount"
-        roundOff={roundOff}
-        grandTotal={grandTotal}
-      />
+        <div className="drv-sidebar">
+          <DiscountSummaryCard
+            subtotal={subtotal}
+            discountTotal={totalDiscount}
+            discountLabel="Total Company Discount"
+            roundOff={roundOff}
+            grandTotal={grandTotal}
+          />
+        </div>
+      </div>
     </div>
   )
 }

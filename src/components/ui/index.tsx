@@ -238,8 +238,18 @@ interface ModalProps {
   onClose:   () => void
   title:     string
   children:  ReactNode
-  size?:     'sm' | 'md' | 'lg' | 'xl'
+  size?:     'sm' | 'md' | 'lg' | 'xl' | '2xl'
   footer?:   ReactNode
+  /** Extra classes merged onto the modal panel — for opt-in layout variants only. */
+  panelClassName?: string
+  /** Extra classes merged onto the scrollable body — for opt-in layout variants only. */
+  bodyClassName?: string
+  /**
+   * When true, the modal becomes a full-screen sheet on mobile (<768px)
+   * instead of a centered card. Defaults to false so existing modals are
+   * unaffected unless they opt in.
+   */
+  fullScreenOnMobile?: boolean
 }
 
 const modalSizes = {
@@ -247,9 +257,13 @@ const modalSizes = {
   md:  'max-w-lg',
   lg:  'max-w-2xl',
   xl:  'max-w-4xl',
+  '2xl': 'modal-panel--wide',
 }
 
-export function Modal({ open, onClose, title, children, size = 'md', footer }: ModalProps) {
+export function Modal({
+  open, onClose, title, children, size = 'md', footer,
+  panelClassName, bodyClassName, fullScreenOnMobile = false,
+}: ModalProps) {
   // Esc closes — also suspends page-level shortcuts underneath while open
   // (see hooks/useKeyboardShortcuts.ts). Hook must run unconditionally
   // (before the `if (!open)` early return), gated via `enabled`.
@@ -258,7 +272,10 @@ export function Modal({ open, onClose, title, children, size = 'md', footer }: M
   if (!open) return null
   return (
     <div
-      className="fixed inset-0 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+      className={cn(
+        'fixed inset-0 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm',
+        fullScreenOnMobile && 'modal-backdrop--flush'
+      )}
       onClick={(e) => e.target === e.currentTarget && onClose()}
       style={{ animation: 'fadeIn .15s ease', zIndex: Z.modalBackdrop }}
     >
@@ -266,12 +283,14 @@ export function Modal({ open, onClose, title, children, size = 'md', footer }: M
         className={cn(
           'bg-[var(--surface)] border border-[var(--border)] rounded-2xl shadow-modal w-full overflow-hidden flex flex-col',
           'max-h-[90vh]',
-          modalSizes[size]
+          modalSizes[size],
+          fullScreenOnMobile && 'modal-panel--flush',
+          panelClassName
         )}
         style={{ animation: 'slideUp .2s ease', position: 'relative', zIndex: Z.modal }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
+        <div className="modal-header flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
           <h2 className="font-bold text-[15px] text-[var(--text)]">{title}</h2>
           <button
             onClick={onClose}
@@ -280,11 +299,11 @@ export function Modal({ open, onClose, title, children, size = 'md', footer }: M
             ✕
           </button>
         </div>
-        {/* Body */}
-        <div className="p-6 overflow-y-auto flex-1">{children}</div>
+        {/* Body — the only part that scrolls; header/footer stay put */}
+        <div className={cn('p-6 overflow-y-auto flex-1 min-h-0', bodyClassName)}>{children}</div>
         {/* Footer */}
         {footer && (
-          <div className="px-6 py-4 border-t border-[var(--border)] flex items-center justify-end gap-2 bg-[var(--surface-2)]">
+          <div className="modal-footer px-6 py-4 border-t border-[var(--border)] flex items-center justify-end gap-2 bg-[var(--surface-2)]">
             {footer}
           </div>
         )}

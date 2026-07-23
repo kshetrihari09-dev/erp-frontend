@@ -5284,11 +5284,73 @@ canvas{
 /* ─────────────────────────────────────────────
    DISCOUNT REVIEW POPUP (Sale page — Next/F12)
    See modules/sales/SalesPage.tsx + components/forms/discount/*
+   Breakpoints: desktop ≥1024px · tablet 768–1023px · mobile <768px
 ───────────────────────────────────────────── */
+
+/* Modal frame ---------------------------------------------------------- */
+
+/* Wider desktop modal — opt-in via Modal size="2xl" (only the Discount
+   Review Modal uses this; every other Modal instance is unaffected). */
+.modal-panel--wide {
+  max-width: 1200px;
+  width: min(90vw, 1200px);
+}
+@media (max-width: 1023px) {
+  .modal-panel--wide { width: 94vw; max-width: 720px; }
+}
+@media (max-width: 767px) {
+  .modal-panel--wide { width: 100vw; max-width: 100vw; }
+}
+
+/* Full-screen sheet on mobile — opt-in via Modal fullScreenOnMobile.
+   Header/footer stay put, only the body scrolls (already true of the
+   base Modal's flex-column + overflow-y-auto structure). */
+@media (max-width: 767px) {
+  .modal-backdrop--flush { padding: 0; align-items: stretch; justify-content: stretch; }
+  .modal-panel--flush {
+    max-height: 100vh;
+    height: 100vh;
+    border-radius: 0;
+    border-left: none; border-right: none; border-bottom: none;
+  }
+}
+
+.drv-modal-body { display: flex; flex-direction: column; }
+
+/* Footer actions --------------------------------------------------------
+   Kbd hints are keyboard-only affordances; hide them on touch/mobile so
+   Back / Clear / Post Invoice stay comfortably reachable. */
+.drv-footer-actions { display: flex; align-items: center; gap: 8px; }
+@media (max-width: 767px) {
+  .drv-kbd-hints { display: none; }
+  .drv-footer-actions { width: 100%; gap: 8px; }
+  .drv-footer-actions > * { flex: 1 1 0; min-height: 44px; }
+}
+
+/* Panel + two-column (content / summary) layout ------------------------ */
 .drv-panel {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 20px;
+}
+
+.drv-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.drv-content { min-width: 0; }
+.drv-sidebar { min-width: 0; }
+
+/* Desktop: content + a fixed-width sticky summary sidebar */
+@media (min-width: 1024px) {
+  .drv-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    align-items: start;
+    gap: 24px;
+  }
+  .drv-sidebar { position: sticky; top: 0; }
 }
 
 .drv-field-row {
@@ -5328,11 +5390,12 @@ canvas{
 .drv-value-input { text-align: right; font-weight: 700; }
 
 .drv-table-wrap {
-  max-height: 340px;
+  max-height: 420px;
   overflow-y: auto;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
 }
+.drv-table { table-layout: auto; }
 .drv-table th { position: sticky; top: 0; }
 .drv-table td { vertical-align: middle; }
 
@@ -5371,7 +5434,75 @@ canvas{
   font-size: 17px; color: var(--brand);
 }
 
-@media (max-width: 640px) {
-  .drv-field-row { grid-template-columns: 1fr; }
-  .drv-cell-value { width: 62px; }
+/* Tablet: keep the table but ensure comfortable spacing/touch targets --- */
+@media (max-width: 1023px) and (min-width: 768px) {
+  .drv-cell-value { min-height: 40px; }
+  .drv-cell-select { min-height: 40px; }
+  .drv-type-btn { min-height: 40px; }
+}
+
+/* Mobile: stack everything, turn wide tables into cards ----------------- */
+@media (max-width: 767px) {
+  .drv-panel { gap: 16px; }
+  .drv-layout { gap: 16px; }
+  .drv-field-row { grid-template-columns: 1fr; gap: 12px; }
+
+  .drv-type-btn,
+  .drv-cell-value,
+  .drv-cell-select,
+  .drv-value-input {
+    min-height: 44px;
+  }
+
+  .drv-table-wrap {
+    max-height: none;
+    overflow-y: visible;
+    border: none;
+    border-radius: 0;
+  }
+
+  /* Table → stacked cards */
+  .drv-table,
+  .drv-table thead,
+  .drv-table tbody,
+  .drv-table tr,
+  .drv-table th,
+  .drv-table td {
+    display: block;
+    width: 100%;
+  }
+  .drv-table thead { display: none; }
+  .drv-table tbody tr {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md, 10px);
+    padding: 12px 14px;
+    margin-bottom: 12px;
+  }
+  .drv-table tbody tr:last-child { margin-bottom: 0; }
+  .drv-table td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border-2);
+    text-align: right;
+  }
+  .drv-table td:last-child { border-bottom: none; }
+  .drv-table td[data-label]::before {
+    content: attr(data-label);
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .05em; color: var(--text-4);
+    text-align: left;
+  }
+  .drv-table td[data-card-title] {
+    display: block;
+    text-align: left;
+    font-size: 14.5px;
+    padding: 0 0 10px;
+    margin-bottom: 6px;
+    border-bottom: 2px solid var(--border);
+  }
+  .drv-cell-input { justify-content: flex-end; flex: 1 1 auto; }
 }
