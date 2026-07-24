@@ -233,7 +233,7 @@ export default function SalesPage() {
   const { register, handleSubmit, reset, watch, setValue } = useForm({
     defaultValues: {
       customer_id: '', date: new Date().toISOString().split('T')[0],
-      payment_mode: 'cash', notes: '',
+      payment_mode: '', notes: '',
     },
   })
 
@@ -317,6 +317,7 @@ export default function SalesPage() {
     const validRows = rows.filter(r => r.product_id && Number(r.qty) > 0)
     if (!validRows.length) { setFlash({ type: 'danger', msg: 'Add at least one product' }); return }
     if (!data.customer_id) { setFlash({ type: 'danger', msg: 'Select a customer before posting the sale' }); setCustomerOpen(true); return }
+    if (!data.payment_mode) { setFlash({ type: 'danger', msg: 'Please select a payment mode.' }); return }
     if (lastInvDate && data.date && data.date < lastInvDate) {
       setFlash({ type: 'danger', msg: `Date cannot be earlier than the previous invoice date (${fmtDate(lastInvDate)}).` })
       return
@@ -385,7 +386,7 @@ export default function SalesPage() {
   function saveDraft() { setFlash({ type: 'info', msg: 'Draft saved locally.' }) }
 
   function clearForm() {
-    reset({ customer_id: '', date: new Date().toISOString().split('T')[0], payment_mode: 'cash', notes: '' })
+    reset({ customer_id: '', date: new Date().toISOString().split('T')[0], payment_mode: '', notes: '' })
     setRows([newRow()]); setTender(''); setFlash(null); setCustomerOpen(true)
     setDiscountModalOpen(false)
     setDiscountScope('invoice'); setInvoiceDiscount(emptyDiscount())
@@ -405,6 +406,7 @@ export default function SalesPage() {
     const v = validDiscountRows(rows)
     if (!v.length) { setFlash({ type: 'danger', msg: 'Add at least one product' }); return }
     if (!customerId) { setFlash({ type: 'danger', msg: 'Select a customer before posting the sale' }); setCustomerOpen(true); return }
+    if (!currentPayMode) { setFlash({ type: 'danger', msg: 'Please select a payment mode.' }); return }
     setFlash(null)
     setDiscountModalOpen(true)
   }
@@ -1296,7 +1298,7 @@ export default function SalesPage() {
         onClose={() => setPrintData(null)}
         onNextBill={() => {
           setPrintData(null); setRows([newRow()]); setTender('')
-          reset({ customer_id: '', date: new Date().toISOString().split('T')[0], payment_mode: 'cash', notes: '' })
+          reset({ customer_id: '', date: new Date().toISOString().split('T')[0], payment_mode: '', notes: '' })
           setDiscountScope('invoice'); setInvoiceDiscount(emptyDiscount())
           setCompanyDiscounts({}); setProductDiscounts({})
         }}
