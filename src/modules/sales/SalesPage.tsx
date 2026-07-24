@@ -1276,9 +1276,9 @@ export default function SalesPage() {
       />
       <PrintPreviewModal
         data={printData} open={!!printData}
-        onClose={() => { setPrintData(null); setFlash(null) }}
+        onClose={() => setPrintData(null)}
         onNextBill={() => {
-          setPrintData(null); setFlash(null); setRows([newRow()]); setTender('')
+          setPrintData(null); setRows([newRow()]); setTender('')
           reset({ customer_id: '', date: new Date().toISOString().split('T')[0], payment_mode: 'cash', notes: '' })
           setDiscountScope('invoice'); setInvoiceDiscount(emptyDiscount())
           setCompanyDiscounts({}); setProductDiscounts({})

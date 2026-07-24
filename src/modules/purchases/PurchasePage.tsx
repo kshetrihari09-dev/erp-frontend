@@ -740,8 +740,8 @@ export default function PurchasePage() {
       <PrintPreviewModal
         data={printData}
         open={!!printData}
-        onClose={() => { setPrintData(null); setFlash(null) }}
-        onNextBill={() => { setPrintData(null); setFlash(null); reset(); setRows([newRow()]) }}
+        onClose={() => setPrintData(null)}
+        onNextBill={() => { setPrintData(null); reset(); setRows([newRow()]) }}
       />
       <AutoCloudBackup data={printData} />
 
