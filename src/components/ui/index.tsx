@@ -1,4 +1,5 @@
 import { forwardRef, useEffect, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type MouseEvent } from 'react'
+import { createPortal } from 'react-dom'
 import { cn, statusColor } from '@/utils'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 import { Z } from '@/styles/zIndex'
@@ -291,8 +292,24 @@ export function Modal({
   // (before the `if (!open)` early return), gated via `enabled`.
   useKeyboardShortcuts([{ combo: 'esc', handler: onClose, description: 'Close' }], { enabled: open })
 
+  // Lock background scroll while open — only the modal body (below) scrolls.
+  // Restores whatever overflow value was previously set, so this composes
+  // safely if something else is also managing document.body.style.overflow.
+  useEffect(() => {
+    if (!open) return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = previousOverflow }
+  }, [open])
+
   if (!open) return null
-  return (
+
+  // Rendered into document.body via a Portal so the dialog is a true
+  // viewport-level overlay: `position: fixed` is always relative to the
+  // viewport (never hijacked by an ancestor's `transform`, e.g. a
+  // framer-motion animated container), and no ancestor's `overflow: hidden`
+  // can clip it — regardless of which page/tab mounted the Modal.
+  return createPortal(
     <div
       className={cn(
         'fixed inset-0 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm',
@@ -310,6 +327,9 @@ export function Modal({
           panelClassName
         )}
         style={{ animation: 'slideUp .2s ease', position: 'relative', zIndex: Z.modal }}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
       >
         {/* Header */}
         <div className="modal-header flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
@@ -330,7 +350,8 @@ export function Modal({
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 

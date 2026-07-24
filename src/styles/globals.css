@@ -4753,6 +4753,11 @@ bsp-row--disabled { cursor: not-allowed; opacity: .55; }
 /* ── Inputs / selects: full width + 44px touch target on mobile ──────────── */
 @media (max-width: 767px) {
   .acc-page .erp-input { width: 100% !important; min-height: 44px !important; box-sizing: border-box; }
+  /* Dialogs (Modal component) render via a Portal to document.body, so they're
+     no longer nested under .acc-page — matched generically here instead so
+     voucher/receipt/payment (and every other) modal keeps the same touch-target
+     sizing on mobile regardless of which page opened it. */
+  [role="dialog"] .erp-input { width: 100% !important; min-height: 44px !important; box-sizing: border-box; }
 }
 
 /* ── Small utility buttons: comfortable touch target on mobile ───────────── */
