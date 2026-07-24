@@ -194,6 +194,9 @@ export default function SalesPage() {
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set())
 
   const [confirmCancel, setConfirmCancel] = useState<string | null>(null)
+  // "Are you sure you want to create this sale?" — same confirm-before-post
+  // pattern PurchasePage uses (see its confirmCreate state / ConfirmDialog).
+  const [confirmPost, setConfirmPost] = useState(false)
   const [showNewCustomer, setShowNewCustomer] = useState(false)
 
   // ── Discount Review workflow ────────────────────────────────────────────
@@ -404,6 +407,13 @@ export default function SalesPage() {
     if (!customerId) { setFlash({ type: 'danger', msg: 'Select a customer before posting the sale' }); setCustomerOpen(true); return }
     setFlash(null)
     setDiscountModalOpen(true)
+  }
+
+  // "Post Invoice" (from the Discount Review popup) no longer posts
+  // immediately — it opens the same "are you sure?" confirm step Purchase
+  // uses before it actually calls onSubmit.
+  function handlePostClick() {
+    setConfirmPost(true)
   }
 
   // Changing the discount scope clears any previously entered discount
@@ -1266,8 +1276,15 @@ export default function SalesPage() {
         productDiscounts={productDiscounts}
         onProductDiscountChange={(rowId, entry) => setProductDiscounts(prev => ({ ...prev, [rowId]: entry }))}
         onClearAll={handleClearDiscount}
-        onPost={onSubmit}
+        onPost={handlePostClick}
         posting={saving}
+      />
+      <ConfirmDialog
+        open={confirmPost}
+        onClose={() => setConfirmPost(false)}
+        onConfirm={onSubmit}
+        title="Create Sale"
+        message="Are you sure you want to create this sale? This will update your inventory and accounts."
       />
       <ConfirmDialog
         open={!!confirmCancel} onClose={() => setConfirmCancel(null)}
