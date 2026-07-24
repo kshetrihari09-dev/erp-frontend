@@ -1,15 +1,11 @@
-import { useState, useEffect, useMemo, useCallback, memo } from 'react'
+import { useState, useEffect, useCallback, memo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   FileText, Receipt, CreditCard, Search, BookOpen,
   Settings, Scale, Calendar, TrendingUp, TrendingDown,
-  Layers, BarChart3, DollarSign, CheckCircle,
+  Layers, CheckCircle,
 } from 'lucide-react'
-import {
-  PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
-  LineChart, Line, XAxis, YAxis, CartesianGrid,
-} from 'recharts'
 import { accountingAPI } from '@/services/api'
 import useUIStore from '@/store/uiStore'
 import { fmt } from '@/utils'
@@ -133,178 +129,6 @@ const KpiCard = memo(({ icon, accentColor, glowColor, label, value, delta, delta
 })
 KpiCard.displayName = 'KpiCard'
 
-// ── Chart tooltip ─────────────────────────────────────────────────────────────
-const DONUT_COLORS = ['#3b82f6', '#10b981', '#8b5cf6', '#f59e0b', '#64748b']
-const DONUT_LABELS = ['Sales', 'Receipts', 'Payments', 'Purchases', 'Others']
-
-const CustomDonutLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
-  if (percent < 0.06) return null
-  const RADIAN = Math.PI / 180
-  const radius = innerRadius + (outerRadius - innerRadius) * 0.5
-  const x = cx + radius * Math.cos(-midAngle * RADIAN)
-  const y = cy + radius * Math.sin(-midAngle * RADIAN)
-  return <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={10} fontWeight={700}>{`${(percent * 100).toFixed(0)}%`}</text>
-}
-
-function ChartTooltip({ active, payload, label, dark }: any) {
-  if (!active || !payload?.length) return null
-  return (
-    <div style={{ background: '#1e2d45', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '9px 13px', boxShadow: '0 8px 24px rgba(0,0,0,0.4)', fontFamily: 'var(--font)' }}>
-      {label && <div style={{ fontSize: 10, color: 'rgba(148,163,184,0.7)', marginBottom: 4, fontFamily: 'var(--font-mono)', letterSpacing: '0.06em' }}>{label}</div>}
-      {payload.map((p: any, i: number) => (
-        <div key={i} style={{ fontSize: 13, fontWeight: 700, color: '#f1f5f9' }}>
-          {p.name === 'count' ? `${p.value} vouchers` : `₹${fmt(p.value)}`}
-        </div>
-      ))}
-    </div>
-  )
-}
-
-// ── Analytics Section ─────────────────────────────────────────────────────────
-interface AnalyticsData {
-  distribution: { name: string; value: number }[]
-  stats: { posted: number; draft: number; reversed: number; cancelled: number; totalAmount: number; avgAmount: number }
-  trend: { month: string; count: number; amount: number }[]
-}
-
-function AnalyticsSection({ vouchers }: { vouchers: any[] }) {
-  const tk = useThemeTokens()
-
-  const analytics = useMemo<AnalyticsData>(() => {
-    if (!vouchers.length) {
-      return {
-        distribution: DONUT_LABELS.map(name => ({ name, value: Math.floor(Math.random() * 40 + 10) })),
-        stats: { posted: 0, draft: 0, reversed: 0, cancelled: 0, totalAmount: 0, avgAmount: 0 },
-        trend: [],
-      }
-    }
-    const typeCounts: Record<string, number> = {}
-    vouchers.forEach(v => { const t = v.voucher_type || 'OTHER'; typeCounts[t] = (typeCounts[t] || 0) + 1 })
-    const distribution = [
-      { name: 'Sales',     value: typeCounts['SALES'] || typeCounts['SALE'] || 0 },
-      { name: 'Receipts',  value: typeCounts['RECEIPT'] || 0 },
-      { name: 'Payments',  value: typeCounts['PAYMENT'] || 0 },
-      { name: 'Purchases', value: typeCounts['PURCHASE'] || 0 },
-      { name: 'Others',    value: Math.max(0, vouchers.length - Object.values(typeCounts).reduce((a,b)=>a+b,0) + (typeCounts['JOURNAL']||0) + (typeCounts['CONTRA']||0)) },
-    ]
-    const posted    = vouchers.filter(v => v.status === 'posted').length
-    const draft     = vouchers.filter(v => v.status === 'draft').length
-    const reversed  = vouchers.filter(v => v.status === 'reversed').length
-    const cancelled = vouchers.filter(v => v.status === 'cancelled').length
-    const totalAmount = vouchers.reduce((s, v) => s + Number(v.total_amount || 0), 0)
-    const monthMap: Record<string, { count: number; amount: number }> = {}
-    vouchers.forEach(v => {
-      const d = new Date(v.voucher_date || '')
-      if (isNaN(d.getTime())) return
-      const key = d.toLocaleString('default', { month: 'short', year: '2-digit' })
-      if (!monthMap[key]) monthMap[key] = { count: 0, amount: 0 }
-      monthMap[key].count++
-      monthMap[key].amount += Number(v.total_amount || 0)
-    })
-    return {
-      distribution,
-      stats: { posted, draft, reversed, cancelled, totalAmount, avgAmount: vouchers.length ? totalAmount / vouchers.length : 0 },
-      trend: Object.entries(monthMap).slice(-6).map(([month, val]) => ({ month, ...val })),
-    }
-  }, [vouchers])
-
-  const hasDistribution = analytics.distribution.some(d => d.value > 0)
-
-  const cardStyle: React.CSSProperties = { ...tk.card, borderRadius: 16, padding: '20px 22px' }
-
-  // Status stat card themes — light uses soft pastels, dark uses translucent tints
-  const statCards = [
-    { label: 'Posted',    value: analytics.stats.posted,    bg: tk.dark ? 'rgba(16,185,129,0.1)'  : '#ecfdf5', color: tk.dark ? '#34d399' : '#059669', border: tk.dark ? 'rgba(16,185,129,0.2)'  : 'rgba(5,150,105,0.15)' },
-    { label: 'Draft',     value: analytics.stats.draft,     bg: tk.dark ? 'rgba(245,158,11,0.1)'  : '#fffbeb', color: tk.dark ? '#fbbf24' : '#b45309', border: tk.dark ? 'rgba(245,158,11,0.2)'  : 'rgba(180,83,9,0.15)' },
-    { label: 'Reversed',  value: analytics.stats.reversed,  bg: tk.dark ? 'rgba(239,68,68,0.1)'   : '#fef2f2', color: tk.dark ? '#f87171' : '#dc2626', border: tk.dark ? 'rgba(239,68,68,0.2)'   : 'rgba(220,38,38,0.15)' },
-    { label: 'Cancelled', value: analytics.stats.cancelled, bg: tk.dark ? 'rgba(100,116,139,0.1)' : 'var(--surface-3)', color: tk.dark ? '#94a3b8' : 'var(--text-3)', border: tk.dark ? 'rgba(100,116,139,0.2)' : 'var(--border)' },
-  ]
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.45, delay: 0.2 }}
-      className="acc-analytics-grid"
-      style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 20 }}
-    >
-      {/* Donut */}
-      <div style={cardStyle} className="acc-analytics-card">
-        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: tk.textMuted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'var(--font-mono)' }}>
-          <Layers size={11} style={{ color: '#3b82f6' }} /> Voucher Distribution
-        </div>
-        {hasDistribution ? (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <ResponsiveContainer width="100%" height={170}>
-              <PieChart>
-                <Pie data={analytics.distribution} cx="50%" cy="50%" innerRadius={50} outerRadius={76} paddingAngle={2} dataKey="value" labelLine={false} label={CustomDonutLabel}>
-                  {analytics.distribution.map((_, i) => <Cell key={i} fill={DONUT_COLORS[i % DONUT_COLORS.length]} />)}
-                </Pie>
-                <Tooltip content={(props) => <ChartTooltip {...props} dark={tk.dark} />} />
-              </PieChart>
-            </ResponsiveContainer>
-            <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '6px 12px', marginTop: 8 }}>
-              {analytics.distribution.map((d, i) => (
-                <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: tk.textMuted }}>
-                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: DONUT_COLORS[i], flexShrink: 0 }} />
-                  {d.name}
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 150, color: tk.textFaint, fontSize: 13 }}>No data yet</div>
-        )}
-      </div>
-
-      {/* Stats */}
-      <div style={cardStyle} className="acc-analytics-card">
-        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: tk.textMuted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'var(--font-mono)' }}>
-          <BarChart3 size={11} style={{ color: '#8b5cf6' }} /> Voucher Statistics
-        </div>
-        <div className="acc-stat-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
-          {statCards.map(s => (
-            <div key={s.label} style={{ background: s.bg, border: `1px solid ${s.border}`, borderRadius: 10, padding: '12px 14px' }}>
-              <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: s.color, opacity: 0.8, marginBottom: 4 }}>{s.label}</div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: s.color, fontFamily: 'var(--font-mono)' }}>{s.value}</div>
-            </div>
-          ))}
-        </div>
-        <div style={{ borderTop: `1px solid ${tk.divider}`, paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 12, color: tk.textMuted, display: 'flex', alignItems: 'center', gap: 5 }}><DollarSign size={11} />Total Amount</span>
-            <span style={{ fontSize: 13, fontWeight: 700, fontFamily: 'var(--font-mono)', color: tk.text }}>₹{fmt(analytics.stats.totalAmount)}</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 12, color: tk.textMuted, display: 'flex', alignItems: 'center', gap: 5 }}><BarChart3 size={11} />Avg Value</span>
-            <span style={{ fontSize: 13, fontWeight: 700, fontFamily: 'var(--font-mono)', color: tk.text }}>₹{fmt(analytics.stats.avgAmount)}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Trend */}
-      <div style={cardStyle} className="acc-analytics-card">
-        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: tk.textMuted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'var(--font-mono)' }}>
-          <TrendingUp size={11} style={{ color: '#10b981' }} /> Monthly Trend
-        </div>
-        {analytics.trend.length >= 2 ? (
-          <ResponsiveContainer width="100%" height={180}>
-            <LineChart data={analytics.trend} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke={tk.gridStroke} />
-              <XAxis dataKey="month" tick={{ fontSize: 10, fill: tk.dark ? 'rgba(148,163,184,0.5)' : '#94a3b8', fontFamily: 'var(--font-mono)' }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 10, fill: tk.dark ? 'rgba(148,163,184,0.5)' : '#94a3b8' }} axisLine={false} tickLine={false} />
-              <Tooltip content={(props) => <ChartTooltip {...props} dark={tk.dark} />} />
-              <Line type="monotone" dataKey="count" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3, fill: '#3b82f6', strokeWidth: 0 }} activeDot={{ r: 5, fill: '#3b82f6', stroke: 'rgba(59,130,246,0.3)', strokeWidth: 4 }} />
-            </LineChart>
-          </ResponsiveContainer>
-        ) : (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 150, color: tk.textFaint, fontSize: 13 }}>Not enough data</div>
-        )}
-      </div>
-    </motion.div>
-  )
-}
-
 // ── MAIN PAGE ─────────────────────────────────────────────────────────────────
 export default function AccountingPage() {
   const [searchParams] = useSearchParams()
@@ -314,7 +138,6 @@ export default function AccountingPage() {
   const [tab, setTab]           = useState(initialTab)
   const [kpiData, setKpiData]   = useState<any>(null)
   const [kpiLoading, setKpiLoading] = useState(true)
-  const [vouchers, setVouchers] = useState<any[]>([])
   const tk = useThemeTokens()
 
   useEffect(() => {
@@ -323,7 +146,6 @@ export default function AccountingPage() {
       try {
         const r = await accountingAPI.vouchers({ page: 1, limit: 200 })
         const rows = r.data.data || []
-        setVouchers(rows)
         const total    = r.data.pagination?.total || rows.length
         const totalAmt = rows.reduce((s: number, v: any) => s + Number(v.total_amount || 0), 0)
         const receipts = rows.filter((v: any) => v.voucher_type === 'RECEIPT').reduce((s: number, v: any) => s + Number(v.total_amount || 0), 0)
@@ -340,12 +162,11 @@ export default function AccountingPage() {
       <style>{`
         /* ── Accounting page — mobile/tablet responsive (self-contained, additive) ── */
         .acc-page { max-width: 100%; overflow-x: hidden; }
-        .acc-kpi-grid, .acc-analytics-grid, .acc-stat-grid, .acc-tb-kpi-grid { min-width: 0; }
-        .acc-kpi-grid > *, .acc-analytics-grid > *, .acc-stat-grid > *, .acc-tb-kpi-grid > * { min-width: 0; }
+        .acc-kpi-grid, .acc-tb-kpi-grid { min-width: 0; }
+        .acc-kpi-grid > *, .acc-tb-kpi-grid > * { min-width: 0; }
 
         @media (max-width: 1024px) {
           .acc-kpi-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 12px !important; }
-          .acc-analytics-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 12px !important; }
           .acc-tb-kpi-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important; }
         }
         @media (max-width: 767px) {
@@ -383,8 +204,6 @@ export default function AccountingPage() {
           .acc-tb-kpi-grid { grid-template-columns: 1fr !important; gap: 8px !important; }
         }
         @media (max-width: 640px) {
-          .acc-analytics-grid { grid-template-columns: 1fr !important; gap: 10px !important; margin-bottom: 14px !important; }
-          .acc-analytics-card { padding: 16px !important; }
           .acc-tab-content { padding: 12px 8px !important; }
         }
         @media (max-width: 420px) {
@@ -399,11 +218,6 @@ export default function AccountingPage() {
         <KpiCard icon={<CreditCard size={20}/>} accentColor="#8b5cf6" glowColor="0 0 28px rgba(139,92,246,0.15)" label="Total Payments" value={kpiLoading ? '—' : `₹${fmt(kpiData?.payments || 0)}`} delta="-5.32%" deltaUp={false} loading={kpiLoading} delay={0.15}/>
         <KpiCard icon={<CheckCircle size={20}/>} accentColor="#f59e0b" glowColor="0 0 28px rgba(245,158,11,0.15)" label="Trial Balance" value="Balanced" loading={kpiLoading} delay={0.2}/>
       </div>
-
-      {/* Analytics */}
-      <AnimatePresence>
-        {tab === 'vouchers' && <AnalyticsSection vouchers={vouchers} />}
-      </AnimatePresence>
 
       {/* Tab card */}
       <motion.div

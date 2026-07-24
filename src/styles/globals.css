@@ -4709,18 +4709,6 @@ bsp-row--disabled { cursor: not-allowed; opacity: .55; }
   .acc-kpi-card { padding: 14px 16px !important; }
 }
 
-/* ── Analytics section (Donut / Stats / Trend): 3 → 2 → 1 ─────────────────── */
-@media (max-width: 1024px) {
-  .acc-analytics-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 12px !important; }
-}
-@media (max-width: 640px) {
-  .acc-analytics-grid { grid-template-columns: 1fr !important; gap: 10px !important; margin-bottom: 14px !important; }
-  .acc-analytics-card { padding: 16px !important; }
-}
-@media (max-width: 400px) {
-  .acc-stat-grid { gap: 8px !important; }
-}
-
 /* ── Tab bar: keep horizontally scrollable, tap-friendly buttons ─────────── */
 .acc-tabbar { -webkit-overflow-scrolling: touch; }
 @media (max-width: 768px) {
