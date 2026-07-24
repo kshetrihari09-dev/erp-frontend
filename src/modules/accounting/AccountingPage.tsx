@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, memo } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   FileText, Receipt, CreditCard, Search, BookOpen,
@@ -306,7 +307,11 @@ function AnalyticsSection({ vouchers }: { vouchers: any[] }) {
 
 // ── MAIN PAGE ─────────────────────────────────────────────────────────────────
 export default function AccountingPage() {
-  const [tab, setTab]           = useState('vouchers')
+  const [searchParams] = useSearchParams()
+  const initialTab = TABS.some(t => t.id === searchParams.get('tab'))
+    ? (searchParams.get('tab') as string)
+    : 'vouchers'
+  const [tab, setTab]           = useState(initialTab)
   const [kpiData, setKpiData]   = useState<any>(null)
   const [kpiLoading, setKpiLoading] = useState(true)
   const [vouchers, setVouchers] = useState<any[]>([])

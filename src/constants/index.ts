@@ -129,7 +129,6 @@ export const PATHS = {
   CUSTOMERS:  '/customers',
   SUPPLIERS:  '/suppliers',
   ACCOUNTING:    '/accounting',
-  ACCOUNT_SETUP: '/account-setup',
   LEDGER:        '/ledger',
   REPORTS:    '/reports',
   SETTINGS:   '/settings',

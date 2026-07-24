@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, ShoppingCart, ShoppingBag, RotateCcw, Package,
-  Download, Users, Truck, BookOpen, BookCopy, SlidersHorizontal,
+  Download, Users, Truck, BookOpen, BookCopy,
   FileBarChart, Settings, LogOut, Building2, CalendarDays, Moon,
   Sun, Menu, X, AlertTriangle, Bell, Search, ChevronRight, Home,
   PackageX, CalendarClock,
@@ -44,7 +44,6 @@ const NAV = [
 
   { section: 'ACCOUNTING' },
   { to: PATHS.ACCOUNTING,    label: 'Accounting',     icon: <BookOpen           size={20} strokeWidth={1.8}/> },
-  { to: PATHS.ACCOUNT_SETUP, label: 'Account Setup',  icon: <SlidersHorizontal  size={20} strokeWidth={1.8}/> },
   { to: PATHS.LEDGER,        label: 'Ledger',         icon: <BookCopy           size={20} strokeWidth={1.8}/> },
 
   { section: 'REPORTS' },
@@ -180,7 +179,6 @@ export default function AppLayout() {
     [PATHS.CUSTOMERS]:  'Customers',
     [PATHS.SUPPLIERS]:  'Suppliers',
     [PATHS.ACCOUNTING]:    'Accounting',
-    [PATHS.ACCOUNT_SETUP]: 'Account Setup',
     [PATHS.LEDGER]:     'Ledger',
     [PATHS.REPORTS]:    'Reports',
     [PATHS.SETTINGS]:   'Settings',
