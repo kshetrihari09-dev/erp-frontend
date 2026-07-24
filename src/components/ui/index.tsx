@@ -1,4 +1,4 @@
-import { forwardRef, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type MouseEvent } from 'react'
+import { forwardRef, useEffect, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type MouseEvent } from 'react'
 import { cn, statusColor } from '@/utils'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 import { Z } from '@/styles/zIndex'
@@ -221,12 +221,34 @@ export function SkeletonRows({ cols = 6, rows = 5 }: { cols?: number; rows?: num
 // ─── Alert / Flash ────────────────────────────────────────────────────────────
 type AlertType = 'success' | 'danger' | 'warning' | 'info'
 
-export function Alert({ type, message, onClose }: { type: AlertType; message: string; onClose?: () => void }) {
+export function Alert({
+  type, message, onClose, icon, autoCloseMs,
+}: {
+  type: AlertType
+  message: ReactNode
+  onClose?: () => void
+  /** Optional leading icon (e.g. a success checkmark). Opt-in only — existing
+   *  call sites that don't pass this keep their current plain-text look. */
+  icon?: ReactNode
+  /** Optional auto-dismiss timeout in ms. When set, the alert calls onClose
+   *  on its own after this delay — same as the existing manual ✕ dismiss.
+   *  Opt-in only; without it alerts behave exactly as before (stay until
+   *  the caller clears them). */
+  autoCloseMs?: number
+}) {
+  useEffect(() => {
+    if (!autoCloseMs || !onClose) return
+    const t = setTimeout(onClose, autoCloseMs)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoCloseMs, onClose, message])
+
   return (
-    <div className={`alert alert-${type} flex items-center gap-2`}>
-      <span className="flex-1 text-sm">{message}</span>
+    <div className={`alert alert-${type} flex items-start gap-2`}>
+      {icon && <span className="alert-icon flex-shrink-0" aria-hidden="true">{icon}</span>}
+      <div className="flex-1 text-sm">{message}</div>
       {onClose && (
-        <button onClick={onClose} className="ml-auto opacity-60 hover:opacity-100 text-inherit leading-none p-0.5">✕</button>
+        <button onClick={onClose} className="ml-auto opacity-60 hover:opacity-100 text-inherit leading-none p-0.5" aria-label="Dismiss">✕</button>
       )}
     </div>
   )

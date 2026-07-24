@@ -754,6 +754,9 @@ select.erp-input option { background: var(--surface); color: var(--text); }
 .alert-danger  { background: var(--red-50);   color: #b91c1c; border: 1px solid rgba(220,38,38,.25); }
 .alert-warning { background: var(--amber-50); color: #92400e; border: 1px solid rgba(217,119,6,.25); }
 .alert-info    { background: var(--brand-light);color: #1e40af;border: 1px solid rgba(37,99,235,.25); }
+.alert-icon    { display: flex; align-items: center; margin-top: 1px; }
+.alert-success-details { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 2px; font-size: 12px; opacity: .9; }
+.alert-success-details b { font-weight: 700; }
 
 /* ─────────────────────────────────────────────
    SKELETON

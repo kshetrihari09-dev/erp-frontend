@@ -15,7 +15,6 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import ScanButton from '@/components/scanner/ScanButton'
 import type { ScanResult } from '@/types/scanner'
 import { useForm } from 'react-hook-form'
-import { motion, AnimatePresence } from 'framer-motion'
 import {
   Printer, FilePlus, List, FileText, ShoppingCart,
   CalendarDays, CreditCard, User, MapPin, Hash,
@@ -26,8 +25,9 @@ import { salesAPI, partiesAPI, productsAPI } from '@/services/api'
 import useUIStore from '@/store/uiStore'
 import {
   Button, Tabs, Modal, Badge, Pagination,
-  SkeletonRows, Empty, SearchInput, ConfirmDialog, Kbd, Spinner,
+  SkeletonRows, Empty, SearchInput, ConfirmDialog, Kbd, Spinner, Alert,
 } from '@/components/ui'
+import TransactionSuccessAlert, { type TransactionSuccessInfo } from '@/components/shared/TransactionSuccessAlert'
 import InvoiceRowsTable, { newRow, type InvoiceRow, type InvoiceRowsTableHandle } from '@/components/forms/InvoiceRowsTable'
 import ProductSearchCell from '@/components/forms/ProductSearchCell'
 import BatchSelect from '@/components/forms/BatchSelect'
@@ -49,28 +49,14 @@ import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 
 const LIMIT = 20
 
-/* ── Flash — IDENTICAL to original ──────────────────────────────────────── */
-function Flash({ type, msg, onClose }: { type: 'success'|'danger'; msg: string; onClose: () => void }) {
-  const isOk = type === 'success'
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: -10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -10 }}
-      className={`flex items-center gap-3 px-4 py-3 rounded-xl border text-sm font-medium mb-4 ${
-        isOk ? 'bg-green-50 border-green-200 text-green-800'
-              : 'bg-red-50 border-red-200 text-red-800'
-      }`}
-    >
-      {isOk
-        ? <CheckCircle2 size={16} className="text-green-500 flex-shrink-0" />
-        : <AlertCircle   size={16} className="text-red-500 flex-shrink-0" />
-      }
-      <span className="flex-1">{msg}</span>
-      <button onClick={onClose} className="text-current opacity-50 hover:opacity-100 transition-opacity text-lg leading-none">×</button>
-    </motion.div>
-  )
-}
+/* ── Flash — now the same Alert/TransactionSuccessAlert used by Purchase ──
+ * (see PurchasePage.tsx). The bespoke local component that used to live
+ * here has been removed so both pages share one implementation instead of
+ * duplicating the success/error banner markup. */
+type Flash =
+  | { type: 'danger';  msg:  string }
+  | { type: 'info';    msg:  string }
+  | { type: 'success'; info: TransactionSuccessInfo }
 
 /* ── FieldLabel — IDENTICAL to original ─────────────────────────────────── */
 function FieldLabel({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
@@ -195,7 +181,7 @@ export default function SalesPage() {
   const [rows,        setRows]        = useState<InvoiceRow[]>([newRow()])
   const tableRef = useRef<InvoiceRowsTableHandle>(null)
   const [saving,      setSaving]      = useState(false)
-  const [flash,       setFlash]       = useState<{ type: 'success'|'danger'; msg: string } | null>(null)
+  const [flash,       setFlash]       = useState<Flash | null>(null)
   const [lastInvDate, setLastInvDate] = useState<string | null>(null)
   const [printData,   setPrintData]   = useState<PrintData | null>(null)
   const [detailId,    setDetailId]    = useState<string | null>(null)
@@ -372,7 +358,19 @@ export default function SalesPage() {
         roundOff: Number(saved.round_off) || 0,
         netTotal: saved.net_total, paidAmount: saved.paid_amount, dueAmount: saved.due_amount,
       })
-      setFlash({ type: 'success', msg: `Invoice ${saved.invoice_no} posted!` })
+      // Success confirmation only fires here, after the backend has
+      // actually confirmed the sale was saved (res.data.data above) —
+      // same rule PurchasePage.tsx follows for its own success alert.
+      setFlash({
+        type: 'success',
+        info: {
+          voucherLabel: 'Invoice',
+          voucherNo:    saved.invoice_no,
+          partyLabel:   'Customer',
+          partyName:    customers.find(c => c.id === data.customer_id)?.name,
+          grandTotal:   Number(saved.net_total),
+        },
+      })
       reset(); setRows([newRow()]); setTender('')
       setDiscountModalOpen(false)
       setDiscountScope('invoice'); setInvoiceDiscount(emptyDiscount())
@@ -381,7 +379,7 @@ export default function SalesPage() {
     finally { setSaving(false) }
   })
 
-  function saveDraft() { setFlash({ type: 'success', msg: 'Draft saved locally.' }) }
+  function saveDraft() { setFlash({ type: 'info', msg: 'Draft saved locally.' }) }
 
   function clearForm() {
     reset({ customer_id: '', date: new Date().toISOString().split('T')[0], payment_mode: 'cash', notes: '' })
@@ -496,9 +494,11 @@ export default function SalesPage() {
       {tab === 'new' && (
         <div className="space-y-4">
 
-          <AnimatePresence>
-            {flash && <Flash type={flash.type} msg={flash.msg} onClose={() => setFlash(null)} />}
-          </AnimatePresence>
+          {flash && (
+            flash.type === 'success'
+              ? <TransactionSuccessAlert info={flash.info} onClose={() => setFlash(null)} />
+              : <Alert type={flash.type} message={flash.msg} onClose={() => setFlash(null)} />
+          )}
 
           {/* ── MOBILE ONLY: sticky total bar ─────────────────────────
               display:none on desktop via CSS (.pos-mobile-total-bar)   */}

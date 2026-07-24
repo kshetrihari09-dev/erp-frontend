@@ -22,8 +22,13 @@ import { PrintPreviewModal } from '@/components/print'
 import type { PrintData } from '@/components/print'
 import AutoCloudBackup from '@/components/cloudStorage/AutoCloudBackup'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
+import TransactionSuccessAlert, { type TransactionSuccessInfo } from '@/components/shared/TransactionSuccessAlert'
 
 const LIMIT = 20
+
+type Flash =
+  | { type: 'danger';  msg:  string }
+  | { type: 'success'; info: TransactionSuccessInfo }
 
 export default function PurchasePage() {
   const { error, info, theme } = useUIStore()
@@ -40,7 +45,7 @@ export default function PurchasePage() {
   const [loading,    setLoading]    = useState(false)
   const [rows,       setRows]       = useState<InvoiceRow[]>([newRow()])
   const [saving,     setSaving]     = useState(false)
-  const [flash,      setFlash]      = useState<{ type: 'success' | 'danger'; msg: string } | null>(null)
+  const [flash,      setFlash]      = useState<Flash | null>(null)
   const [printData,  setPrintData]  = useState<PrintData | null>(null)
   const [detailId,   setDetailId]   = useState<string | null>(null)
   const [detail,     setDetail]     = useState<Purchase | null>(null)
@@ -150,6 +155,18 @@ export default function PurchasePage() {
         paidAmount: saved.paid_amount,
         dueAmount:  saved.due_amount,
       })
+      // Success confirmation only fires here, after the backend has
+      // actually confirmed the purchase was saved (res.data.data above).
+      setFlash({
+        type: 'success',
+        info: {
+          voucherLabel: 'Purchase Bill',
+          voucherNo:    saved.bill_no,
+          partyLabel:   'Supplier',
+          partyName:    suppliers.find((s: any) => s.id === data.supplier_id)?.name,
+          grandTotal:   Number(saved.net_total),
+        },
+      })
     } catch (e: any) { setFlash({ type: 'danger', msg: e.message }) }
     finally { setSaving(false) }
   })
@@ -164,6 +181,7 @@ export default function PurchasePage() {
    *  trigger it without needing a completed purchase first. */
   function clearForm() {
     setPrintData(null)
+    setFlash(null)
     reset()
     setRows([newRow()])
   }
@@ -247,11 +265,9 @@ export default function PurchasePage() {
       {tab === 'new' && (
         <div className="inv-has-mobile-bar">
           {flash && (
-            <Alert
-              type={flash.type === 'success' ? 'success' : 'danger'}
-              message={flash.msg}
-              onClose={() => setFlash(null)}
-            />
+            flash.type === 'success'
+              ? <TransactionSuccessAlert info={flash.info} onClose={() => setFlash(null)} />
+              : <Alert type="danger" message={flash.msg} onClose={() => setFlash(null)} />
           )}
 
           {/* ── Header form ─────────────────────────────────────────── */}
@@ -724,8 +740,8 @@ export default function PurchasePage() {
       <PrintPreviewModal
         data={printData}
         open={!!printData}
-        onClose={() => setPrintData(null)}
-        onNextBill={() => { setPrintData(null); reset(); setRows([newRow()]) }}
+        onClose={() => { setPrintData(null); setFlash(null) }}
+        onNextBill={() => { setPrintData(null); setFlash(null); reset(); setRows([newRow()]) }}
       />
       <AutoCloudBackup data={printData} />
 
