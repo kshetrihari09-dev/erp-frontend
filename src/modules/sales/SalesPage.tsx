@@ -88,13 +88,15 @@ function SummaryRow({
 
 /* ── EditablePaymentMode — Sales List inline editor ─────────────────────────
  * UI-only enhancement. Badge → click → compact dropdown + Save/Cancel.
- * Calls the dedicated PUT /sales/:id/payment-mode endpoint, which updates
- * only that one column server-side. This component never recalculates
- * totals, and never touches stock, accounting, vouchers, tax, or discounts —
- * it only ever sends/receives `payment_mode`. */
+ * Calls the dedicated PUT /sales/:id/payment-mode endpoint. That endpoint
+ * returns the FULL updated sale row (see salesAPI.updatePaymentMode's
+ * ApiResponse<Sale> type) — not just the payment_mode field — so we hand
+ * the whole record back to the caller via onSaved. The Sales List then
+ * replaces the entire row instead of patching a single field, which is
+ * what keeps Paid / Due / Status from going stale after this edit. */
 function EditablePaymentMode({
   sale, onSaved,
-}: { sale: Sale; onSaved: (id: string, mode: string) => void }) {
+}: { sale: Sale; onSaved: (id: string, updated: Sale) => void }) {
   const { success, error } = useUIStore()
   const [editing, setEditing] = useState(false)
   const [value,   setValue]   = useState<string>(sale.payment_mode)
@@ -127,10 +129,16 @@ function EditablePaymentMode({
     setSaving(true)
     try {
       const res     = await salesAPI.updatePaymentMode(sale.id, value)
-      const updated = res.data?.data?.payment_mode ?? value
+      // The endpoint responds with the complete, up-to-date sale row
+      // (payment_mode, paid_amount, due_amount, status, updated_at, …).
+      // Previously only `payment_mode` was pulled out of this response and
+      // everything else was thrown away, which is why Paid/Due/Status kept
+      // showing the pre-edit values in the Sales List even though the
+      // database itself was correct. Pass the whole record through instead.
+      const updated: Sale = res.data?.data ?? { ...sale, payment_mode: value }
       onSaved(sale.id, updated)
       setEditing(false)
-      success('Payment mode updated', `Invoice ${sale.invoice_no} is now ${updated}.`)
+      success('Payment mode updated', `Invoice ${sale.invoice_no} is now ${updated.payment_mode}.`)
     } catch (e: any) {
       error('Update failed', e.message)
     } finally {
@@ -254,10 +262,27 @@ export default function SalesPage() {
 
   useEffect(() => { if (tab === 'list') loadList() }, [tab, loadList])
 
-  // Patches the one changed field locally so the list doesn't need a full
-  // reload after an inline Payment Mode edit in the Sales List.
-  const handlePaymentModeSaved = useCallback((id: string, mode: string) => {
-    setSales(prev => prev.map(s => s.id === id ? { ...s, payment_mode: mode as Sale['payment_mode'] } : s))
+  // Replaces the ENTIRE row with the fresh record returned by the
+  // payment-mode API call — not just the payment_mode field — so Paid,
+  // Due, and Status can never lag behind what was actually saved. This
+  // avoids a full-list reload (only the one edited row changes), and it
+  // deliberately does not memoize or derive any of these fields elsewhere:
+  // the table cells always read paid_amount/due_amount/status straight off
+  // this `sales` array, so once the row is replaced every column reflects
+  // the latest data on the very next render.
+  const handlePaymentModeSaved = useCallback((id: string, updated: Sale) => {
+    setSales(prev => prev.map(s => s.id === id ? { ...s, ...updated } : s))
+    // Belt-and-braces: re-fetch just this one sale from the source of truth
+    // in the background. If payment_mode changes ever end up cascading into
+    // paid_amount/due_amount via a JOIN/VIEW/trigger that the payment-mode
+    // response itself doesn't carry, this reconciles the row without
+    // requiring a full list reload.
+    salesAPI.get(id)
+      .then(r => {
+        const fresh = r.data?.data
+        if (fresh) setSales(prev => prev.map(s => s.id === id ? { ...s, ...fresh } : s))
+      })
+      .catch(() => {})
   }, [])
 
   useEffect(() => {
