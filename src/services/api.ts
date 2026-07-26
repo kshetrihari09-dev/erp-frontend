@@ -180,12 +180,20 @@ export const accountingAPI = {
     http.post<ApiResponse<Voucher>>('/accounting/vouchers', data),
   postVoucher:    (id: string)      => http.post(`/accounting/vouchers/${id}/post`, {}),
   reverseVoucher: (id: string)      => http.post(`/accounting/vouchers/${id}/reverse`, {}),
+  /** Password-protected edit of an already-POSTED voucher — same id/no, journal recalculated. */
+  editVoucher: (id: string, data: { reason: string; voucher_date?: string; party_id?: string | null; narration?: string; lines: VoucherLine[] }) =>
+    http.put<ApiResponse<{ voucher: Voucher; correction_voucher_id: string }>>(`/accounting/vouchers/${id}/edit`, data),
+  voucherEditHistory: (id: string) => http.get<ApiResponse<any[]>>(`/accounting/vouchers/${id}/edit-history`),
 
   // Specific voucher endpoints (kept for backwards compat)
   receipts:      (params?: Params) => http.get('/accounting/receipts', { params }),
   createReceipt: (data: Params)    => http.post('/accounting/receipts', data),
+  editReceipt:   (id: string, data: { reason: string; party_id?: string | null; date?: string; amount: number; account_id: string; narration?: string }) =>
+    http.put(`/accounting/receipts/${id}/edit`, data),
   payments:      (params?: Params) => http.get('/accounting/payments', { params }),
   createPayment: (data: Params)    => http.post('/accounting/payments', data),
+  editPayment:   (id: string, data: { reason: string; party_id?: string | null; date?: string; amount: number; account_id: string; narration?: string }) =>
+    http.put(`/accounting/payments/${id}/edit`, data),
   journal:       (params?: Params) => http.get('/accounting/journal', { params }),
   createJV:      (data: Params)    => http.post('/accounting/journal', data),
 

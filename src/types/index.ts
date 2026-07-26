@@ -29,6 +29,8 @@ export interface User {
   company_id:      string
   created_at:      string
   last_login_at?:  string
+  /** Whether this user can reverse posted entries — also gates editing a posted voucher. */
+  can_reverse_entries?: boolean
 }
 
 export interface Company {
@@ -269,6 +271,8 @@ export interface Voucher {
   status:       VoucherStatus
   lines?:       VoucherLine[]
   created_at:   string
+  /** True once this posted voucher has gone through the password-protected edit workflow. */
+  is_edited?:   boolean
 }
 
 export interface TrialBalanceRow {
