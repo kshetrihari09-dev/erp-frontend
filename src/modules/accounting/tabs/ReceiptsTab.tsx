@@ -197,7 +197,8 @@ function VoucherListTab({ apiCall, type, title, onCount }: {
     // /reports/party-balance endpoint (same source as the Ledger page and
     // Party Balance report), no new calculation logic.
     reportsAPI.partyBalance().then(r => {
-      const rows: any[] = r.data?.data ?? []
+      const body: any = r.data?.data ?? r.data ?? {}
+      const rows: any[] = Array.isArray(body) ? body : (body?.data ?? [])
       const map: PartyBalanceMap = {}
       rows.forEach(p => { map[p.id] = { debit: Number(p.debit) || 0, credit: Number(p.credit) || 0 } })
       setPartyBalances(map)
@@ -206,7 +207,8 @@ function VoucherListTab({ apiCall, type, title, onCount }: {
 
   const refreshPartyBalances = () => {
     reportsAPI.partyBalance().then(r => {
-      const rows: any[] = r.data?.data ?? []
+      const body: any = r.data?.data ?? r.data ?? {}
+      const rows: any[] = Array.isArray(body) ? body : (body?.data ?? [])
       const map: PartyBalanceMap = {}
       rows.forEach(p => { map[p.id] = { debit: Number(p.debit) || 0, credit: Number(p.credit) || 0 } })
       setPartyBalances(map)
