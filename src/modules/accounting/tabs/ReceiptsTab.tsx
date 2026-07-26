@@ -83,7 +83,8 @@ function QuickVoucherForm({ type, accounts, parties, partyBalances, balancesLoad
 
   const resetForNextVoucher = () => {
     setVoucherNo(null)
-    reset({ party_id: '', date: new Date().toISOString().split('T')[0], account_id: '', amount: '', narration: '' })
+    const keepDate = watch('date')
+    reset({ party_id: '', date: keepDate, account_id: '', amount: '', narration: '' })
   }
 
   return (
