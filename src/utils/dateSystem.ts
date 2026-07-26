@@ -63,6 +63,7 @@ export function convertInputDateToAD(inputDate: string | null | undefined, dateS
 /** Today's date, expressed in the given system, as 'YYYY-MM-DD'.
  *  Handy as a default value for new-record date fields. */
 export function todayInSystem(dateSystem: DateSystem): string {
-  const todayAD = new Date().toISOString().split('T')[0]
+  const now = new Date()
+  const todayAD = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
   return dateSystem === 'AD' ? todayAD : adToBS(todayAD)
 }

@@ -73,7 +73,13 @@ export function adToBSFull(adIso: string | null | undefined): string {
 }
 
 /** BS 'YYYY-MM-DD' (or a bare {year,month,day}, month 1-indexed) → AD
- *  ISO 'YYYY-MM-DD'. Returns '' for null/invalid input. */
+ *  ISO 'YYYY-MM-DD'. Returns '' for null/invalid input.
+ *
+ *  Deliberately reads the converted date's local Y/M/D (getFullYear() /
+ *  getMonth() / getDate()) rather than toJsDate().toISOString(): the
+ *  library's toJsDate() returns a Date built from local midnight, and
+ *  toISOString() reports that same instant in UTC — for any timezone
+ *  ahead of UTC (e.g. Nepal Time), that rolls the date back by one day. */
 export function bsToAD(bs: string | null | undefined | { year: number; month: number; day: number }): string {
   if (!bs) return ''
   try {
@@ -82,7 +88,10 @@ export function bsToAD(bs: string | null | undefined | { year: number; month: nu
       : [bs.year, bs.month, bs.day]
     // Library constructor month is 0-indexed, like the native JS Date.
     const jsDate = new NepaliDate(y, m - 1, d).toJsDate()
-    return jsDate.toISOString().split('T')[0]
+    const adYear  = jsDate.getFullYear()
+    const adMonth = String(jsDate.getMonth() + 1).padStart(2, '0')
+    const adDay   = String(jsDate.getDate()).padStart(2, '0')
+    return `${adYear}-${adMonth}-${adDay}`
   } catch {
     return ''
   }
@@ -90,5 +99,7 @@ export function bsToAD(bs: string | null | undefined | { year: number; month: nu
 
 /** Today's date, in BS. */
 export function todayBS(format: 'YYYY-MM-DD' | 'DD/MM/YYYY' = 'YYYY-MM-DD'): string {
-  return adToBS(new Date().toISOString(), format)
+  const now = new Date()
+  const todayAD = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+  return adToBS(todayAD, format)
 }

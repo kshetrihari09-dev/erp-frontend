@@ -43,13 +43,35 @@ export const fmtCompact = (n: number | string | null | undefined): string => {
 }
 
 // ─── Date formatting ──────────────────────────────────────────────────────────
-export const fmtDate = (d: string | null | undefined, fallback = '—') =>
-  d ? new Date(d).toLocaleDateString('en-NP') : fallback
+const DATE_ONLY_RE = /^(\d{4})-(\d{2})-(\d{2})$/
+
+export const fmtDate = (d: string | null | undefined, fallback = '—') => {
+  if (!d) return fallback
+  // Pure calendar dates (voucher_date, entry_date, period boundaries, etc.)
+  // are formatted straight from their Y/M/D digits, never through
+  // `new Date(d)`: date-only strings parse as UTC midnight, and
+  // `.toLocaleDateString()` then re-renders that instant in the browser's
+  // local timezone — for any timezone behind UTC, that displays the
+  // previous day. Matches the existing 'M/D/YYYY' look for AD dates.
+  const m = DATE_ONLY_RE.exec(d)
+  if (m) {
+    const [, y, mo, day] = m
+    return `${Number(mo)}/${Number(day)}/${y}`
+  }
+  return new Date(d).toLocaleDateString('en-NP')
+}
 
 export const fmtDateTime = (d: string | null | undefined) =>
   d ? new Date(d).toLocaleString('en-NP') : '—'
 
-export const today = () => new Date().toISOString().split('T')[0]
+// today() returns the *local* calendar day. Deliberately not
+// `new Date().toISOString().split('T')[0]`, which reports UTC's calendar
+// day — for a browser running ahead of UTC (e.g. Nepal Time), that can
+// read as "yesterday" for the first few hours of each local day.
+export const today = () => {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+}
 
 // ─── Invoice math ─────────────────────────────────────────────────────────────
 export interface InvoiceRow {
