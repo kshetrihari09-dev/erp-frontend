@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useForm } from 'react-hook-form'
 import { Plus, Printer } from 'lucide-react'
-import { accountingAPI, partiesAPI } from '@/services/api'
+import { accountingAPI, partiesAPI, reportsAPI } from '@/services/api'
 import useUIStore from '@/store/uiStore'
-import { Button, Modal, Badge, Pagination, SkeletonRows, Empty } from '@/components/ui'
+import { Button, Modal, Badge, Pagination, SkeletonRows, Empty, ConfirmDialog } from '@/components/ui'
 import { fmt } from '@/utils'
 import { formatDisplayDate } from '@/utils/dateSystem'
 import DateSystemInput from '@/components/shared/DateSystemInput'
@@ -13,12 +13,22 @@ import type { Account, Party } from '@/types'
 
 const LIMIT = 20
 
-function QuickVoucherForm({ type, accounts, parties, onClose }: {
-  type: 'RECEIPT' | 'PAYMENT'; accounts: Account[]; parties: Party[]; onClose: () => void
+// party_id → { debit, credit } — same shape/convention as /reports/party-balance
+// (the same source the Ledger page and Party Balance report already use).
+type PartyBalanceMap = Record<string, { debit: number; credit: number }>
+
+function QuickVoucherForm({ type, accounts, parties, partyBalances, onPosted, onClose }: {
+  type: 'RECEIPT' | 'PAYMENT'; accounts: Account[]; parties: Party[]; partyBalances: PartyBalanceMap; onPosted?: () => void; onClose: () => void
 }) {
   const { success, error } = useUIStore()
-  const [printData, setPrintData] = useState<PrintData | null>(null)
-  const { register, handleSubmit, watch, setValue, formState: { isSubmitting } } = useForm({
+  const [printData, setPrintData]     = useState<PrintData | null>(null)
+  const [confirmSave, setConfirmSave] = useState(false)
+  // Populated only once the voucher has actually been posted — the real
+  // voucher_no comes from next_voucher_number() on the backend at creation
+  // time, so there is nothing genuine to show before that. This is purely
+  // a read-only display of what the (unchanged) backend already generated.
+  const [voucherNo, setVoucherNo] = useState<string | null>(null)
+  const { register, handleSubmit, watch, setValue, reset, formState: { isSubmitting } } = useForm({
     defaultValues: { party_id: '', date: new Date().toISOString().split('T')[0], account_id: '', amount: '', narration: '' },
   })
 
@@ -31,8 +41,11 @@ function QuickVoucherForm({ type, accounts, parties, onClose }: {
       if (type === 'RECEIPT') { const r = await accountingAPI.createReceipt(payload); saved = r.data?.data ?? {} }
       else                    { const r = await accountingAPI.createPayment(payload); saved = r.data?.data ?? {} }
       const partyName = parties.find((p: any) => p.id === data.party_id)?.name
+      const no = saved.voucher_no || saved.return_no || (type === 'RECEIPT' ? 'REC' : 'PAY') + '-' + Date.now()
+      setVoucherNo(no)
+      onPosted?.()
       setPrintData({
-        voucherNo:   saved.voucher_no || saved.return_no || (type === 'RECEIPT' ? 'REC' : 'PAY') + '-' + Date.now(),
+        voucherNo:   no,
         type:        type,
         date:        data.date,
         narration:   data.narration || undefined,
@@ -46,15 +59,54 @@ function QuickVoucherForm({ type, accounts, parties, onClose }: {
 
   const assetAccounts = accounts.filter(a => ((a as any).account_type || (a as any).type) === 'asset' && !(a as any).is_group)
 
+  const partyId = watch('party_id')
+  const bal = partyId ? partyBalances[partyId] : undefined
+  const balanceLabel = !partyId
+    ? '—'
+    : !bal
+      ? '—'
+      : bal.debit > 0
+        ? `Rs. ${fmt(bal.debit)} Dr`
+        : bal.credit > 0
+          ? `Rs. ${fmt(bal.credit)} Cr`
+          : 'Rs. 0.00'
+
+  const resetForNextVoucher = () => {
+    setVoucherNo(null)
+    reset({ party_id: '', date: new Date().toISOString().split('T')[0], account_id: '', amount: '', narration: '' })
+  }
+
   return (
     <>
       <div className="form-grid">
+        <div>
+          <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">
+            {type === 'RECEIPT' ? 'Receipt No.' : 'Payment No.'}
+          </label>
+          <input
+            className="erp-input opacity-70 cursor-not-allowed"
+            value={voucherNo || 'Auto-generated on save'}
+            readOnly
+            disabled
+            tabIndex={-1}
+          />
+        </div>
         <div>
           <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">Party</label>
           <select className="erp-input" {...register('party_id')}>
             <option value="">— No party —</option>
             {parties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
+        </div>
+        <div>
+          <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">Current Balance</label>
+          <input
+            className="erp-input opacity-70 cursor-not-allowed"
+            value={balanceLabel}
+            readOnly
+            disabled
+            tabIndex={-1}
+          />
         </div>
         <div>
           <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">Date</label>
@@ -83,14 +135,21 @@ function QuickVoucherForm({ type, accounts, parties, onClose }: {
         </div>
       </div>
       <div className="flex justify-end gap-2 mt-5 pt-4 border-t border-[var(--border)]">
+      <ConfirmDialog
+        open={confirmSave}
+        onClose={() => setConfirmSave(false)}
+        onConfirm={onSubmit}
+        title={`Create ${type === 'RECEIPT' ? 'Receipt' : 'Payment'}`}
+        message={`Are you sure you want to save this ${type === 'RECEIPT' ? 'receipt' : 'payment'} voucher?`}
+      />
       <PrintPreviewModal
         data={printData}
         open={!!printData}
         onClose={() => { setPrintData(null); onClose() }}
-        onNextBill={() => { setPrintData(null); onClose() }}
+        onNextBill={() => { setPrintData(null); resetForNextVoucher() }}
       />
         <Button variant="secondary" onClick={onClose}>Cancel</Button>
-        <Button variant="primary" loading={isSubmitting} onClick={onSubmit}>
+        <Button variant="primary" loading={isSubmitting} onClick={() => setConfirmSave(true)}>
           Create {type === 'RECEIPT' ? 'Receipt' : 'Payment'}
         </Button>
       </div>
@@ -110,6 +169,7 @@ function VoucherListTab({ apiCall, type, title, onCount }: {
   const [listPrintData, setListPrintData] = useState<PrintData | null>(null)
   const [accounts, setAccounts] = useState<Account[]>([])
   const [parties,  setParties]  = useState<Party[]>([])
+  const [partyBalances, setPartyBalances] = useState<PartyBalanceMap>({})
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -133,14 +193,36 @@ function VoucherListTab({ apiCall, type, title, onCount }: {
       partiesAPI.customers({ limit: 500 }),
       partiesAPI.suppliers({ limit: 500 }),
     ]).then(([c, s]) => setParties([...(c.data.data || []), ...(s.data.data || [])])).catch(() => {})
+    // Current balance shown in the voucher popup — reuses the existing
+    // /reports/party-balance endpoint (same source as the Ledger page and
+    // Party Balance report), no new calculation logic.
+    reportsAPI.partyBalance().then(r => {
+      const rows: any[] = r.data?.data ?? []
+      const map: PartyBalanceMap = {}
+      rows.forEach(p => { map[p.id] = { debit: Number(p.debit) || 0, credit: Number(p.credit) || 0 } })
+      setPartyBalances(map)
+    }).catch(() => {})
   }, [])
 
+  const refreshPartyBalances = () => {
+    reportsAPI.partyBalance().then(r => {
+      const rows: any[] = r.data?.data ?? []
+      const map: PartyBalanceMap = {}
+      rows.forEach(p => { map[p.id] = { debit: Number(p.debit) || 0, credit: Number(p.credit) || 0 } })
+      setPartyBalances(map)
+    }).catch(() => {})
+  }
+
+  // Balances shown in the popup should be current — refresh right before
+  // opening it and again after a voucher posts, since the previous voucher
+  // (or the Next flow) changes the party's balance.
+  const openModal = () => { refreshPartyBalances(); setModal(true) }
   const handleClose = () => { setModal(false); load() }
 
   return (
     <div>
       <div className="flex justify-end mb-3">
-        <Button variant="primary" icon={<Plus size={14}/>} onClick={() => setModal(true)}>New {title}</Button>
+        <Button variant="primary" icon={<Plus size={14}/>} onClick={openModal}>New {title}</Button>
       </div>
       <div className="table-card">
         <div className="overflow-x-auto">
@@ -183,7 +265,14 @@ function VoucherListTab({ apiCall, type, title, onCount }: {
         <Pagination page={page} total={total} limit={LIMIT} onChange={setPage} />
       </div>
       <Modal open={modal} onClose={handleClose} title={`New ${title}`} size="lg">
-        <QuickVoucherForm type={type} accounts={accounts} parties={parties} onClose={handleClose} />
+        <QuickVoucherForm
+          type={type}
+          accounts={accounts}
+          parties={parties}
+          partyBalances={partyBalances}
+          onPosted={refreshPartyBalances}
+          onClose={handleClose}
+        />
       </Modal>
     </div>
   )
