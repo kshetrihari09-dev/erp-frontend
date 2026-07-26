@@ -10,7 +10,9 @@
  *   - NO Tailwind classes
  */
 import { forwardRef } from 'react'
-import { fmt, fmtDate } from '@/utils'
+import { fmt } from '@/utils'
+import { formatDisplayDate } from '@/utils/dateSystem'
+import useUIStore from '@/store/uiStore'
 import type { Company } from '@/types'
 import { DEFAULT_TPL, type TemplateConfig } from '@/store/templateStore'
 
@@ -74,6 +76,10 @@ const InvoiceTemplate = forwardRef<HTMLDivElement, {
   copyLabel?:  string
   tpl?:        TemplateConfig
 }>(({ data, size = 'a4', copyLabel = 'ORIGINAL', tpl = DEFAULT_TPL }, ref) => {
+  // Print/preview dates follow the same app-wide AD/BS toggle as the
+  // Sales/Purchase/Voucher lists and forms — this is the one place that
+  // formatting is applied for every printed document, regardless of module.
+  const { dateMode } = useUIStore()
   const isA4      = size === 'a4'
   const isThermal = size.startsWith('thermal')
   const co        = data.company
@@ -256,8 +262,8 @@ const InvoiceTemplate = forwardRef<HTMLDivElement, {
                   <td style={s.metaVal}>{data.voucherNo}</td>
                 </tr>
                 <tr>
-                  <td style={s.metaLabel}>Date (AD):</td>
-                  <td style={s.metaVal}>{fmtDate(data.date)}</td>
+                  <td style={s.metaLabel}>Date ({dateMode}):</td>
+                  <td style={s.metaVal}>{formatDisplayDate(data.date, dateMode)}</td>
                 </tr>
                 {tpl.showDateBS && data.dateBS && (
                   <tr>
@@ -283,7 +289,7 @@ const InvoiceTemplate = forwardRef<HTMLDivElement, {
         </div>
       ) : (
         <div style={{ fontSize: '9px', marginBottom: '4px', color: '#000' }}>
-          <div><b>No:</b> {data.voucherNo} &nbsp; <b>Date:</b> {fmtDate(data.date)}</div>
+          <div><b>No:</b> {data.voucherNo} &nbsp; <b>Date:</b> {formatDisplayDate(data.date, dateMode)}</div>
           {tpl.showDateBS && data.dateBS && <div><b>BS:</b> {data.dateBS}</div>}
           {data.partyName   && <div><b>Party:</b> {data.partyName}</div>}
           {data.paymentMode && <div style={{ textTransform: 'capitalize' }}><b>Mode:</b> {data.paymentMode}</div>}
@@ -412,7 +418,7 @@ const InvoiceTemplate = forwardRef<HTMLDivElement, {
         )}
         <div style={{ opacity: 0.7, fontSize: '9px', marginTop: 2 }}>
           {isThermal
-            ? `${data.voucherNo} • ${fmtDate(data.date)}`
+            ? `${data.voucherNo} • ${formatDisplayDate(data.date, dateMode)}`
             : `Printed: ${new Date().toLocaleString()}`
           }
         </div>

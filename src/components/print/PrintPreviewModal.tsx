@@ -27,7 +27,8 @@ import { useRef, useEffect, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Maximize2, X, CheckCircle2 } from 'lucide-react'
-import { fmt, fmtDate } from '@/utils'
+import { fmt } from '@/utils'
+import { formatDisplayDate, type DateSystem } from '@/utils/dateSystem'
 import { useShortcutScope } from '@/hooks/useKeyboardShortcuts'
 import { htmlToPdfBlob } from '@/utils/htmlToPdfBlob'
 import { uploadDocumentToCloud } from '@/components/cloudStorage/CloudBackupButton'
@@ -52,17 +53,17 @@ const TYPE_COLORS: Record<string, string> = {
   PURCHASE_RETURN: '#b45309',
 }
 
-function shareWhatsApp(data: PrintData) {
+function shareWhatsApp(data: PrintData, dateMode: DateSystem) {
   const msg = encodeURIComponent(
-    `*${data.voucherNo}*\nDate: ${fmtDate(data.date)}\n${data.partyName ? `Party: ${data.partyName}\n` : ''}Amount: ${fmt(data.netTotal)}`
+    `*${data.voucherNo}*\nDate: ${formatDisplayDate(data.date, dateMode)}\n${data.partyName ? `Party: ${data.partyName}\n` : ''}Amount: ${fmt(data.netTotal)}`
   )
   window.open(`https://wa.me/?text=${msg}`, '_blank')
 }
 
-function shareEmail(data: PrintData, company: any) {
+function shareEmail(data: PrintData, company: any, dateMode: DateSystem) {
   const subject = encodeURIComponent(`${data.voucherNo} from ${company?.name || 'Us'}`)
   const body    = encodeURIComponent(
-    `Dear ${data.partyName || 'Customer'},\n\nPlease find your invoice details:\n\nVoucher No: ${data.voucherNo}\nDate: ${fmtDate(data.date)}\nAmount: ${fmt(data.netTotal)}\n\nThank you.`
+    `Dear ${data.partyName || 'Customer'},\n\nPlease find your invoice details:\n\nVoucher No: ${data.voucherNo}\nDate: ${formatDisplayDate(data.date, dateMode)}\nAmount: ${fmt(data.netTotal)}\n\nThank you.`
   )
   window.open(`mailto:?subject=${subject}&body=${body}`)
 }
@@ -85,7 +86,7 @@ export default function PrintPreviewModal({
   data, open, onClose, onNextBill, autoprint = false,
 }: PrintPreviewModalProps) {
   const { company }     = useAuthStore()
-  const { success: toastSuccess, error: toastError } = useUIStore()
+  const { success: toastSuccess, error: toastError, dateMode } = useUIStore()
   const [backingUp, setBackingUp] = useState(false)
   const tpl             = useTemplateStore(s => s.activeTemplate)
   const { print, downloadPDF } = usePrint()
@@ -166,8 +167,8 @@ export default function PrintPreviewModal({
     setTimeout(handlePrint, 100)
   }, [handlePrint])
 
-  const handleEmail    = useCallback(() => { if (printData) shareEmail(printData, company) }, [printData, company])
-  const handleWhatsApp = useCallback(() => { if (printData) shareWhatsApp(printData) }, [printData])
+  const handleEmail    = useCallback(() => { if (printData) shareEmail(printData, company, dateMode) }, [printData, company, dateMode])
+  const handleWhatsApp = useCallback(() => { if (printData) shareWhatsApp(printData, dateMode) }, [printData, dateMode])
 
   const handleNextBill = useCallback(() => {
     onNextBill?.()
@@ -236,7 +237,7 @@ export default function PrintPreviewModal({
                   </div>
                   <div style={{ fontSize: 12, color: 'var(--text-3,#888)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {printData.partyName && <span>{printData.partyName} · </span>}
-                    {fmtDate(printData.date)} · <b style={{ color: typeColor }}>{fmt(printData.netTotal)}</b>
+                    {formatDisplayDate(printData.date, dateMode)} · <b style={{ color: typeColor }}>{fmt(printData.netTotal)}</b>
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>

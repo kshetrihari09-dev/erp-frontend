@@ -33,7 +33,9 @@ import ProductSearchCell from '@/components/forms/ProductSearchCell'
 import BatchSelect from '@/components/forms/BatchSelect'
 import QtyGate from '@/components/forms/QtyGate'
 import QuickAddPartyModal from '@/components/forms/QuickAddPartyModal'
-import { fmt, fmtDate, calcRowAmount } from '@/utils'
+import { fmt, calcRowAmount } from '@/utils'
+import { formatDisplayDate } from '@/utils/dateSystem'
+import DateSystemInput from '@/components/shared/DateSystemInput'
 import DiscountReviewModal from '@/components/forms/discount/DiscountReviewModal'
 import {
   computeItemDiscounts, computeTotals, emptyDiscount, validRows as validDiscountRows,
@@ -90,7 +92,7 @@ function SummaryRow({
    MAIN PAGE
 ═══════════════════════════════════════════════════════════════════════════ */
 export default function SalesPage() {
-  const { success, error, info, theme } = useUIStore()
+  const { success, error, info, theme, dateMode } = useUIStore()
   const [tab, setTab] = useState('new')
 
   const [customers, setCustomers] = useState<Party[]>([])
@@ -237,7 +239,7 @@ export default function SalesPage() {
     if (!data.customer_id) { setFlash({ type: 'danger', msg: 'Select a customer before posting the sale' }); setCustomerOpen(true); return }
     if (!data.payment_mode) { setFlash({ type: 'danger', msg: 'Please select a payment mode.' }); return }
     if (lastInvDate && data.date && data.date < lastInvDate) {
-      setFlash({ type: 'danger', msg: `Date cannot be earlier than the previous invoice date (${fmtDate(lastInvDate)}).` })
+      setFlash({ type: 'danger', msg: `Date cannot be earlier than the previous invoice date (${formatDisplayDate(lastInvDate, dateMode)}).` })
       return
     }
     setSaving(true); setFlash(null)
@@ -537,13 +539,14 @@ export default function SalesPage() {
                     </div>
                   </div>
 
-                  {/* Date — IDENTICAL to original */}
+                  {/* Date — same field, now AD/BS aware via DateSystemInput */}
                   <div>
                     <FieldLabel icon={<CalendarDays size={11}/>}>Date</FieldLabel>
-                    <input
-                      type="date" className="erp-input"
+                    <DateSystemInput
+                      className="erp-input"
                       min={lastInvDate || undefined}
-                      {...register('date')}
+                      valueAD={watch('date')}
+                      onChangeAD={(ad) => setValue('date', ad)}
                     />
                   </div>
 
@@ -980,7 +983,7 @@ export default function SalesPage() {
                       ? sales.map(s => (
                           <tr key={s.id} className="clickable" onClick={() => setDetailId(s.id)}>
                             <td className="td-mono text-brand">{s.invoice_no}</td>
-                            <td className="td-mono">{fmtDate(s.date_ad)}</td>
+                            <td className="td-mono">{formatDisplayDate(s.date_ad, dateMode)}</td>
                             <td>{s.party_name}</td>
                             <td className="td-right">{fmt(s.net_total)}</td>
                             <td className="td-right text-green-700">{fmt(s.paid_amount)}</td>
@@ -1050,7 +1053,7 @@ export default function SalesPage() {
                   {/* Customer + date row */}
                   <div className="sil-card-sub">
                     <span className="sil-card-customer">{s.party_name || ''}</span>
-                    <span className="sil-card-date">{fmtDate(s.date_ad)}</span>
+                    <span className="sil-card-date">{formatDisplayDate(s.date_ad, dateMode)}</span>
                   </div>
 
                   {/* Chips row: mode, status, paid, due */}
@@ -1130,7 +1133,7 @@ export default function SalesPage() {
           <div>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
               {[
-                ['Party', detail.party_name], ['Date', fmtDate(detail.date_ad)],
+                ['Party', detail.party_name], ['Date', formatDisplayDate(detail.date_ad, dateMode)],
                 ['Payment', detail.payment_mode], ['Status', ''],
                 ['Round Off', fmt(detail.round_off ?? 0)],
                 ['Net Total', fmt(detail.net_total)], ['Due', fmt(detail.due_amount)],

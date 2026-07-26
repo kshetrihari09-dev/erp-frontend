@@ -14,7 +14,9 @@ import ProductSearchCell from '@/components/forms/ProductSearchCell'
 import BatchSelect from '@/components/forms/BatchSelect'
 import QtyGate from '@/components/forms/QtyGate'
 import QuickAddPartyModal from '@/components/forms/QuickAddPartyModal'
-import { fmt, fmtDate, calcRowAmount } from '@/utils'
+import { fmt, calcRowAmount } from '@/utils'
+import { formatDisplayDate } from '@/utils/dateSystem'
+import DateSystemInput from '@/components/shared/DateSystemInput'
 import { PAYMENT_MODES } from '@/constants'
 import type { Product, Party, Purchase } from '@/types'
 import PostingStatusBadge from '@/components/PostingStatusBadge'
@@ -31,7 +33,7 @@ type Flash =
   | { type: 'success'; info: TransactionSuccessInfo }
 
 export default function PurchasePage() {
-  const { error, info, theme } = useUIStore()
+  const { error, info, theme, dateMode } = useUIStore()
   const [tab, setTab] = useState('new')
   const tableRef = useRef<InvoiceRowsTableHandle>(null)
 
@@ -296,7 +298,11 @@ export default function PurchasePage() {
               </div>
               <div>
                 <label className="pmic-field-label">Date</label>
-                <input type="date" className="erp-input w-full" {...register('date')} />
+                <DateSystemInput
+                  className="erp-input w-full"
+                  valueAD={watch('date')}
+                  onChangeAD={(ad) => setValue('date', ad)}
+                />
               </div>
               <div>
                 <label className="pmic-field-label" title="Shortcut: F8">Payment Mode <Kbd>F8</Kbd></label>
@@ -569,7 +575,7 @@ export default function PurchasePage() {
                       ? purchases.map(p => (
                           <tr key={p.id} className="clickable" onClick={() => setDetailId(p.id)}>
                             <td className="td-mono text-brand">{p.bill_no}</td>
-                            <td className="td-mono">{fmtDate(p.date_ad)}</td>
+                            <td className="td-mono">{formatDisplayDate(p.date_ad, dateMode)}</td>
                             <td>{p.party_name || '—'}</td>
                             <td className="td-right">{fmt(p.net_total)}</td>
                             <td className="td-right text-green-700">{fmt(p.paid_amount)}</td>
@@ -614,7 +620,7 @@ export default function PurchasePage() {
                   {/* Supplier + date */}
                   <div className="sil-card-sub">
                     <span className="sil-card-customer">{p.party_name || 'Unknown Supplier'}</span>
-                    <span className="sil-card-date">{fmtDate(p.date_ad)}</span>
+                    <span className="sil-card-date">{formatDisplayDate(p.date_ad, dateMode)}</span>
                   </div>
                   {/* Chips */}
                   <div className="sil-card-chips">
@@ -676,7 +682,7 @@ export default function PurchasePage() {
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
               {[
                 ['Supplier',  detail.party_name || '—'],
-                ['Date',      fmtDate(detail.date_ad)],
+                ['Date',      formatDisplayDate(detail.date_ad, dateMode)],
                 ['Round Off', fmt(detail.round_off ?? 0)],
                 ['Net Total', fmt(detail.net_total)],
                 ['Paid',      fmt(detail.paid_amount)],
