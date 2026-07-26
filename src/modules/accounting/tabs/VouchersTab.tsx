@@ -1,9 +1,11 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useForm, useFieldArray } from 'react-hook-form'
-import { Plus, Trash2, CheckCircle2, RotateCcw, Printer } from 'lucide-react'
+import { Plus, Trash2, CheckCircle2, RotateCcw, Printer, Pencil } from 'lucide-react'
 import { accountingAPI, partiesAPI } from '@/services/api'
 import useUIStore from '@/store/uiStore'
+import useAuthStore from '@/store/authStore'
 import { Button, Modal, Badge, Pagination, SkeletonRows, Empty, SearchInput } from '@/components/ui'
+import VoucherEditPasswordDialog from '@/components/forms/VoucherEditPasswordDialog'
 import { fmt } from '@/utils'
 import { formatDisplayDate } from '@/utils/dateSystem'
 import DateSystemInput from '@/components/shared/DateSystemInput'
@@ -23,6 +25,10 @@ interface VouchersTabProps {
 
 export default function VouchersTab({ onCount, openSignal }: VouchersTabProps = {}) {
   const { success, error, dateMode } = useUIStore()
+  const { user, hasRole } = useAuthStore()
+  // "Authorized users" for editing a posted voucher — same trust level the
+  // backend requires (can_reverse_entries), owner/admin always included.
+  const canEditPosted = hasRole(['owner', 'admin']) || !!user?.can_reverse_entries
   const [vouchers, setVouchers] = useState<Voucher[]>([])
   const [total,    setTotal]    = useState(0)
   const [page,     setPage]     = useState(1)
@@ -32,6 +38,10 @@ export default function VouchersTab({ onCount, openSignal }: VouchersTabProps = 
   const [loading,  setLoading]  = useState(false)
   const [modal,    setModal]    = useState(false)
   const [detail,   setDetail]   = useState<Voucher | null>(null)
+  // Password confirmation step for editing a POSTED voucher (voucher pending confirmation).
+  const [passwordTarget, setPasswordTarget] = useState<Voucher | null>(null)
+  // Unlocked and ready to edit — carries the mandatory reason captured in the password dialog.
+  const [editTarget, setEditTarget] = useState<{ voucher: Voucher; reason: string } | null>(null)
   // Print preview for an existing voucher row (separate from VoucherForm's
   // own printData below, which is only for a voucher just created there).
   const [printData, setPrintData] = useState<PrintData | null>(null)
@@ -96,7 +106,12 @@ export default function VouchersTab({ onCount, openSignal }: VouchersTabProps = 
                   ? vouchers.map(v => (
                       <tr key={v.id} className="clickable"
                         onClick={() => accountingAPI.voucher(v.id).then(r => setDetail(r.data.data)).catch(() => {})}>
-                        <td className="td-mono text-brand">{v.voucher_no}</td>
+                        <td className="td-mono text-brand">
+                          {v.voucher_no}
+                          {v.is_edited && (
+                            <span className="badge badge-amber ml-1.5" style={{ fontSize: 9, padding: '1px 6px' }} title="This voucher has been edited since it was posted">Edited</span>
+                          )}
+                        </td>
                         <td><span className="badge badge-blue">{v.voucher_type}</span></td>
                         <td className="td-mono">{formatDisplayDate(v.voucher_date, dateMode)}</td>
                         <td>{v.party_name || '—'}</td>
@@ -122,6 +137,10 @@ export default function VouchersTab({ onCount, openSignal }: VouchersTabProps = 
                             {v.status === 'posted' && (
                               <Button variant="danger" size="sm" icon={<RotateCcw size={12}/>}
                                 onClick={() => reverseVoucher(v.id)}>Reverse</Button>
+                            )}
+                            {v.status === 'posted' && canEditPosted && (
+                              <Button variant="secondary" size="sm" icon={<Pencil size={12}/>}
+                                onClick={() => setPasswordTarget(v)}>Edit</Button>
                             )}
                           </div>
                         </td>
@@ -187,6 +206,28 @@ export default function VouchersTab({ onCount, openSignal }: VouchersTabProps = 
         <VoucherForm onClose={() => { setModal(false); load() }} />
       </Modal>
 
+      {/* Step 1 — password + mandatory reason, before any editing is allowed */}
+      <VoucherEditPasswordDialog
+        open={!!passwordTarget}
+        voucherLabel={passwordTarget?.voucher_no}
+        onCancel={() => setPasswordTarget(null)}
+        onUnlock={(reason) => {
+          if (passwordTarget) setEditTarget({ voucher: passwordTarget, reason })
+          setPasswordTarget(null)
+        }}
+      />
+
+      {/* Step 2 — unlocked edit form, pre-filled with the voucher's current values */}
+      <Modal open={!!editTarget} onClose={() => setEditTarget(null)} title={editTarget ? `Edit Voucher — ${editTarget.voucher.voucher_no}` : ''} size="xl">
+        {editTarget && (
+          <VoucherForm
+            editVoucher={editTarget.voucher}
+            editReason={editTarget.reason}
+            onClose={() => { setEditTarget(null); load() }}
+          />
+        )}
+      </Modal>
+
       {/* Print preview for an existing voucher row */}
       <PrintPreviewModal
         data={printData}
@@ -197,28 +238,31 @@ export default function VouchersTab({ onCount, openSignal }: VouchersTabProps = 
   )
 }
 
-// ─── Voucher creation form ─────────────────────────────────────────────────────
-function VoucherForm({ onClose }: { onClose: () => void }) {
+// ─── Voucher creation / edit form ───────────────────────────────────────────────
+function VoucherForm({ onClose, editVoucher, editReason }: { onClose: () => void; editVoucher?: Voucher; editReason?: string }) {
   const { success, error } = useUIStore()
   const [accounts,  setAccounts]  = useState<Account[]>([])
   const [parties,   setParties]   = useState<Party[]>([])
   const [printData, setPrintData] = useState<PrintData | null>(null)
+  const isEdit = !!editVoucher
 
   useEffect(() => {
     accountingAPI.accounts().then(r => setAccounts(r.data.data || [])).catch(() => {})
     partiesAPI.customers({ limit: 500 }).then(r => setParties(r.data.data || [])).catch(() => {})
   }, [])
 
-  const { register, control, handleSubmit, watch, setValue, formState: { isSubmitting } } = useForm({
+  const { register, control, handleSubmit, watch, setValue, reset, formState: { isSubmitting } } = useForm({
     defaultValues: {
-      voucher_type: 'JOURNAL',
-      voucher_date: new Date().toISOString().split('T')[0],
-      party_id: '',
-      narration: '',
-      lines: [
-        { account_id: '', description: '', debit: '', credit: '' },
-        { account_id: '', description: '', debit: '', credit: '' },
-      ],
+      voucher_type: editVoucher?.voucher_type || 'JOURNAL',
+      voucher_date: editVoucher?.voucher_date?.split('T')[0] || new Date().toISOString().split('T')[0],
+      party_id:     editVoucher?.party_id || '',
+      narration:    editVoucher?.narration || '',
+      lines: editVoucher?.lines?.length
+        ? editVoucher.lines.map(l => ({ account_id: l.account_id, description: l.description || '', debit: l.debit || '', credit: l.credit || '' }))
+        : [
+            { account_id: '', description: '', debit: '', credit: '' },
+            { account_id: '', description: '', debit: '', credit: '' },
+          ],
     },
   })
 
@@ -233,18 +277,31 @@ function VoucherForm({ onClose }: { onClose: () => void }) {
     const validLines = data.lines.filter(l => l.account_id && (Number(l.debit) > 0 || Number(l.credit) > 0))
     if (validLines.length < 2) { error('Need at least 2 lines'); return }
     if (!balanced) { error('Debits must equal credits'); return }
+    const preparedLines = validLines.map(l => ({
+      account_id: l.account_id,
+      description: l.description,
+      debit:  Number(l.debit)  || 0,
+      credit: Number(l.credit) || 0,
+    }))
     try {
+      if (isEdit && editVoucher) {
+        await accountingAPI.editVoucher(editVoucher.id, {
+          reason:       editReason || '',
+          voucher_date: data.voucher_date,
+          party_id:     data.party_id || null,
+          narration:    data.narration,
+          lines:        preparedLines,
+        })
+        success('Voucher updated — journal entries recalculated')
+        onClose()
+        return
+      }
       const res = await accountingAPI.createVoucher({
         voucher_type: data.voucher_type,
         voucher_date: data.voucher_date,
         party_id:     data.party_id || undefined,
         narration:    data.narration,
-        lines:        validLines.map(l => ({
-          account_id: l.account_id,
-          description: l.description,
-          debit:  Number(l.debit)  || 0,
-          credit: Number(l.credit) || 0,
-        })),
+        lines:        preparedLines,
       })
       const saved = res?.data?.data ?? {}
       const dr    = data.lines.reduce((s: number, l: any) => s + (Number(l.debit) || 0), 0)
@@ -265,7 +322,7 @@ function VoucherForm({ onClose }: { onClose: () => void }) {
       <div className="form-grid mb-4">
         <div>
           <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">Type</label>
-          <select className="erp-input" {...register('voucher_type')}>
+          <select className="erp-input" disabled={isEdit} title={isEdit ? 'Voucher type cannot be changed when editing' : undefined} {...register('voucher_type')}>
             {VOUCHER_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
           </select>
         </div>
@@ -349,7 +406,7 @@ function VoucherForm({ onClose }: { onClose: () => void }) {
 
       <div className="flex justify-end gap-2 mt-5 pt-4 border-t border-[var(--border)]">
         <Button variant="secondary" onClick={onClose}>Cancel</Button>
-        <Button variant="primary" loading={isSubmitting} onClick={onSubmit}>Create Voucher</Button>
+        <Button variant="primary" loading={isSubmitting} onClick={onSubmit}>{isEdit ? 'Save Changes' : 'Create Voucher'}</Button>
       <PrintPreviewModal
         data={printData}
         open={!!printData}

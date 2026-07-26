@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useForm } from 'react-hook-form'
-import { Plus, Printer, CheckCircle2 } from 'lucide-react'
+import { Plus, Printer, CheckCircle2, Pencil } from 'lucide-react'
 import { accountingAPI, partiesAPI, reportsAPI } from '@/services/api'
 import useUIStore from '@/store/uiStore'
+import useAuthStore from '@/store/authStore'
 import { Button, Modal, Badge, Pagination, SkeletonRows, Empty, ConfirmDialog } from '@/components/ui'
+import VoucherEditPasswordDialog from '@/components/forms/VoucherEditPasswordDialog'
 import { fmt } from '@/utils'
 import { formatDisplayDate } from '@/utils/dateSystem'
 import DateSystemInput from '@/components/shared/DateSystemInput'
@@ -17,8 +19,9 @@ const LIMIT = 20
 // (the same source the Ledger page and Party Balance report already use).
 type PartyBalanceMap = Record<string, { debit: number; credit: number }>
 
-function QuickVoucherForm({ type, accounts, parties, partyBalances, balancesLoaded, onPosted, onClose }: {
+function QuickVoucherForm({ type, accounts, parties, partyBalances, balancesLoaded, onPosted, onClose, editRow, editReason }: {
   type: 'RECEIPT' | 'PAYMENT'; accounts: Account[]; parties: Party[]; partyBalances: PartyBalanceMap; balancesLoaded?: boolean; onPosted?: () => void; onClose: () => void
+  editRow?: any; editReason?: string
 }) {
   const { success, error } = useUIStore()
   const [printData, setPrintData]     = useState<PrintData | null>(null)
@@ -27,13 +30,21 @@ function QuickVoucherForm({ type, accounts, parties, partyBalances, balancesLoad
   // Print button below — never automatically after save.
   const [successData, setSuccessData] = useState<PrintData | null>(null)
   const [confirmSave, setConfirmSave] = useState(false)
+  const isEdit = !!editRow
   // Populated only once the voucher has actually been posted — the real
   // voucher_no comes from next_voucher_number() on the backend at creation
   // time, so there is nothing genuine to show before that. This is purely
   // a read-only display of what the (unchanged) backend already generated.
-  const [voucherNo, setVoucherNo] = useState<string | null>(null)
+  // When editing, the voucher already has its (unchanged) number.
+  const [voucherNo, setVoucherNo] = useState<string | null>(editRow?.voucher_no || null)
   const { register, handleSubmit, watch, setValue, reset, formState: { isSubmitting } } = useForm({
-    defaultValues: { party_id: '', date: new Date().toISOString().split('T')[0], account_id: '', amount: '', narration: '' },
+    defaultValues: {
+      party_id:  editRow?.party_id || '',
+      date:      editRow?.voucher_date?.split('T')[0] || new Date().toISOString().split('T')[0],
+      account_id: editRow?.cash_account_id || '',
+      amount:    editRow ? String(editRow.total_amount ?? editRow.amount ?? '') : '',
+      narration: editRow?.narration || '',
+    },
   })
 
   const onSubmit = handleSubmit(async (data) => {
@@ -41,6 +52,15 @@ function QuickVoucherForm({ type, accounts, parties, partyBalances, balancesLoad
     if (!Number(data.amount)) { error('Enter a valid amount'); return }
     try {
       const payload = { party_id: data.party_id || undefined, date: data.date, amount: Number(data.amount), account_id: data.account_id, narration: data.narration || undefined }
+      if (isEdit && editRow) {
+        const editPayload = { ...payload, party_id: data.party_id || null, reason: editReason || '' }
+        if (type === 'RECEIPT') await accountingAPI.editReceipt(editRow.id, editPayload)
+        else                    await accountingAPI.editPayment(editRow.id, editPayload)
+        success(`${type === 'RECEIPT' ? 'Receipt' : 'Payment'} updated — journal entries recalculated`)
+        onPosted?.()
+        onClose()
+        return
+      }
       let saved: any = {}
       if (type === 'RECEIPT') { const r = await accountingAPI.createReceipt(payload); saved = r.data?.data ?? {} }
       else                    { const r = await accountingAPI.createPayment(payload); saved = r.data?.data ?? {} }
@@ -183,8 +203,8 @@ function QuickVoucherForm({ type, accounts, parties, partyBalances, balancesLoad
         onNextBill={() => { setPrintData(null); resetForNextVoucher() }}
       />
         <Button variant="secondary" onClick={onClose}>Cancel</Button>
-        <Button variant="primary" loading={isSubmitting} onClick={() => setConfirmSave(true)}>
-          Create {type === 'RECEIPT' ? 'Receipt' : 'Payment'}
+        <Button variant="primary" loading={isSubmitting} onClick={() => isEdit ? onSubmit() : setConfirmSave(true)}>
+          {isEdit ? 'Save Changes' : `Create ${type === 'RECEIPT' ? 'Receipt' : 'Payment'}`}
         </Button>
       </div>
     </>
@@ -195,6 +215,9 @@ function VoucherListTab({ apiCall, type, title, onCount }: {
   apiCall: (p: any) => Promise<any>; type: 'RECEIPT' | 'PAYMENT'; title: string; onCount?: (count: number) => void
 }) {
   const { error, dateMode } = useUIStore()
+  const { user, hasRole } = useAuthStore()
+  // "Authorized users" for editing a posted voucher — same trust level the backend requires.
+  const canEditPosted = hasRole(['owner', 'admin']) || !!user?.can_reverse_entries
   const [rows,    setRows]    = useState<any[]>([])
   const [total,   setTotal]   = useState(0)
   const [page,    setPage]    = useState(1)
@@ -205,6 +228,11 @@ function VoucherListTab({ apiCall, type, title, onCount }: {
   const [parties,  setParties]  = useState<Party[]>([])
   const [partyBalances, setPartyBalances] = useState<PartyBalanceMap>({})
   const [balancesLoaded, setBalancesLoaded] = useState(false)
+  // Password confirmation step for editing a POSTED receipt/payment.
+  const [passwordTarget, setPasswordTarget] = useState<any | null>(null)
+  // Unlocked and ready to edit — the full voucher (with lines) + mandatory reason.
+  const [editTarget, setEditTarget] = useState<{ row: any; reason: string } | null>(null)
+  const [resolvingEdit, setResolvingEdit] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -265,6 +293,28 @@ function VoucherListTab({ apiCall, type, title, onCount }: {
   const openModal = () => { refreshPartyBalances(); setModal(true) }
   const handleClose = () => { setModal(false); load() }
 
+  // After password confirmation, fetch the full voucher (with lines) so we
+  // can pre-fill the cash/bank account — the list row alone doesn't carry it.
+  async function resolveAndOpenEdit(row: any, reason: string) {
+    setResolvingEdit(true)
+    try {
+      const r = await accountingAPI.voucher(row.id)
+      const body = r.data.data as any
+      const full  = body.voucher
+      const lines = body.lines || []
+      // RECEIPT: cash/bank line is the debit side. PAYMENT: cash/bank line is the credit side.
+      const cashLine = type === 'RECEIPT'
+        ? lines.find((l: any) => Number(l.debit) > 0)
+        : lines.find((l: any) => Number(l.credit) > 0)
+      refreshPartyBalances()
+      setEditTarget({ row: { ...full, cash_account_id: cashLine?.account_id }, reason })
+    } catch (e: any) {
+      error('Could not load voucher', e.message)
+    } finally {
+      setResolvingEdit(false)
+    }
+  }
+
   return (
     <div>
       <div className="flex justify-end mb-3">
@@ -282,13 +332,19 @@ function VoucherListTab({ apiCall, type, title, onCount }: {
                 : rows.length
                   ? rows.map((v: any) => (
                       <tr key={v.id}>
-                        <td className="td-mono text-brand">{v.voucher_no || '—'}</td>
+                        <td className="td-mono text-brand">
+                          {v.voucher_no || '—'}
+                          {v.is_edited && (
+                            <span className="badge badge-amber ml-1.5" style={{ fontSize: 9, padding: '1px 6px' }} title="This voucher has been edited since it was posted">Edited</span>
+                          )}
+                        </td>
                         <td className="td-mono">{formatDisplayDate(v.voucher_date || v.date, dateMode)}</td>
                         <td>{v.party_name || '—'}</td>
                         <td className="text-[var(--text-3)] truncate" style={{ maxWidth: 180 }}>{v.narration || '—'}</td>
                         <td className="td-right">{fmt(v.total_amount ?? v.amount ?? 0)}</td>
                         <td><Badge status={(v.status || 'posted').toLowerCase()}/></td>
                         <td onClick={e => e.stopPropagation()}>
+                          <div className="flex gap-1">
                           <Button variant="secondary" size="sm" icon={<Printer size={12}/>}
                             onClick={() => setListPrintData({
                               voucherNo:  v.voucher_no || '—',
@@ -300,6 +356,11 @@ function VoucherListTab({ apiCall, type, title, onCount }: {
                               paidAmount: Number(v.total_amount ?? v.amount ?? 0),
                             })}
                           >Print</Button>
+                          {(v.status || '').toLowerCase() === 'posted' && canEditPosted && (
+                            <Button variant="secondary" size="sm" icon={<Pencil size={12}/>} disabled={resolvingEdit}
+                              onClick={() => setPasswordTarget(v)}>Edit</Button>
+                          )}
+                          </div>
                         </td>
                       </tr>
                     ))
@@ -320,6 +381,30 @@ function VoucherListTab({ apiCall, type, title, onCount }: {
           onPosted={refreshPartyBalances}
           onClose={handleClose}
         />
+      </Modal>
+
+      {/* Step 1 — password + mandatory reason */}
+      <VoucherEditPasswordDialog
+        open={!!passwordTarget}
+        voucherLabel={passwordTarget?.voucher_no}
+        onCancel={() => setPasswordTarget(null)}
+        onUnlock={(reason) => {
+          const target = passwordTarget
+          setPasswordTarget(null)
+          if (target) resolveAndOpenEdit(target, reason)
+        }}
+      />
+
+      {/* Step 2 — unlocked edit form, pre-filled with the voucher's current values */}
+      <Modal open={!!editTarget} onClose={() => setEditTarget(null)} title={editTarget ? `Edit ${title} — ${editTarget.row.voucher_no}` : ''} size="lg">
+        {editTarget && (
+          <QuickVoucherForm
+            type={type} accounts={accounts} parties={parties}
+            partyBalances={partyBalances} balancesLoaded={balancesLoaded}
+            editRow={editTarget.row} editReason={editTarget.reason}
+            onClose={() => { setEditTarget(null); load() }}
+          />
+        )}
       </Modal>
     </div>
   )
