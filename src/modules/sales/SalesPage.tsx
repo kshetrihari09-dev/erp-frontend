@@ -102,6 +102,19 @@ function EditablePaymentMode({
   const [value,   setValue]   = useState<string>(sale.payment_mode)
   const [saving,  setSaving]  = useState(false)
 
+  // Keep the local `value` in sync with the parent row. The `sales` array in
+  // the parent gets replaced with a fresh object each time this row updates
+  // (initial save response, then the background salesAPI.get(id) reconcile —
+  // see handlePaymentModeSaved), but this component instance is NOT
+  // remounted when that happens (the <tr>/<div> key is the stable sale.id),
+  // so its own `value` state would otherwise keep whatever it was left at
+  // and could display a stale payment mode until the dropdown is reopened.
+  // Skipped while `editing` is true so an in-flight edit the user is
+  // actively making isn't clobbered by an unrelated parent re-render.
+  useEffect(() => {
+    if (!editing) setValue(sale.payment_mode)
+  }, [sale.payment_mode, editing])
+
   if (!editing) {
     return (
       <Badge
@@ -270,7 +283,15 @@ export default function SalesPage() {
   // the table cells always read paid_amount/due_amount/status straight off
   // this `sales` array, so once the row is replaced every column reflects
   // the latest data on the very next render.
+  // Per-sale-id request token. Lets the background reconcile fetch below
+  // detect whether it's still the most recent one for that row before it's
+  // allowed to write into `sales` — see comment inside handlePaymentModeSaved.
+  const paymentModeReqRef = useRef<Record<string, number>>({})
+
   const handlePaymentModeSaved = useCallback((id: string, updated: Sale) => {
+    const myReqId = (paymentModeReqRef.current[id] || 0) + 1
+    paymentModeReqRef.current[id] = myReqId
+
     setSales(prev => prev.map(s => s.id === id ? { ...s, ...updated } : s))
     // Belt-and-braces: re-fetch just this one sale from the source of truth
     // in the background. If payment_mode changes ever end up cascading into
@@ -279,6 +300,13 @@ export default function SalesPage() {
     // requiring a full list reload.
     salesAPI.get(id)
       .then(r => {
+        // If the same sale was edited again while this request was in
+        // flight, `paymentModeReqRef.current[id]` has already moved past
+        // `myReqId`. That means this response describes an older edit than
+        // what's now on screen — applying it would silently revert the row
+        // to stale data. Bail out and let the newer edit's own reconcile
+        // fetch (which is still in flight, or already applied) win instead.
+        if (paymentModeReqRef.current[id] !== myReqId) return
         const fresh = r.data?.data
         if (fresh) setSales(prev => prev.map(s => s.id === id ? { ...s, ...fresh } : s))
       })
