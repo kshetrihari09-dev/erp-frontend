@@ -25,7 +25,7 @@ import { salesAPI, partiesAPI, productsAPI } from '@/services/api'
 import useUIStore from '@/store/uiStore'
 import {
   Button, Tabs, Modal, Badge, Pagination,
-  SkeletonRows, Empty, SearchInput, ConfirmDialog, Kbd, Spinner, Alert,
+  SkeletonRows, Empty, SearchInput, ConfirmDialog, Kbd, Alert,
 } from '@/components/ui'
 import TransactionSuccessAlert, { type TransactionSuccessInfo } from '@/components/shared/TransactionSuccessAlert'
 import InvoiceRowsTable, { newRow, type InvoiceRow, type InvoiceRowsTableHandle } from '@/components/forms/InvoiceRowsTable'
@@ -82,103 +82,6 @@ function SummaryRow({
       <span className={`font-bold tabular-nums ${large ? 'text-xl text-brand' : highlight ? 'text-base text-brand' : 'text-sm text-[var(--text)]'}`}>
         {value}
       </span>
-    </div>
-  )
-}
-
-/* ── EditablePaymentMode — Sales List inline editor ─────────────────────────
- * UI-only enhancement. Badge → click → compact dropdown + Save/Cancel.
- * Calls the dedicated PUT /sales/:id/payment-mode endpoint. That endpoint
- * returns the FULL updated sale row (see salesAPI.updatePaymentMode's
- * ApiResponse<Sale> type) — not just the payment_mode field — so we hand
- * the whole record back to the caller via onSaved. The Sales List then
- * replaces the entire row instead of patching a single field, which is
- * what keeps Paid / Due / Status from going stale after this edit. */
-function EditablePaymentMode({
-  sale, onSaved,
-}: { sale: Sale; onSaved: (id: string, updated: Sale) => void }) {
-  const { success, error } = useUIStore()
-  const [editing, setEditing] = useState(false)
-  const [value,   setValue]   = useState<string>(sale.payment_mode)
-  const [saving,  setSaving]  = useState(false)
-
-  // Keep the local `value` in sync with the parent row. The `sales` array in
-  // the parent gets replaced with a fresh object each time this row updates
-  // (initial save response, then the background salesAPI.get(id) reconcile —
-  // see handlePaymentModeSaved), but this component instance is NOT
-  // remounted when that happens (the <tr>/<div> key is the stable sale.id),
-  // so its own `value` state would otherwise keep whatever it was left at
-  // and could display a stale payment mode until the dropdown is reopened.
-  // Skipped while `editing` is true so an in-flight edit the user is
-  // actively making isn't clobbered by an unrelated parent re-render.
-  useEffect(() => {
-    if (!editing) setValue(sale.payment_mode)
-  }, [sale.payment_mode, editing])
-
-  if (!editing) {
-    return (
-      <Badge
-        status={sale.payment_mode}
-        className="cursor-pointer hover:opacity-70"
-        onClick={(e: React.MouseEvent) => {
-          e.stopPropagation()
-          setValue(sale.payment_mode)
-          setEditing(true)
-        }}
-      />
-    )
-  }
-
-  const cancelEdit = (e?: React.MouseEvent) => {
-    e?.stopPropagation()
-    setValue(sale.payment_mode)
-    setEditing(false)
-  }
-
-  const saveEdit = async (e?: React.MouseEvent) => {
-    e?.stopPropagation()
-    // Unchanged value — exit edit mode without an API call.
-    if (value === sale.payment_mode) { setEditing(false); return }
-    setSaving(true)
-    try {
-      const res     = await salesAPI.updatePaymentMode(sale.id, value)
-      // The endpoint responds with the complete, up-to-date sale row
-      // (payment_mode, paid_amount, due_amount, status, updated_at, …).
-      // Previously only `payment_mode` was pulled out of this response and
-      // everything else was thrown away, which is why Paid/Due/Status kept
-      // showing the pre-edit values in the Sales List even though the
-      // database itself was correct. Pass the whole record through instead.
-      const updated: Sale = res.data?.data ?? { ...sale, payment_mode: value }
-      onSaved(sale.id, updated)
-      setEditing(false)
-      success('Payment mode updated', `Invoice ${sale.invoice_no} is now ${updated.payment_mode}.`)
-    } catch (e: any) {
-      error('Update failed', e.message)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <div className="flex items-center gap-1 flex-wrap" onClick={e => e.stopPropagation()}>
-      <select
-        className="erp-input"
-        style={{ height: 28, padding: '2px 6px', fontSize: 12, minWidth: 90 }}
-        value={value}
-        disabled={saving}
-        autoFocus
-        onChange={e => setValue(e.target.value)}
-      >
-        {PAYMENT_MODES.map(m => (
-          <option key={m.value} value={m.value}>{m.label}</option>
-        ))}
-      </select>
-      <Button type="button" variant="primary" size="sm" disabled={saving} onClick={saveEdit}>
-        {saving ? <Spinner size={12}/> : 'Save'}
-      </Button>
-      <Button type="button" variant="secondary" size="sm" disabled={saving} onClick={cancelEdit}>
-        Cancel
-      </Button>
     </div>
   )
 }
@@ -274,44 +177,6 @@ export default function SalesPage() {
   }, [page, search])
 
   useEffect(() => { if (tab === 'list') loadList() }, [tab, loadList])
-
-  // Replaces the ENTIRE row with the fresh record returned by the
-  // payment-mode API call — not just the payment_mode field — so Paid,
-  // Due, and Status can never lag behind what was actually saved. This
-  // avoids a full-list reload (only the one edited row changes), and it
-  // deliberately does not memoize or derive any of these fields elsewhere:
-  // the table cells always read paid_amount/due_amount/status straight off
-  // this `sales` array, so once the row is replaced every column reflects
-  // the latest data on the very next render.
-  // Per-sale-id request token. Lets the background reconcile fetch below
-  // detect whether it's still the most recent one for that row before it's
-  // allowed to write into `sales` — see comment inside handlePaymentModeSaved.
-  const paymentModeReqRef = useRef<Record<string, number>>({})
-
-  const handlePaymentModeSaved = useCallback((id: string, updated: Sale) => {
-    const myReqId = (paymentModeReqRef.current[id] || 0) + 1
-    paymentModeReqRef.current[id] = myReqId
-
-    setSales(prev => prev.map(s => s.id === id ? { ...s, ...updated } : s))
-    // Belt-and-braces: re-fetch just this one sale from the source of truth
-    // in the background. If payment_mode changes ever end up cascading into
-    // paid_amount/due_amount via a JOIN/VIEW/trigger that the payment-mode
-    // response itself doesn't carry, this reconciles the row without
-    // requiring a full list reload.
-    salesAPI.get(id)
-      .then(r => {
-        // If the same sale was edited again while this request was in
-        // flight, `paymentModeReqRef.current[id]` has already moved past
-        // `myReqId`. That means this response describes an older edit than
-        // what's now on screen — applying it would silently revert the row
-        // to stale data. Bail out and let the newer edit's own reconcile
-        // fetch (which is still in flight, or already applied) win instead.
-        if (paymentModeReqRef.current[id] !== myReqId) return
-        const fresh = r.data?.data
-        if (fresh) setSales(prev => prev.map(s => s.id === id ? { ...s, ...fresh } : s))
-      })
-      .catch(() => {})
-  }, [])
 
   useEffect(() => {
     if (!detailId) { setDetail(null); return }
@@ -1120,9 +985,7 @@ export default function SalesPage() {
                             <td className="td-right">{fmt(s.net_total)}</td>
                             <td className="td-right text-green-700">{fmt(s.paid_amount)}</td>
                             <td className={`td-right ${Number(s.due_amount) > 0 ? 'text-amber-600' : ''}`}>{fmt(s.due_amount)}</td>
-                            <td onClick={e => e.stopPropagation()}>
-                              <EditablePaymentMode sale={s} onSaved={handlePaymentModeSaved}/>
-                            </td>
+                            <td><Badge status={s.payment_mode}/></td>
                             <td><Badge status={s.status}/></td>
                             <td onClick={e => e.stopPropagation()}>
                               <PostingStatusBadge sourceType="SALE" sourceId={s.id} compact/>
@@ -1192,7 +1055,7 @@ export default function SalesPage() {
 
                   {/* Chips row: mode, status, paid, due */}
                   <div className="sil-card-chips">
-                    <EditablePaymentMode sale={s} onSaved={handlePaymentModeSaved}/>
+                    <Badge status={s.payment_mode}/>
                     <Badge status={s.status}/>
                     {Number(s.paid_amount) > 0 && (
                       <span className="sil-chip sil-chip-paid">Paid {fmt(s.paid_amount)}</span>
