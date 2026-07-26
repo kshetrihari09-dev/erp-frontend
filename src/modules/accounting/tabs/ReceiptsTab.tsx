@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useForm } from 'react-hook-form'
-import { Plus, Printer } from 'lucide-react'
+import { Plus, Printer, CheckCircle2 } from 'lucide-react'
 import { accountingAPI, partiesAPI, reportsAPI } from '@/services/api'
 import useUIStore from '@/store/uiStore'
 import { Button, Modal, Badge, Pagination, SkeletonRows, Empty, ConfirmDialog } from '@/components/ui'
@@ -17,11 +17,15 @@ const LIMIT = 20
 // (the same source the Ledger page and Party Balance report already use).
 type PartyBalanceMap = Record<string, { debit: number; credit: number }>
 
-function QuickVoucherForm({ type, accounts, parties, partyBalances, onPosted, onClose }: {
-  type: 'RECEIPT' | 'PAYMENT'; accounts: Account[]; parties: Party[]; partyBalances: PartyBalanceMap; onPosted?: () => void; onClose: () => void
+function QuickVoucherForm({ type, accounts, parties, partyBalances, balancesLoaded, onPosted, onClose }: {
+  type: 'RECEIPT' | 'PAYMENT'; accounts: Account[]; parties: Party[]; partyBalances: PartyBalanceMap; balancesLoaded?: boolean; onPosted?: () => void; onClose: () => void
 }) {
   const { success, error } = useUIStore()
   const [printData, setPrintData]     = useState<PrintData | null>(null)
+  // Holds the just-saved voucher for the "Voucher created successfully"
+  // confirmation. Print Preview (printData) is only ever set from the
+  // Print button below — never automatically after save.
+  const [successData, setSuccessData] = useState<PrintData | null>(null)
   const [confirmSave, setConfirmSave] = useState(false)
   // Populated only once the voucher has actually been posted — the real
   // voucher_no comes from next_voucher_number() on the backend at creation
@@ -44,7 +48,11 @@ function QuickVoucherForm({ type, accounts, parties, partyBalances, onPosted, on
       const no = saved.voucher_no || saved.return_no || (type === 'RECEIPT' ? 'REC' : 'PAY') + '-' + Date.now()
       setVoucherNo(no)
       onPosted?.()
-      setPrintData({
+      // NOTE: this used to be setPrintData(...), which auto-opened Print
+      // Preview the instant the voucher saved. Print Preview must now only
+      // open when the user explicitly clicks "Print" in the success dialog
+      // below — see the successData / setPrintData(successData) handler.
+      setSuccessData({
         voucherNo:   no,
         type:        type,
         date:        data.date,
@@ -63,13 +71,15 @@ function QuickVoucherForm({ type, accounts, parties, partyBalances, onPosted, on
   const bal = partyId ? partyBalances[partyId] : undefined
   const balanceLabel = !partyId
     ? '—'
-    : !bal
-      ? '—'
-      : bal.debit > 0
-        ? `Rs. ${fmt(bal.debit)} Dr`
-        : bal.credit > 0
-          ? `Rs. ${fmt(bal.credit)} Cr`
-          : 'Rs. 0.00'
+    : !balancesLoaded
+      ? 'Loading…'
+      : !bal
+        ? 'No balance found'
+        : bal.debit > 0
+          ? `Rs. ${fmt(bal.debit)} Dr`
+          : bal.credit > 0
+            ? `Rs. ${fmt(bal.credit)} Cr`
+            : 'Rs. 0.00'
 
   const resetForNextVoucher = () => {
     setVoucherNo(null)
@@ -142,6 +152,29 @@ function QuickVoucherForm({ type, accounts, parties, partyBalances, onPosted, on
         title={`Create ${type === 'RECEIPT' ? 'Receipt' : 'Payment'}`}
         message={`Are you sure you want to save this ${type === 'RECEIPT' ? 'receipt' : 'payment'} voucher?`}
       />
+      <Modal open={!!successData} onClose={() => { setSuccessData(null); onClose() }} title="Success" size="sm">
+        <div className="flex flex-col items-center text-center gap-3 py-2">
+          <CheckCircle2 size={40} className="text-green-500" />
+          <div className="text-base font-semibold text-[var(--text-1)]">Voucher created successfully</div>
+          <div className="text-sm text-[var(--text-3)] mb-2">What would you like to do?</div>
+          <div className="flex gap-2 w-full">
+            <Button
+              variant="secondary"
+              className="flex-1"
+              onClick={() => { const sd = successData; setSuccessData(null); setPrintData(sd) }}
+            >
+              Print
+            </Button>
+            <Button
+              variant="primary"
+              className="flex-1"
+              onClick={() => { setSuccessData(null); resetForNextVoucher() }}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      </Modal>
       <PrintPreviewModal
         data={printData}
         open={!!printData}
@@ -170,6 +203,7 @@ function VoucherListTab({ apiCall, type, title, onCount }: {
   const [accounts, setAccounts] = useState<Account[]>([])
   const [parties,  setParties]  = useState<Party[]>([])
   const [partyBalances, setPartyBalances] = useState<PartyBalanceMap>({})
+  const [balancesLoaded, setBalancesLoaded] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -197,12 +231,18 @@ function VoucherListTab({ apiCall, type, title, onCount }: {
     // /reports/party-balance endpoint (same source as the Ledger page and
     // Party Balance report), no new calculation logic.
     reportsAPI.partyBalance().then(r => {
+      console.log('[party-balance] raw response:', r.data)
       const body: any = r.data?.data ?? r.data ?? {}
       const rows: any[] = Array.isArray(body) ? body : (body?.data ?? [])
+      console.log('[party-balance] resolved rows:', rows)
       const map: PartyBalanceMap = {}
       rows.forEach(p => { map[p.id] = { debit: Number(p.debit) || 0, credit: Number(p.credit) || 0 } })
       setPartyBalances(map)
-    }).catch(() => {})
+      setBalancesLoaded(true)
+    }).catch(e => {
+      console.error('[party-balance] fetch failed:', e)
+      error('Could not load party balances', e?.message)
+    })
   }, [])
 
   const refreshPartyBalances = () => {
@@ -212,7 +252,10 @@ function VoucherListTab({ apiCall, type, title, onCount }: {
       const map: PartyBalanceMap = {}
       rows.forEach(p => { map[p.id] = { debit: Number(p.debit) || 0, credit: Number(p.credit) || 0 } })
       setPartyBalances(map)
-    }).catch(() => {})
+    }).catch(e => {
+      console.error('[party-balance] refresh failed:', e)
+      error('Could not refresh party balances', e?.message)
+    })
   }
 
   // Balances shown in the popup should be current — refresh right before
@@ -272,6 +315,7 @@ function VoucherListTab({ apiCall, type, title, onCount }: {
           accounts={accounts}
           parties={parties}
           partyBalances={partyBalances}
+          balancesLoaded={balancesLoaded}
           onPosted={refreshPartyBalances}
           onClose={handleClose}
         />
