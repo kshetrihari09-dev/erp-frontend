@@ -478,9 +478,9 @@ export default function DashboardPage() {
               </button>
             </div>
 
-            {/* Scrollable table container — prevent page-level overflow */}
-            <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-              <table className="erp-table dash-table" style={{ fontSize: 12, minWidth: 480 }}>
+            {/* Table container — fluid on mobile, no horizontal scroll */}
+            <div className="dash-table-wrap">
+              <table className="erp-table dash-table dash-recent-table" style={{ fontSize: 12 }}>
                 <thead>
                   <tr>
                     <th>Invoice</th>
@@ -488,7 +488,7 @@ export default function DashboardPage() {
                     <th>Date</th>
                     <th style={{ textAlign: 'right' }}>Amount</th>
                     <th>Mode</th>
-                    <th>Status</th>
+                    <th className="dash-col-status">Status</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -497,20 +497,20 @@ export default function DashboardPage() {
                     : recentSales.length
                       ? recentSales.map((s: any) => (
                           <tr key={s.id} className="clickable" onClick={() => navigate(PATHS.SALES)}>
-                            <td style={{ fontFamily: 'var(--font-mono)', color: 'var(--brand)', fontSize: 11, whiteSpace: 'nowrap' }}>
+                            <td className="dash-col-invoice" style={{ fontFamily: 'var(--font-mono)', color: 'var(--brand)', fontSize: 11, whiteSpace: 'nowrap' }}>
                               {s.invoice_no}
                             </td>
-                            <td style={{ maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <td className="dash-col-party" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {s.party_name || 'Walk-in'}
                             </td>
-                            <td style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>
+                            <td className="dash-col-date" style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>
                               {fmtDate(s.date_ad)}
                             </td>
-                            <td style={{ textAlign: 'right', fontWeight: 700, fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
+                            <td className="dash-col-amount" style={{ textAlign: 'right', fontWeight: 700, fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
                               {fmt(s.net_total || s.total)}
                             </td>
-                            <td><Badge status={s.payment_mode}/></td>
-                            <td><Badge status={s.status}/></td>
+                            <td className="dash-col-mode"><Badge status={s.payment_mode}/></td>
+                            <td className="dash-col-status"><Badge status={s.status}/></td>
                           </tr>
                         ))
                       : (

@@ -2578,6 +2578,17 @@ bsp-row--disabled { cursor: not-allowed; opacity: .55; }
 .dark .dash-table tr:hover { background: rgba(255,255,255,.025); }
 .dash-table tr:last-child td { border-bottom: none; }
 
+/* Recent Sales table — fluid layout, no forced min-width so it can shrink
+   to fit the card on any screen instead of relying on horizontal scroll. */
+.dash-table-wrap { width: 100%; overflow-x: hidden; }
+.dash-recent-table { width: 100%; table-layout: auto; }
+.dash-recent-table .dash-col-party {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ── Recharts custom tooltip ────────────────────────────────────────────── */
 .chart-tooltip {
   background: #1e2d45; border: 1px solid rgba(255,255,255,.1);
@@ -2602,6 +2613,23 @@ bsp-row--disabled { cursor: not-allowed; opacity: .55; }
   .dash-greeting      { padding: 12px 14px; }
   .dash-greeting-stats{ display: none; }
   .period-tab         { padding: 3px 7px; font-size: 10px; }
+
+  /* Recent Sales — drop the least-critical column and tighten spacing so
+     Invoice / Party / Date / Amount / Mode all fit without side-scrolling. */
+  .dash-recent-table .dash-col-status,
+  .dash-recent-table thead tr th:nth-child(6),
+  .dash-recent-table tbody tr td:nth-child(6) { display: none; }
+  .dash-recent-table th,
+  .dash-recent-table td { padding: 7px 6px; }
+  .dash-recent-table th { font-size: 9px; }
+  .dash-recent-table td { font-size: 11.5px; }
+  .dash-recent-table .dash-col-party { max-width: 76px; }
+}
+
+@media (max-width: 400px) {
+  .dash-recent-table th,
+  .dash-recent-table td { padding: 6px 4px; }
+  .dash-recent-table .dash-col-party { max-width: 56px; }
 }
 
 /* ══════════════════════════════════════════════════════════════════════════════
