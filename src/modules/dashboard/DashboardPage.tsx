@@ -478,9 +478,9 @@ export default function DashboardPage() {
               </button>
             </div>
 
-            {/* Table container — fluid on mobile, no horizontal scroll */}
-            <div className="dash-table-wrap">
-              <table className="erp-table dash-table dash-recent-table" style={{ fontSize: 12 }}>
+            {/* ── DESKTOP: full table — hidden on mobile ─────────────────── */}
+            <div className="dash-table-wrap dash-sales-desktop-table">
+              <table className="erp-table dash-table" style={{ fontSize: 12 }}>
                 <thead>
                   <tr>
                     <th>Invoice</th>
@@ -488,7 +488,7 @@ export default function DashboardPage() {
                     <th>Date</th>
                     <th style={{ textAlign: 'right' }}>Amount</th>
                     <th>Mode</th>
-                    <th className="dash-col-status">Status</th>
+                    <th>Status</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -497,20 +497,20 @@ export default function DashboardPage() {
                     : recentSales.length
                       ? recentSales.map((s: any) => (
                           <tr key={s.id} className="clickable" onClick={() => navigate(PATHS.SALES)}>
-                            <td className="dash-col-invoice" style={{ fontFamily: 'var(--font-mono)', color: 'var(--brand)', fontSize: 11, whiteSpace: 'nowrap' }}>
+                            <td style={{ fontFamily: 'var(--font-mono)', color: 'var(--brand)', fontSize: 11, whiteSpace: 'nowrap' }}>
                               {s.invoice_no}
                             </td>
-                            <td className="dash-col-party" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <td style={{ maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {s.party_name || 'Walk-in'}
                             </td>
-                            <td className="dash-col-date" style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>
+                            <td style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>
                               {fmtDate(s.date_ad)}
                             </td>
-                            <td className="dash-col-amount" style={{ textAlign: 'right', fontWeight: 700, fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
+                            <td style={{ textAlign: 'right', fontWeight: 700, fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
                               {fmt(s.net_total || s.total)}
                             </td>
-                            <td className="dash-col-mode"><Badge status={s.payment_mode}/></td>
-                            <td className="dash-col-status"><Badge status={s.status}/></td>
+                            <td><Badge status={s.payment_mode}/></td>
+                            <td><Badge status={s.status}/></td>
                           </tr>
                         ))
                       : (
@@ -525,6 +525,36 @@ export default function DashboardPage() {
                   }
                 </tbody>
               </table>
+            </div>
+
+            {/* ── MOBILE: card list — same pattern as the Sales page list ── */}
+            <div className="dash-sales-mobile-list">
+              {loading ? (
+                <div className="sil-loading" style={{ padding: '4px 14px 14px' }}>
+                  {[1, 2, 3].map(i => <div key={i} className="sil-card sil-card-skeleton"/>)}
+                </div>
+              ) : recentSales.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '28px 14px', color: 'var(--text-4)', fontSize: 13 }}>
+                  No sales yet — create your first invoice
+                </div>
+              ) : (
+                recentSales.map((s: any) => (
+                  <div key={s.id} className="sil-card" onClick={() => navigate(PATHS.SALES)}>
+                    <div className="sil-card-top">
+                      <span className="sil-card-invno">{s.invoice_no}</span>
+                      <span className="sil-card-total">{fmt(s.net_total || s.total)}</span>
+                    </div>
+                    <div className="sil-card-sub">
+                      <span className="sil-card-customer">{s.party_name || 'Walk-in'}</span>
+                      <span className="sil-card-date">{fmtDate(s.date_ad)}</span>
+                    </div>
+                    <div className="sil-card-chips">
+                      <Badge status={s.payment_mode}/>
+                      <Badge status={s.status}/>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </motion.div>
