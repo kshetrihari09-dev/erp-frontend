@@ -49,7 +49,7 @@ function LocalBackupPanel() {
 
   return (
     <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-5 shadow-card mb-4">
-      <div className="flex items-start justify-between gap-3 mb-4">
+      <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
         <div>
           <div className="font-bold text-sm">Local Backup</div>
           <p className="text-xs text-[var(--text-4)] mt-0.5">

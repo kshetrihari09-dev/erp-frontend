@@ -2294,6 +2294,7 @@ bsp-row--disabled { cursor: not-allowed; opacity: .55; }
 .tpl-preview-scroll {
   flex:       1;
   overflow-y: auto;
+  overflow-x: auto;
   padding:    20px;
   background: #f0f2f5;
 }
@@ -4836,14 +4837,13 @@ bsp-row--disabled { cursor: not-allowed; opacity: .55; }
 @media (max-width: 640px) { .stp-span2 { grid-column: span 1; } }
 
 /* ── Desktop table: hidden on mobile ─────────────────────────────────────── */
-.stp-desktop-table           { display: block; }
+.stp-desktop-table           { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 @media (max-width: 767px) {
   .stp-desktop-table         { display: none !important; }
 }
 
-/* ── Tablet: table stays, gets h-scroll + compact cells ─────────────────── */
+/* ── Tablet: table stays, gets compact cells too ─────────────────────────── */
 @media (min-width: 768px) and (max-width: 1024px) {
-  .stp-desktop-table          { overflow-x: auto; }
   .stp-desktop-table table    { min-width: 560px; font-size: 12px; }
   .stp-desktop-table th,
   .stp-desktop-table td       { padding: 8px 10px !important; }
@@ -4992,7 +4992,19 @@ bsp-row--disabled { cursor: not-allowed; opacity: .55; }
   color:       var(--text);
 }
 
-/* ── Settings Center: left nav (desktop) + content panel ─────────────────── */
+/* ── Audit Log: filter bar (auto-wrapping grid, no fixed pixel widths) ──── */
+.stp-audit-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+}
+.stp-audit-filters > div:first-child { grid-column: span 2; min-width: 220px; }
+@media (max-width: 640px) {
+  .stp-audit-filters { grid-template-columns: 1fr 1fr; }
+  .stp-audit-filters > div:first-child { grid-column: 1 / -1; }
+}
+
+
 .stp-shell {
   display: flex;
   align-items: flex-start;
@@ -5050,8 +5062,10 @@ bsp-row--disabled { cursor: not-allowed; opacity: .55; }
   }
 }
 
-/* ── TemplateTab: split-pane stacks on tablet/mobile ─────────────────────── */
-@media (max-width: 900px) {
+/* ── TemplateTab: split-pane stacks earlier now that it's nested inside
+   Settings' left-nav layout (~244px less available width than a full-page
+   view) ───────────────────────────────────────────────────────────────── */
+@media (max-width: 1180px) {
   .tpl-layout {
     flex-direction: column !important;
     height:         auto !important;

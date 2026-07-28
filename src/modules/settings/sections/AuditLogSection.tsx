@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Shield, Download } from 'lucide-react'
+import { Shield, Download, Search, X } from 'lucide-react'
 import { useAuditLog, useUsers } from '@/hooks/useQuery'
 import { Pagination, SkeletonRows, Empty, Select, Input, Button, Modal } from '@/components/ui'
 import { fmtDateTime } from '@/utils'
@@ -63,23 +63,42 @@ export default function AuditLogSection() {
   const rows  = (data?.data  as any[]) || []
   const total = (data?.pagination as any)?.total || 0
 
+  const hasFilters = !!(search || dateFrom || dateTo || userId || action || entity)
+  function clearFilters() {
+    setSearch(''); setDateFrom(''); setDateTo(''); setUserId(''); setAction(''); setEntity(''); setPage(1)
+  }
+
   return (
     <div className="table-card">
-      <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-[var(--border)]">
-        <Shield size={14} className="text-[var(--text-4)]"/>
-        <span className="font-semibold text-sm mr-2">Audit Trail</span>
-        <div className="flex flex-wrap gap-2 flex-1">
-          <Input placeholder="Search…" value={search} onChange={e => { setSearch(e.target.value); setPage(1) }} className="max-w-[180px]" />
-          <input type="date" className="erp-input max-w-[150px]" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setPage(1) }} title="From date" />
-          <input type="date" className="erp-input max-w-[150px]" value={dateTo} onChange={e => { setDateTo(e.target.value); setPage(1) }} title="To date" />
-          <Select className="max-w-[150px]" value={userId} onChange={e => { setUserId(e.target.value); setPage(1) }}
+      <div className="px-4 py-3 border-b border-[var(--border)]">
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <div className="flex items-center gap-2">
+            <Shield size={14} className="text-[var(--text-4)]"/>
+            <span className="font-semibold text-sm">Audit Trail</span>
+          </div>
+          <div className="flex items-center gap-2">
+            {hasFilters && (
+              <Button variant="ghost" size="sm" icon={<X size={12}/>} onClick={clearFilters}>Clear Filters</Button>
+            )}
+            <Button variant="secondary" size="sm" icon={<Download size={13}/>} onClick={() => exportCSV(rows)}>Export</Button>
+          </div>
+        </div>
+        <div className="stp-audit-filters">
+          <Input
+            prefix={<Search size={13}/>}
+            placeholder="Search user, action, entity, IP…"
+            value={search}
+            onChange={e => { setSearch(e.target.value); setPage(1) }}
+          />
+          <input type="date" className="erp-input" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setPage(1) }} title="From date" />
+          <input type="date" className="erp-input" value={dateTo} onChange={e => { setDateTo(e.target.value); setPage(1) }} title="To date" />
+          <Select value={userId} onChange={e => { setUserId(e.target.value); setPage(1) }}
             options={[{ value: '', label: 'All Users' }, ...users.map(u => ({ value: u.id, label: u.name }))]} />
-          <Select className="max-w-[140px]" value={action} onChange={e => { setAction(e.target.value); setPage(1) }}
+          <Select value={action} onChange={e => { setAction(e.target.value); setPage(1) }}
             options={[{ value: '', label: 'All Actions' }, ...ACTIONS.map(a => ({ value: a, label: a }))]} />
-          <Select className="max-w-[150px]" value={entity} onChange={e => { setEntity(e.target.value); setPage(1) }}
+          <Select value={entity} onChange={e => { setEntity(e.target.value); setPage(1) }}
             options={[{ value: '', label: 'All Entities' }, ...ENTITIES.map(e => ({ value: e, label: e }))]} />
         </div>
-        <Button variant="secondary" size="sm" icon={<Download size={13}/>} onClick={() => exportCSV(rows)}>Export</Button>
       </div>
 
       {/* Desktop */}

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Plus, X } from 'lucide-react'
 import { useFiscalYears } from '@/hooks/useQuery'
 import { settingsAPI } from '@/services/api'
 import useUIStore from '@/store/uiStore'
@@ -31,8 +32,8 @@ export default function FiscalYearsSection() {
   return (
     <div>
       <div className="flex justify-end mb-3">
-        <Button variant="primary" size="sm" onClick={() => setShowForm(v => !v)}>
-          {showForm ? 'Cancel' : '+ Add Fiscal Year'}
+        <Button variant="primary" size="sm" icon={showForm ? <X size={14}/> : <Plus size={14}/>} onClick={() => setShowForm(v => !v)}>
+          {showForm ? 'Cancel' : 'Add Fiscal Year'}
         </Button>
       </div>
 
@@ -85,7 +86,7 @@ export default function FiscalYearsSection() {
                         <td>{y.is_locked ? <span className="badge badge-red">Locked</span> : <span className="badge badge-green">Open</span>}</td>
                       </tr>
                     ))
-                  : <tr><td colSpan={6}><Empty message="No fiscal years configured. Click '+ Add Fiscal Year' to create one."/></td></tr>
+                  : <tr><td colSpan={6}><Empty message="No fiscal years configured. Click 'Add Fiscal Year' to create one."/></td></tr>
               }
             </tbody>
           </table>
@@ -95,7 +96,7 @@ export default function FiscalYearsSection() {
           {isLoading
             ? [1,2].map(i => <div key={i} className="stp-card stp-card-skel"/>)
             : years.length === 0
-              ? <Empty message="No fiscal years configured. Click '+ Add Fiscal Year' to create one."/>
+              ? <Empty message="No fiscal years configured. Click 'Add Fiscal Year' to create one."/>
               : years.map((y: any) => (
                   <div key={y.id} className="stp-card">
                     <div className="stp-card-top">
