@@ -102,7 +102,7 @@ export default function PrintPreviewModal({
 
   // Initialise size from template setting; user can override per-print
   const [size,       setSize]       = useState<PrintSize>(() => tplSizeToPrintSize(tpl.paperSize))
-  const [copies,     setCopies]     = useState(1)
+  const [copies,     setCopies]     = useState(() => tpl.copies || 1)
   const [fullscreen, setFullscreen] = useState(false)
   const [moreOpen,   setMoreOpen]   = useState(false)
 
@@ -140,8 +140,10 @@ export default function PrintPreviewModal({
       partyName: printData.partyName,
       amount:    printData.netTotal,
       date:      printData.date,
+      marginMM:  tpl.marginMM,
+      duplicateLabel: tpl.duplicateLabel,
     })
-  }, [printData, size, copies, print])
+  }, [printData, size, copies, print, tpl.marginMM, tpl.duplicateLabel])
 
   const handleDownload = useCallback(() => {
     if (!printData || !printRef.current) return

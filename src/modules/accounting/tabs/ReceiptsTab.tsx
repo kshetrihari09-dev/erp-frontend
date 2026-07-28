@@ -153,7 +153,7 @@ function QuickVoucherForm({ type, accounts, parties, partyBalances, balancesLoad
           </label>
           <select className="erp-input" {...register('account_id')}>
             <option value="">Select account…</option>
-            {assetAccounts.map(a => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
+            {assetAccounts.map(a => <option key={a.id} value={a.id}>{a.account_code} — {a.name}</option>)}
           </select>
         </div>
         <div>

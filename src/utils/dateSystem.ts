@@ -18,8 +18,10 @@
 import { adToBS, bsToAD } from './nepaliDate'
 import { fmtDate as fmtDateAD } from './index'
 
-/** The two supported date systems. Mirrors `useUIStore`'s `dateMode`. */
-export type DateSystem = 'AD' | 'BS'
+/** The supported date display systems. Mirrors `useUIStore`'s `dateMode`.
+ *  'BOTH' is display-only (see formatDisplayDate) — for input/editing,
+ *  helpers below treat it the same as 'AD'. */
+export type DateSystem = 'AD' | 'BS' | 'BOTH'
 
 /**
  * formatDisplayDate — given a canonical AD date (ISO 'YYYY-MM-DD', or any
@@ -30,6 +32,8 @@ export type DateSystem = 'AD' | 'BS'
  *    so switching to AD is a visual no-op versus current behavior.
  *  - 'BS' → the same underlying date, converted and shown as
  *    'YYYY-MM-DD' in Bikram Sambat.
+ *  - 'BOTH' → both, as "AD (BS)", e.g. "26/07/2026 (2083-04-11)". Centralized
+ *    here so every existing call site gains this automatically.
  *
  * Never double-converts: the input is always assumed to be the AD source
  * of truth, never a previously-converted BS value.
@@ -41,7 +45,10 @@ export function formatDisplayDate(
 ): string {
   if (!adDate) return fallback
   if (dateSystem === 'AD') return fmtDateAD(adDate, fallback)
-  return adToBS(adDate, 'YYYY-MM-DD') || fallback
+  if (dateSystem === 'BS') return adToBS(adDate, 'YYYY-MM-DD') || fallback
+  const ad = fmtDateAD(adDate, fallback)
+  const bs = adToBS(adDate, 'YYYY-MM-DD') || fallback
+  return `${ad} (${bs})`
 }
 
 /**
@@ -56,8 +63,8 @@ export function formatDisplayDate(
  */
 export function convertInputDateToAD(inputDate: string | null | undefined, dateSystem: DateSystem): string {
   if (!inputDate) return ''
-  if (dateSystem === 'AD') return inputDate
-  return bsToAD(inputDate)
+  if (dateSystem === 'BS') return bsToAD(inputDate)
+  return inputDate // 'AD' and 'BOTH' both edit via the native AD date input
 }
 
 /** Today's date, expressed in the given system, as 'YYYY-MM-DD'.
@@ -65,5 +72,5 @@ export function convertInputDateToAD(inputDate: string | null | undefined, dateS
 export function todayInSystem(dateSystem: DateSystem): string {
   const now = new Date()
   const todayAD = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
-  return dateSystem === 'AD' ? todayAD : adToBS(todayAD)
+  return dateSystem === 'BS' ? adToBS(todayAD) : todayAD
 }

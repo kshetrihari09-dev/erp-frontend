@@ -2,7 +2,8 @@ import http from '@/services/http'
 import type { ApiResponse, Company, User, Sale, SaleItem, Purchase, PurchaseItem,
   Product, Party, Account, AccountDefault, Voucher, VoucherLine,
   VoucherPosting, PostingStatus, DashboardStats, PnLReport,
-  TrialBalanceRow, LedgerEntry, StockBatch, InvoiceTemplate, FiscalYear, AuditLog } from '@/types'
+  TrialBalanceRow, LedgerEntry, StockBatch, InvoiceTemplate, FiscalYear, AuditLog,
+  CompanyPreferences, Backup } from '@/types'
 import type { ScannedProduct } from '@/types/scanner'
 
 type Params = Record<string, unknown>
@@ -163,7 +164,7 @@ export const partiesAPI = {
   update:         (id: string, data: Partial<Party>) => http.put<ApiResponse<Party>>(`/parties/${id}`, data),
   delete:         (id: string)      => http.delete(`/parties/${id}`),
   ledger:         (id: string, params?: Params) =>
-    http.get<ApiResponse<LedgerEntry[]>>(`/parties/${id}/ledger`, { params }),
+    http.get<ApiResponse<{ party: Party; rows: LedgerEntry[]; summary?: unknown; closingBalance?: number; closing_balance?: number; opening_balance?: number }>>(`/parties/${id}/ledger`, { params }),
 }
 
 // ─── Accounting ───────────────────────────────────────────────────────────────
@@ -283,7 +284,7 @@ export const scannerAPI = {
    * Returns { ip, port }.
    */
   networkInfo: () =>
-    http.get<ApiResponse<{ ip: string; port: number }>>(
+    http.get<ApiResponse<{ ip: string; port: number; lanDetected: boolean }>>(
       '/scanner/network-info',
     ),
 
@@ -331,7 +332,7 @@ export const settingsAPI = {
   users:            (params?: Params) => http.get<ApiResponse<User[]>>('/settings/users', { params }),
   createUser:       (data: Partial<User> & { password: string }) =>
     http.post<ApiResponse<User>>('/settings/users', data),
-  updateUser:       (id: string, data: Partial<User>) => http.put(`/settings/users/${id}`, data),
+  updateUser:       (id: string, data: Partial<User> & { password?: string }) => http.put(`/settings/users/${id}`, data),
   templates:        () => http.get<ApiResponse<InvoiceTemplate[]>>('/settings/invoice-templates'),
   createTemplate:   (data: Params) => http.post('/settings/invoice-templates', data),
   updateTemplate:   (id: string, data: Params) => http.put(`/settings/invoice-templates/${id}`, data),
@@ -340,6 +341,18 @@ export const settingsAPI = {
   fiscalYears:      () => http.get<ApiResponse<FiscalYear[]>>('/settings/fiscal-years'),
   createFiscalYear: (data: Params) => http.post('/settings/fiscal-years', data),
   auditLog:         (params?: Params) => http.get<ApiResponse<AuditLog[]>>('/settings/audit-log', { params }),
+
+  // ── Preferences (General / Sales & Purchase / Accounting & Vouchers /
+  //    Notifications / sensitive-action toggles) — companies.settings jsonb.
+  preferences:       () => http.get<ApiResponse<CompanyPreferences>>('/settings/preferences'),
+  updatePreferences: (data: Partial<CompanyPreferences> & { confirmPassword?: string }) =>
+    http.put<ApiResponse<CompanyPreferences>>('/settings/preferences', data),
+
+  // ── Local Backup & Cloud ─────────────────────────────────────────────────
+  backups:        (params?: Params) => http.get<ApiResponse<Backup[]>>('/settings/backup', { params }),
+  runBackup:      () => http.post<ApiResponse<Backup>>('/settings/backup/run'),
+  verifyBackup:   (id: string) => http.post<ApiResponse<Backup>>(`/settings/backup/${id}/verify`),
+  downloadBackup: (id: string) => http.get(`/settings/backup/${id}/download`, { responseType: 'blob' }),
 }
 
 // ─── Cloud Storage Integration (new, additive) ─────────────────────────────────

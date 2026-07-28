@@ -55,9 +55,10 @@ export function usePrint() {
       size?: PrintSize; copies?: number
       voucherNo?: string; type?: string
       partyName?: string; amount?: number; date?: string
+      marginMM?: number; duplicateLabel?: string
     } = {}
   ) => {
-    const { size = 'a4', copies = 1, voucherNo = '', type = '', partyName, amount = 0, date = '' } = opts
+    const { size = 'a4', copies = 1, voucherNo = '', type = '', partyName, amount = 0, date = '', marginMM, duplicateLabel = 'DUPLICATE' } = opts
     const el = contentRef.current
     if (!el) { console.warn('[usePrint] contentRef is null'); return }
 
@@ -70,9 +71,13 @@ export function usePrint() {
     printRoot.style.cssText = 'display:none'
 
     // Add print-specific style tag
+    const pageCSS = marginMM != null
+      ? PAGE_CSS[size].replace(/margin:\s*[\d.]+mm;/, `margin: ${marginMM}mm;`)
+      : PAGE_CSS[size]
+
     const styleTag = document.createElement('style')
     styleTag.textContent = `
-      ${PAGE_CSS[size]}
+      ${pageCSS}
       @media print {
         body > *:not(#erp-print-root) { display: none !important; }
         #erp-print-root {
@@ -106,7 +111,7 @@ export function usePrint() {
       if (i > 0) {
         const wm = document.createElement('div')
         wm.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-45deg);font-size:60pt;color:rgba(0,0,0,0.06);font-weight:bold;pointer-events:none;z-index:9999;'
-        wm.textContent = 'DUPLICATE'
+        wm.textContent = duplicateLabel
         copy.insertBefore(wm, copy.firstChild)
       }
       return copy.outerHTML

@@ -26,6 +26,11 @@ export interface TemplateConfig {
   fontSize:        'small' | 'medium' | 'large'
   primaryColor:    string
   paperSize:       'A4' | 'thermal' | 'A5'
+  // Printing (Settings → Printing)
+  copies:          number          // how many copies usePrint() prints per click
+  marginMM:        number          // page margin in millimeters
+  footerText:      string          // small print line at the very bottom (separate from thankYouMessage)
+  duplicateLabel:  string          // label shown on copies after the first (was hardcoded 'DUPLICATE')
 }
 
 export const DEFAULT_TPL: TemplateConfig = {
@@ -47,6 +52,10 @@ export const DEFAULT_TPL: TemplateConfig = {
   fontSize:        'medium',
   primaryColor:    '#1d4ed8',
   paperSize:       'A4',
+  copies:          1,
+  marginMM:        10,
+  footerText:      '',
+  duplicateLabel:  'DUPLICATE',
 }
 
 interface TemplateState {
@@ -63,7 +72,14 @@ const useTemplateStore = create<TemplateState>()(
         set((s) => ({ activeTemplate: { ...s.activeTemplate, ...t } })),
       resetTemplate: () => set({ activeTemplate: DEFAULT_TPL }),
     }),
-    { name: STORAGE_KEYS.TEMPLATE }
+    {
+      name: STORAGE_KEYS.TEMPLATE,
+      merge: (persisted, current) => ({
+        ...current,
+        ...(persisted as Partial<TemplateState>),
+        activeTemplate: { ...current.activeTemplate, ...(persisted as any)?.activeTemplate },
+      }),
+    }
   )
 )
 

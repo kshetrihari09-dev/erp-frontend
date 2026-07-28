@@ -50,7 +50,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
 Button.displayName = 'Button'
 
 // ─── Input ────────────────────────────────────────────────────────────────────
-interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
+interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'prefix'> {
   label?:   string
   error?:   string
   prefix?:  ReactNode

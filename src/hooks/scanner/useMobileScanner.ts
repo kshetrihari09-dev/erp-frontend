@@ -207,7 +207,7 @@ export default function useMobileScanner({ token, apiBase }: Options) {
 
   // ── Barcode scanning loop ──────────────────────────────────────────────────
   const startBarcodeLoop = useCallback(async () => {
-    const { BrowserMultiFormatReader, NotFoundException } = await import('@zxing/browser')
+    const { BrowserMultiFormatReader } = await import('@zxing/browser')
     const reader = new BrowserMultiFormatReader()
     barcodeStart.current = Date.now()
 

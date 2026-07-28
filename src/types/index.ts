@@ -15,7 +15,7 @@ export interface Pagination {
 }
 
 // ─── Auth ──────────────────────────────────────────────────────────────────────
-export type UserRole = 'admin' | 'manager' | 'accountant' | 'cashier' | 'viewer'
+export type UserRole = 'owner' | 'admin' | 'manager' | 'accountant' | 'cashier' | 'viewer'
 
 export interface User {
   id:              string
@@ -31,6 +31,10 @@ export interface User {
   last_login_at?:  string
   /** Whether this user can reverse posted entries — also gates editing a posted voucher. */
   can_reverse_entries?: boolean
+  /** Real, backend-enforced permission flags (see requirePermission() in the API). */
+  can_post_vouchers?:   boolean
+  can_approve_vouchers?: boolean
+  can_lock_periods?:    boolean
 }
 
 export interface Company {
@@ -46,6 +50,69 @@ export interface Company {
   invoice_prefix:  string
   currency:        string
   vat_percent:     number
+}
+
+// ─── Settings Center (companies.settings jsonb) ────────────────────────────────
+export interface CompanyPreferences {
+  general: {
+    dateDisplayMode:     'AD' | 'BS' | 'BOTH'
+    numberFormat:        string
+    timeZone:            string
+    defaultPaymentMode:  string // 'none' | 'cash' | 'credit' | ...
+    roundOff:            boolean
+  }
+  salesPurchase: {
+    invoicePrefixOverride: string
+    roundOff:              boolean
+    taxPercentOverride:    number | null
+    creditDays:            number
+    allowNegativeStock:    boolean
+    allowExpiredBatchSale: boolean
+    requireBatchOnSale:    boolean
+    requireExpiryOnBatch:  boolean
+  }
+  accounting: {
+    voucherNumberingPrefix:   Record<string, string>
+    defaultCashAccountId:     string | null
+    defaultBankAccountId:     string | null
+    customerControlAccountId: string | null
+    supplierControlAccountId: string | null
+    discountAccountId:        string | null
+    roundOffAccountId:        string | null
+  }
+  notifications: {
+    lowStock:           boolean
+    expiry:             boolean
+    outstandingBalance: boolean
+    paymentDue:         boolean
+    backupFailure:      boolean
+    systemAlerts:       boolean
+  }
+  sensitiveActions: {
+    paymentModeEdit:  boolean
+    invoiceCancel:    boolean
+    fiscalYearChange: boolean
+    companySettings:  boolean
+  }
+  backup: {
+    autoEnabled: boolean
+    frequency:   'daily' | 'weekly' | 'monthly'
+  }
+}
+
+export interface Backup {
+  id:            string
+  company_id:    string
+  type:          'manual' | 'auto'
+  status:        'pending' | 'success' | 'failed'
+  file_name?:    string | null
+  size_bytes?:   number | null
+  checksum?:     string | null
+  verified:      boolean
+  verified_at?:  string | null
+  error_message?: string | null
+  created_at:    string
+  updated_at:    string
 }
 
 export interface AuthState {

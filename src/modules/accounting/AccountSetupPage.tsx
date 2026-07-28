@@ -119,7 +119,7 @@ function AccountSearchDropdown({
     if (!q) return accounts.slice(0, 50)
     const lq = q.toLowerCase()
     return accounts.filter(a =>
-      a.name.toLowerCase().includes(lq) || a.code.toLowerCase().includes(lq)
+      a.name.toLowerCase().includes(lq) || a.account_code.toLowerCase().includes(lq)
     ).slice(0, 50)
   }, [q, accounts])
 
@@ -149,7 +149,7 @@ function AccountSearchDropdown({
         {selected ? (
           <span className="flex items-center gap-2 min-w-0 flex-1">
             <span className="font-mono text-[11px] text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950 px-1.5 py-0.5 rounded shrink-0">
-              {selected.code}
+              {selected.account_code}
             </span>
             <span className="text-slate-800 dark:text-slate-100 truncate font-medium">{selected.name}</span>
           </span>
@@ -204,15 +204,15 @@ function AccountSearchDropdown({
                     }
                   `}
                 >
-                  <span className="font-mono text-[10px] text-slate-400 dark:text-slate-500 w-14 shrink-0">{a.code}</span>
+                  <span className="font-mono text-[10px] text-slate-400 dark:text-slate-500 w-14 shrink-0">{a.account_code}</span>
                   <span className="flex-1 font-medium truncate">{a.name}</span>
                   <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-semibold shrink-0 ${
-                    a.type === 'asset'     ? 'bg-blue-50   dark:bg-blue-950   text-blue-600   dark:text-blue-400'   :
-                    a.type === 'liability' ? 'bg-purple-50 dark:bg-purple-950 text-purple-600 dark:text-purple-400' :
-                    a.type === 'income'    ? 'bg-green-50  dark:bg-green-950  text-green-600  dark:text-green-400'  :
-                    a.type === 'expense'   ? 'bg-red-50    dark:bg-red-950    text-red-600    dark:text-red-400'    :
+                    a.account_type === 'asset'     ? 'bg-blue-50   dark:bg-blue-950   text-blue-600   dark:text-blue-400'   :
+                    a.account_type === 'liability' ? 'bg-purple-50 dark:bg-purple-950 text-purple-600 dark:text-purple-400' :
+                    a.account_type === 'income'    ? 'bg-green-50  dark:bg-green-950  text-green-600  dark:text-green-400'  :
+                    a.account_type === 'expense'   ? 'bg-red-50    dark:bg-red-950    text-red-600    dark:text-red-400'    :
                     'bg-slate-50 dark:bg-slate-800 text-slate-500'
-                  }`}>{a.type}</span>
+                  }`}>{a.account_type}</span>
                   {a.id === value && <CheckCircle2 size={13} className="text-indigo-500 shrink-0" />}
                 </button>
               ))

@@ -38,18 +38,22 @@ export default function DateSystemInput({
   valueAD, onChangeAD, className, min, max, ...rest
 }: DateSystemInputProps) {
   const { dateMode } = useUIStore()
-  const [text, setText] = useState(() => formatDisplayDate(valueAD, dateMode, ''))
+  // BOTH is a display-only mode (shows "AD (BS)" in read-only contexts);
+  // there's no sensible way to edit two calendars in one field, so editing
+  // falls back to AD, same as before BOTH existed.
+  const editMode = dateMode === 'BS' ? 'BS' : 'AD'
+  const [text, setText] = useState(() => formatDisplayDate(valueAD, editMode, ''))
 
   // Re-sync the visible text whenever the underlying AD value changes from
   // outside (loading a different record, resetting the form) or the user
   // flips the global AD/BS toggle — but only when it actually differs, so
   // we don't clobber a value the user is still mid-typing in BS mode.
   useEffect(() => {
-    const next = formatDisplayDate(valueAD, dateMode, '')
-    setText(prev => (convertInputDateToAD(prev, dateMode) === valueAD ? prev : next))
-  }, [valueAD, dateMode])
+    const next = formatDisplayDate(valueAD, editMode, '')
+    setText(prev => (convertInputDateToAD(prev, editMode) === valueAD ? prev : next))
+  }, [valueAD, editMode])
 
-  if (dateMode === 'AD') {
+  if (editMode === 'AD') {
     return (
       <input
         type="date"

@@ -4992,6 +4992,64 @@ bsp-row--disabled { cursor: not-allowed; opacity: .55; }
   color:       var(--text);
 }
 
+/* ── Settings Center: left nav (desktop) + content panel ─────────────────── */
+.stp-shell {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+}
+.stp-nav {
+  flex: 0 0 224px;
+  position: sticky;
+  top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 8px;
+}
+.stp-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 11px;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-3);
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  text-align: left;
+  width: 100%;
+  transition: background .12s, color .12s;
+}
+.stp-nav-item:hover { background: var(--surface-2); color: var(--text); }
+.stp-nav-item--active {
+  background: var(--brand-light);
+  color: var(--brand);
+}
+.stp-nav-item svg { flex-shrink: 0; }
+.stp-content { flex: 1; min-width: 0; }
+
+/* ── Mobile: dropdown-style section select instead of sidebar ────────────── */
+.stp-nav-mobile {
+  display: none;
+}
+@media (max-width: 900px) {
+  .stp-shell { flex-direction: column; gap: 14px; }
+  .stp-nav { display: none; }
+  .stp-nav-mobile {
+    display: block;
+    width: 100%;
+  }
+  .stp-nav-mobile select.erp-input {
+    font-weight: 600;
+  }
+}
+
 /* ── TemplateTab: split-pane stacks on tablet/mobile ─────────────────────── */
 @media (max-width: 900px) {
   .tpl-layout {

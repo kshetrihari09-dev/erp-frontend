@@ -111,6 +111,8 @@ export const QK = {
   ACCOUNT_DEFAULTS: 'account-defaults',
   VOUCHER_POSTINGS: 'voucher-postings',
   POSTING_STATUS:   'posting-status',
+  PREFERENCES:      'preferences',
+  BACKUPS:          'backups',
 } as const
 
 // ─── Routes / paths ───────────────────────────────────────────────────────────

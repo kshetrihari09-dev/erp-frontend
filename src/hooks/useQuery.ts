@@ -402,6 +402,66 @@ export function useAuditLog(params?: Record<string, unknown>) {
   })
 }
 
+// ─── Preferences (General / Sales & Purchase / Accounting / Notifications) ────
+export function usePreferences() {
+  return useQuery({
+    queryKey: [QK.PREFERENCES],
+    queryFn:  () => settingsAPI.preferences().then(unwrap),
+  })
+}
+
+export function useUpdatePreferences() {
+  const qc = useQueryClient()
+  const { success, error } = useUIStore()
+  return useMutation({
+    mutationFn: settingsAPI.updatePreferences,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [QK.PREFERENCES] })
+      success('Settings saved')
+    },
+    onError: (err: any) => {
+      if (err?.response?.data?.requiresPasswordConfirm) return // handled by caller's password dialog
+      error('Failed to save settings', err?.response?.data?.message)
+    },
+  })
+}
+
+// ─── Backup & Cloud (local backups) ────────────────────────────────────────────
+export function useBackups(params?: Record<string, unknown>) {
+  return useQuery({
+    queryKey: [QK.BACKUPS, params],
+    queryFn:  () => settingsAPI.backups(params).then(unwrapPaginated),
+    placeholderData: keepPreviousData,
+  })
+}
+
+export function useRunBackup() {
+  const qc = useQueryClient()
+  const { success, error } = useUIStore()
+  return useMutation({
+    mutationFn: settingsAPI.runBackup,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [QK.BACKUPS] })
+      success('Backup completed')
+    },
+    onError: (err: any) => error('Backup failed', err?.response?.data?.message),
+  })
+}
+
+export function useVerifyBackup() {
+  const qc = useQueryClient()
+  const { success, error, warning } = useUIStore()
+  return useMutation({
+    mutationFn: settingsAPI.verifyBackup,
+    onSuccess: (res: any) => {
+      qc.invalidateQueries({ queryKey: [QK.BACKUPS] })
+      if (res?.data?.data?.verified) success('Backup verified', 'Checksum matches')
+      else warning('Verification failed', 'The backup file may be corrupted')
+    },
+    onError: (err: any) => error('Verification failed', err?.response?.data?.message),
+  })
+}
+
 // ─── Today's BS Date ─────────────────────────────────────────────────────────
 export function useTodayBS() {
   return useQuery({

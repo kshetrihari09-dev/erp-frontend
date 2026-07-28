@@ -135,7 +135,6 @@ export default function PurchasePage() {
           qty:         Number(r.qty),
           bonus:       Number(r.bonus)   || 0,
           rate:        Number(r.rate),
-          vat_pct:     Number(r.vat_pct) || 13,
           amount:      r.amount,
         })),
       })

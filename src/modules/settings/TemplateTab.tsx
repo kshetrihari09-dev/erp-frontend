@@ -92,11 +92,13 @@ export default function TemplateTab() {
     if (!printRef.current) return
     print(printRef, {
       size:      tpl.paperSize === 'thermal' ? 'thermal-80' : 'a4',
-      copies:    1,
+      copies:    tpl.copies || 1,
       voucherNo: DEMO_DATA.voucherNo,
       type:      DEMO_DATA.type,
       date:      DEMO_DATA.date,
       amount:    DEMO_DATA.netTotal,
+      marginMM:  tpl.marginMM,
+      duplicateLabel: tpl.duplicateLabel,
     })
   }
 
@@ -240,6 +242,49 @@ export default function TemplateTab() {
                   ))}
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* ── Printing ───────────────────────────────────────────────── */}
+          <SectionHead>Printing</SectionHead>
+          <div className="tpl-group">
+            <div className="tpl-field">
+              <label className="tpl-label">Copies per Print</label>
+              <input
+                type="number" min={1} max={5}
+                className="erp-input"
+                value={tpl.copies}
+                onChange={e => set('copies', Math.max(1, Math.min(5, Number(e.target.value) || 1)))}
+              />
+              <p className="tpl-hint">Copies after the first are watermarked with the duplicate label below.</p>
+            </div>
+            <div className="tpl-field">
+              <label className="tpl-label">Duplicate Copy Label</label>
+              <input
+                className="erp-input"
+                value={tpl.duplicateLabel}
+                placeholder="DUPLICATE"
+                onChange={e => set('duplicateLabel', e.target.value || 'DUPLICATE')}
+              />
+            </div>
+            <div className="tpl-field">
+              <label className="tpl-label">Page Margin (mm)</label>
+              <input
+                type="number" min={0} max={30}
+                className="erp-input"
+                value={tpl.marginMM}
+                onChange={e => set('marginMM', Math.max(0, Math.min(30, Number(e.target.value) || 0)))}
+              />
+            </div>
+            <div className="tpl-field">
+              <label className="tpl-label">Invoice Footer Text</label>
+              <input
+                className="erp-input"
+                value={tpl.footerText}
+                placeholder="e.g. Goods once sold will not be taken back"
+                onChange={e => set('footerText', e.target.value)}
+              />
+              <p className="tpl-hint">Printed below the thank-you message, on every copy.</p>
             </div>
           </div>
 

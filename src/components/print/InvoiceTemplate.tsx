@@ -422,6 +422,9 @@ const InvoiceTemplate = forwardRef<HTMLDivElement, {
             : `Printed: ${new Date().toLocaleString()}`
           }
         </div>
+        {tpl.footerText && (
+          <div style={{ opacity: 0.7, fontSize: '9px', marginTop: 2 }}>{tpl.footerText}</div>
+        )}
       </div>
     </div>
   )

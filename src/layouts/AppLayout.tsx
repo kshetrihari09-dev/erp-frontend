@@ -409,7 +409,7 @@ export default function AppLayout() {
             <button
               onClick={toggleDateMode}
               className="topbar-btn"
-              title={`Switch to ${dateMode === 'AD' ? 'Bikram Sambat' : 'Gregorian'} date`}
+              title={`Switch to ${dateMode === 'AD' ? 'Bikram Sambat' : dateMode === 'BS' ? 'both dates' : 'Gregorian'} date`}
               aria-label="Toggle AD/BS date"
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
@@ -420,7 +420,7 @@ export default function AppLayout() {
               }}
             >
               <CalendarDays size={13}/>
-              <span>{dateMode === 'AD' ? todayAD : todayBS}</span>
+              <span>{dateMode === 'AD' ? todayAD : dateMode === 'BS' ? todayBS : `${todayAD} (${todayBS})`}</span>
               <span
                 style={{
                   fontSize: 9.5, fontWeight: 800, letterSpacing: .3,

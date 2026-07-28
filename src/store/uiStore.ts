@@ -23,10 +23,12 @@ interface UIState {
   setTheme: (t: 'light' | 'dark') => void
   toggleTheme: () => void
 
-  // Date display mode (AD = Gregorian, BS = Bikram Sambat) — display-only,
-  // never affects what's stored/sent to the API.
-  dateMode: 'AD' | 'BS'
-  setDateMode: (m: 'AD' | 'BS') => void
+  // Date display mode (AD = Gregorian, BS = Bikram Sambat, BOTH = show
+  // both side by side) — display-only, never affects what's stored/sent
+  // to the API. Centralized in utils/dateSystem.ts formatDisplayDate, so
+  // every call site automatically gains BOTH support.
+  dateMode: 'AD' | 'BS' | 'BOTH'
+  setDateMode: (m: 'AD' | 'BS' | 'BOTH') => void
   toggleDateMode: () => void
 
   // Toasts
@@ -66,7 +68,9 @@ const useUIStore = create<UIState>()(
       // Date display mode
       dateMode: 'AD',
       setDateMode: (dateMode) => set({ dateMode }),
-      toggleDateMode: () => set((s) => ({ dateMode: s.dateMode === 'AD' ? 'BS' : 'AD' })),
+      toggleDateMode: () => set((s) => ({
+        dateMode: s.dateMode === 'AD' ? 'BS' : s.dateMode === 'BS' ? 'BOTH' : 'AD',
+      })),
 
       // Toasts
       toasts: [],

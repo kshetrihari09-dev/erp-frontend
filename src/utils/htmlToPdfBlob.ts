@@ -37,10 +37,10 @@ export async function htmlToPdfBlob(
   }
 
   // html2pdf's worker API can output a Blob directly via .outputPdf('blob').
-  const blob: Blob = await html2pdf()
+  const blob = await html2pdf()
     .set(opt)
     .from(element)
-    .outputPdf('blob')
+    .outputPdf('blob') as Blob
 
   return blob
 }

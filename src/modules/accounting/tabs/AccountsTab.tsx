@@ -107,9 +107,9 @@ export default function AccountsTab({ onCount }: { onCount?: (count: number) => 
                 : accounts.length
                   ? accounts.map(a => (
                       <tr key={a.id}>
-                        <td className="td-mono text-brand">{a.code}</td>
+                        <td className="td-mono text-brand">{a.account_code}</td>
                         <td className="font-semibold">{a.name}</td>
-                        <td><span className="badge badge-blue">{a.type}</span></td>
+                        <td><span className="badge badge-blue">{a.account_type}</span></td>
                         <td className="text-[var(--text-3)]">{a.sub_type || '—'}</td>
                         <td>
                           {a.is_group
