@@ -3,7 +3,7 @@ import type { ApiResponse, Company, User, Sale, SaleItem, Purchase, PurchaseItem
   Product, Party, Account, AccountDefault, Voucher, VoucherLine,
   VoucherPosting, PostingStatus, DashboardStats, PnLReport,
   TrialBalanceRow, LedgerEntry, StockBatch, InvoiceTemplate, FiscalYear, AuditLog,
-  CompanyPreferences, Backup } from '@/types'
+  CompanyPreferences, Backup, AccountLedgerResponse } from '@/types'
 import type { ScannedProduct } from '@/types/scanner'
 
 type Params = Record<string, unknown>
@@ -173,6 +173,14 @@ export const accountingAPI = {
   accounts:      (params?: Params) => http.get<ApiResponse<Account[]>>('/accounting/accounts', { params }),
   createAccount: (data: Partial<Account>) => http.post<ApiResponse<Account>>('/accounting/accounts', data),
   updateAccount: (id: string, data: Partial<Account>) => http.put(`/accounting/accounts/${id}`, data),
+
+  // General ledger for any Chart-of-Accounts account (Cash, Bank, Inventory,
+  // Sales, Expenses, Equity, ...) — distinct from partiesAPI.ledger, which is
+  // for an individual customer/supplier. Pre-existing backend route
+  // (accounting.js GET /ledger/:account_id); this is just its first frontend
+  // consumer.
+  ledger:        (accountId: string, params?: Params) =>
+    http.get<ApiResponse<AccountLedgerResponse>>(`/accounting/ledger/${accountId}`, { params }),
 
   // Vouchers (generic — covers receipts, payments, journal)
   vouchers:       (params?: Params) => http.get<ApiResponse<Voucher[]>>('/accounting/vouchers', { params }),

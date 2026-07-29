@@ -365,7 +365,7 @@ function VoucherForm({ onClose, editVoucher, editReason }: { onClose: () => void
                 <td>
                   <select className="erp-input" style={{ fontSize: 12, padding: '5px 7px' }} {...register(`lines.${i}.account_id`)}>
                     <option value="">Select account…</option>
-                    {accounts.map(a => <option key={a.id} value={a.id}>{a.account_code} — {a.name}</option>)}
+                    {accounts.map(a => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
                   </select>
                 </td>
                 <td>

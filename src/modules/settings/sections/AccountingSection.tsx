@@ -18,7 +18,7 @@ export default function AccountingSection() {
   const accounts = accountsData || []
   const accountOptions = [
     { value: '', label: '— Not set —' },
-    ...accounts.filter(a => !a.is_group).map(a => ({ value: a.id, label: `${a.account_code} · ${a.name}` })),
+    ...accounts.filter(a => !a.is_group).map(a => ({ value: a.id, label: `${a.code} · ${a.name}` })),
   ]
 
   const { form, set, save, saving, loading, dialog } = usePreferenceSection('accounting', 'Accounting settings saved')

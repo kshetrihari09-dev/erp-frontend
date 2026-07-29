@@ -1,17 +1,19 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { partiesAPI } from '@/services/api'
+import { partiesAPI, accountingAPI } from '@/services/api'
 import { SkeletonRows } from '@/components/ui'
-import { fmt, fmtDate, downloadCSV } from '@/utils'
+import { fmt, downloadCSV } from '@/utils'
+import { formatDisplayDate } from '@/utils/dateSystem'
+import useUIStore from '@/store/uiStore'
 import {
   Download, Search, RotateCcw, Printer, TrendingUp,
   TrendingDown, DollarSign, FileText, Receipt, BarChart3,
   Calendar, ChevronLeft, ChevronRight, SlidersHorizontal,
   Building2, Phone, Hash, ArrowUpRight, ArrowDownRight,
   Activity, Clock, CreditCard, CheckCircle, AlertCircle,
-  Package, RefreshCw,
+  Package, RefreshCw, ChevronDown, X, Wallet, Scale, ShoppingBag,
 } from 'lucide-react'
-import type { Party } from '@/types'
+import type { Party, Account } from '@/types'
 
 /* ─────────────────────────────────────────────────────────────────────────────
    All colours use CSS custom properties so they automatically adapt to
@@ -35,13 +37,6 @@ const LABEL_STYLE: React.CSSProperties = {
 }
 
 // ── Print CSS ───────────────────────────────────────────────────────────────
-// The generic @media print rule in globals.css only hides the sidebar/topbar/
-// buttons — it never overrides the --text/--surface CSS variables, so
-// printing this page while dark mode is active came out as light-grey text
-// on a white sheet: unreadable. Scoping our own print area (same approach as
-// TrialBalTab.tsx's #tb-print-area) forces real black-on-white regardless of
-// the active theme, and hides filter/search/pagination chrome that has no
-// business on paper.
 const PRINT_CSS = `
 @media print {
   body * { visibility: hidden !important; }
@@ -55,6 +50,151 @@ const PRINT_CSS = `
   tfoot { display: table-footer-group; }
 }
 `
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   ACCOUNT SELECTOR — general Chart-of-Accounts + party picker
+   Groups: Assets → Cash / Bank / Inventory / Other, Receivables → Customers,
+   Payables → Suppliers / Other, Income → Sales / Other, Expenses, Equity.
+───────────────────────────────────────────────────────────────────────────── */
+type LedgerEntity =
+  | { kind: 'account'; id: string; code: string; name: string; type: string; sub_type?: string }
+  | { kind: 'party';   id: string; name: string; partyType: 'Customer' | 'Supplier'; phone?: string; pan_no?: string }
+
+interface SelectorSubgroup { label: string; items: LedgerEntity[] }
+interface SelectorCategory { label: string; accent: string; icon: React.ReactNode; subgroups: SelectorSubgroup[] }
+
+const CATEGORY_STYLE: Record<string, { accent: string; icon: React.ReactNode }> = {
+  Assets:       { accent: '#3b82f6', icon: <Wallet size={12} /> },
+  Receivables:  { accent: '#3b82f6', icon: <ArrowDownRight size={12} /> },
+  Payables:     { accent: '#8b5cf6', icon: <ArrowUpRight size={12} /> },
+  Income:       { accent: '#10b981', icon: <TrendingUp size={12} /> },
+  Expenses:     { accent: '#ef4444', icon: <ShoppingBag size={12} /> },
+  Equity:       { accent: '#f59e0b', icon: <Scale size={12} /> },
+}
+
+function entityKey(e: LedgerEntity) { return `${e.kind}:${e.id}` }
+
+function AccountLedgerSelector({
+  categories, value, onChange,
+}: {
+  categories: SelectorCategory[]
+  value: LedgerEntity | null
+  onChange: (e: LedgerEntity) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [q, setQ]       = useState('')
+  const ref             = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [open])
+
+  const filtered = useMemo(() => {
+    if (!q) return categories
+    const lq = q.toLowerCase()
+    return categories
+      .map(cat => ({
+        ...cat,
+        subgroups: cat.subgroups
+          .map(sg => ({
+            ...sg,
+            items: sg.items.filter(it =>
+              it.name.toLowerCase().includes(lq) ||
+              (it.kind === 'account' && it.code.toLowerCase().includes(lq))
+            ),
+          }))
+          .filter(sg => sg.items.length > 0),
+      }))
+      .filter(cat => cat.subgroups.length > 0)
+  }, [categories, q])
+
+  return (
+    <div className="ldg-acct-select" ref={ref}>
+      <button
+        type="button"
+        className="erp-input ldg-acct-select-btn"
+        onClick={() => { setOpen(v => !v); setQ('') }}
+      >
+        {value ? (
+          <span className="ldg-acct-select-value">
+            {value.kind === 'account' && <span className="ldg-acct-select-code">{value.code}</span>}
+            <span className="ldg-acct-select-name">{value.name}</span>
+            {value.kind === 'party' && (
+              <span className={`ldg-acct-select-tag ${value.partyType === 'Supplier' ? 'is-supplier' : 'is-customer'}`}>
+                {value.partyType}
+              </span>
+            )}
+          </span>
+        ) : (
+          <span className="ldg-acct-select-placeholder">Select an account…</span>
+        )}
+        <ChevronDown size={14} className="ldg-acct-select-chevron" style={{ transform: open ? 'rotate(180deg)' : undefined }} />
+      </button>
+
+      {open && (
+        <div className="ldg-acct-panel">
+          <div className="ldg-acct-search-wrap">
+            <Search size={13} className="ldg-acct-search-icon" />
+            <input
+              autoFocus
+              value={q}
+              onChange={e => setQ(e.target.value)}
+              placeholder="Search accounts, customers, suppliers…"
+              className="ldg-acct-search-input"
+            />
+            {q && (
+              <button type="button" className="ldg-acct-search-clear" onClick={() => setQ('')}>
+                <X size={12} />
+              </button>
+            )}
+          </div>
+
+          <div className="ldg-acct-results">
+            {filtered.length === 0 ? (
+              <div className="ldg-acct-empty">No matching accounts or parties</div>
+            ) : (
+              filtered.map(cat => (
+                <div key={cat.label} className="ldg-acct-group">
+                  <div className="ldg-acct-group-label" style={{ color: cat.accent }}>
+                    {cat.icon} {cat.label}
+                  </div>
+                  {cat.subgroups.map(sg => (
+                    <div key={sg.label}>
+                      {cat.subgroups.length > 1 && <div className="ldg-acct-subgroup-label">{sg.label}</div>}
+                      {sg.items.map(it => {
+                        const active = value ? entityKey(value) === entityKey(it) : false
+                        return (
+                          <button
+                            key={entityKey(it)}
+                            type="button"
+                            className={`ldg-acct-item ${active ? 'is-active' : ''}`}
+                            onClick={() => { onChange(it); setOpen(false); setQ('') }}
+                          >
+                            {it.kind === 'account' && <span className="ldg-acct-item-code">{it.code}</span>}
+                            <span className="ldg-acct-item-name">{it.name}</span>
+                            {it.kind === 'party' && (
+                              <span className={`ldg-acct-select-tag ${it.partyType === 'Supplier' ? 'is-supplier' : 'is-customer'}`}>
+                                {it.partyType}
+                              </span>
+                            )}
+                            {active && <CheckCircle size={13} className="ldg-acct-item-check" />}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  ))}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 // ── Animated number ───────────────────────────────────────────────────────────
 function AnimatedNumber({ value, prefix = '₹' }: { value: number; prefix?: string }) {
@@ -186,6 +326,8 @@ const TX_BADGE_STYLES: Record<string, { bg: string; color: string; border: strin
   RETURN:           { bg: 'rgba(239,68,68,0.12)',   color: '#ef4444',       border: 'rgba(239,68,68,0.25)',  label: 'Return' },
   'SALES RETURN':   { bg: 'rgba(239,68,68,0.12)',   color: '#ef4444',       border: 'rgba(239,68,68,0.25)',  label: 'Sale Return' },
   'PURCHASE RETURN':{ bg: 'rgba(245,158,11,0.12)',  color: '#f59e0b',       border: 'rgba(245,158,11,0.25)', label: 'Purch. Return' },
+  JOURNAL:          { bg: 'rgba(100,116,139,0.12)', color: 'var(--text-3)', border: 'rgba(100,116,139,0.2)', label: 'Journal' },
+  CONTRA:           { bg: 'rgba(20,184,166,0.12)',  color: '#14b8a6',       border: 'rgba(20,184,166,0.25)', label: 'Contra' },
 }
 
 function TxBadge({ type }: { type: string }) {
@@ -225,8 +367,11 @@ function SkeletonKpi() {
 const ROWS_PER_PAGE_OPTIONS = [20, 50, 100]
 
 export default function LedgerPage() {
+  const { dateMode } = useUIStore()
+
   const [parties,    setParties   ] = useState<Party[]>([])
-  const [partyId,    setPartyId   ] = useState('')
+  const [accounts,   setAccounts  ] = useState<Account[]>([])
+  const [entity,     setEntity    ] = useState<LedgerEntity | null>(null)
   const [dateFrom,   setDateFrom  ] = useState(new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0])
   const [dateTo,     setDateTo    ] = useState(new Date().toISOString().split('T')[0])
   const [txFilter,   setTxFilter  ] = useState('')
@@ -241,35 +386,121 @@ export default function LedgerPage() {
     Promise.all([
       partiesAPI.customers({ limit: 500 }),
       partiesAPI.suppliers({ limit: 500 }),
-    ]).then(([c, s]) => {
+      accountingAPI.accounts({ is_active: true, is_group: false }),
+    ]).then(([c, s, a]) => {
       setParties([
         ...(c.data.data || []).map((p: Party) => ({ ...p, _type: 'Customer' })),
         ...(s.data.data || []).map((p: Party) => ({ ...p, _type: 'Supplier' })),
       ])
+      setAccounts(a.data.data || [])
     }).catch(() => {})
   }, [])
 
+  // ── Group accounts + parties into the requested category tree ─────────────
+  const categories = useMemo<SelectorCategory[]>(() => {
+    const byType    = (t: string) => accounts.filter(a => a.type === t)
+    const bySub     = (t: string) => accounts.filter(a => a.sub_type === t)
+    const asAccount = (a: Account): LedgerEntity => ({ kind: 'account', id: a.id, code: a.code, name: a.name, type: a.type, sub_type: a.sub_type })
+    const asParty   = (p: any): LedgerEntity => ({ kind: 'party', id: p.id, name: p.name, partyType: p._type, phone: p.phone, pan_no: p.pan_no })
+    const sortAcc   = (list: Account[]) => [...list].sort((a, b) => a.code.localeCompare(b.code)).map(asAccount)
+    const sortParty = (list: any[])     => [...list].sort((a, b) => a.name.localeCompare(b.name)).map(asParty)
+
+    const cash      = bySub('cash')
+    const bank      = bySub('bank')
+    const inventory = bySub('inventory')
+    const sales     = bySub('sales')
+    const usedIds   = new Set([...cash, ...bank, ...inventory, ...sales].map(a => a.id))
+    const controlSubTypes = new Set(['accounts_receivable', 'accounts_payable'])
+
+    const otherAssets   = byType('asset').filter(a => !usedIds.has(a.id) && !controlSubTypes.has(a.sub_type || ''))
+    const otherIncome   = byType('income').filter(a => !usedIds.has(a.id))
+    const otherPayables = byType('liability').filter(a => a.sub_type !== 'accounts_payable')
+    const expenses      = byType('expense')
+    const equity         = byType('equity')
+    const customers      = parties.filter((p: any) => p._type === 'Customer')
+    const suppliers       = parties.filter((p: any) => p._type === 'Supplier')
+
+    const build = (label: string, subgroups: SelectorSubgroup[]): SelectorCategory => ({
+      label, accent: CATEGORY_STYLE[label].accent, icon: CATEGORY_STYLE[label].icon,
+      subgroups: subgroups.filter(sg => sg.items.length > 0),
+    })
+
+    return [
+      build('Assets', [
+        { label: 'Cash in Hand',  items: sortAcc(cash) },
+        { label: 'Bank Accounts', items: sortAcc(bank) },
+        { label: 'Inventory',     items: sortAcc(inventory) },
+        { label: 'Other Assets',  items: sortAcc(otherAssets) },
+      ]),
+      build('Receivables', [
+        { label: 'Customers', items: sortParty(customers) },
+      ]),
+      build('Payables', [
+        { label: 'Suppliers',      items: sortParty(suppliers) },
+        { label: 'Other Payables', items: sortAcc(otherPayables) },
+      ]),
+      build('Income', [
+        { label: 'Sales',        items: sortAcc(sales) },
+        { label: 'Other Income', items: sortAcc(otherIncome) },
+      ]),
+      build('Expenses', [
+        { label: 'Expenses', items: sortAcc(expenses) },
+      ]),
+      build('Equity', [
+        { label: 'Equity', items: sortAcc(equity) },
+      ]),
+    ].filter(cat => cat.subgroups.length > 0)
+  }, [accounts, parties])
+
   async function generate() {
-    if (!partyId) return
+    if (!entity) return
     setLoading(true); setError(''); setLedgerData(null); setPage(1); setSearch('')
     try {
-      const r = await partiesAPI.ledger(partyId, { date_from: dateFrom, date_to: dateTo })
-      const payload = (r.data?.data ?? r.data) as any
-      if (!payload || (!payload.rows && !payload.data)) { setError('No ledger data returned'); return }
-      const rows = payload.rows ?? payload.data ?? []
-      setLedgerData({
-        party:          payload.party ?? parties.find(p => p.id === partyId),
-        rows,
-        summary:        payload.summary ?? null,
-        closingBalance: payload.closingBalance ?? payload.closing_balance ?? rows[rows.length - 1]?.running_balance ?? 0,
-        openingBalance: payload.opening_balance ?? 0,
-      })
+      if (entity.kind === 'account') {
+        const r = await accountingAPI.ledger(entity.id, { date_from: dateFrom, date_to: dateTo, limit: 2000 })
+        const payload = (r.data?.data ?? r.data) as any
+        if (!payload) { setError('No ledger data returned'); return }
+        const rows = (payload.rows || []).map((row: any) => ({
+          date_ad:         row.entry_date,
+          type:            row.voucher_type || row.event_type || 'JOURNAL',
+          reference:       row.voucher_no || row.reference_no || '—',
+          description:     row.description || row.party_name || '',
+          debit:           row.debit,
+          credit:          row.credit,
+          running_balance: row.running_balance,
+        }))
+        setLedgerData({
+          kind:           'account',
+          name:           payload.account?.name ?? entity.name,
+          code:           payload.account?.code ?? entity.code,
+          accountType:    payload.account?.type ?? entity.type,
+          subType:        payload.account?.sub_type ?? entity.sub_type,
+          rows,
+          closingBalance: payload.closing_balance ?? rows[rows.length - 1]?.running_balance ?? 0,
+          openingBalance: payload.opening_balance ?? 0,
+        })
+      } else {
+        const r = await partiesAPI.ledger(entity.id, { date_from: dateFrom, date_to: dateTo })
+        const payload = (r.data?.data ?? r.data) as any
+        if (!payload || (!payload.rows && !payload.data)) { setError('No ledger data returned'); return }
+        const rows = payload.rows ?? payload.data ?? []
+        setLedgerData({
+          kind:           'party',
+          name:           payload.party?.name ?? entity.name,
+          partyType:      entity.partyType,
+          phone:          payload.party?.phone ?? entity.phone,
+          pan_no:         (payload.party as any)?.pan_no ?? entity.pan_no,
+          rows,
+          closingBalance: payload.closingBalance ?? payload.closing_balance ?? rows[rows.length - 1]?.running_balance ?? 0,
+          openingBalance: payload.opening_balance ?? 0,
+        })
+      }
     } catch (e: any) { setError(e.message || 'Failed to load ledger') }
     finally { setLoading(false) }
   }
 
   function reset() {
-    setPartyId(''); setLedgerData(null); setError(''); setSearch(''); setTxFilter(''); setPage(1)
+    setEntity(null); setLedgerData(null); setError(''); setSearch(''); setTxFilter(''); setPage(1)
     setDateFrom(new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0])
     setDateTo(new Date().toISOString().split('T')[0])
   }
@@ -296,22 +527,15 @@ export default function LedgerPage() {
   }
 
   const rows         = ledgerData?.rows ?? []
-  const party        = ledgerData?.party ?? parties.find(p => p.id === partyId)
   const closingBal   = Number(ledgerData?.closingBalance ?? 0)
   const openingBal   = Number(ledgerData?.openingBalance ?? 0)
-  const summary      = ledgerData?.summary
   const dataRows     = rows.filter((r: any) => r.type !== 'opening')
   const totalDr      = dataRows.reduce((s: number, e: any) => s + (Number(e.debit)  || 0), 0)
   const totalCr      = dataRows.reduce((s: number, e: any) => s + (Number(e.credit) || 0), 0)
-  const partyType    = (party as any)?._type ?? (party?.type === 'supplier' ? 'Supplier' : 'Customer')
-  const salesRows    = dataRows.filter((r: any) => r.type === 'SALES')
-  const receiptRows  = dataRows.filter((r: any) => r.type === 'RECEIPT')
-  const totalSales   = salesRows.reduce((s: number, r: any) => s + (Number(r.debit)   || 0), 0)
-  const totalReceipts= receiptRows.reduce((s: number, r: any) => s + (Number(r.credit) || 0), 0)
-  const avgInvoice   = salesRows.length > 0 ? totalSales / salesRows.length : 0
-  const lastTxDate   = dataRows.length > 0 ? fmtDate(dataRows[dataRows.length - 1]?.date_ad || dataRows[dataRows.length - 1]?.date) : '—'
-  const partyPhone   = (party as any)?.phone
-  const partyPan     = (party as any)?.pan_no
+  const debitEntries = dataRows.filter((r: any) => Number(r.debit)  > 0).length
+  const creditEntries= dataRows.filter((r: any) => Number(r.credit) > 0).length
+  const lastTxDate   = dataRows.length > 0 ? formatDisplayDate(dataRows[dataRows.length - 1]?.date_ad, dateMode) : '—'
+  const netMovement  = totalDr - totalCr
 
   const filteredRows = useMemo(() => {
     let r = rows
@@ -330,10 +554,19 @@ export default function LedgerPage() {
   const totalPages = Math.ceil(filteredRows.length / rowsPerPage)
   const pagedRows  = filteredRows.slice((page - 1) * rowsPerPage, page * rowsPerPage)
 
-  // Party type badge colours — translucent, works on light and dark
-  const partyBadgeStyle = partyType === 'Supplier'
+  // Header badge colours — translucent, works on light and dark
+  const partyBadgeStyle = ledgerData?.partyType === 'Supplier'
     ? { bg: 'rgba(139,92,246,0.12)', color: '#8b5cf6', border: 'rgba(139,92,246,0.25)' }
     : { bg: 'rgba(59,130,246,0.12)', color: '#3b82f6', border: 'rgba(59,130,246,0.25)' }
+
+  const ACCOUNT_TYPE_STYLE: Record<string, { bg: string; color: string; border: string }> = {
+    asset:     { bg: 'rgba(59,130,246,0.12)',  color: '#3b82f6', border: 'rgba(59,130,246,0.25)' },
+    liability: { bg: 'rgba(139,92,246,0.12)',  color: '#8b5cf6', border: 'rgba(139,92,246,0.25)' },
+    income:    { bg: 'rgba(16,185,129,0.12)',  color: '#10b981', border: 'rgba(16,185,129,0.25)' },
+    expense:   { bg: 'rgba(239,68,68,0.12)',   color: '#ef4444', border: 'rgba(239,68,68,0.25)'  },
+    equity:    { bg: 'rgba(245,158,11,0.12)',  color: '#f59e0b', border: 'rgba(245,158,11,0.25)' },
+  }
+  const accountBadgeStyle = ACCOUNT_TYPE_STYLE[ledgerData?.accountType] ?? ACCOUNT_TYPE_STYLE.asset
 
   const balColor = closingBal > 0 ? 'var(--green)' : closingBal < 0 ? 'var(--red)' : 'var(--text-3)'
 
@@ -345,22 +578,14 @@ export default function LedgerPage() {
         style={{ ...CARD, padding: '18px 20px', marginBottom: 16 }}
       >
         <div className="ldg-filter-row" style={{ display: 'flex', alignItems: 'flex-end', gap: 12, flexWrap: 'wrap' }}>
-          {/* Party */}
-          <div className="ldg-party-field" style={{ flex: 1, minWidth: 200 }}>
-            <label style={LABEL_STYLE}><Building2 size={10} /> Party</label>
-            <select className="erp-input" style={{ width: '100%' }} value={partyId}
-              onChange={e => { setPartyId(e.target.value); setLedgerData(null); setError('') }}>
-              <option value="">Select customer or supplier…</option>
-              {['Customer', 'Supplier'].map(type => {
-                const group = parties.filter((p: any) => p._type === type)
-                if (!group.length) return null
-                return (
-                  <optgroup key={type} label={`── ${type}s ──`}>
-                    {group.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                  </optgroup>
-                )
-              })}
-            </select>
+          {/* Account / Party selector */}
+          <div className="ldg-party-field" style={{ flex: 1, minWidth: 240 }}>
+            <label style={LABEL_STYLE}><Building2 size={10} /> Account</label>
+            <AccountLedgerSelector
+              categories={categories}
+              value={entity}
+              onChange={e => { setEntity(e); setLedgerData(null); setError('') }}
+            />
           </div>
 
           {/* Date inputs */}
@@ -378,7 +603,7 @@ export default function LedgerPage() {
             <label style={LABEL_STYLE}><SlidersHorizontal size={10} /> Tx Type</label>
             <select className="erp-input" style={{ width: '100%' }} value={txFilter} onChange={e => { setTxFilter(e.target.value); setPage(1) }}>
               <option value="">All Types</option>
-              {['SALES', 'PURCHASE', 'RECEIPT', 'PAYMENT', 'RETURN', 'opening'].map(t => (
+              {['SALES', 'PURCHASE', 'RECEIPT', 'PAYMENT', 'RETURN', 'JOURNAL', 'CONTRA', 'opening'].map(t => (
                 <option key={t} value={t}>{t.charAt(0) + t.slice(1).toLowerCase()}</option>
               ))}
             </select>
@@ -386,9 +611,9 @@ export default function LedgerPage() {
 
           {/* Actions */}
           <div className="ldg-actions" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button disabled={!partyId || loading} onClick={generate}
+            <button disabled={!entity || loading} onClick={generate}
               className="ldg-generate-btn"
-              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7, height: 35, padding: '0 20px', fontSize: 13, fontWeight: 700, borderRadius: 9, color: '#fff', border: 'none', cursor: !partyId || loading ? 'not-allowed' : 'pointer', background: 'linear-gradient(135deg,#2563eb,#1d4ed8)', boxShadow: '0 2px 10px rgba(37,99,235,.35)', opacity: !partyId || loading ? 0.55 : 1 }}>
+              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7, height: 35, padding: '0 20px', fontSize: 13, fontWeight: 700, borderRadius: 9, color: '#fff', border: 'none', cursor: !entity || loading ? 'not-allowed' : 'pointer', background: 'linear-gradient(135deg,#2563eb,#1d4ed8)', boxShadow: '0 2px 10px rgba(37,99,235,.35)', opacity: !entity || loading ? 0.55 : 1 }}>
               {loading ? <RefreshCw size={13} className="animate-spin" /> : <Search size={13} />}
               Show Ledger
             </button>
@@ -396,7 +621,7 @@ export default function LedgerPage() {
             {rows.length > 0 && (
               <>
                 <SecBtn onClick={handlePrint}><Printer size={13} /> Print</SecBtn>
-                <SecBtn onClick={() => downloadCSV(rows, `ledger-${party?.name || partyId}`)}><Download size={13} /> Export</SecBtn>
+                <SecBtn onClick={() => downloadCSV(rows, `ledger-${ledgerData?.name || entity?.name || 'account'}`)}><Download size={13} /> Export</SecBtn>
               </>
             )}
           </div>
@@ -418,8 +643,8 @@ export default function LedgerPage() {
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
           style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '90px 0', textAlign: 'center' }}>
           <div style={{ width: 72, height: 72, borderRadius: 20, background: 'var(--brand-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 36, marginBottom: 16 }}>📒</div>
-          <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text-2)', marginBottom: 6 }}>Select a Party to View Ledger</div>
-          <div style={{ fontSize: 13, color: 'var(--text-3)' }}>Choose a customer or supplier and click <strong>Show Ledger</strong></div>
+          <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text-2)', marginBottom: 6 }}>Select an Account to View Ledger</div>
+          <div style={{ fontSize: 13, color: 'var(--text-3)' }}>Choose any account, customer, or supplier and click <strong>Show Ledger</strong></div>
         </motion.div>
       )}
 
@@ -428,7 +653,7 @@ export default function LedgerPage() {
         {(rows.length > 0 || loading) && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
 
-            {/* Party header */}
+            {/* Account/Party header */}
             <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}
               style={{ ...CARD, overflow: 'hidden' }}>
               <div className="ldg-party-header-row" style={{ display: 'flex', flexWrap: 'wrap' }}>
@@ -436,21 +661,35 @@ export default function LedgerPage() {
                 <div className="ldg-info-panel" style={{ flex: 1, minWidth: 260, padding: '20px 22px', borderRight: '1px solid var(--border)' }}>
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
                     <div style={{ width: 52, height: 52, borderRadius: 14, background: 'linear-gradient(135deg,#3b82f6,#1d4ed8)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: 20, flexShrink: 0 }}>
-                      {party?.name?.[0]?.toUpperCase() ?? '?'}
+                      {ledgerData?.name?.[0]?.toUpperCase() ?? '?'}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
                         <h2 style={{ fontWeight: 800, fontSize: 16, color: 'var(--text)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {party?.name ?? '—'}
+                          {ledgerData?.name ?? '—'}
                         </h2>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', padding: '2px 10px', borderRadius: 99, fontSize: 11, fontWeight: 700, background: partyBadgeStyle.bg, color: partyBadgeStyle.color, border: `1px solid ${partyBadgeStyle.border}` }}>
-                          {partyType === 'Customer' ? '👤' : '🏭'} {partyType}
-                        </span>
+                        {ledgerData?.kind === 'party' ? (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', padding: '2px 10px', borderRadius: 99, fontSize: 11, fontWeight: 700, background: partyBadgeStyle.bg, color: partyBadgeStyle.color, border: `1px solid ${partyBadgeStyle.border}` }}>
+                            {ledgerData.partyType === 'Customer' ? '👤' : '🏭'} {ledgerData.partyType}
+                          </span>
+                        ) : (
+                          <>
+                            {ledgerData?.code && (
+                              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, color: 'var(--text-3)', background: 'var(--surface-2)', padding: '2px 8px', borderRadius: 6 }}>
+                                {ledgerData.code}
+                              </span>
+                            )}
+                            <span style={{ display: 'inline-flex', alignItems: 'center', padding: '2px 10px', borderRadius: 99, fontSize: 11, fontWeight: 700, textTransform: 'capitalize', background: accountBadgeStyle.bg, color: accountBadgeStyle.color, border: `1px solid ${accountBadgeStyle.border}` }}>
+                              {ledgerData?.accountType}
+                            </span>
+                          </>
+                        )}
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 16, fontSize: 11, color: 'var(--text-3)', flexWrap: 'wrap' }}>
-                        {partyPhone && <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Phone size={11} />{partyPhone}</span>}
-                        {partyPan   && <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Hash size={11} />PAN: {partyPan}</span>}
-                        {summary    && <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><CheckCircle size={11} style={{ color: 'var(--green)' }} />Source: {summary.source === 'accounting' ? 'Vouchers' : 'Transactions'}</span>}
+                        {ledgerData?.kind === 'party' && ledgerData?.phone && <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Phone size={11} />{ledgerData.phone}</span>}
+                        {ledgerData?.kind === 'party' && ledgerData?.pan_no && <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Hash size={11} />PAN: {ledgerData.pan_no}</span>}
+                        {ledgerData?.kind === 'account' && ledgerData?.subType && <span style={{ display: 'flex', alignItems: 'center', gap: 4, textTransform: 'capitalize' }}><Hash size={11} />{ledgerData.subType.replace(/_/g, ' ')}</span>}
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><CheckCircle size={11} style={{ color: 'var(--green)' }} />From Chart of Accounts &amp; Journal Entries</span>
                       </div>
                     </div>
                   </div>
@@ -466,19 +705,19 @@ export default function LedgerPage() {
               </div>
             </motion.div>
 
-            {/* KPI row */}
+            {/* KPI row — Opening / Debit / Credit / Closing, per spec */}
             <div id="ldg-no-print" className="ldg-kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
               {loading ? (
                 Array.from({ length: 4 }).map((_, i) => <SkeletonKpi key={i} />)
               ) : (
                 <>
                   <KpiCard icon={<DollarSign size={18} />} iconBg="rgba(59,130,246,0.1)" iconColor="#3b82f6" label="Opening Balance" value={openingBal} sub="Start of period" delay={0.05} />
-                  <KpiCard icon={<FileText size={18} />} iconBg="rgba(139,92,246,0.1)" iconColor="#8b5cf6" label="Total Sales" value={totalSales} sub={`${salesRows.length} invoice${salesRows.length !== 1 ? 's' : ''}`} delay={0.1} />
-                  <KpiCard icon={<Receipt size={18} />} iconBg="rgba(16,185,129,0.1)" iconColor="#10b981" label="Total Received" value={totalReceipts} sub={`${receiptRows.length} receipt${receiptRows.length !== 1 ? 's' : ''}`} delay={0.15} />
+                  <KpiCard icon={<TrendingDown size={18} />} iconBg="rgba(239,68,68,0.1)" iconColor="#ef4444" label="Total Debit" value={totalDr} sub={`${debitEntries} entr${debitEntries === 1 ? 'y' : 'ies'}`} delay={0.1} />
+                  <KpiCard icon={<TrendingUp size={18} />} iconBg="rgba(16,185,129,0.1)" iconColor="#10b981" label="Total Credit" value={totalCr} sub={`${creditEntries} entr${creditEntries === 1 ? 'y' : 'ies'}`} delay={0.15} />
                   <KpiCard icon={<BarChart3 size={18} />}
                     iconBg={closingBal >= 0 ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)'}
                     iconColor={closingBal >= 0 ? '#10b981' : '#ef4444'}
-                    label="Current Balance" value={closingBal} sub="End of period" valColor={balColor} delay={0.2} />
+                    label="Closing Balance" value={closingBal} sub="End of period" valColor={balColor} delay={0.2} />
                 </>
               )}
             </div>
@@ -486,12 +725,12 @@ export default function LedgerPage() {
             {/* Secondary tiles */}
             <div id="ldg-no-print" className="ldg-stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 10 }}>
               {[
-                { icon: <Activity size={13} style={{ color: 'var(--text-3)' }} />,   label: 'Transactions', value: dataRows.length },
-                { icon: <FileText  size={13} style={{ color: '#3b82f6' }} />,         label: 'Invoices',     value: salesRows.length },
-                { icon: <CreditCard size={13} style={{ color: '#10b981' }} />,        label: 'Receipts',     value: receiptRows.length },
-                { icon: <TrendingUp size={13} style={{ color: '#8b5cf6' }} />,        label: 'Avg Invoice',  value: `₹${fmt(avgInvoice)}` },
-                { icon: <Clock size={13} style={{ color: '#f59e0b' }} />,             label: 'Last Tx',      value: lastTxDate },
-                { icon: <Package size={13} style={{ color: '#ef4444' }} />,           label: 'Total Debit',  value: `₹${fmt(totalDr)}` },
+                { icon: <Activity size={13} style={{ color: 'var(--text-3)' }} />,   label: 'Transactions',   value: dataRows.length },
+                { icon: <TrendingDown size={13} style={{ color: '#ef4444' }} />,      label: 'Debit Entries',  value: debitEntries },
+                { icon: <TrendingUp size={13} style={{ color: '#10b981' }} />,        label: 'Credit Entries', value: creditEntries },
+                { icon: <FileText size={13} style={{ color: '#3b82f6' }} />,          label: 'Total Debit',    value: `₹${fmt(totalDr)}` },
+                { icon: <Receipt size={13} style={{ color: '#8b5cf6' }} />,           label: 'Total Credit',   value: `₹${fmt(totalCr)}` },
+                { icon: <Clock size={13} style={{ color: '#f59e0b' }} />,             label: 'Last Tx',        value: lastTxDate },
               ].map((s, i) => (
                 <StatTile key={i} icon={s.icon} label={s.label} value={s.value} loading={loading} delay={0.25 + i * 0.04} />
               ))}
@@ -551,7 +790,7 @@ export default function LedgerPage() {
                         onMouseLeave={e => { (e.currentTarget as HTMLTableRowElement).style.background = isOpening ? 'var(--surface-2)' : i % 2 === 0 ? 'transparent' : 'var(--surface-2)' }}
                       >
                         <td style={{ padding: '9px 14px', fontFamily: 'var(--font-mono)', fontSize: 12, whiteSpace: 'nowrap', color: 'var(--text-3)' }}>
-                          {isOpening ? <span style={{ fontStyle: 'italic', fontSize: 11 }}>Opening</span> : (e.date_ad ? fmtDate(e.date_ad) : e.date || '—')}
+                          {isOpening ? <span style={{ fontStyle: 'italic', fontSize: 11 }}>Opening</span> : (e.date_ad ? formatDisplayDate(e.date_ad, dateMode) : e.date || '—')}
                         </td>
                         <td style={{ padding: '9px 14px', fontFamily: 'var(--font-mono)', fontSize: 12, color: '#3b82f6', fontWeight: 600 }}>
                           {e.reference || '—'}
@@ -608,7 +847,7 @@ export default function LedgerPage() {
                       {/* Top: date + type badge */}
                       <div className="ldg-mc-top">
                         <span className="ldg-mc-date">
-                          {isOpening ? 'Opening Balance' : (e.date_ad ? fmtDate(e.date_ad) : e.date || '—')}
+                          {isOpening ? 'Opening Balance' : (e.date_ad ? formatDisplayDate(e.date_ad, dateMode) : e.date || '—')}
                         </span>
                         {e.type && <TxBadge type={e.type} />}
                       </div>
@@ -703,7 +942,7 @@ export default function LedgerPage() {
           style={{ ...CARD, padding: '64px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
           <div style={{ width: 60, height: 60, borderRadius: 18, background: 'var(--surface-3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 30, marginBottom: 14 }}>📭</div>
           <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text-2)', marginBottom: 6 }}>No Transactions Found</div>
-          <div style={{ fontSize: 13, color: 'var(--text-3)' }}>No entries match the selected date range and party</div>
+          <div style={{ fontSize: 13, color: 'var(--text-3)' }}>No entries match the selected date range and account</div>
         </motion.div>
       )}
     </div>

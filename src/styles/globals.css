@@ -59,6 +59,15 @@
   --purple: #8B5CF6; --purple-50: #faf5ff;
   --pink:   #EC4899; --pink-50:   #fdf2f8;
 
+  /* Sidebar "N low stock" alert chip — isolated from the shared --amber /
+     --amber-50 tokens above (those stay untouched everywhere else: badges,
+     .alert-warning, dashboard alert cards, etc.) so only this one sidebar
+     element can be re-themed per light/dark without side effects. */
+  --sidebar-lowstock-bg:       var(--amber-50);
+  --sidebar-lowstock-border:   transparent;
+  --sidebar-lowstock-border-w: 0px;
+  --sidebar-lowstock-fg:       var(--amber);
+
   /* Surfaces — LIGHT MODE */
   --bg:        #f1f5f9;
   --surface:   #ffffff;
@@ -151,6 +160,11 @@
   --sidebar-shadow:    0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.5);
   --sidebar-active-shadow: inset 0 0 0 1px rgba(59,130,246,.28), 0 0 20px -6px rgba(37,99,235,.55);
   --sidebar-scrollbar-thumb-hover: rgba(255,255,255,.18);
+
+  --sidebar-lowstock-bg:       rgba(245,158,11,.12);
+  --sidebar-lowstock-border:   rgba(245,158,11,.28);
+  --sidebar-lowstock-border-w: 1px;
+  --sidebar-lowstock-fg:       #D97706;
 }
 
 /* ─────────────────────────────────────────────
@@ -4513,6 +4527,165 @@ bsp-row--disabled { cursor: not-allowed; opacity: .55; }
    LEDGER PAGE — MOBILE & TABLET RESPONSIVENESS
    Scoped with .ldg- prefix. All rules additive.
 ══════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Account/Party ledger selector (grouped, searchable) ─────────────────── */
+.ldg-acct-select { position: relative; width: 100%; }
+
+.ldg-acct-select-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  cursor: pointer;
+  text-align: left;
+}
+.ldg-acct-select-value {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+}
+.ldg-acct-select-code {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-3);
+  background: var(--surface-2);
+  padding: 1px 6px;
+  border-radius: 5px;
+  flex-shrink: 0;
+}
+.ldg-acct-select-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.ldg-acct-select-placeholder { color: var(--text-4); }
+.ldg-acct-select-tag {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 99px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.ldg-acct-select-tag.is-customer { background: rgba(59,130,246,.12);  color: #3b82f6; }
+.ldg-acct-select-tag.is-supplier { background: rgba(139,92,246,.12); color: #8b5cf6; }
+.ldg-acct-select-chevron { color: var(--text-4); flex-shrink: 0; transition: transform .15s; }
+
+.ldg-acct-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: var(--z-dropdown);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  max-height: 360px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.ldg-acct-search-wrap {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.ldg-acct-search-icon { color: var(--text-4); flex-shrink: 0; }
+.ldg-acct-search-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 13px;
+  color: var(--text);
+}
+.ldg-acct-search-input::placeholder { color: var(--text-4); }
+.ldg-acct-search-clear {
+  display: flex;
+  align-items: center;
+  color: var(--text-4);
+  background: none;
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 2px;
+}
+.ldg-acct-results { padding: 4px 0; }
+.ldg-acct-empty {
+  padding: 24px 12px;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--text-4);
+}
+.ldg-acct-group { padding: 4px 0; }
+.ldg-acct-group + .ldg-acct-group { border-top: 1px solid var(--border); }
+.ldg-acct-group-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px 4px;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  font-family: var(--font-mono);
+}
+.ldg-acct-subgroup-label {
+  padding: 4px 12px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-4);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+.ldg-acct-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-2);
+  text-align: left;
+  min-width: 0;
+}
+.ldg-acct-item:hover { background: var(--surface-2); }
+.ldg-acct-item.is-active { background: var(--brand-light); color: var(--brand); }
+.ldg-acct-item-code {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-4);
+  flex-shrink: 0;
+  min-width: 46px;
+}
+.ldg-acct-item-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ldg-acct-item-check { color: var(--brand); flex-shrink: 0; margin-left: auto; }
+
+@media (max-width: 768px) {
+  .ldg-acct-panel { max-height: 300px; }
+  .ldg-acct-select-name { max-width: 100%; }
+}
 
 /* ── Filter row: party / dates / type / actions ──────────────────────────── */
 .ldg-date-fields {

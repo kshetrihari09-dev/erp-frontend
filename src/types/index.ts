@@ -115,6 +115,36 @@ export interface Backup {
   updated_at:    string
 }
 
+/** One row from GET /accounting/ledger/:account_id (see reportingEngine.js `ledger()`). */
+export interface AccountLedgerRow {
+  entry_date:      string
+  event_type?:     string
+  period_ref?:     string
+  voucher_id?:      string
+  voucher_no?:      string
+  voucher_type?:    string
+  reference_no?:    string
+  account_id:       string
+  debit:            number
+  credit:           number
+  description?:     string
+  party_name?:      string
+  is_edited?:       boolean
+  running_balance:  number
+}
+
+export interface AccountLedgerResponse {
+  account:          Account
+  opening_balance:  number
+  closing_balance:  number
+  total_debit:      number
+  total_credit:     number
+  rows:             AccountLedgerRow[]
+  total:            number
+  page:             number
+  limit:            number
+}
+
 export interface AuthState {
   token:           string | null
   user:            User | null
@@ -307,9 +337,9 @@ export type VoucherStatus = 'draft' | 'posted' | 'cancelled' | 'reversed'
 
 export interface Account {
   id:           string
-  account_code: string
+  code:         string
   name:         string
-  account_type: AccountType
+  type:         AccountType
   sub_type?:    string
   is_group:     boolean
   parent_id?:   string

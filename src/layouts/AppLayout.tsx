@@ -323,7 +323,11 @@ export default function AppLayout() {
             {alerts.lowStock > 0 && (
               <div
                 className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg mb-1 font-medium"
-                style={{ color: 'var(--amber)', background: 'var(--amber-50)' }}
+                style={{
+                  color:      'var(--sidebar-lowstock-fg)',
+                  background: 'var(--sidebar-lowstock-bg)',
+                  border:     'var(--sidebar-lowstock-border-w) solid var(--sidebar-lowstock-border)',
+                }}
               >
                 <AlertTriangle size={12}/> {alerts.lowStock} low stock
               </div>
