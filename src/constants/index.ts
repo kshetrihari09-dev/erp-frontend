@@ -127,7 +127,6 @@ export const PATHS = {
   PRODUCTS:   '/products',
   MANUFACTURERS: '/manufacturers',
   STOCK:      '/stock',
-  RECEIVES:   '/receives',
   CUSTOMERS:  '/customers',
   SUPPLIERS:  '/suppliers',
   ACCOUNTING:    '/accounting',

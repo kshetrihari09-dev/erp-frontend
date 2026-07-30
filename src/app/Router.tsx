@@ -17,7 +17,6 @@ const PurchaseReturnPage = lazy(() => import('@/modules/billing/PurchaseReturnPa
 const ProductsPage = lazy(() => import('@/modules/inventory/ProductsPage'))
 const ManufacturersPage = lazy(() => import('@/modules/inventory/ManufacturersPage'))
 const StockPage    = lazy(() => import('@/modules/inventory/StockPage'))
-const ReceivePage  = lazy(() => import('@/modules/inventory/ReceivePage'))
 const CustomersPage= lazy(() => import('@/modules/users/CustomersPage'))
 const SuppliersPage= lazy(() => import('@/modules/users/SuppliersPage'))
 const AccountingPage=lazy(() => import('@/modules/accounting/AccountingPage'))
@@ -68,7 +67,6 @@ export default function Router() {
             <Route path="manufacturers" element={<ManufacturersPage />} />
             <Route path="stock"        element={<StockPage />} />
             <Route path="stock-report" element={<StockPage />} />
-            <Route path="receives"     element={<ReceivePage />} />
 
             {/* Parties */}
             <Route path="customers"    element={<CustomersPage />} />

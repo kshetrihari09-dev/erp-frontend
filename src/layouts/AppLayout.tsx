@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, ShoppingCart, ShoppingBag, RotateCcw, Package,
-  Download, Users, Truck, BookOpen, BookCopy,
+  Users, Truck, BookOpen, BookCopy,
   FileBarChart, Settings, LogOut, Building2, CalendarDays, Moon,
   Sun, Menu, X, AlertTriangle, Bell, Search, ChevronRight, Home,
   PackageX, CalendarClock,
@@ -40,7 +40,6 @@ const NAV = [
 
   { section: 'INVENTORY' },
   { to: PATHS.PRODUCTS,   label: 'Products',       icon: <Package         size={20} strokeWidth={1.8}/>, alertKey: 'lowStock' },
-  { to: PATHS.RECEIVES,   label: 'Receive Stock',  icon: <Download        size={20} strokeWidth={1.8}/> },
 
   { section: 'ACCOUNTING' },
   { to: PATHS.ACCOUNTING,    label: 'Accounting',     icon: <BookOpen           size={20} strokeWidth={1.8}/> },
@@ -175,7 +174,6 @@ export default function AppLayout() {
     [PATHS.PURCHASE_RETURNS]: 'Purchase Returns',
     [PATHS.PRODUCTS]:   'Products',
     [PATHS.STOCK]:      'Stock Report',
-    [PATHS.RECEIVES]:   'Receive Stock',
     [PATHS.CUSTOMERS]:  'Customers',
     [PATHS.SUPPLIERS]:  'Suppliers',
     [PATHS.ACCOUNTING]:    'Accounting',

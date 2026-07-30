@@ -140,13 +140,6 @@ export const purchaseReturnsAPI = {
   create:        (data: Params)    => http.post('/returns/purchase', data),
 }
 
-// ─── Receives (Inventory In) ──────────────────────────────────────────────────
-export const receivesAPI = {
-  list:   (params?: Params) => http.get('/receives', { params }),
-  create: (data: Params)    => http.post('/receives', data),
-  delete: (id: string)      => http.delete(`/receives/${id}`),
-}
-
 // ─── Stock ────────────────────────────────────────────────────────────────────
 export const stockAPI = {
   list:    (params?: Params) => http.get('/stock', { params }),

@@ -3,7 +3,7 @@ import type { UseQueryOptions } from '@tanstack/react-query'
 import { QK, DEFAULT_PAGE_SIZE } from '@/constants'
 import {
   productsAPI, salesAPI, purchasesAPI, partiesAPI, accountingAPI,
-  reportsAPI, stockAPI, settingsAPI, returnsAPI, receivesAPI, dateAPI,
+  reportsAPI, stockAPI, settingsAPI, returnsAPI, dateAPI,
 } from '@/services/api'
 import * as manufacturersService from '@/services/manufacturers'
 import type { ManufacturerInput } from '@/services/manufacturers'

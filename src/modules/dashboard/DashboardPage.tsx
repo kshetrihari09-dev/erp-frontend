@@ -5,7 +5,7 @@ import { motion } from 'framer-motion'
 import {
   FileText, Package, AlertTriangle, TrendingUp, TrendingDown,
   DollarSign, ShoppingCart, ShoppingBag, Users,
-  BarChart2, Clock, ArrowUpRight, Zap, Download, Activity,
+  BarChart2, Clock, ArrowUpRight, Zap, Activity,
 } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -576,7 +576,6 @@ export default function DashboardPage() {
                   <QACard label="Purchase" path={PATHS.PURCHASE}  color="#8B5CF6" icon={<ShoppingBag size={16} strokeWidth={1.8}/>} delay={.24}/>
                   <QACard label="Customer" path={PATHS.CUSTOMERS} color="#0D9488" icon={<Users       size={16} strokeWidth={1.8}/>} delay={.26}/>
                   <QACard label="Product"  path={PATHS.PRODUCTS}  color="#10B981" icon={<Package     size={16} strokeWidth={1.8}/>} delay={.28}/>
-                  <QACard label="Receive"  path={PATHS.RECEIVES}  color="#F59E0B" icon={<Download    size={16} strokeWidth={1.8}/>} delay={.30}/>
                   <QACard label="Reports"  path={PATHS.REPORTS}   color="#EF4444" icon={<BarChart2   size={16} strokeWidth={1.8}/>} delay={.32}/>
                 </div>
               </div>
