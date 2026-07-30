@@ -93,7 +93,7 @@ export default function AccountsTab({ onCount }: { onCount?: (count: number) => 
         <Button variant="primary" icon={<Plus size={14}/>} onClick={() => setModal(true)} className="acc-filter-btn">New Account</Button>
       </div>
       <div className="table-card">
-        <div className="overflow-x-auto">
+        <div className="acc-desktop-table overflow-x-auto">
           <table className="erp-table">
             <thead>
               <tr>
@@ -124,6 +124,36 @@ export default function AccountsTab({ onCount }: { onCount?: (count: number) => 
               }
             </tbody>
           </table>
+        </div>
+
+        <div className="acc-mobile-list">
+          {isLoading ? (
+            <div className="acc-mobile-skel-wrap">
+              {Array.from({ length: 5 }).map((_, i) => <div key={i} className="acc-mobile-card-skel" />)}
+            </div>
+          ) : accounts.length === 0 ? (
+            <Empty message="No accounts found — create one to get started" />
+          ) : accounts.map(a => (
+            <div key={a.id} className="acc-mobile-card">
+              <div className="acc-mc-top">
+                <div className="acc-mc-line">
+                  <span className="acc-mc-no">{a.code}</span>
+                  <span className="acc-mc-party" style={{ fontWeight: 600, color: 'var(--text)' }}>{a.name}</span>
+                </div>
+                <span className="acc-mc-amount">{fmt(a.balance ?? 0)}</span>
+              </div>
+              <div className="acc-mc-sub">
+                <div className="acc-mc-chips">
+                  <span className="badge badge-blue">{a.type}</span>
+                  {a.is_group
+                    ? <span className="badge badge-purple">Group</span>
+                    : <span className="badge badge-muted">Ledger</span>
+                  }
+                </div>
+                <span className="acc-mc-date">{a.sub_type || '—'}</span>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
       <Modal open={modal} onClose={() => setModal(false)} title="New Account" size="lg">

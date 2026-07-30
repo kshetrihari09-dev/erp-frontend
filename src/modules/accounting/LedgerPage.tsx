@@ -460,11 +460,18 @@ export default function LedgerPage() {
         const r = await accountingAPI.ledger(entity.id, { date_from: dateFrom, date_to: dateTo, limit: 2000 })
         const payload = (r.data?.data ?? r.data) as any
         if (!payload) { setError('No ledger data returned'); return }
+        // Cash in Hand / Bank Account ledgers: show the party (customer/supplier)
+        // involved in each transaction instead of the voucher narration.
+        // All other account ledgers keep the existing narration-first behavior.
+        const acctSubType = payload.account?.sub_type ?? entity.sub_type
+        const isCashOrBank = acctSubType === 'cash' || acctSubType === 'bank'
         const rows = (payload.rows || []).map((row: any) => ({
           date_ad:         row.entry_date,
           type:            row.voucher_type || row.event_type || 'JOURNAL',
           reference:       row.voucher_no || row.reference_no || '—',
-          description:     row.description || row.party_name || '',
+          description:     isCashOrBank
+            ? (row.party_name || row.description || '')
+            : (row.description || row.party_name || ''),
           debit:           row.debit,
           credit:          row.credit,
           running_balance: row.running_balance,
