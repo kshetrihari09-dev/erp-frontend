@@ -483,7 +483,7 @@ export default function SignupPage() {
             background: 'linear-gradient(135deg,#fff 30%,#a5b4fc 100%)',
             WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
           }}>Create your account</h1>
-          <p style={{ color: 'rgba(165,180,252,0.55)', fontSize: 13, margin: 0 }}>Set up your MediERP in minutes</p>
+          <p style={{ color: 'rgba(165,180,252,0.55)', fontSize: 13, margin: 0 }}>Set up your Byapar in minutes</p>
         </div>
 
         {/* Toast */}

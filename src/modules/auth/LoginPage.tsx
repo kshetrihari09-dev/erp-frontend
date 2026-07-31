@@ -139,7 +139,7 @@ function LeftPanel() {
               marginTop:22, marginBottom:5, fontSize:34, fontWeight:800, letterSpacing:'-0.5px',
               background:'linear-gradient(135deg, #fff 30%, #a5b4fc 100%)',
               WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', backgroundClip:'text',
-            }}>MediERP</h1>
+            }}>Byapar</h1>
             <p style={{ color:'rgba(165,180,252,0.65)', fontSize:13, fontWeight:500, letterSpacing:'0.4px' }}>Pharma + Accounting System</p>
           </motion.div>
         </motion.div>
@@ -390,7 +390,7 @@ export default function LoginPage() {
                 <rect x="4" y="12" width="24" height="8" rx="2.5" fill="white"/>
               </svg>
             </div>
-            <h1 style={{ fontSize:24, fontWeight:800, background:'linear-gradient(135deg,#fff,#a5b4fc)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', backgroundClip:'text', marginBottom:4 }}>MediERP</h1>
+            <h1 style={{ fontSize:24, fontWeight:800, background:'linear-gradient(135deg,#fff,#a5b4fc)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', backgroundClip:'text', marginBottom:4 }}>Byapar</h1>
             <p style={{ color:'rgba(165,180,252,0.6)', fontSize:13 }}>Pharma + Accounting System</p>
           </div>
 
@@ -422,7 +422,7 @@ export default function LoginPage() {
                 <motion.div key="pw" initial={{ opacity:0, y:10 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, y:-10 }} transition={{ duration:0.18 }} style={{ padding:'24px 24px 20px' }}>
                   <div style={{ marginBottom:22 }}>
                     <h2 style={{ color:'#fff', fontSize:18, fontWeight:700, marginBottom:4 }}>Welcome back</h2>
-                    <p style={{ color:'rgba(255,255,255,0.32)', fontSize:13 }}>Sign in to your MediERP account</p>
+                    <p style={{ color:'rgba(255,255,255,0.32)', fontSize:13 }}>Sign in to your Byapar account</p>
                   </div>
 
                   {pwErr && <Err msg={pwErr}/>}

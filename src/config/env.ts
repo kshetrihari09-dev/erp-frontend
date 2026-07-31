@@ -11,7 +11,7 @@
 // ── Raw env values ─────────────────────────────────────────────────────────────
 const env = {
   API_BASE_URL:    import.meta.env.VITE_API_BASE_URL    as string,
-  APP_NAME:        import.meta.env.VITE_APP_NAME        as string  || 'MediERP',
+  APP_NAME:        import.meta.env.VITE_APP_NAME        as string  || 'Byapar',
   APP_ENV:         import.meta.env.VITE_APP_ENV         as string  || 'development',
   SHOW_DEV_BADGE:  import.meta.env.VITE_SHOW_DEV_BADGE  === 'true',
   ENABLE_API_LOGS: import.meta.env.VITE_ENABLE_API_LOGS === 'true',

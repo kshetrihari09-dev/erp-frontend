@@ -190,7 +190,7 @@ export default function DashboardPage() {
                 {greeting}, {user?.name?.split(' ')[0] || 'there'} 👋
               </div>
               <div className="dash-greeting-sub" style={{ fontSize: 11, marginTop: 2 }}>
-                {company?.name || 'MediERP'} · {new Date().toLocaleDateString('en-NP', { dateStyle: 'medium' })}
+                {company?.name || 'Byapar'} · {new Date().toLocaleDateString('en-NP', { dateStyle: 'medium' })}
               </div>
             </div>
 

@@ -1,4 +1,4 @@
-# MediERP — Security & HTTPS Deployment Guide
+# Byapar — Security & HTTPS Deployment Guide
 
 ## What changed and why
 
