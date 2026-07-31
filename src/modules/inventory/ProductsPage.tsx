@@ -1,10 +1,11 @@
 import { useState, lazy, Suspense } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Plus, Package, ScanLine, Type, Boxes } from 'lucide-react'
+import { Plus, Package, ScanLine, Type, Boxes, Download } from 'lucide-react'
 import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct } from '@/hooks/useQuery'
 import { Button, Modal, Badge, Pagination, SkeletonRows, Empty, SearchInput, ConfirmDialog } from '@/components/ui'
 import ManufacturerSelect from '@/components/forms/ManufacturerSelect'
+import ExportProductsModal from './ExportProductsModal'
 import { useDebounce } from '@/hooks/useDebounce'
 import { fmt } from '@/utils'
 import { PRODUCT_UNITS } from '@/constants'
@@ -215,6 +216,7 @@ export default function ProductsPage() {
   const [modal,   setModal]   = useState(false)
   const [editing, setEditing] = useState<Product | null>(null)
   const [delId,   setDelId]   = useState<string | null>(null)
+  const [exportOpen, setExportOpen] = useState(false)
   const del = useDeleteProduct()
 
   const { data, isLoading } = useProducts({ page, limit: 20, search: search || undefined })
@@ -225,9 +227,14 @@ export default function ProductsPage() {
     <div>
       <div className="page-header">
         <div><div className="page-breadcrumb">Inventory</div><h1 className="page-title">Products</h1></div>
-        <Button variant="primary" icon={<Plus size={14}/>} onClick={() => { setEditing(null); setModal(true) }}>
-          New Product
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="secondary" icon={<Download size={14}/>} onClick={() => setExportOpen(true)}>
+            Export
+          </Button>
+          <Button variant="primary" icon={<Plus size={14}/>} onClick={() => { setEditing(null); setModal(true) }}>
+            New Product
+          </Button>
+        </div>
       </div>
 
       <div className="flex items-center gap-2 mb-3">
@@ -364,6 +371,13 @@ export default function ProductsPage() {
         onConfirm={() => del.mutate(delId!)}
         title="Delete Product" message="This will permanently delete the product. Continue?"
         danger
+      />
+
+      <ExportProductsModal
+        open={exportOpen}
+        onClose={() => setExportOpen(false)}
+        search={search}
+        filteredCount={total}
       />
     </div>
   )
