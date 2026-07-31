@@ -1,11 +1,12 @@
 import { useState, lazy, Suspense } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Plus, Package, ScanLine, Type, Boxes, Download } from 'lucide-react'
+import { Plus, Package, ScanLine, Type, Boxes, Download, Upload } from 'lucide-react'
 import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct } from '@/hooks/useQuery'
 import { Button, Modal, Badge, Pagination, SkeletonRows, Empty, SearchInput, ConfirmDialog } from '@/components/ui'
 import ManufacturerSelect from '@/components/forms/ManufacturerSelect'
 import ExportProductsModal from './ExportProductsModal'
+import ImportProductsModal from './ImportProductsModal'
 import { useDebounce } from '@/hooks/useDebounce'
 import { fmt } from '@/utils'
 import { PRODUCT_UNITS } from '@/constants'
@@ -217,6 +218,7 @@ export default function ProductsPage() {
   const [editing, setEditing] = useState<Product | null>(null)
   const [delId,   setDelId]   = useState<string | null>(null)
   const [exportOpen, setExportOpen] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
   const del = useDeleteProduct()
 
   const { data, isLoading } = useProducts({ page, limit: 20, search: search || undefined })
@@ -228,6 +230,9 @@ export default function ProductsPage() {
       <div className="page-header">
         <div><div className="page-breadcrumb">Inventory</div><h1 className="page-title">Products</h1></div>
         <div className="flex items-center gap-2">
+          <Button variant="secondary" icon={<Upload size={14}/>} onClick={() => setImportOpen(true)}>
+            Import
+          </Button>
           <Button variant="secondary" icon={<Download size={14}/>} onClick={() => setExportOpen(true)}>
             Export
           </Button>
@@ -378,6 +383,11 @@ export default function ProductsPage() {
         onClose={() => setExportOpen(false)}
         search={search}
         filteredCount={total}
+      />
+
+      <ImportProductsModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
       />
     </div>
   )
