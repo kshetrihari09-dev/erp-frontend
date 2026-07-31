@@ -3,7 +3,7 @@ import type { ApiResponse, Company, User, Sale, SaleItem, Purchase, PurchaseItem
   Product, Party, Account, AccountDefault, Voucher, VoucherLine,
   VoucherPosting, PostingStatus, DashboardStats, PnLReport,
   TrialBalanceRow, LedgerEntry, StockBatch, InvoiceTemplate, FiscalYear, AuditLog,
-  CompanyPreferences, Backup, AccountLedgerResponse } from '@/types'
+  CompanyPreferences, Backup, AccountLedgerResponse, UserCompany } from '@/types'
 import type { ScannedProduct } from '@/types/scanner'
 
 type Params = Record<string, unknown>
@@ -65,6 +65,28 @@ export const authAPI = {
     http.post('/auth/add-contact', data),
   addPhone: (data: { phone_token: string }) =>
     http.post('/auth/add-phone', data),
+}
+
+// ─── Multi-Company ──────────────────────────────────────────────────────────
+export interface SwitchCompanyResponse {
+  token:         string
+  refresh_token: string
+  user:          User
+  company:       Company
+}
+
+export const companiesAPI = {
+  /** Companies the current user can access (with is_default / is_current flags). */
+  list: () => http.get<ApiResponse<UserCompany[]>>('/companies'),
+  create: (data: Partial<Company> & { make_default?: boolean }) =>
+    http.post<ApiResponse<Company>>('/companies', data),
+  update: (id: string, data: Partial<Company>) =>
+    http.put<ApiResponse<Company>>(`/companies/${id}`, data),
+  /** Re-issues a token scoped to the given company. Caller must swap the token in. */
+  switchTo: (id: string) =>
+    http.post<ApiResponse<SwitchCompanyResponse>>(`/companies/${id}/switch`),
+  setDefault: (id: string) =>
+    http.put<ApiResponse<{ id: string }>>(`/companies/${id}/default`),
 }
 
 // ─── Products ─────────────────────────────────────────────────────────────────

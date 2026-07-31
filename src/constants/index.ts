@@ -104,6 +104,7 @@ export const QK = {
   DASHBOARD:   'dashboard',
   REPORTS:     'reports',
   COMPANY:     'company',
+  COMPANIES:   'companies',
   USERS:       'users',
   TEMPLATES:   'templates',
   FISCAL_YEARS:'fiscal-years',

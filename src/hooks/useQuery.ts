@@ -3,7 +3,7 @@ import type { UseQueryOptions } from '@tanstack/react-query'
 import { QK, DEFAULT_PAGE_SIZE } from '@/constants'
 import {
   productsAPI, salesAPI, purchasesAPI, partiesAPI, accountingAPI,
-  reportsAPI, stockAPI, settingsAPI, returnsAPI, dateAPI,
+  reportsAPI, stockAPI, settingsAPI, returnsAPI, dateAPI, companiesAPI,
 } from '@/services/api'
 import * as manufacturersService from '@/services/manufacturers'
 import type { ManufacturerInput } from '@/services/manufacturers'
@@ -370,6 +370,15 @@ export function useCompanySettings() {
   return useQuery({
     queryKey: [QK.COMPANY],
     queryFn:  () => settingsAPI.company().then(unwrap),
+  })
+}
+
+// ─── Multi-Company ──────────────────────────────────────────────────────────
+export function useUserCompanies() {
+  return useQuery({
+    queryKey: [QK.COMPANIES],
+    queryFn:  () => companiesAPI.list().then(unwrap),
+    staleTime: 1000 * 30, // company list changes rarely; short stale time is enough
   })
 }
 
