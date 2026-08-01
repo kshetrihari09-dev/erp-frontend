@@ -245,11 +245,17 @@ export const accountingAPI = {
   lockPeriod:    (id: string) => http.post(`/accounting/periods/${id}/lock`, {}),
   unlockPeriod:  (id: string) => http.post(`/accounting/periods/${id}/unlock`, {}),
 
-  // Account Defaults — COA role mapping for PostingEngine
+  // Account Defaults — COA role mapping for PostingEngine (Engine Setup)
   accountDefaults:      ()                                    => http.get<ApiResponse<AccountDefault[]>>('/accounting/account-defaults'),
   setAccountDefault:    (data: { role: string; account_id: string; description?: string }) =>
     http.post<ApiResponse<AccountDefault>>('/accounting/account-defaults', data),
   deleteAccountDefault: (role: string)                       => http.delete(`/accounting/account-defaults/${role}`),
+  resetAccountDefault:  (role: string)                       =>
+    http.post<ApiResponse<AccountDefault>>(`/accounting/account-defaults/${role}/reset`, {}),
+  initializeAccountDefaults: ()                              =>
+    http.post<ApiResponse<{ created: Array<{ role: string; account_id: string; account_name: string }> }>>(
+      '/accounting/account-defaults/initialize', {},
+    ),
 
   // Voucher Postings — cross-reference between ops records and journal entries
   voucherPostings:  (params?: Params) => http.get<ApiResponse<VoucherPosting[]>>('/accounting/voucher-postings', { params }),

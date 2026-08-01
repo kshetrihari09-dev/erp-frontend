@@ -448,6 +448,11 @@ export interface AccountDefault {
   account_name: string
   account_type: AccountType
   sub_type?:    string
+  // Engine Setup auto-defaults
+  is_default:            boolean          // true = still using the system-assigned default
+  default_account_id?:   string | null    // the originally auto-assigned account, if any
+  default_account_code?: string | null
+  default_account_name?: string | null
 }
 
 export const ACCOUNT_DEFAULT_ROLES = [

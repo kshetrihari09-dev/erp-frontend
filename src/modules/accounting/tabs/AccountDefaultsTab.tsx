@@ -1,12 +1,21 @@
 /**
- * AccountDefaultsTab — Chart of Accounts Role Mapping
+ * AccountDefaultsTab — Engine Setup / Chart of Accounts Role Mapping
  *
- * Lets admins/accountants configure which ledger account to use for each
- * PostingEngine role (accounts_receivable, sales_revenue, cash, etc.).
+ * Every role here is pre-assigned a sensible default automatically when
+ * the company is created (see auth.js seedAccountDefaults / companies.js),
+ * so the ERP is usable immediately without any manual setup. Fields marked
+ * "Default" are still using that auto-assigned account.
  *
- * Until these are configured, Sales/Purchase/Returns save successfully but
- * create no journal entries. Once all required roles are mapped, every
- * subsequent transaction automatically flows through PostingEngine.
+ * Every field remains fully editable at any time — changing a mapping only
+ * affects future postings; existing vouchers and journal entries always
+ * keep the account they were originally posted against. "Reset to Default"
+ * restores the original auto-assigned account for a role.
+ *
+ * For companies that existed before this feature (so have no defaults yet),
+ * this page auto-runs a one-time, idempotent "initialize" pass on first
+ * load that fills in any still-unmapped roles it can match from the
+ * existing Chart of Accounts — it never overwrites a role that's already
+ * configured.
  *
  * Required roles (red if missing):
  *   accounts_receivable, accounts_payable, sales_revenue, inventory,
@@ -15,12 +24,14 @@
  * Optional roles (grey):
  *   cogs, purchase_expense, discount_given, discount_received
  */
-import { useState, useMemo } from 'react'
-import { CheckCircle, AlertCircle, Trash2, Settings, ChevronRight, Info } from 'lucide-react'
+import { useState, useMemo, useEffect, useRef } from 'react'
+import { CheckCircle, AlertCircle, Trash2, Settings, ChevronRight, Info, RotateCcw, Sparkles } from 'lucide-react'
 import {
   useAccountDefaults,
   useSetAccountDefault,
   useDeleteAccountDefault,
+  useResetAccountDefault,
+  useInitializeAccountDefaults,
   useAccounts,
 } from '@/hooks/useQuery'
 import { Button, Modal, Empty, SkeletonRows } from '@/components/ui'
@@ -61,7 +72,7 @@ function AssignModal({ role, label, hint, current, accounts, onClose }: AssignMo
     const q = search.toLowerCase()
     return accounts.filter(a =>
       !a.is_group && a.is_active &&
-      (a.name.toLowerCase().includes(q) || a.account_code.toLowerCase().includes(q))
+      (a.name.toLowerCase().includes(q) || a.code.toLowerCase().includes(q))
     )
   }, [accounts, search])
 
@@ -105,10 +116,10 @@ function AssignModal({ role, label, hint, current, accounts, onClose }: AssignMo
                 ].join(' ')}
               >
                 <span className="flex items-center gap-2 min-w-0">
-                  <code className="text-[11px] font-mono text-[var(--brand)] shrink-0">{a.account_code}</code>
+                  <code className="text-[11px] font-mono text-[var(--brand)] shrink-0">{a.code}</code>
                   <span className="text-sm font-medium truncate">{a.name}</span>
                 </span>
-                <span className="text-[11px] text-[var(--text-3)] shrink-0 capitalize">{a.account_type}</span>
+                <span className="text-[11px] text-[var(--text-3)] shrink-0 capitalize">{a.type}</span>
               </button>
             ))
         }
@@ -151,7 +162,22 @@ export default function AccountDefaultsTab() {
   const { data: allAccounts = [], isLoading: loadingAccounts } = useAccounts()
   const accounts = (allAccounts as Account[])
 
-  const deleteDefault = useDeleteAccountDefault()
+  const deleteDefault    = useDeleteAccountDefault()
+  const resetDefault     = useResetAccountDefault()
+  const initializeAll    = useInitializeAccountDefaults()
+
+  // One-time, silent auto-assign for companies that opened this page before
+  // any defaults existed (e.g. created before this feature shipped). Never
+  // overwrites roles that are already configured — see /account-defaults/initialize.
+  const hasAutoInitialized = useRef(false)
+  useEffect(() => {
+    if (loadingDefaults) return
+    if (hasAutoInitialized.current) return
+    if ((defaults as AccountDefault[]).length >= ACCOUNT_DEFAULT_ROLES.length) return
+    hasAutoInitialized.current = true
+    initializeAll.mutate()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadingDefaults, defaults])
 
   // Build a lookup: role → AccountDefault
   const defaultsByRole = useMemo(() => {
@@ -179,7 +205,7 @@ export default function AccountDefaultsTab() {
           ? <CheckCircle size={18} className="text-green-600 dark:text-green-400 shrink-0 mt-0.5" />
           : <AlertCircle size={18} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
         }
-        <div>
+        <div className="flex-1">
           <p className={[
             'text-sm font-semibold',
             allRequiredDone ? 'text-green-800 dark:text-green-300' : 'text-amber-800 dark:text-amber-300',
@@ -189,12 +215,26 @@ export default function AccountDefaultsTab() {
               : `${requiredMissing.length} required role${requiredMissing.length > 1 ? 's' : ''} not yet configured — transactions save but no journal entries are created`
             }
           </p>
+          <p className="text-xs mt-1 opacity-80">
+            Every field below is pre-assigned a sensible default and ready to use — edit or reset any of them anytime.
+          </p>
           {!allRequiredDone && (
             <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
               Missing: {requiredMissing.join(', ')}
             </p>
           )}
         </div>
+        {!allRequiredDone && (
+          <Button
+            variant="secondary"
+            size="sm"
+            loading={initializeAll.isPending}
+            onClick={() => initializeAll.mutate()}
+          >
+            <Sparkles size={13} className="mr-1" />
+            Auto-Assign Defaults
+          </Button>
+        )}
       </div>
 
       {/* ── Role Table ────────────────────────────────────────────────────── */}
@@ -252,11 +292,21 @@ export default function AccountDefaultsTab() {
                         <td>
                           {mapped
                             ? (
-                                <span className="flex items-center gap-1.5">
+                                <span className="flex items-center gap-1.5 flex-wrap">
                                   <code className="text-[11px] font-mono text-[var(--brand)]">
                                     {mapped.account_code}
                                   </code>
                                   <span className="font-medium text-sm">{mapped.account_name}</span>
+                                  {mapped.is_default && (
+                                    <span
+                                      className="inline-flex items-center gap-0.5 text-[9px] font-bold uppercase tracking-wider
+                                        text-[var(--brand)] bg-[var(--brand-light)] px-1.5 py-0.5 rounded"
+                                      title="Auto-assigned when the company was set up — not yet changed"
+                                    >
+                                      <Sparkles size={9} />
+                                      Default
+                                    </span>
+                                  )}
                                 </span>
                               )
                             : <span className="text-[var(--text-3)] text-xs italic">Not set</span>
@@ -274,6 +324,19 @@ export default function AccountDefaultsTab() {
                         {/* Actions */}
                         <td className="text-right">
                           <div className="flex items-center justify-end gap-1">
+                            {mapped && !mapped.is_default && mapped.default_account_id && (
+                              <button
+                                onClick={() => resetDefault.mutate(role)}
+                                disabled={resetDefault.isPending}
+                                className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-md
+                                  bg-[var(--surface-2)] hover:bg-[var(--surface-3)] border border-[var(--border)]
+                                  text-[var(--text-2)] transition-colors"
+                                title={`Restore ${mapped.default_account_code ?? ''} ${mapped.default_account_name ?? ''}`.trim()}
+                              >
+                                <RotateCcw size={11} />
+                                Reset
+                              </button>
+                            )}
                             <button
                               onClick={() => setAssignModal({ role, label, hint })}
                               className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-md
@@ -310,17 +373,23 @@ export default function AccountDefaultsTab() {
         <div className="mt-5 p-4 rounded-xl border border-[var(--border)] bg-[var(--surface-2)]">
           <h3 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
             <ChevronRight size={14} className="text-[var(--brand)]" />
-            Quick Setup Guide
+            Still missing a few roles?
           </h3>
+          <p className="text-xs text-[var(--text-2)] mb-2">
+            New companies get all 12 roles pre-assigned automatically. If some are still
+            missing here, click <strong>Auto-Assign Defaults</strong> above to match them
+            against your existing Chart of Accounts — it only fills in gaps and never
+            changes a role you've already configured. Anything it can't match (e.g. no
+            matching account exists yet) you can assign manually:
+          </p>
           <ol className="text-xs text-[var(--text-2)] space-y-1 list-decimal list-inside">
-            <li>Go to <strong>Chart of Accounts</strong> and create the required accounts (if not yet created).</li>
-            <li>Return here and click <strong>Assign</strong> for each role marked "required".</li>
+            <li>Go to <strong>Chart of Accounts</strong> and create the missing account (if needed).</li>
+            <li>Return here and click <strong>Assign</strong> for that role.</li>
             <li>Select the matching ledger account — search by code or name.</li>
-            <li>Once all 8 required roles are mapped, PostingEngine activates automatically.</li>
-            <li>All future sales, purchases, returns and receives will create journal entries.</li>
           </ol>
           <p className="text-xs text-[var(--text-3)] mt-3">
-            <strong>Tip:</strong> You can also run the server-side seed script for auto-detection:
+            <strong>Tip:</strong> the same matching logic is also available as a one-off
+            server script:
             <code className="ml-1 px-1.5 py-0.5 rounded bg-[var(--surface-3)] font-mono text-[11px]">
               node scripts/seed_account_defaults.js &lt;company_id&gt;
             </code>

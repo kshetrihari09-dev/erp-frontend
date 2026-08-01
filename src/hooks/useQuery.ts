@@ -549,6 +549,33 @@ export function useDeleteAccountDefault() {
   })
 }
 
+export function useResetAccountDefault() {
+  const qc = useQueryClient()
+  const { success, error } = useUIStore()
+  return useMutation({
+    mutationFn: accountingAPI.resetAccountDefault,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [QK.ACCOUNT_DEFAULTS] })
+      success('Reset to default')
+    },
+    onError: (e: any) => error('Failed to reset', e?.response?.data?.message || e?.message || ''),
+  })
+}
+
+export function useInitializeAccountDefaults() {
+  const qc = useQueryClient()
+  const { success, error } = useUIStore()
+  return useMutation({
+    mutationFn: accountingAPI.initializeAccountDefaults,
+    onSuccess: (res: any) => {
+      qc.invalidateQueries({ queryKey: [QK.ACCOUNT_DEFAULTS] })
+      const count = res?.data?.data?.created?.length ?? 0
+      if (count > 0) success(`${count} default${count > 1 ? 's' : ''} auto-assigned`)
+    },
+    onError: (e: any) => error('Failed to auto-assign defaults', e?.response?.data?.message || e?.message || ''),
+  })
+}
+
 export function useUpdatePartyAccount() {
   const qc = useQueryClient()
   const { success, error } = useUIStore()
