@@ -64,6 +64,40 @@ export function useDeleteProduct() {
   })
 }
 
+// ── Opening Inventory (Edit Product) ────────────────────────────────────────
+// Existing opening-inventory batches for a product, each shown as its own
+// separate, unchangeable line (Batch A, Batch B, ...). Read-only — adding a
+// new entry always goes through useAddOpeningInventory below, which only
+// ever creates a new batch and never touches rows returned by this query.
+export function useProductOpeningBatches(productId?: string) {
+  return useQuery({
+    queryKey: [QK.PRODUCT, productId, 'opening-batches'],
+    queryFn:  () => productsAPI.openingBatches(productId!).then(unwrap),
+    enabled:  !!productId,
+  })
+}
+
+// Adds one new, independent opening-inventory batch to an existing product
+// (Edit Product → "Add Opening Inventory"). This is purely additive: it
+// never updates, replaces, or deletes any prior opening batch — each call
+// is its own Batch A / Batch B / Batch C line, all contributing to
+// current_stock and all available to FIFO.
+export function useAddOpeningInventory() {
+  const qc = useQueryClient()
+  const { success, error } = useUIStore()
+  return useMutation({
+    mutationFn: ({ productId, qty, batch_no, expiry, purchase_rate }: {
+      productId: string; qty: number; batch_no?: string; expiry?: string; purchase_rate?: number
+    }) => productsAPI.adjust(productId, { qty, reason: 'Opening stock', batch_no, expiry, purchase_rate }),
+    onSuccess: (_res, vars) => {
+      qc.invalidateQueries({ queryKey: [QK.PRODUCTS] })
+      qc.invalidateQueries({ queryKey: [QK.PRODUCT, vars.productId, 'opening-batches'] })
+      success('Opening inventory added')
+    },
+    onError: (e: { message: string }) => error('Failed', e.message),
+  })
+}
+
 // ─── Manufacturers ──────────────────────────────────────────────────────────
 // Client-side "master data" — see services/manufacturers.ts for why there's
 // no real endpoint yet. Shaped exactly like the API-backed hooks around it

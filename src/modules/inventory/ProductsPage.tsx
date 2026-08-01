@@ -2,7 +2,7 @@ import { useState, lazy, Suspense } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Plus, Package, ScanLine, Type, Boxes, Download, Upload } from 'lucide-react'
-import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct } from '@/hooks/useQuery'
+import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct, useProductOpeningBatches, useAddOpeningInventory } from '@/hooks/useQuery'
 import { Button, Modal, Badge, Pagination, SkeletonRows, Empty, SearchInput, ConfirmDialog } from '@/components/ui'
 import ManufacturerSelect from '@/components/forms/ManufacturerSelect'
 import ExportProductsModal from './ExportProductsModal'
@@ -12,7 +12,7 @@ import { fmt } from '@/utils'
 import { PRODUCT_UNITS } from '@/constants'
 import { parseProductOcr } from '@/utils/parseProductOcr'
 import { productSchema, PRODUCT_VAT_OPTIONS, type ProductFormInput } from '@/services/productCreation'
-import type { Product } from '@/types'
+import type { Product, OpeningInventoryBatch } from '@/types'
 import type { CaptureMode } from '@/hooks/scanner/useProductCapture'
 
 const ProductScanModal = lazy(() => import('@/components/scanner/ProductScanModal'))
@@ -25,6 +25,133 @@ type Form = ProductFormInput
 
 function hasCameraSupport(): boolean {
   return typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia
+}
+
+// ── Opening Inventory — Edit Product ────────────────────────────────────────
+// Shown only when editing an existing product. Every prior opening entry
+// (Batch A, Batch B, ...) is listed as its own separate, read-only line —
+// never merged, replaced, or deleted here. "Add Opening Inventory" reveals
+// a new row with its own Opening Stock / Batch / Expiry / Purchase Rate
+// fields; saving that row calls POST /products/:id/adjust directly (via
+// useAddOpeningInventory), which always INSERTs a brand-new batch + a new
+// inventory movement — it never updates the rows shown above. This is
+// completely independent of the main "Save Changes" button below, which
+// still only edits the product's own fields (name, rates, etc.) and never
+// touches stock, exactly as before.
+function OpeningInventorySection({ productId }: { productId: string }) {
+  const { data: batches, isLoading } = useProductOpeningBatches(productId)
+  const addOpening = useAddOpeningInventory()
+  const [showAddRow, setShowAddRow] = useState(false)
+  const [row, setRow] = useState({ qty: '', batch_no: '', expiry: '', purchase_rate: '' })
+  const [rowError, setRowError] = useState<string | null>(null)
+
+  const saveRow = async () => {
+    const qty = Number(row.qty)
+    if (!row.qty || isNaN(qty) || qty <= 0) {
+      setRowError('Opening Stock must be greater than 0')
+      return
+    }
+    setRowError(null)
+    await addOpening.mutateAsync({
+      productId,
+      qty,
+      batch_no:      row.batch_no.trim()  || undefined,
+      expiry:        row.expiry.trim()    || undefined,
+      purchase_rate: row.purchase_rate !== '' ? Number(row.purchase_rate) : undefined,
+    })
+    setRow({ qty: '', batch_no: '', expiry: '', purchase_rate: '' })
+    setShowAddRow(false)
+  }
+
+  return (
+    <div className="mt-5 pt-4 border-t border-[var(--border)]">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-[var(--text-3)]">
+          <Boxes size={13} className="text-brand" />
+          Opening Inventory
+        </div>
+        {!showAddRow && (
+          <button
+            type="button"
+            onClick={() => setShowAddRow(true)}
+            className="flex items-center gap-1 text-xs font-semibold text-brand hover:opacity-80 transition-opacity"
+          >
+            <Plus size={13} /> Add Opening Inventory
+          </button>
+        )}
+      </div>
+
+      {/* Existing entries — each its own line, exactly as originally saved */}
+      {isLoading ? (
+        <div className="text-xs text-[var(--text-4)]">Loading…</div>
+      ) : batches?.length ? (
+        <div className="space-y-1.5 mb-3">
+          {batches.map((b: OpeningInventoryBatch) => (
+            <div key={b.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs px-3 py-2 rounded-lg bg-[var(--surface-3)]">
+              <span className="font-semibold min-w-[70px]">{b.batch_no || '—'}</span>
+              <span className="text-[var(--text-3)]">
+                Qty {b.qty_received}
+                {Number(b.qty_remaining) !== Number(b.qty_received) && ` (${b.qty_remaining} left)`}
+              </span>
+              <span className="text-[var(--text-3)]">Exp {b.expiry || '—'}</span>
+              <span className="text-[var(--text-3)]">Rate {fmt(b.unit_cost)}</span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="text-xs text-[var(--text-4)] mb-3">No opening inventory recorded yet.</div>
+      )}
+
+      {/* New row — creates a new batch on save, never edits the lines above */}
+      {showAddRow && (
+        <div className="rounded-lg border border-[var(--border)] p-3">
+          <div className="form-grid col3">
+            <div>
+              <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">Opening Stock</label>
+              <input
+                type="number" min="0" step="1" placeholder="0" className="erp-input"
+                value={row.qty}
+                onChange={e => setRow(r => ({ ...r, qty: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">Batch Number</label>
+              <input
+                placeholder="B002" className="erp-input"
+                value={row.batch_no}
+                onChange={e => setRow(r => ({ ...r, batch_no: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">Expiry (MM/YY)</label>
+              <input
+                placeholder="06/28" className="erp-input"
+                value={row.expiry}
+                onChange={e => setRow(r => ({ ...r, expiry: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">Purchase Rate</label>
+              <input
+                type="number" step="0.01" placeholder="0.00" className="erp-input"
+                value={row.purchase_rate}
+                onChange={e => setRow(r => ({ ...r, purchase_rate: e.target.value }))}
+              />
+            </div>
+          </div>
+          {rowError && <p className="text-xs text-red-500 mt-2">{rowError}</p>}
+          <div className="flex gap-2 mt-3">
+            <Button variant="primary" size="sm" loading={addOpening.isPending} onClick={saveRow}>
+              Save Opening Inventory
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => { setShowAddRow(false); setRowError(null) }}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
 
 function ProductForm({ initial, onClose }: { initial?: Product | null; onClose: () => void }) {
@@ -170,11 +297,14 @@ function ProductForm({ initial, onClose }: { initial?: Product | null; onClose: 
         <Field label="Min Stock" name="min_stock" type="number" />
       </div>
 
-      {/* ── Opening Inventory — only shown when creating a new product.
-          Editing an existing product never touches its stock here; that's
-          the Stock page's job. Same fields/behavior as Quick Add's
-          "Opening Stock" section: 0/empty means no batch, no transaction. */}
-      {!initial && (
+      {/* ── Opening Inventory ──────────────────────────────────────────────
+          Creating a new product: same single opening-stock fields as
+          before (0/empty means no batch, no transaction) — unchanged.
+          Editing an existing product: existing opening batches are shown
+          as separate, unchangeable lines, with an "Add Opening Inventory"
+          action that only ever creates a new batch — never updates,
+          merges, or deletes a prior one. */}
+      {!initial ? (
         <div className="mt-5 pt-4 border-t border-[var(--border)]">
           <div className="flex items-center gap-1.5 mb-3 text-xs font-bold uppercase tracking-wide text-[var(--text-3)]">
             <Boxes size={13} className="text-brand" />
@@ -186,6 +316,8 @@ function ProductForm({ initial, onClose }: { initial?: Product | null; onClose: 
             <Field label="Opening Expiry (MM/YY)" name="opening_expiry" placeholder="06/27" />
           </div>
         </div>
+      ) : (
+        <OpeningInventorySection productId={initial.id} />
       )}
 
       <div className="flex justify-end gap-2 mt-5 pt-4 border-t border-[var(--border)]">

@@ -2,7 +2,7 @@ import http from '@/services/http'
 import type { ApiResponse, Company, User, Sale, SaleItem, Purchase, PurchaseItem,
   Product, Party, Account, AccountDefault, Voucher, VoucherLine,
   VoucherPosting, PostingStatus, DashboardStats, PnLReport,
-  TrialBalanceRow, LedgerEntry, StockBatch, InvoiceTemplate, FiscalYear, AuditLog,
+  TrialBalanceRow, LedgerEntry, StockBatch, OpeningInventoryBatch, InvoiceTemplate, FiscalYear, AuditLog,
   CompanyPreferences, Backup, AccountLedgerResponse, UserCompany } from '@/types'
 import type { ScannedProduct } from '@/types/scanner'
 
@@ -97,9 +97,18 @@ export const productsAPI = {
   update:     (id: string, data: Partial<Product>) => http.put<ApiResponse<Product>>(`/products/${id}`, data),
   delete:     (id: string)      => http.delete(`/products/${id}`),
   stock:      (id: string)      => http.get(`/products/${id}/stock`),
-  adjust:     (id: string, data: { qty: number; reason: string }) =>
-    http.post(`/products/${id}/adjust`, data),
+  adjust:     (id: string, data: {
+    qty: number; reason: string
+    batch_no?: string; expiry?: string; purchase_rate?: number
+  }) => http.post(`/products/${id}/adjust`, data),
   categories: ()                => http.get('/products/categories'),
+
+  /**
+   * Existing opening-inventory batches for a product (Edit Product's
+   * "Opening Inventory" section) — each prior entry (Batch A, Batch B, ...)
+   * as its own separate line. Never used to edit/merge/delete a batch.
+   */
+  openingBatches: (id: string)  => http.get<ApiResponse<OpeningInventoryBatch[]>>(`/products/${id}/opening-batches`),
 
   /**
    * Prefix search — returns products whose name STARTS WITH `q`.

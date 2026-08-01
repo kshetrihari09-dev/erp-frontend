@@ -227,6 +227,22 @@ export interface StockBatch {
   bin_location?:   string | null
 }
 
+// One opening-inventory batch/line for a product, as returned by
+// GET /products/:id/opening-batches. Each row is an independent batch —
+// never merged with, or a replacement for, any other row.
+export interface OpeningInventoryBatch {
+  id:            string
+  batch_no?:     string
+  expiry?:       string
+  expiry_date?:  string
+  receipt_date:  string
+  qty_received:  number
+  qty_remaining: number
+  unit_cost:     number
+  total_cost:    number
+  created_at?:   string
+}
+
 // ─── Parties ──────────────────────────────────────────────────────────────────
 export type PartyType = 'customer' | 'supplier'
 
