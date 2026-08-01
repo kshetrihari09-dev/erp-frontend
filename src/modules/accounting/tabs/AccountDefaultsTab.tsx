@@ -394,6 +394,15 @@ export default function AccountDefaultsTab() {
               node scripts/seed_account_defaults.js &lt;company_id&gt;
             </code>
           </p>
+          <p className="text-xs text-[var(--text-3)] mt-2">
+            If <strong>discount_given</strong> / <strong>discount_received</strong> specifically
+            won't auto-assign, it's usually because the company predates the Discount
+            Allowed / Discount Received accounts — run this once to add them and map
+            both roles:
+            <code className="ml-1 px-1.5 py-0.5 rounded bg-[var(--surface-3)] font-mono text-[11px]">
+              node scripts/backfill_discount_accounts.js &lt;company_id&gt;
+            </code>
+          </p>
         </div>
       )}
 
