@@ -18,12 +18,25 @@
  *   Tab      select highlighted product + move to next field
  *   Escape   close dropdown
  *
+ * Hardware barcode scanner support (USB / Bluetooth, keyboard-emulating):
+ *   A physical scanner just "types" the code into this same input and then
+ *   sends Enter (or Tab, on scanners configured that way) — there's no
+ *   separate code path to maintain. Because a raw barcode almost never
+ *   matches a product *name* prefix, that keystroke sequence lands here
+ *   with an empty results list, exactly where "Create new product" used
+ *   to fire unconditionally. Before doing that, we now try one exact
+ *   barcode/item_code lookup (GET /scanner/products/barcode/:code, the
+ *   same endpoint the camera scanners use) — if it matches, the row is
+ *   filled instantly; if not, behaviour is unchanged (Create new product).
+ *   This adds no latency to normal name search/selection, since that path
+ *   never reaches the barcode check at all.
+ *
  * After selection:
  *   - Row is filled automatically via onChange(product)
  *   - InvoiceRowsTable moves focus to Qty field
  *   - No page refresh / no navigation
  *
- * If no product found:
+ * If no product found (by name AND by barcode/item code):
  *   - Shows "+ Create New Product 'query'" option
  *   - Opens QuickAddModal inline
  */
@@ -34,9 +47,51 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 import { Search, Plus, PackageSearch, Loader2 } from 'lucide-react'
-import { productsAPI } from '@/services/api'
+import { productsAPI, scannerAPI } from '@/services/api'
 import type { Product } from '@/types'
 import QuickAddModal from './QuickAddModal'
+
+/** Maps the (slightly different) ScannedProduct shape returned by the
+ *  barcode-lookup endpoint onto the full Product shape this cell's
+ *  onChange contract expects, filling in the handful of fields that
+ *  endpoint doesn't return with the same safe defaults the rest of the
+ *  app already uses for a freshly-looked-up product. */
+function scannedToProduct(s: {
+  id: string; item_code: string; name: string
+  generic_name?: string; company_name?: string; unit: string
+  sales_rate: number; purchase_rate: number; mrp: number
+  vat_percent?: number; cc_pct?: number; current_stock: number
+}): Product {
+  return {
+    id: s.id,
+    item_code: s.item_code,
+    name: s.name,
+    generic_name: s.generic_name,
+    company_name: s.company_name,
+    unit: s.unit,
+    sales_rate: s.sales_rate,
+    purchase_rate: s.purchase_rate,
+    mrp: s.mrp,
+    vat_percent: s.vat_percent,
+    cc_pct: s.cc_pct,
+    current_stock: s.current_stock,
+    min_stock: 0,
+    is_active: true,
+  }
+}
+
+/** One exact barcode/item_code lookup. Returns null (never throws) on a
+ *  404 "not found" or any network error — callers treat that as "not a
+ *  barcode, proceed with normal fallback" rather than an error state. */
+async function tryBarcodeMatch(code: string): Promise<Product | null> {
+  try {
+    const res = await scannerAPI.lookupBarcode(code)
+    const data = res.data?.data
+    return data ? scannedToProduct(data) : null
+  } catch {
+    return null
+  }
+}
 
 interface Props {
   value:      string           // current product_id
@@ -222,6 +277,33 @@ const ProductSearchCell = forwardRef<ProductSearchCellHandle, Props>(function Pr
     closeDropdown()
   }
 
+  /* ── Barcode-first fallback for "no name match" ──────────────────────────
+   * Reached only when the typed text matched no product name (results is
+   * empty), which is exactly what happens both for a genuinely new product
+   * AND for a scanned barcode/item code — those never match a name prefix.
+   * One exact lookup disambiguates the two before we offer to create a
+   * duplicate product. Adds zero latency to the normal "pick from the
+   * dropdown" path, since that path never calls this. */
+  function resolveByBarcodeOrCreate(typed: string) {
+    if (typed.length < 3) {
+      setCreateSeed(typed)
+      closeDropdown()
+      setShowCreate(true)
+      return
+    }
+    setLoading(true)
+    tryBarcodeMatch(typed).then(scanned => {
+      setLoading(false)
+      if (scanned) {
+        selectProduct(scanned)
+      } else {
+        setCreateSeed(typed)
+        closeDropdown()
+        setShowCreate(true)
+      }
+    })
+  }
+
   /* ── Query change ─────────────────────────────────────────────────────── */
   function handleQueryChange(e: React.ChangeEvent<HTMLInputElement>) {
     const val = e.target.value
@@ -252,20 +334,22 @@ const ProductSearchCell = forwardRef<ProductSearchCellHandle, Props>(function Pr
 
       case 'Enter':
         e.preventDefault()
-        if (highlighted === createIdx && showCreateRow) {
-          // Enter on Create row → open modal
-          setCreateSeed(query.trim())
-          closeDropdown()
-          setShowCreate(true)
-        } else if (results[highlighted]) {
+        if (results[highlighted]) {
           selectProduct(results[highlighted])
+        } else if (showCreateRow) {
+          resolveByBarcodeOrCreate(query.trim())
         }
         break
 
       case 'Tab':
-        // Tab selects current highlight and lets focus move naturally
+        // Tab selects current highlight and lets focus move naturally.
+        // Scanners configured to send Tab instead of Enter get the same
+        // barcode-first treatment as Enter, below.
         if (results[highlighted]) {
           selectProduct(results[highlighted])
+        } else if (showCreateRow) {
+          e.preventDefault()
+          resolveByBarcodeOrCreate(query.trim())
         } else {
           closeDropdown()
         }
