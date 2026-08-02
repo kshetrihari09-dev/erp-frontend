@@ -28,7 +28,11 @@ interface Props {
    *  (Product.company_name). Free text is preserved even if it doesn't
    *  match any directory entry (e.g. legacy products, imported data). */
   value:      string
-  onChange:   (name: string) => void
+  /** Second argument is the full Manufacturer record when the name was
+   *  picked from (or just created in) the directory — omitted for free
+   *  text that doesn't match any entry. Lets callers read directory
+   *  fields like `cc_pct` without a separate lookup. */
+  onChange:   (name: string, manufacturer?: Manufacturer) => void
   placeholder?: string
 }
 
@@ -115,7 +119,7 @@ export default function ManufacturerSelect({ value, onChange, placeholder }: Pro
   }
 
   function select(m: Manufacturer) {
-    onChange(m.name)
+    onChange(m.name, m)
     close()
   }
 
@@ -148,7 +152,7 @@ export default function ManufacturerSelect({ value, onChange, placeholder }: Pro
 
   function handleCreated(m: Manufacturer) {
     setShowCreate(false)
-    onChange(m.name)
+    onChange(m.name, m)
   }
 
   return (

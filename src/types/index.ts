@@ -204,6 +204,12 @@ export interface Manufacturer {
   pan_no?:        string
   is_active:      boolean
   notes?:         string
+  /** Default C.C% (bonus-quantity charge, see calcRowAmount) for products
+   *  from this manufacturer. Only ever used to pre-fill a *new* product's
+   *  own cc_percent when this manufacturer is selected — it's a starting
+   *  point, not a live link; changing it later never touches products
+   *  already created under it. */
+  cc_pct?:        number
   created_at:     string
 }
 

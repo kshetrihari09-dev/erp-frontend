@@ -416,6 +416,42 @@ export function useUserCompanies() {
   })
 }
 
+export function useDeleteCompany() {
+  const qc = useQueryClient()
+  const { success, error } = useUIStore()
+  return useMutation({
+    // confirmPassword is threaded through by useSensitiveConfirm()'s
+    // runWithConfirm(); companiesAPI.remove always requires it server-side.
+    mutationFn: ({ id, confirmPassword }: { id: string; confirmPassword?: string }) =>
+      companiesAPI.remove(id, confirmPassword),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [QK.COMPANIES] })
+      success('Company deleted')
+    },
+    onError: (e: any) => {
+      // Let the requiresPasswordConfirm flow bubble up silently (no toast) —
+      // useSensitiveConfirm's runWithConfirm() catches it and opens the
+      // password modal. Only show a toast for genuine failures.
+      if (!e?.response?.data?.requiresPasswordConfirm) {
+        error('Could not delete company', e?.response?.data?.message || e?.message || '')
+      }
+    },
+  })
+}
+
+export function useRestoreCompany() {
+  const qc = useQueryClient()
+  const { success, error } = useUIStore()
+  return useMutation({
+    mutationFn: (id: string) => companiesAPI.restore(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [QK.COMPANIES] })
+      success('Company restored')
+    },
+    onError: (e: any) => error('Could not restore company', e?.response?.data?.message || e?.message || ''),
+  })
+}
+
 export function useUsers(params?: Record<string, unknown>) {
   return useQuery({
     queryKey: [QK.USERS, params],

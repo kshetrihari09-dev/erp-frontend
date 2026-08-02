@@ -59,12 +59,12 @@ export default function ManufacturersPage() {
             <thead>
               <tr>
                 <th>Name</th><th>Short Name</th><th>Contact</th><th>Phone</th>
-                <th>Status</th><th></th>
+                <th className="td-right">C.C %</th><th>Status</th><th></th>
               </tr>
             </thead>
             <tbody>
               {isLoading
-                ? <SkeletonRows cols={6} />
+                ? <SkeletonRows cols={7} />
                 : filtered.length
                   ? filtered.map(m => (
                       <tr key={m.id}>
@@ -72,6 +72,7 @@ export default function ManufacturersPage() {
                         <td className="text-[var(--text-3)]">{m.short_name || '—'}</td>
                         <td className="text-[var(--text-3)]">{m.contact_person || '—'}</td>
                         <td className="text-[var(--text-3)]">{m.phone || '—'}</td>
+                        <td className="td-right text-[var(--text-3)]">{m.cc_pct ? `${m.cc_pct}%` : '—'}</td>
                         <td>
                           {m.is_active
                             ? <span className="badge badge-green">Active</span>
@@ -85,7 +86,7 @@ export default function ManufacturersPage() {
                         </td>
                       </tr>
                     ))
-                  : <tr><td colSpan={6}><Empty message="No manufacturers found" icon={<Factory size={32}/>}/></td></tr>
+                  : <tr><td colSpan={7}><Empty message="No manufacturers found" icon={<Factory size={32}/>}/></td></tr>
               }
             </tbody>
           </table>

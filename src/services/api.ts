@@ -82,6 +82,13 @@ export const companiesAPI = {
     http.post<ApiResponse<Company>>('/companies', data),
   update: (id: string, data: Partial<Company>) =>
     http.put<ApiResponse<Company>>(`/companies/${id}`, data),
+  /** Deactivates ("deletes") a company. Always requires confirmPassword —
+   *  call via useSensitiveConfirm()'s runWithConfirm() so the password
+   *  modal is handled automatically. Reversible via restore(). */
+  remove: (id: string, confirmPassword?: string) =>
+    http.delete<ApiResponse<{ id: string }>>(`/companies/${id}`, { data: { confirmPassword } }),
+  restore: (id: string) =>
+    http.post<ApiResponse<Company>>(`/companies/${id}/restore`),
   /** Re-issues a token scoped to the given company. Caller must swap the token in. */
   switchTo: (id: string) =>
     http.post<ApiResponse<SwitchCompanyResponse>>(`/companies/${id}/switch`),

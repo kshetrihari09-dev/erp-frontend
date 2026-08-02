@@ -157,7 +157,7 @@ function OpeningInventorySection({ productId }: { productId: string }) {
 function ProductForm({ initial, onClose }: { initial?: Product | null; onClose: () => void }) {
   const create = useCreateProduct()
   const update = useUpdateProduct()
-  const { register, handleSubmit, setValue, watch, formState: { errors, isSubmitting } } = useForm<Form>({
+  const { register, handleSubmit, setValue, watch, formState: { errors, isSubmitting, dirtyFields } } = useForm<Form>({
     resolver: zodResolver(productSchema),
     defaultValues: initial ? {
       name: initial.name, generic_name: initial.generic_name || '', company_name: initial.company_name || '',
@@ -167,11 +167,14 @@ function ProductForm({ initial, onClose }: { initial?: Product | null; onClose: 
       // `tax_rate` column name; only GET /products/search aliases it to
       // vat_percent. Fall back through both so Edit shows the real saved value.
       vat_percent: (initial as any).tax_rate ?? initial.vat_percent ?? 13,
+      // Same story for C.C% — the real column is `cc_percent`; only
+      // GET /products/search aliases it to `cc_pct`.
+      cc_percent: (initial as any).cc_percent ?? (initial as any).cc_pct ?? 0,
       min_stock: initial.min_stock,
     } : {
       // Same defaults Quick Add has always used, so a product created
       // without touching these fields is identical either way.
-      unit: 'Strip', vat_percent: 13, min_stock: 50, mrp: 0, sales_rate: '' as any, purchase_rate: 0,
+      unit: 'Strip', vat_percent: 13, cc_percent: 0, min_stock: 50, mrp: 0, sales_rate: '' as any, purchase_rate: 0,
       barcode: '', opening_stock: '' as any, opening_batch: '', opening_expiry: '',
     },
   })
@@ -250,8 +253,16 @@ function ProductForm({ initial, onClose }: { initial?: Product | null; onClose: 
           <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">Manufacturer</label>
           <ManufacturerSelect
             value={watch('company_name') || ''}
-            onChange={name => {
+            onChange={(name, manufacturer) => {
               setValue('company_name', name, { shouldDirty: true, shouldValidate: true })
+              // Pre-fill C.C% from the manufacturer's default — only for a
+              // brand-new product, and only if the user hasn't already
+              // typed their own value into that field. Never touches an
+              // existing product being edited, and never overwrites a
+              // value the user set themselves.
+              if (!initial && !dirtyFields.cc_percent && manufacturer?.cc_pct != null) {
+                setValue('cc_percent', manufacturer.cc_pct, { shouldDirty: false })
+              }
               // Return focus to the Product form — the next field in tab
               // order — once a manufacturer is picked/created, same as
               // the (+) flows on Sale/Purchase moving on to Quantity.
@@ -293,6 +304,17 @@ function ProductForm({ initial, onClose }: { initial?: Product | null; onClose: 
           <select className="erp-input" {...register('vat_percent')}>
             {PRODUCT_VAT_OPTIONS.map(v => <option key={v} value={v}>{v}%</option>)}
           </select>
+        </div>
+        <div>
+          <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">
+            C.C % <span className="normal-case font-medium text-[var(--text-4)]">(optional)</span>
+          </label>
+          <input
+            type="number" min={0} max={100} step="0.01" placeholder="0"
+            className="erp-input"
+            {...register('cc_percent')}
+          />
+          {errors.cc_percent && <p className="text-xs text-red-500 mt-1">{(errors as any).cc_percent?.message}</p>}
         </div>
         <Field label="Min Stock" name="min_stock" type="number" />
       </div>

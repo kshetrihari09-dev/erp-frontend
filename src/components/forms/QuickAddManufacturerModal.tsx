@@ -28,7 +28,7 @@ interface Props {
 interface FormState {
   name: string; short_name: string; contact_person: string; phone: string
   email: string; address: string; website: string; pan_no: string
-  is_active: boolean; notes: string
+  is_active: boolean; notes: string; cc_pct: string
 }
 
 export default function QuickAddManufacturerModal({ initialName, initial, existingNames, onSave, onClose }: Props) {
@@ -47,6 +47,7 @@ export default function QuickAddManufacturerModal({ initialName, initial, existi
     pan_no:         initial?.pan_no         || '',
     is_active:      initial?.is_active ?? true,
     notes:          initial?.notes          || '',
+    cc_pct:         initial?.cc_pct != null ? String(initial.cc_pct) : '',
   })
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [error, setError] = useState('')
@@ -104,6 +105,7 @@ export default function QuickAddManufacturerModal({ initialName, initial, existi
         pan_no:         form.pan_no.trim()          || undefined,
         is_active:      form.is_active,
         notes:          form.notes.trim()           || undefined,
+        cc_pct:         form.cc_pct.trim() === '' ? undefined : Math.min(100, Math.max(0, Number(form.cc_pct))),
       }
       const saved = isEdit
         ? await updateManufacturer.mutateAsync({ id: initial!.id, data: payload })
@@ -231,7 +233,7 @@ export default function QuickAddManufacturerModal({ initialName, initial, existi
             </div>
           </div>
 
-          {/* Row 5 — PAN/VAT + Status */}
+          {/* Row 5 — PAN/VAT + C.C % + Status */}
           <div className="qam-row">
             <div className="qam-field">
               <label className="qam-label">PAN / VAT No <span className="qam-optional">(optional)</span></label>
@@ -242,6 +244,23 @@ export default function QuickAddManufacturerModal({ initialName, initial, existi
                 onKeyDown={handleFieldKeyDown}
               />
             </div>
+            <div className="qam-field">
+              <label className="qam-label">
+                Default C.C % <span className="qam-optional">(optional)</span>
+              </label>
+              <input
+                type="number" inputMode="decimal" min={0} max={100} step="0.01"
+                className="erp-input"
+                value={form.cc_pct}
+                onChange={e => set('cc_pct', e.target.value)}
+                onKeyDown={handleFieldKeyDown}
+                placeholder="0"
+              />
+            </div>
+          </div>
+
+          {/* Row 6 — Status */}
+          <div className="qam-row">
             <div className="qam-field">
               <label className="qam-label">Status</label>
               <div className="qam-status-toggle">
@@ -263,7 +282,7 @@ export default function QuickAddManufacturerModal({ initialName, initial, existi
             </div>
           </div>
 
-          {/* Row 6 — Notes */}
+          {/* Row 7 — Notes */}
           <div className="qam-row">
             <div className="qam-field qam-field--wide">
               <label className="qam-label">Notes <span className="qam-optional">(optional)</span></label>

@@ -130,6 +130,7 @@ export interface ManufacturerInput {
   pan_no?:         string
   is_active?:      boolean
   notes?:          string
+  cc_pct?:         number
 }
 
 export function create(companyId: string, input: ManufacturerInput): Manufacturer {
@@ -150,6 +151,7 @@ export function create(companyId: string, input: ManufacturerInput): Manufacture
     pan_no:         input.pan_no?.trim()          || undefined,
     is_active:      input.is_active ?? true,
     notes:          input.notes?.trim()          || undefined,
+    cc_pct:         input.cc_pct !== undefined ? Math.min(100, Math.max(0, Number(input.cc_pct) || 0)) : undefined,
     created_at:     new Date().toISOString(),
   }
   writeStore(companyId, [...readStore(companyId), record])
@@ -170,6 +172,7 @@ export function update(companyId: string, id: string, input: Partial<Manufacture
     ...list[idx],
     ...input,
     name: input.name?.trim() || list[idx].name,
+    cc_pct: input.cc_pct !== undefined ? Math.min(100, Math.max(0, Number(input.cc_pct) || 0)) : list[idx].cc_pct,
   }
   const next = [...list]
   next[idx] = updated
