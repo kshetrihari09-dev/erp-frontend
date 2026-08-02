@@ -694,12 +694,12 @@ export default function SalesPage() {
               MOBILE:  pos-table-wrap.pos-desktop-only hidden; pos-mobile-items shown
           ════════════════════════════════════════════════════════════ */}
           <div className="pos-card">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-4 pos-invoice-header">
               <div className="pos-card-title">
                 <ShoppingCart size={14} className="text-brand" />
                 Invoice Items
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 pos-invoice-actions">
                 <BarcodeScanInput
                   ref={barcodeInputRef}
                   autoFocus

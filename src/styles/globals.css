@@ -5900,6 +5900,27 @@ canvas{
   to { transform: rotate(360deg); }
 }
 @media (max-width: 768px) {
-  .bsi-root { width: 100%; }
+  .bsi-root { flex: 1 1 140px; min-width: 0; width: auto; }
+}
+
+/* Invoice Items header (title + barcode field + Scan Medicine button +
+   keyboard hints) — desktop keeps everything on one row via the existing
+   flex layout, unchanged. On mobile, the barcode field previously forced
+   itself to 100% width while still sharing a row with the Scan Medicine
+   button, which pushed that button past the edge of the card (visually
+   "hidden", not actually removed). Fix: the action group now wraps onto
+   its own full-width row under the title, and BarcodeScanInput sizes
+   itself via flex-basis instead of width:100%, so both controls stay on
+   screen and tappable regardless of viewport width. */
+@media (max-width: 768px) {
+  .pos-invoice-header {
+    flex-wrap: wrap;
+    row-gap: 10px;
+  }
+  .pos-invoice-actions {
+    flex: 1 1 100%;
+    width: 100%;
+    flex-wrap: wrap;
+  }
 }
 
