@@ -193,10 +193,21 @@ export default function useLocalScanner({ onResult, active }: Options) {
   }, [])
 
   // ── Select a match → hydrate to full ScannedProduct → resolve locally ─────
+  //
+  // Continuous multi-scan: this only PAUSES the decode loops (barcode RAF
+  // loop + OCR tick loop) — it deliberately does NOT call stopCamera(), so
+  // the live video stream and (if warmed up) the Tesseract OCR worker both
+  // stay alive across items. LocalScannerView resumes scanning (rescan())
+  // a short beat after each successful add, and since the camera never
+  // actually closed, that resume is instant — no re-request of getUserMedia
+  // between medicines. The camera only fully closes when the user taps ✕
+  // or the scanner view itself unmounts.
   const selectProduct = useCallback(async (product: LocalProduct) => {
     if (!mountedRef.current) return
     setState(s => ({ ...s, status: 'submitting' }))
-    stopCamera()
+    engine.stopScanning()
+    stopOcrLoop()
+    if (noticeTimeoutRef.current) { clearTimeout(noticeTimeoutRef.current); noticeTimeoutRef.current = null }
     try {
       let full: ScannedProduct | null = null
       if (typeof (product as any).current_stock === 'number' && (product as any).batches) {
@@ -225,7 +236,7 @@ export default function useLocalScanner({ onResult, active }: Options) {
     } catch {
       if (mountedRef.current) setState(s => ({ ...s, status: 'error', error: 'Something went wrong. Please try again.' }))
     }
-  }, [onResult, stopCamera, state.lastBarcode, state.lastOcrText])
+  }, [onResult, engine, stopOcrLoop, state.lastBarcode, state.lastOcrText])
 
   // ── OCR: scan-box-cropped, persistent-worker, self-scheduling loop ────────
   const getOcrWorker = useCallback(async () => {

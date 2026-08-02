@@ -18,9 +18,17 @@
  * The QR / cross-device flow (ScannerModal + useScannerSession) is
  * untouched and still available — via the "Use Another Device" affordance
  * here, which simply closes this view and opens that existing modal.
+ *
+ * CONTINUOUS MULTI-SCAN (billing flow):
+ *   Tap Scan once → camera opens → scan item #1 → product added → beep +
+ *   vibrate + a brief green "Added!" flash (~200ms) → scanning resumes
+ *   automatically (camera stays open the whole time, so there's no
+ *   re-permission/reopen delay) → scan item #2 → ... The user only taps
+ *   the ✕ (top-right, via onClose) when they're done adding items — that's
+ *   the one and only thing that closes the camera and this view.
  */
 
-import { useRef, useCallback } from 'react'
+import { useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
@@ -32,6 +40,7 @@ import type { ScanResult } from '@/types/scanner'
 import { ScanFrame, ModeBadge, ProductCard, BarcodeRectOverlay } from './ScannerUI'
 import BarcodeScannerView from './BarcodeScannerView'
 import { Z } from '@/styles/zIndex'
+import { playSuccessBeep } from '@/utils/beep'
 
 // Full-screen scanner overlay — see src/styles/zIndex.ts for the app-wide
 // stacking scale this belongs to. Scanners sit above regular
@@ -54,18 +63,30 @@ export default function LocalScannerView({ open, context, onResult, onClose, onU
   const galleryInputRef = useRef<HTMLInputElement>(null)
   const vibratedRef      = useRef(false)
 
+  // rescan() only exists once useLocalScanner has been called below, but
+  // handleResult (passed INTO that same hook as onResult) needs to invoke
+  // it — a ref sidesteps the chicken-and-egg ordering rather than
+  // restructuring the hook to take a resume callback.
+  const rescanRef = useRef<() => void>(() => {})
+
   const handleResult = useCallback((result: ScanResult) => {
+    playSuccessBeep()
     vibrate(60)
     onResult(result)
-    // Brief success beat so the green check + "Added" state is visible,
-    // then close automatically — per the "auto-return + close" flow.
-    setTimeout(() => onClose(), 650)
-  }, [onResult, onClose])
+    // Brief success beat — beep, vibrate, green "Added!" flash — then
+    // automatically resume scanning for the next item. The camera is
+    // never closed in between (see useLocalScanner's selectProduct), so
+    // this resume is instant. The scanner only closes when the user taps
+    // the ✕ (onClose), never automatically.
+    setTimeout(() => rescanRef.current(), 200)
+  }, [onResult])
 
   const {
     state, videoRef, containerRef, toggleFlash, switchCamera, setMode, setZoom,
     selectProduct, rescan, retryPermission, scanImageFile,
   } = useLocalScanner({ context, onResult: handleResult, active: open })
+
+  useEffect(() => { rescanRef.current = rescan }, [rescan])
 
   // One vibration pulse the moment matches are found (device support only)
   if (state.status === 'matches' && !vibratedRef.current) {
