@@ -13,6 +13,9 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import ScanButton from '@/components/scanner/ScanButton'
+import BarcodeScanInput, { type BarcodeScanInputHandle } from '@/components/scanner/BarcodeScanInput'
+import ProductNotFoundDialog from '@/components/scanner/ProductNotFoundDialog'
+import { playSuccessBeep, playErrorBeep } from '@/utils/beep'
 import type { ScanResult } from '@/types/scanner'
 import { useForm } from 'react-hook-form'
 import {
@@ -155,6 +158,102 @@ export default function SalesPage() {
     })
     setProducts(prev => prev.some(x => x.id === p.id) ? prev : [...prev, p as any])
   }, [])
+
+  // ── Dedicated barcode-scanner input (BarcodeScanInput) ──────────────────
+  // Separate, always-focused fast path for a USB/Bluetooth hardware
+  // scanner — see BarcodeScanInput.tsx and the "Hardware barcode scanner
+  // support" note in ProductSearchCell.tsx for how this differs from
+  // that per-row combobox. This is intentionally additive: ScanButton's
+  // camera flow (handleScanResult above) is untouched.
+  const barcodeInputRef = useRef<BarcodeScanInputHandle>(null)
+  const [notFoundCode, setNotFoundCode] = useState<string | null>(null)
+  const [flashRowId,   setFlashRowId]   = useState<number | undefined>(undefined)
+  const flashTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  function flashRow(id: number) {
+    setFlashRowId(id)
+    if (flashTimerRef.current) clearTimeout(flashTimerRef.current)
+    flashTimerRef.current = setTimeout(() => setFlashRowId(undefined), 600)
+  }
+
+  // Auto-focus the barcode field the moment the Sale page mounts — the
+  // cashier should never have to click it before the very first scan.
+  useEffect(() => {
+    barcodeInputRef.current?.focus()
+    return () => { if (flashTimerRef.current) clearTimeout(flashTimerRef.current) }
+  }, [])
+
+  const handleBarcodeProduct = useCallback((p: Product) => {
+    playSuccessBeep()
+
+    // Already on the invoice? Increase quantity instead of adding a
+    // duplicate row — "qty > 0" excludes the still-blank placeholder row
+    // a fresh invoice always starts with. Reads `rows` from this render's
+    // closure (this callback is recreated each time `rows` changes, so
+    // it's never stale) rather than a functional setRows updater, so the
+    // side effects below (flashRow/focus) can run as plain effects after
+    // the state update instead of living inside the updater itself.
+    const existingIdx = rows.findIndex(r => r.product_id === p.id && Number(r.qty) > 0)
+
+    if (existingIdx !== -1) {
+      const next = rows.map((r, i) => {
+        if (i !== existingIdx) return r
+        const qty = Number(r.qty || 0) + 1
+        const { amount, cc_amount } = calcRowAmount({
+          qty, rate: Number(r.rate), bonus: Number(r.bonus) || 0,
+          discount_pct: Number(r.discount_pct) || 0, cc_pct: Number(r.cc_pct) || 0,
+        })
+        return { ...r, qty, amount, cc_amount }
+      })
+      setRows(next)
+      setProducts(prev => prev.some(x => x.id === p.id) ? prev : [...prev, p])
+      flashRow(next[existingIdx]._id)
+      // Existing row already has its batch resolved — nothing further to
+      // wait on, so return focus to the barcode input right away.
+      requestAnimationFrame(() => barcodeInputRef.current?.focus())
+      return
+    }
+
+    // New product — add a row flagged `_scanned` so BatchSelect knows to
+    // auto-pick a single batch (or show the popup for 2+) and to hand
+    // focus back to the barcode field once resolved, instead of to Qty
+    // (see BatchSelect.tsx / InvoiceRowsTable.tsx).
+    const row: InvoiceRow = { ...newRow(), _scanned: true }
+    row.product_id   = p.id
+    row.product_name = p.name
+    row.rate         = p.sales_rate
+    row.cc_pct       = p.cc_pct ?? 0
+    const { amount, cc_amount } = calcRowAmount({
+      qty: row.qty, rate: Number(row.rate), bonus: 0,
+      discount_pct: 0, cc_pct: Number(row.cc_pct) || 0,
+    })
+    row.amount = amount
+    row.cc_amount = cc_amount
+
+    const last = rows[rows.length - 1]
+    const next = (last && !last.product_id) ? [...rows.slice(0, -1), row] : [...rows, row]
+    setRows(next)
+    setProducts(prev => prev.some(x => x.id === p.id) ? prev : [...prev, p])
+
+    flashRow(row._id)
+    // Baseline refocus: covers the "0 batches" case, where BatchSelect
+    // never opens a popup or calls onAutoResolved at all. For the 1- or
+    // 2+-batch cases, BatchSelect's own popup (which auto-focuses itself)
+    // or its onAutoResolved callback takes over a moment later — see
+    // BatchSelect.tsx.
+    requestAnimationFrame(() => barcodeInputRef.current?.focus())
+  }, [rows])
+
+  const handleBarcodeNotFound = useCallback((code: string) => {
+    playErrorBeep()
+    setNotFoundCode(code)
+  }, [])
+
+  function closeNotFoundDialog() {
+    setNotFoundCode(null)
+    // "Product Not Found dialog closes" -> focus barcode field automatically.
+    requestAnimationFrame(() => barcodeInputRef.current?.focus())
+  }
 
   const { register, handleSubmit, reset, watch, setValue } = useForm({
     defaultValues: {
@@ -299,6 +398,7 @@ export default function SalesPage() {
       setDiscountModalOpen(false)
       setDiscountScope('invoice'); setInvoiceDiscount(emptyDiscount())
       setCompanyDiscounts({}); setProductDiscounts({})
+      requestAnimationFrame(() => barcodeInputRef.current?.focus())
     } catch (e: any) { setFlash({ type: 'danger', msg: e.message }) }
     finally { setSaving(false) }
   })
@@ -311,6 +411,7 @@ export default function SalesPage() {
     setDiscountModalOpen(false)
     setDiscountScope('invoice'); setInvoiceDiscount(emptyDiscount())
     setCompanyDiscounts({}); setProductDiscounts({})
+    requestAnimationFrame(() => barcodeInputRef.current?.focus())
   }
 
   async function cancelSale(id: string) {
@@ -599,6 +700,12 @@ export default function SalesPage() {
                 Invoice Items
               </div>
               <div className="flex items-center gap-3">
+                <BarcodeScanInput
+                  ref={barcodeInputRef}
+                  autoFocus
+                  onResolved={handleBarcodeProduct}
+                  onNotFound={handleBarcodeNotFound}
+                />
                 <ScanButton context="sales" onResult={handleScanResult} />
                 {/* pos-kbd-hints: hidden on mobile via CSS addendum */}
                 <div className="pos-kbd-hints flex items-center gap-3 text-xs text-[var(--text-4)]" title="F2 Product · F3 Customer · F4 Batch · F5 New Product · F6 New Customer · F7 Discount · F8 Payment · F9 Save · F10 Print · Esc Close">
@@ -629,6 +736,8 @@ export default function SalesPage() {
                 showBonus
                 showCC
                 showDiscount={false}
+                onBarcodeRowResolved={() => barcodeInputRef.current?.focus()}
+                flashRowId={flashRowId}
               />
             </div>
 
@@ -1183,6 +1292,7 @@ export default function SalesPage() {
       </Modal>
 
       {/* ── Dialogs — IDENTICAL to original ──────────────────────────── */}
+      <ProductNotFoundDialog code={notFoundCode} onClose={closeNotFoundDialog} />
       <DiscountReviewModal
         open={discountModalOpen}
         onClose={() => setDiscountModalOpen(false)}
@@ -1220,6 +1330,7 @@ export default function SalesPage() {
           reset({ customer_id: '', date: new Date().toISOString().split('T')[0], payment_mode: '', notes: '' })
           setDiscountScope('invoice'); setInvoiceDiscount(emptyDiscount())
           setCompanyDiscounts({}); setProductDiscounts({})
+          requestAnimationFrame(() => barcodeInputRef.current?.focus())
         }}
       />
       {/* Fires automatically the moment a sale posts (printData is set in

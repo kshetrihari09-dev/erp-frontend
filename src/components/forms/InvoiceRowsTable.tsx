@@ -21,6 +21,14 @@ import QtyGate from './QtyGate'
 
 export interface InvoiceRow {
   _id:          number
+  /** Client-only marker: true if this row was added by the barcode
+   *  scanner (BarcodeScanInput) rather than manual product search.
+   *  Never read by onSubmit (which maps only explicit named fields onto
+   *  the API payload — see SalesPage.tsx), so this never reaches the
+   *  backend. Used only to opt this one row into "auto-select if a
+   *  single batch exists" (see BatchSelect's `autoSelectSingle` prop)
+   *  without changing that behaviour for manually-added rows. */
+  _scanned?:    boolean
   product_id:   string
   product_name: string
   batch_no:     string
@@ -72,6 +80,16 @@ interface Props {
    *  case), with an optional button to browse existing batches — see
    *  BatchSelect.tsx/QtyGate.tsx for the full rationale. */
   mode?:         'sale' | 'purchase'
+  /** Fired when a scanned row's (row._scanned === true) batch gets
+   *  resolved — auto-selected (single batch) or picked from the popup
+   *  (multiple batches). SalesPage uses this to return focus to the
+   *  barcode scan input. Rows not added via a scan never trigger this —
+   *  their batch selection focuses Qty exactly as it always has. */
+  onBarcodeRowResolved?: (idx: number) => void
+  /** InvoiceRow._id of a row to briefly highlight — SalesPage sets this
+   *  for ~600ms right after a scan adds or increments a row, purely as
+   *  visual confirmation. No effect on data/validation. */
+  flashRowId?: number
 }
 
 /* ── Component ───────────────────────────────────────────────────────────── */
@@ -80,6 +98,7 @@ const InvoiceRowsTable = forwardRef<InvoiceRowsTableHandle, Props>(function Invo
   rows, products, onChange, onProductsChange,
   showBonus = true, showCC = true, showDiscount = false,
   showExpiry = true, showBatch = true, mode = 'sale',
+  onBarcodeRowResolved, flashRowId,
 }, ref) {
   const firstRowRef = useRef<boolean>(true)
   const rowElsRef = useRef<Map<number, HTMLTableRowElement>>(new Map())
@@ -307,6 +326,9 @@ const InvoiceRowsTable = forwardRef<InvoiceRowsTableHandle, Props>(function Invo
                 key={row._id}
                 ref={el => { if (el) rowElsRef.current.set(idx, el); else rowElsRef.current.delete(idx) }}
                 onKeyDown={e => handleRowKeyDown(e, idx)}
+                style={row._id === flashRowId
+                  ? { backgroundColor: 'var(--brand-subtle, rgba(37,99,235,0.12))', transition: 'background-color 200ms ease' }
+                  : { transition: 'background-color 400ms ease' }}
               >
 
                 {/* ── Product combobox ──────────────────────────────── */}
@@ -332,6 +354,8 @@ const InvoiceRowsTable = forwardRef<InvoiceRowsTableHandle, Props>(function Invo
                       onSelect={batch => handleBatchSelect(idx, batch)}
                       onTextChange={text => handleBatchText(idx, text)}
                       mode={mode}
+                      autoSelectSingle={!!row._scanned}
+                      onAutoResolved={row._scanned ? () => onBarcodeRowResolved?.(idx) : undefined}
                     />
                   </td>
                 )}

@@ -5844,3 +5844,62 @@ canvas{
     border: none;
   }
 }
+
+/* ── BarcodeScanInput — dedicated always-focused scanner field ───────────
+   Visually matches .psc-input/.psc-search-wrap (ProductSearchCell) so it
+   reads as part of the same family of controls, just its own fixed-width
+   pill in the Invoice Items header rather than a per-row combobox. ────── */
+.bsi-root {
+  position:     relative;
+  display:      flex;
+  align-items:  center;
+  width:        200px;
+  flex-shrink:  0;
+}
+.bsi-icon {
+  position:       absolute;
+  left:           9px;
+  color:          var(--brand);
+  pointer-events: none;
+  flex-shrink:    0;
+  z-index:        1;
+}
+.bsi-input {
+  width:         100%;
+  height:        32px;
+  padding:       0 28px 0 30px;
+  border:        1.5px solid var(--border);
+  border-radius: 7px;
+  background:    var(--surface);
+  font-size:     12.5px;
+  font-family:   var(--font);
+  font-weight:   500;
+  color:         var(--text);
+  outline:       none;
+  transition:    border-color .12s, background .12s, box-shadow .12s;
+}
+.bsi-input:hover {
+  border-color: var(--brand);
+}
+.bsi-input:focus {
+  border-color: var(--brand);
+  background:   #fff;
+  box-shadow:   0 0 0 3px rgba(37,99,235,.1);
+}
+.bsi-input:disabled {
+  opacity: .7;
+  cursor:  wait;
+}
+.bsi-loading {
+  position: absolute;
+  right:    9px;
+  color:    var(--text-4);
+  animation: bsi-spin .8s linear infinite;
+}
+@keyframes bsi-spin {
+  to { transform: rotate(360deg); }
+}
+@media (max-width: 768px) {
+  .bsi-root { width: 100%; }
+}
+

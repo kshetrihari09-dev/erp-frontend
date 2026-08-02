@@ -65,6 +65,19 @@ interface Props {
   /** "sale" (default) is pick-only; "purchase" is freely enterable —
    *  see file header. */
   mode?:        'sale' | 'purchase'
+  /** Barcode-scan rows only (see InvoiceRowsTable's `_scanned` flag).
+   *  When true AND exactly one batch exists, that batch is selected
+   *  immediately without opening the popup — the whole point of
+   *  continuous scanning is not stopping to confirm a single option.
+   *  Default false/undefined: EVERY existing manual-entry behavior is
+   *  completely unchanged, including showing the popup for a single
+   *  batch so the user can see what they're confirming. */
+  autoSelectSingle?: boolean
+  /** Barcode-scan rows only. Called instead of the default "focus this
+   *  row's Quantity field" behaviour once a batch is resolved (auto or
+   *  via the popup) — SalesPage uses this to return focus to the
+   *  barcode input instead, so scanning can continue uninterrupted. */
+  onAutoResolved?: () => void
 }
 
 /** Find the Quantity input in this same invoice row — desktop rows are
@@ -84,6 +97,7 @@ function focusRowQty(el: HTMLElement | null) {
 
 export default function BatchSelect({
   productId, productName, value, onSelect, onTextChange, className, tabIndex, mode = 'sale',
+  autoSelectSingle, onAutoResolved,
 }: Props) {
   const { batches, loading } = useProductBatches(productId)
 
@@ -112,7 +126,12 @@ export default function BatchSelect({
   function resolve(batch: StockBatch) {
     onSelect(batch)
     setPopupOpen(false)
-    focusRowQty(rootRef.current)
+    // Scanned rows: hand focus back to the barcode input instead of Qty,
+    // so continuous scanning never has to detour through the row grid.
+    // Every other row (onAutoResolved undefined) keeps the exact
+    // pre-existing behaviour.
+    if (onAutoResolved) onAutoResolved()
+    else focusRowQty(rootRef.current)
   }
 
   /* ── Sale: auto-open the popup the moment a product resolves batches ───── */
@@ -123,6 +142,14 @@ export default function BatchSelect({
     if (processedRef.current === productId) return
     processedRef.current = productId
 
+    // Scanned rows with exactly one batch: select it immediately, no
+    // popup — see the `autoSelectSingle` doc comment above. Every other
+    // case (0, or 2+, or a manually-added row) behaves exactly as before.
+    if (autoSelectSingle && saleBatches.length === 1) {
+      resolve(saleBatches[0])
+      return
+    }
+
     // Every product with at least one batch opens the popup — one batch
     // just means the list has exactly one (pre-highlighted) row to
     // confirm with Enter/double-click, rather than skipping the popup.
@@ -131,7 +158,7 @@ export default function BatchSelect({
     if (saleBatches.length >= 1) {
       setPopupOpen(true)
     }
-  }, [mode, productId, loading, saleBatches]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [mode, productId, loading, saleBatches, autoSelectSingle]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── Purchase: freely-typeable batch number + optional "browse existing" ── */
   if (mode === 'purchase') {
