@@ -1,6 +1,9 @@
 import { useEffect, useRef } from 'react'
 import JsBarcode from 'jsbarcode'
 
+// CSS reference pixel density: 96px per inch, 25.4mm per inch.
+const MM_TO_PX = 96 / 25.4
+
 export interface BarcodeLabelProps {
   name: string
   price: number | string
@@ -28,9 +31,36 @@ export interface BarcodeLabelProps {
  * SVG markup survives `element.innerHTML` copying — canvas pixel data
  * does not. That matters here because the print-popup path in
  * BarcodePrintPage clones this component's rendered DOM via innerHTML.
+ *
+ * SIZING — previously `heightMm * 3.4` / `heightMm * 2.1` were passed
+ * straight into JsBarcode's `height`/`fontSize` options as if they were
+ * already pixel counts. For a 25mm-tall label (~94px on screen), that
+ * produced an ~85px bar block plus a ~52px digit font — over 130px of
+ * barcode alone, before the name/price rows, stuffed into a 94px box.
+ * The flex column overflowed massively and `overflow: hidden` clipped
+ * straight through the product-name text (the cut-off letters in the
+ * reported screenshot). Fixed by converting mm to real px once
+ * (MM_TO_PX) and explicitly budgeting the three stacked rows — name,
+ * barcode block, price — as fractions of the label's real pixel height,
+ * so they can never add up to more than the label itself.
  */
 export default function BarcodeLabel({ name, price, code, widthMm, heightMm, className }: BarcodeLabelProps) {
   const svgRef = useRef<SVGSVGElement>(null)
+
+  const heightPx = heightMm * MM_TO_PX
+
+  // Fixed, real-px budgets for the name/price rows, clamped so they stay
+  // legible on tiny labels without ever ballooning on large ones.
+  const namePx  = Math.min(22, Math.max(8, heightPx * 0.22))
+  const pricePx = Math.min(24, Math.max(9, heightPx * 0.24))
+  const gapsPx  = 3 // breathing room around the barcode block
+
+  // Whatever's left over is the barcode's entire budget — bars AND the
+  // digit-display text together, since JsBarcode stacks those inside one
+  // SVG and both count against the same vertical space.
+  const barcodeBudgetPx = Math.max(14, heightPx - namePx - pricePx - gapsPx)
+  const barcodeFontPx   = Math.max(6, Math.min(11, barcodeBudgetPx * 0.30))
+  const barsHeightPx    = Math.max(8, barcodeBudgetPx - barcodeFontPx - 3)
 
   useEffect(() => {
     if (!svgRef.current || !code) return
@@ -38,17 +68,17 @@ export default function BarcodeLabel({ name, price, code, widthMm, heightMm, cla
       JsBarcode(svgRef.current, code, {
         format: 'CODE128',
         displayValue: true,
-        fontSize: Math.max(7, Math.round(heightMm * 2.1)),
-        height: Math.max(16, Math.round(heightMm * 3.4)),
+        fontSize: barcodeFontPx,
+        height: barsHeightPx,
         margin: 0,
-        width: heightMm >= 30 ? 1.6 : 1.3,
+        width: heightMm >= 30 ? 1.3 : 1.0,
       })
     } catch {
       // Empty/invalid code (e.g. mid-search, before a product is picked) —
       // leave the SVG blank instead of crashing the whole print page.
       svgRef.current.innerHTML = ''
     }
-  }, [code, heightMm])
+  }, [code, barcodeFontPx, barsHeightPx, heightMm])
 
   return (
     <div
@@ -60,6 +90,7 @@ export default function BarcodeLabel({ name, price, code, widthMm, heightMm, cla
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
+        gap: '0.5mm',
         border: '1px dashed #999',
         boxSizing: 'border-box',
         padding: '1mm',
@@ -73,19 +104,32 @@ export default function BarcodeLabel({ name, price, code, widthMm, heightMm, cla
     >
       <div
         style={{
-          fontSize: `${Math.max(2.2, heightMm * 0.16)}mm`,
+          fontSize: `${namePx}px`,
           fontWeight: 700,
           whiteSpace: 'nowrap',
           overflow: 'hidden',
           textOverflow: 'ellipsis',
           maxWidth: '100%',
-          lineHeight: 1.15,
+          lineHeight: 1.1,
         }}
       >
         {name}
       </div>
-      <svg ref={svgRef} style={{ width: '92%', height: 'auto', display: 'block' }} />
-      <div style={{ fontSize: `${Math.max(2.4, heightMm * 0.19)}mm`, fontWeight: 700, lineHeight: 1.15 }}>
+      <svg
+        ref={svgRef}
+        style={{
+          display: 'block',
+          width: 'auto',
+          height: 'auto',
+          maxWidth: '100%',
+          // Safety net only — barsHeightPx/barcodeFontPx already fit the
+          // budget, this just guarantees it can shrink (never grow)
+          // further if a long code makes the intrinsic SVG width (and
+          // therefore, proportionally, its height) exceed the label.
+          maxHeight: `${barcodeBudgetPx}px`,
+        }}
+      />
+      <div style={{ fontSize: `${pricePx}px`, fontWeight: 700, lineHeight: 1.1 }}>
         Rs. {price}
       </div>
     </div>
