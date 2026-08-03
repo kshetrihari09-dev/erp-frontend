@@ -174,6 +174,7 @@ export default function AppLayout() {
     [PATHS.SALES_RETURNS]:    'Sales Returns',
     [PATHS.PURCHASE_RETURNS]: 'Purchase Returns',
     [PATHS.PRODUCTS]:   'Products',
+    [PATHS.BARCODE_PRINT]: 'Barcode Print',
     [PATHS.STOCK]:      'Stock Report',
     [PATHS.CUSTOMERS]:  'Customers',
     [PATHS.SUPPLIERS]:  'Suppliers',
