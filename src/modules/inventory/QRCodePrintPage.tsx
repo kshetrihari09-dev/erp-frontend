@@ -349,25 +349,45 @@ export default function QRCodePrintPage() {
           {totalLabels === 0 ? (
             <Empty message="No labels queued yet" icon={<QrCode size={28}/>} />
           ) : (
+            // "Paper sheet" frame — purely a preview affordance so the mm
+            // margin around the labels reads visually like the printed
+            // A4 page margin (same PAGE_MARGIN_MM value the print popup's
+            // @page rule and the PDF export's `margin` option both use).
+            // The actual grid below (sheetRef) is untouched — it's the
+            // exact node the print/PDF paths read from, so what's framed
+            // here is guaranteed to match the real output, not a second
+            // approximation of it.
             <div
-              ref={sheetRef}
               style={{
-                display: 'grid',
-                gridTemplateColumns: `repeat(${cols}, ${widthMm}mm)`,
-                gap: '2mm',
-                justifyContent: 'start',
+                display: 'inline-block',
+                background: '#fff',
+                padding: `${PAGE_MARGIN_MM}mm`,
+                border: '1px solid var(--border)',
+                borderRadius: 4,
+                boxShadow: '0 1px 4px rgba(0,0,0,0.10)',
               }}
             >
-              {flatLabels.map(({ item, i }) => (
-                <QRCodeLabel
-                  key={`${item.product.id}-${i}`}
-                  name={item.product.name}
-                  price={item.product.sales_rate}
-                  code={item.product.barcode || item.product.item_code}
-                  widthMm={widthMm}
-                  heightMm={heightMm}
-                />
-              ))}
+              <div
+                ref={sheetRef}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: `repeat(${cols}, ${widthMm}mm)`,
+                  gridAutoRows: `${heightMm}mm`,
+                  gap: '2mm',
+                  justifyContent: 'start',
+                }}
+              >
+                {flatLabels.map(({ item, i }) => (
+                  <QRCodeLabel
+                    key={`${item.product.id}-${i}`}
+                    name={item.product.name}
+                    price={item.product.sales_rate}
+                    code={item.product.barcode || item.product.item_code}
+                    widthMm={widthMm}
+                    heightMm={heightMm}
+                  />
+                ))}
+              </div>
             </div>
           )}
         </div>
