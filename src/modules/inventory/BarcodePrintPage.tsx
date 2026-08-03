@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useSearchParams } from 'react-router-dom'
 import { Printer, Download, Search, X, Loader2, Package } from 'lucide-react'
 import { productsAPI } from '@/services/api'
@@ -41,6 +42,36 @@ export default function BarcodePrintPage() {
 
   const sheetRef = useRef<HTMLDivElement>(null)
   const [pdfBusy, setPdfBusy] = useState(false)
+
+  // ── Dropdown position — portaled to document.body ───────────────────────
+  // The left-hand search box lives inside a `.table-card`, and that class
+  // has `overflow: hidden` (rounded-corner clipping). A plain
+  // `position: absolute` dropdown nested inside it gets silently clipped
+  // at the card's bottom edge — the search itself works fine (results
+  // populate), the dropdown is just invisible, which reads exactly like
+  // "search isn't working." ProductSearchCell hit the same ancestor-
+  // clipping issue and fixed it by portaling to document.body with a
+  // real computed position; mirrored here.
+  const searchWrapRef = useRef<HTMLDivElement>(null)
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null)
+
+  const updateDropdownPosition = useCallback(() => {
+    const el = searchWrapRef.current
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    setDropdownPos({ top: rect.bottom + 4, left: rect.left, width: rect.width })
+  }, [])
+
+  useEffect(() => {
+    if (!query.trim()) return
+    updateDropdownPosition()
+    window.addEventListener('scroll', updateDropdownPosition, true)
+    window.addEventListener('resize', updateDropdownPosition)
+    return () => {
+      window.removeEventListener('scroll', updateDropdownPosition, true)
+      window.removeEventListener('resize', updateDropdownPosition)
+    }
+  }, [query, updateDropdownPosition])
 
   // ── Prefix search, debounced (mirrors ProductSearchCell's pattern) ──────
   useEffect(() => {
@@ -190,7 +221,7 @@ export default function BarcodePrintPage() {
         <div className="flex flex-col gap-4">
           <div className="table-card p-4">
             <div className="text-xs font-semibold uppercase tracking-wide text-[var(--text-3)] mb-2">Search Product</div>
-            <div className="relative">
+            <div className="relative" ref={searchWrapRef}>
               <div className="flex items-center gap-2 border rounded-lg px-3 py-2" style={{ borderColor: 'var(--border)' }}>
                 <Search size={14} className="text-[var(--text-4)]" />
                 <input
@@ -202,9 +233,18 @@ export default function BarcodePrintPage() {
                 {searching && <Loader2 size={14} className="animate-spin text-[var(--text-4)]" />}
               </div>
 
-              {query.trim() && (
-                <div className="absolute z-10 left-0 right-0 mt-1 max-h-72 overflow-y-auto rounded-lg border bg-[var(--surface)] shadow-lg"
-                  style={{ borderColor: 'var(--border)' }}>
+              {query.trim() && dropdownPos && createPortal(
+                <div
+                  className="max-h-72 overflow-y-auto rounded-lg border bg-[var(--surface)] shadow-lg"
+                  style={{
+                    position: 'fixed',
+                    top: dropdownPos.top,
+                    left: dropdownPos.left,
+                    width: dropdownPos.width,
+                    zIndex: 1000,
+                    borderColor: 'var(--border)',
+                  }}
+                >
                   {results.length === 0 && !searching && (
                     <div className="px-3 py-3 text-xs text-[var(--text-4)]">No products found</div>
                   )}
@@ -218,7 +258,8 @@ export default function BarcodePrintPage() {
                       <span className="text-[10px] text-[var(--text-4)] font-mono shrink-0">{p.item_code}</span>
                     </button>
                   ))}
-                </div>
+                </div>,
+                document.body
               )}
             </div>
           </div>
