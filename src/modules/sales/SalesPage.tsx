@@ -144,20 +144,62 @@ export default function SalesPage() {
   // auto-select/auto-open logic used for search and keyboard selection —
   // a scanned product goes through the exact same batch popup, so a
   // scan never silently locks in a batch the user didn't confirm.
+  //
+  // Mirrors handleBarcodeProduct (the hardware-scanner path) below: same
+  // dedupe-by-incrementing-qty, same `_scanned` flag, same calcRowAmount()
+  // call for Amount. This camera-scan path was previously missing all
+  // three, which is why Amount stayed 0 and Batch never auto-resolved on
+  // a fresh scan — QtyGate itself was working correctly the whole time,
+  // it disables Qty only when the product genuinely has zero available
+  // stock batches (see QtyGate.tsx/BatchSelect.tsx), which is unrelated
+  // to this fix.
   const handleScanResult = useCallback((result: ScanResult) => {
-    const p   = result.product
-    const row = newRow()
+    const p = result.product
+
+    // Already on the invoice? Bump qty instead of adding a duplicate
+    // row — same "qty > 0" dedupe handleBarcodeProduct uses, so scanning
+    // the same medicine twice in one continuous session just increases
+    // quantity instead of creating a second line.
+    const existingIdx = rows.findIndex(r => r.product_id === p.id && Number(r.qty) > 0)
+
+    if (existingIdx !== -1) {
+      const next = rows.map((r, i) => {
+        if (i !== existingIdx) return r
+        const qty = Number(r.qty || 0) + 1
+        const { amount, cc_amount } = calcRowAmount({
+          qty, rate: Number(r.rate), bonus: Number(r.bonus) || 0,
+          discount_pct: Number(r.discount_pct) || 0, cc_pct: Number(r.cc_pct) || 0,
+        })
+        return { ...r, qty, amount, cc_amount }
+      })
+      setRows(next)
+      setProducts(prev => prev.some(x => x.id === p.id) ? prev : [...prev, p as any])
+      flashRow(next[existingIdx]._id)
+      return
+    }
+
+    // New product — flagged `_scanned` so BatchSelect auto-picks a single
+    // batch (or opens the popup for 2+) instead of sitting unresolved,
+    // exactly like a hardware-scanner row. Amount/cc_amount are computed
+    // right away instead of staying at newRow()'s default of 0.
+    const row: InvoiceRow = { ...newRow(), _scanned: true }
     row.product_id   = p.id
     row.product_name = p.name
     row.rate         = p.sales_rate
     row.cc_pct       = p.cc_pct ?? 0
-    setRows(prev => {
-      const last = prev[prev.length - 1]
-      if (last && !last.product_id) return [...prev.slice(0, -1), row]
-      return [...prev, row]
+    const { amount, cc_amount } = calcRowAmount({
+      qty: row.qty, rate: Number(row.rate), bonus: 0,
+      discount_pct: 0, cc_pct: Number(row.cc_pct) || 0,
     })
+    row.amount    = amount
+    row.cc_amount = cc_amount
+
+    const last = rows[rows.length - 1]
+    const next = (last && !last.product_id) ? [...rows.slice(0, -1), row] : [...rows, row]
+    setRows(next)
     setProducts(prev => prev.some(x => x.id === p.id) ? prev : [...prev, p as any])
-  }, [])
+    flashRow(row._id)
+  }, [rows])
 
   // ── Dedicated barcode-scanner input (BarcodeScanInput) ──────────────────
   // Separate, always-focused fast path for a USB/Bluetooth hardware

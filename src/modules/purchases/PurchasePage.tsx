@@ -62,19 +62,46 @@ export default function PurchasePage() {
   // lone batch, open the picker for several) the same way it does for a
   // product chosen by search or keyboard, so a scan never silently locks
   // in a batch without the user confirming it.
+  //
+  // Also computes Amount right away (calcRowAmount) and dedupes against
+  // an existing row for the same product by bumping qty instead of
+  // adding a duplicate line — previously this handler left Amount at
+  // newRow()'s default of 0 and always added a fresh row even on a
+  // repeat scan.
   const handleScanResult = useCallback((result: ScanResult) => {
-    const p   = result.product
-    const row = newRow()
+    const p = result.product
+
+    const existingIdx = rows.findIndex(r => r.product_id === p.id && Number(r.qty) > 0)
+    if (existingIdx !== -1) {
+      const next = rows.map((r, i) => {
+        if (i !== existingIdx) return r
+        const qty = Number(r.qty || 0) + 1
+        const { amount } = calcRowAmount({
+          qty, rate: Number(r.rate), bonus: Number(r.bonus) || 0,
+          discount_pct: 0, cc_pct: 0,
+        })
+        return { ...r, qty, amount }
+      })
+      setRows(next)
+      setProducts(prev => prev.some(x => x.id === p.id) ? prev : [...prev, p as any])
+      return
+    }
+
+    const row: InvoiceRow = { ...newRow(), _scanned: true }
     row.product_id   = p.id
     row.product_name = p.name
     row.rate         = p.purchase_rate
-    setRows(prev => {
-      const last = prev[prev.length - 1]
-      if (last && !last.product_id) return [...prev.slice(0, -1), row]
-      return [...prev, row]
+    const { amount } = calcRowAmount({
+      qty: row.qty, rate: Number(row.rate), bonus: 0,
+      discount_pct: 0, cc_pct: 0,
     })
+    row.amount = amount
+
+    const last = rows[rows.length - 1]
+    const next = (last && !last.product_id) ? [...rows.slice(0, -1), row] : [...rows, row]
+    setRows(next)
     setProducts(prev => prev.some(x => x.id === p.id) ? prev : [...prev, p as any])
-  }, [])
+  }, [rows])
 
   const { register, handleSubmit, reset, watch, setValue } = useForm({
     defaultValues: {
