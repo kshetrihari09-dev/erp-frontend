@@ -1,5 +1,6 @@
 import { useState, lazy, Suspense } from 'react'
 import { useForm } from 'react-hook-form'
+import type { UseFormRegister, FieldErrors } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Plus, Package, ScanLine, Type, Boxes, Download, Upload } from 'lucide-react'
 import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct, useProductOpeningBatches, useAddOpeningInventory } from '@/hooks/useQuery'
@@ -154,6 +155,35 @@ function OpeningInventorySection({ productId }: { productId: string }) {
   )
 }
 
+// Defined at module scope — NOT inside ProductForm — so its identity is
+// stable across renders. A component defined inside another component's
+// render body gets a brand-new function reference every render; React
+// then treats every <Field/> as a different component type than last
+// render and fully unmounts + remounts the underlying <input>, which is
+// exactly what drops focus (and closes the on-screen keyboard on mobile)
+// after the very first keystroke — ProductForm re-renders on every
+// keystroke because of the `watch(...)` call further down, so this was
+// firing on every single character typed in ANY field, not just once.
+// `register` and `errors` are threaded through as explicit props instead
+// of being closed over, since that closure is exactly what made the old
+// version need to be redefined per-render in the first place.
+function Field({ label, name, type = 'text', register, errors, ...rest }: {
+  label: string
+  name: keyof Form
+  type?: string
+  register: UseFormRegister<Form>
+  errors: FieldErrors<Form>
+  [key: string]: any
+}) {
+  return (
+    <div>
+      <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">{label}</label>
+      <input type={type} className="erp-input" {...register(name)} {...rest} />
+      {errors[name] && <p className="text-xs text-red-500 mt-1">{(errors as any)[name]?.message}</p>}
+    </div>
+  )
+}
+
 function ProductForm({ initial, onClose }: { initial?: Product | null; onClose: () => void }) {
   const create = useCreateProduct()
   const update = useUpdateProduct()
@@ -216,13 +246,6 @@ function ProductForm({ initial, onClose }: { initial?: Product | null; onClose: 
     onClose()
   })
 
-  const Field = ({ label, name, type = 'text', ...rest }: any) => (
-    <div>
-      <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">{label}</label>
-      <input type={type} className="erp-input" {...register(name)} {...rest} />
-      {errors[name as keyof Form] && <p className="text-xs text-red-500 mt-1">{(errors as any)[name]?.message}</p>}
-    </div>
-  )
 
   return (
     <>
@@ -247,8 +270,8 @@ function ProductForm({ initial, onClose }: { initial?: Product | null; onClose: 
       )}
 
       <div className="form-grid">
-        <div className="span2"><Field label="Product Name *" name="name" /></div>
-        <Field label="Generic Name" name="generic_name" />
+        <div className="span2"><Field label="Product Name *" name="name" register={register} errors={errors} /></div>
+        <Field label="Generic Name" name="generic_name" register={register} errors={errors} />
         <div>
           <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">Manufacturer</label>
           <ManufacturerSelect
@@ -272,7 +295,7 @@ function ProductForm({ initial, onClose }: { initial?: Product | null; onClose: 
             }}
           />
         </div>
-        <Field label="Category" name="category" />
+        <Field label="Category" name="category" register={register} errors={errors} />
         <div>
           <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">Barcode</label>
           <div className="flex gap-1.5">
@@ -296,9 +319,9 @@ function ProductForm({ initial, onClose }: { initial?: Product | null; onClose: 
             {PRODUCT_UNITS.map(u => <option key={u}>{u}</option>)}
           </select>
         </div>
-        <Field label="MRP" name="mrp" type="number" step="0.01" />
-        <Field label="Sale Rate" name="sales_rate" type="number" step="0.01" />
-        <Field label="Purchase Rate" name="purchase_rate" type="number" step="0.01" />
+        <Field label="MRP" name="mrp" type="number" step="0.01" register={register} errors={errors} />
+        <Field label="Sale Rate" name="sales_rate" type="number" step="0.01" register={register} errors={errors} />
+        <Field label="Purchase Rate" name="purchase_rate" type="number" step="0.01" register={register} errors={errors} />
         <div>
           <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">VAT %</label>
           <select className="erp-input" {...register('vat_percent')}>
@@ -316,7 +339,7 @@ function ProductForm({ initial, onClose }: { initial?: Product | null; onClose: 
           />
           {errors.cc_percent && <p className="text-xs text-red-500 mt-1">{(errors as any).cc_percent?.message}</p>}
         </div>
-        <Field label="Min Stock" name="min_stock" type="number" />
+        <Field label="Min Stock" name="min_stock" type="number" register={register} errors={errors} />
       </div>
 
       {/* ── Opening Inventory ──────────────────────────────────────────────
@@ -333,9 +356,9 @@ function ProductForm({ initial, onClose }: { initial?: Product | null; onClose: 
             Opening Inventory <span className="normal-case font-medium text-[var(--text-4)]">(optional)</span>
           </div>
           <div className="form-grid col3">
-            <Field label="Opening Stock" name="opening_stock" type="number" min="0" step="1" placeholder="0" />
-            <Field label="Opening Batch" name="opening_batch" placeholder="B001" />
-            <Field label="Opening Expiry (MM/YY)" name="opening_expiry" placeholder="06/27" />
+            <Field label="Opening Stock" name="opening_stock" type="number" min="0" step="1" placeholder="0" register={register} errors={errors} />
+            <Field label="Opening Batch" name="opening_batch" placeholder="B001" register={register} errors={errors} />
+            <Field label="Opening Expiry (MM/YY)" name="opening_expiry" placeholder="06/27" register={register} errors={errors} />
           </div>
         </div>
       ) : (
