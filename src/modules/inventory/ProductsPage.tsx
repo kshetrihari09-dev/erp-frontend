@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import type { UseFormRegister, FieldErrors } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Plus, Package, ScanLine, Type, Boxes, Download, Upload, Printer } from 'lucide-react'
+import { Plus, Package, ScanLine, Type, Boxes, Download, Upload, Printer, QrCode } from 'lucide-react'
 import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct, useProductOpeningBatches, useAddOpeningInventory } from '@/hooks/useQuery'
 import { Button, Modal, Badge, Pagination, SkeletonRows, Empty, SearchInput, ConfirmDialog } from '@/components/ui'
 import ManufacturerSelect from '@/components/forms/ManufacturerSelect'
@@ -418,6 +418,9 @@ export default function ProductsPage() {
           <Button variant="secondary" icon={<Printer size={14}/>} onClick={() => navigate('/barcode-print')}>
             Print Barcodes
           </Button>
+          <Button variant="secondary" icon={<QrCode size={14}/>} onClick={() => navigate('/qrcode-print')}>
+            Print QR Codes
+          </Button>
           <Button variant="primary" icon={<Plus size={14}/>} onClick={() => { setEditing(null); setModal(true) }}>
             New Product
           </Button>
@@ -469,6 +472,8 @@ export default function ProductsPage() {
                           <div className="flex gap-1">
                             <Button variant="ghost" size="sm" icon={<Printer size={12}/>}
                               onClick={() => navigate(`/barcode-print?productId=${p.id}`)}>Print</Button>
+                            <Button variant="ghost" size="sm" icon={<QrCode size={12}/>}
+                              onClick={() => navigate(`/qrcode-print?productId=${p.id}`)}>QR</Button>
                             <Button variant="ghost" size="sm" onClick={() => { setEditing(p); setModal(true) }}>Edit</Button>
                             <Button variant="danger" size="sm" onClick={() => setDelId(p.id)}>Del</Button>
                           </div>
@@ -539,6 +544,7 @@ export default function ProductsPage() {
                   </div>
                   <div className="prod-mc-actions">
                     <button className="prod-mc-btn" onClick={() => navigate(`/barcode-print?productId=${p.id}`)}>Print</button>
+                    <button className="prod-mc-btn" onClick={() => navigate(`/qrcode-print?productId=${p.id}`)}>QR</button>
                     <button className="prod-mc-btn" onClick={() => { setEditing(p); setModal(true) }}>Edit</button>
                     <button className="prod-mc-btn prod-mc-btn-danger" onClick={() => setDelId(p.id)}>Delete</button>
                   </div>

@@ -127,6 +127,7 @@ export const PATHS = {
   PURCHASE_RETURNS: '/purchase-returns',
   PRODUCTS:   '/products',
   BARCODE_PRINT: '/barcode-print',
+  QR_CODE_PRINT: '/qrcode-print',
   MANUFACTURERS: '/manufacturers',
   STOCK:      '/stock',
   CUSTOMERS:  '/customers',
