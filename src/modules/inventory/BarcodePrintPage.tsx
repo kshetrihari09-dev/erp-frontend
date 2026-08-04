@@ -286,10 +286,10 @@ export default function BarcodePrintPage() {
               <div className="flex items-center gap-2">
                 <label className="text-xs text-[var(--text-3)]">Width (mm)</label>
                 <input type="number" min={10} value={customW} onChange={e => setCustomW(Number(e.target.value) || 0)}
-                  className="erp-input w-20" />
+                  className="erp-input" style={{ width: 80, flex: '0 0 auto' }} />
                 <label className="text-xs text-[var(--text-3)]">Height (mm)</label>
                 <input type="number" min={10} value={customH} onChange={e => setCustomH(Number(e.target.value) || 0)}
-                  className="erp-input w-20" />
+                  className="erp-input" style={{ width: 80, flex: '0 0 auto' }} />
               </div>
             )}
           </div>
@@ -313,7 +313,8 @@ export default function BarcodePrintPage() {
                       min={1}
                       value={item.qty}
                       onChange={e => updateQty(item.product.id, Number(e.target.value) || 1)}
-                      className="erp-input w-16 text-center"
+                      className="erp-input text-center"
+                      style={{ width: 56, flex: '0 0 auto' }}
                     />
                     <button onClick={() => removeItem(item.product.id)} className="text-[var(--text-4)] hover:text-red-500 p-1">
                       <X size={14} />
