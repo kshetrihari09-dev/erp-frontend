@@ -13,13 +13,13 @@ const DEFAULT_MIN_QR_MM = 25
 const ABSOLUTE_MIN_QR_MM = 12
 
 // Quiet zone around the QR modules, expressed in "modules" (the unit the
-// `qrcode` library's `margin` option uses) — 4 is the value the QR
-// specification recommends; most generators (including this one before)
-// use 0–1 and rely on external padding, which is why scanners sometimes
-// struggle right at the label edge. Baking the quiet zone into the QR
-// artwork itself means it survives no matter how the label gets cropped,
-// exported, or re-scaled downstream.
-const QR_QUIET_ZONE_MODULES = 4
+// `qrcode` library's `margin` option uses). The QR spec recommends 4, but
+// that reads as a wide, wasteful white border once the label's own CSS
+// padding is stacked on top of it too — 2 modules is the commonly-used
+// practical minimum for printed labels and stays comfortably scannable
+// while leaving far more of the label's square budget to the actual QR
+// modules instead of blank margin.
+const QR_QUIET_ZONE_MODULES = 2
 
 // Module-level cache so printing many copies of the same product (qty > 1)
 // or re-rendering during layout changes never regenerates identical QR
@@ -79,16 +79,23 @@ export default function QRCodeLabel({
 
   // Budgets computed in mm (the unit the whole label is laid out in) so
   // they scale consistently regardless of screen zoom or print DPI.
-  const namePt  = Math.min(5.5, Math.max(2.2, heightMm * 0.16))
-  const pricePt = Math.min(6,   Math.max(2.4, heightMm * 0.18))
-  const padMm   = Math.max(0.8, Math.min(2, Math.min(widthMm, heightMm) * 0.06))
-  const gapMm   = Math.max(0.4, Math.min(1.2, heightMm * 0.03))
+  // These ARE mm values already (used directly as `${nameSizeMm}mm`
+  // font-size below) — NOT points, despite earlier naming that implied
+  // otherwise and caused a double unit-conversion bug (see nameRowMm/
+  // priceRowMm history): reserving too little row height for the actual
+  // rendered font size, so overflow:hidden clipped straight through the
+  // glyphs top/bottom on smaller label presets.
+  const nameSizeMm  = Math.min(4.2, Math.max(1.8, heightMm * 0.13))
+  const priceSizeMm = Math.min(4.6, Math.max(2.0, heightMm * 0.15))
+  const padMm = Math.max(0.5, Math.min(1.4, Math.min(widthMm, heightMm) * 0.045))
+  const gapMm = Math.max(0.3, Math.min(0.9, heightMm * 0.02))
 
-  // Rough mm-equivalent of each text row (line-height ~1.15 in mm, using
-  // the pt sizes above at 1pt ≈ 0.3528mm) — just enough to reserve real
-  // vertical space for the two text rows before handing the rest to the QR.
-  const nameRowMm  = namePt * 0.3528 * 1.25
-  const priceRowMm = pricePt * 0.3528 * 1.25
+  const LINE_HEIGHT = 1.15
+  // Name can wrap to 2 lines (see WebkitLineClamp below) — reserve for
+  // the worst case so a wrapped second line never gets clipped. Price is
+  // always a single line.
+  const nameRowMm  = nameSizeMm * LINE_HEIGHT * 2
+  const priceRowMm = priceSizeMm * LINE_HEIGHT
 
   const availableHeightMm = heightMm - padMm * 2 - nameRowMm - priceRowMm - gapMm * 2
   const availableWidthMm  = widthMm - padMm * 2
@@ -174,9 +181,9 @@ export default function QRCodeLabel({
     >
       <div
         style={{
-          fontSize: `${namePt}mm`,
+          fontSize: `${nameSizeMm}mm`,
           fontWeight: 700,
-          lineHeight: 1.15,
+          lineHeight: LINE_HEIGHT,
           width: '100%',
           textAlign: 'center',
           // Wrap up to 2 lines when there's room; beyond that, truncate
@@ -213,9 +220,9 @@ export default function QRCodeLabel({
 
       <div
         style={{
-          fontSize: `${pricePt}mm`,
+          fontSize: `${priceSizeMm}mm`,
           fontWeight: 700,
-          lineHeight: 1.15,
+          lineHeight: LINE_HEIGHT,
           whiteSpace: 'nowrap',
           overflow: 'hidden',
           textOverflow: 'ellipsis',
