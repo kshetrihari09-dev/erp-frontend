@@ -199,13 +199,49 @@ export default function BarcodePrintPage() {
   }
 
   return (
-    <div>
+    <div className="bcp-page">
+      <style>{`
+        /* ── Barcode Print — mobile/tablet responsive (self-contained, additive) ── */
+        .bcp-page { max-width: 100%; overflow-x: hidden; }
+
+        /* Sidebar (search/size/queue) + preview: side-by-side on desktop,
+           stacked on tablet/mobile so the preview isn't squeezed into a
+           sliver next to a fixed-min-width sidebar. */
+        .bcp-layout-grid { grid-template-columns: minmax(280px, 380px) 1fr; }
+        @media (max-width: 900px) {
+          .bcp-layout-grid { grid-template-columns: 1fr !important; }
+        }
+
+        /* Header action buttons: wrap instead of overflowing the header,
+           and stack full-width one under the other once the row is too
+           narrow for both side by side. */
+        .bcp-header-actions { flex-wrap: wrap; }
+        @media (max-width: 560px) {
+          .bcp-header-actions { width: 100%; }
+          .bcp-header-actions > button { flex: 1 1 auto; }
+        }
+        @media (max-width: 400px) {
+          .bcp-header-actions { flex-direction: column; align-items: stretch; }
+          .bcp-header-actions > button { width: 100%; }
+        }
+
+        /* Preview sheet: allow horizontal scroll on narrow screens instead
+           of clipping/overflowing the card — the label grid's real mm
+           widths don't shrink (that would misrepresent the print output),
+           so a horizontal scrollbar is the correct fallback, not a bug. */
+        .bcp-preview-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+        @media (max-width: 480px) {
+          .bcp-page .table-card { padding: 12px !important; }
+        }
+      `}</style>
+
       <div className="page-header">
         <div>
           <div className="page-breadcrumb">Inventory</div>
           <h1 className="page-title">Barcode Print</h1>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 bcp-header-actions">
           <Button variant="secondary" icon={pdfBusy ? <Loader2 size={14} className="animate-spin"/> : <Download size={14}/>}
             onClick={downloadPdf} disabled={pdfBusy || totalLabels === 0}>
             Download PDF
@@ -216,7 +252,7 @@ export default function BarcodePrintPage() {
         </div>
       </div>
 
-      <div className="grid gap-4" style={{ gridTemplateColumns: 'minmax(280px, 380px) 1fr' }}>
+      <div className="grid gap-4 bcp-layout-grid">
         {/* ── Left: search + queued items + label size ─────────────────── */}
         <div className="flex flex-col gap-4">
           <div className="table-card p-4">
@@ -327,7 +363,7 @@ export default function BarcodePrintPage() {
         </div>
 
         {/* ── Right: live preview / actual print & PDF source ───────────── */}
-        <div className="table-card p-4 overflow-x-auto">
+        <div className="table-card p-4 overflow-x-auto bcp-preview-scroll">
           <div className="text-xs font-semibold uppercase tracking-wide text-[var(--text-3)] mb-3">
             Preview — {cols} per row on A4
           </div>

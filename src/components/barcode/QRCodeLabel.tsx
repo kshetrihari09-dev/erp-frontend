@@ -32,7 +32,7 @@ export default function QRCodeLabel({ name, price, code, widthMm, heightMm, clas
   const heightPx = heightMm * MM_TO_PX
   const widthPx  = widthMm * MM_TO_PX
 
-  const namePx  = Math.min(22, Math.max(8, heightPx * 0.22))
+  const namePx  = Math.min(14, Math.max(6, heightPx * 0.14))
   const pricePx = Math.min(24, Math.max(9, heightPx * 0.24))
   const gapsPx  = 3 // breathing room around the QR block
 
