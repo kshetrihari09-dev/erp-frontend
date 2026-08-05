@@ -44,8 +44,22 @@ export interface BarcodeScanInputHandle {
 interface Props {
   onResolved:  (product: Product) => void
   onNotFound:  (code: string) => void
+  /** Fires instead of onNotFound when the backend rejects the scan with
+   *  403 QR_ACCOUNT_MISMATCH — a structured QR payload printed under a
+   *  different account than the one currently logged in. Optional so
+   *  existing callers keep compiling unchanged; if omitted, this falls
+   *  back to onNotFound(code) exactly like before (the code will just be
+   *  the raw JSON text in that case, which is a worse but still-safe
+   *  degradation — the mismatch is still blocked either way). */
+  onAccountMismatch?: (message: string) => void
   autoFocus?:  boolean
 }
+
+// Exact copy of the message the backend returns for QR_ACCOUNT_MISMATCH
+// (see erp-unified-backend/src/scanner/scannerRoutes.js) — kept as a
+// literal so the UI copy is stable even if a future response shape
+// changes; res.data?.code is still what actually drives the branch.
+const QR_ACCOUNT_MISMATCH_MSG = 'This QR Code belongs to another account and cannot be used in the current account.'
 
 function scannedToProduct(s: {
   id: string; item_code: string; name: string
@@ -70,7 +84,7 @@ function scannedToProduct(s: {
 const barcodeCache = new Map<string, Product>()
 
 const BarcodeScanInput = forwardRef<BarcodeScanInputHandle, Props>(function BarcodeScanInput({
-  onResolved, onNotFound, autoFocus,
+  onResolved, onNotFound, onAccountMismatch, autoFocus,
 }, ref) {
   const [code, setCode] = useState('')
   const [busy, setBusy] = useState(false)
@@ -104,9 +118,14 @@ const BarcodeScanInput = forwardRef<BarcodeScanInputHandle, Props>(function Barc
         setCode('')
         onNotFound(trimmed)
       }
-    } catch {
+    } catch (err: any) {
       setCode('')
-      onNotFound(trimmed)
+      if (err?.response?.status === 403 && err?.response?.data?.code === 'QR_ACCOUNT_MISMATCH') {
+        if (onAccountMismatch) onAccountMismatch(QR_ACCOUNT_MISMATCH_MSG)
+        else onNotFound(trimmed) // caller hasn't wired the dedicated handler — still blocked, just less clearly labeled
+      } else {
+        onNotFound(trimmed)
+      }
     } finally {
       setBusy(false)
     }

@@ -151,11 +151,21 @@ export default function useMobileScanner({ token, apiBase }: Options) {
   const zoomRef = useRef(ZOOM_MIN)
   useEffect(() => { zoomRef.current = state.zoom }, [state.zoom])
 
+  // Exact copy of the message the backend returns for QR_ACCOUNT_MISMATCH —
+  // see useLocalScanner.ts for the full rationale (same fetch pattern here,
+  // just via raw fetch() + authFetch instead of axios).
+  const QR_ACCOUNT_MISMATCH_MSG = 'This QR Code belongs to another account and cannot be used in the current account.'
+
   // ── Product search ─────────────────────────────────────────────────────────
-  const searchBarcode = useCallback(async (code: string): Promise<MobileProduct[]> => {
+  // fetch() doesn't throw on non-2xx like axios does, so the 403
+  // QR_ACCOUNT_MISMATCH case is detected from the parsed body's `code`
+  // field regardless of res.ok, and returned as a distinct sentinel rather
+  // than folded into "no match" — see call site below.
+  const searchBarcode = useCallback(async (code: string): Promise<MobileProduct[] | 'ACCOUNT_MISMATCH'> => {
     try {
       const res  = await authFetch(`${apiBase}/scanner/products/barcode/${encodeURIComponent(code)}`)
       const json = await res.json()
+      if (!res.ok && json?.code === 'QR_ACCOUNT_MISMATCH') return 'ACCOUNT_MISMATCH'
       return json.success && json.data ? [json.data] : []
     } catch { return [] }
   }, [apiBase, authFetch])
@@ -239,6 +249,10 @@ export default function useMobileScanner({ token, apiBase }: Options) {
 
         const products = await searchBarcode(code)
         if (!mountedRef.current) return
+        if (products === 'ACCOUNT_MISMATCH') {
+          setState(s => ({ ...s, status: 'error', error: QR_ACCOUNT_MISMATCH_MSG }))
+          return
+        }
         if (products.length > 0) {
           setState(s => ({ ...s, status: 'matches', mode: 'barcode', matches: products }))
         } else {

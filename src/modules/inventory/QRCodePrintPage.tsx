@@ -6,6 +6,8 @@ import { productsAPI } from '@/services/api'
 import type { Product } from '@/types'
 import { Button, Empty } from '@/components/ui'
 import QRCodeLabel from '@/components/barcode/QRCodeLabel'
+import useAuthStore from '@/store/authStore'
+import { buildProductQrPayload } from '@/utils/productQr'
 
 /* ── Label sizes ──────────────────────────────────────────────────────────
  * Same presets as BarcodePrintPage — common thermal/inkjet label stock
@@ -31,6 +33,11 @@ interface LabelItem {
 
 export default function QRCodePrintPage() {
   const [searchParams] = useSearchParams()
+  // Whichever account is currently logged in — this is what gets baked
+  // into every generated QR's `accountId`, so the scanner can tell a QR
+  // printed here apart from one printed under a different account. See
+  // utils/productQr.ts for the full payload shape and rationale.
+  const accountId = useAuthStore(s => s.company?.id)
 
   const [query, setQuery]     = useState('')
   const [results, setResults] = useState<Product[]>([])
@@ -402,7 +409,7 @@ export default function QRCodePrintPage() {
                   key={`${item.product.id}-${i}`}
                   name={item.product.name}
                   price={item.product.sales_rate}
-                  code={item.product.barcode || item.product.item_code}
+                  code={accountId ? buildProductQrPayload(item.product, accountId) : (item.product.barcode || item.product.item_code)}
                   widthMm={widthMm}
                   heightMm={heightMm}
                 />

@@ -209,6 +209,7 @@ export default function SalesPage() {
   // camera flow (handleScanResult above) is untouched.
   const barcodeInputRef = useRef<BarcodeScanInputHandle>(null)
   const [notFoundCode, setNotFoundCode] = useState<string | null>(null)
+  const [accountMismatchMsg, setAccountMismatchMsg] = useState<string | null>(null)
   const [flashRowId,   setFlashRowId]   = useState<number | undefined>(undefined)
   const flashTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -290,6 +291,20 @@ export default function SalesPage() {
     playErrorBeep()
     setNotFoundCode(code)
   }, [])
+
+  // Distinct from handleBarcodeNotFound: this is a deliberate block (QR
+  // printed under a different account), not a missing product, so it
+  // gets its own dialog with a plain message instead of "no product
+  // matches this code: <raw JSON>".
+  const handleAccountMismatch = useCallback((message: string) => {
+    playErrorBeep()
+    setAccountMismatchMsg(message)
+  }, [])
+
+  function closeAccountMismatchDialog() {
+    setAccountMismatchMsg(null)
+    requestAnimationFrame(() => barcodeInputRef.current?.focus())
+  }
 
   function closeNotFoundDialog() {
     setNotFoundCode(null)
@@ -747,6 +762,7 @@ export default function SalesPage() {
                   autoFocus
                   onResolved={handleBarcodeProduct}
                   onNotFound={handleBarcodeNotFound}
+                  onAccountMismatch={handleAccountMismatch}
                 />
                 <ScanButton context="sales" onResult={handleScanResult} />
                 {/* pos-kbd-hints: hidden on mobile via CSS addendum */}
@@ -1335,6 +1351,12 @@ export default function SalesPage() {
 
       {/* ── Dialogs — IDENTICAL to original ──────────────────────────── */}
       <ProductNotFoundDialog code={notFoundCode} onClose={closeNotFoundDialog} />
+      <ProductNotFoundDialog
+        code={accountMismatchMsg}
+        onClose={closeAccountMismatchDialog}
+        title="QR Code Not Valid Here"
+        message={accountMismatchMsg ?? undefined}
+      />
       <DiscountReviewModal
         open={discountModalOpen}
         onClose={() => setDiscountModalOpen(false)}

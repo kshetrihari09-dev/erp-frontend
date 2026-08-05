@@ -17,14 +17,22 @@ import { Modal, Button } from '@/components/ui'
 interface Props {
   code:    string | null
   onClose: () => void
+  /** Overrides the default "Product Not Found" title — used for the
+   *  account-mismatch case below. */
+  title?:   string
+  /** When set, replaces the default "No product matches this code: X"
+   *  body with a plain message (no code chip) — used when the dialog is
+   *  reporting something other than a missing product, e.g. a QR code
+   *  generated for a different account. */
+  message?: string
 }
 
-export default function ProductNotFoundDialog({ code, onClose }: Props) {
+export default function ProductNotFoundDialog({ code, onClose, title = 'Product Not Found', message }: Props) {
   return (
     <Modal
       open={!!code}
       onClose={onClose}
-      title="Product Not Found"
+      title={title}
       size="sm"
       footer={<Button variant="primary" size="sm" onClick={onClose}>OK</Button>}
     >
@@ -32,17 +40,21 @@ export default function ProductNotFoundDialog({ code, onClose }: Props) {
         <div className="shrink-0 w-9 h-9 rounded-full bg-[var(--danger-subtle,rgba(239,68,68,0.12))] flex items-center justify-center">
           <AlertTriangle size={17} className="text-[var(--danger,#EF4444)]" />
         </div>
-        <div>
-          <div className="text-sm text-[var(--text)]">
-            No product matches this code:
+        {message ? (
+          <div className="text-sm text-[var(--text)]">{message}</div>
+        ) : (
+          <div>
+            <div className="text-sm text-[var(--text)]">
+              No product matches this code:
+            </div>
+            <div className="mt-1.5 font-mono text-sm font-semibold px-2.5 py-1.5 rounded-lg bg-[var(--surface-2)] inline-block break-all">
+              {code}
+            </div>
+            <div className="mt-2 text-xs text-[var(--text-4)]">
+              Check the barcode is assigned to a product, or add it from the Product page.
+            </div>
           </div>
-          <div className="mt-1.5 font-mono text-sm font-semibold px-2.5 py-1.5 rounded-lg bg-[var(--surface-2)] inline-block break-all">
-            {code}
-          </div>
-          <div className="mt-2 text-xs text-[var(--text-4)]">
-            Check the barcode is assigned to a product, or add it from the Product page.
-          </div>
-        </div>
+        )}
       </div>
     </Modal>
   )

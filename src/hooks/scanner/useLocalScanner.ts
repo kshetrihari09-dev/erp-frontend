@@ -46,6 +46,15 @@ const OCR_TICK_GAP_MS = 250
 // than a full-label photo with multiple disconnected blocks.
 const OCR_PSM_SINGLE_LINE = '7'
 
+// Exact copy of the message the backend returns for QR_ACCOUNT_MISMATCH
+// (see erp-unified-backend/src/scanner/scannerRoutes.js) — a structured
+// QR payload whose accountId doesn't match the account the user is
+// currently logged into. Kept as a literal here (rather than trusting
+// whatever string the server sends) so the UI copy stays consistent even
+// if a future response is malformed; the `code` field is still what
+// actually drives the branch below.
+const QR_ACCOUNT_MISMATCH_MSG = 'This QR Code belongs to another account and cannot be used in the current account.'
+
 export type LocalScanMode   = 'barcode' | 'ocr' | 'idle'
 export type LocalScanStatus =
   | 'requesting-permission'
@@ -163,12 +172,23 @@ export default function useLocalScanner({ onResult, active }: Options) {
   }, [engine, terminateOcrWorker])
 
   // ── Product search (same backend endpoints as before) ──────────────────────
-  const searchBarcode = useCallback(async (code: string): Promise<LocalProduct[]> => {
+  // Return type grows a third case: the backend can now reject a scan
+  // outright (403 QR_ACCOUNT_MISMATCH) when the decoded QR is a structured
+  // payload printed under a *different* account than the one currently
+  // logged in. That's a deliberate, permanent "no" — falling back to OCR
+  // or fuzzy search on the raw JSON text would be meaningless anyway, so
+  // handleBarcodeDetected surfaces it immediately instead of continuing.
+  const searchBarcode = useCallback(async (code: string): Promise<LocalProduct[] | 'ACCOUNT_MISMATCH'> => {
     try {
       const res = await scannerAPI.lookupBarcode(code)
       const json: any = res.data
       return json.success && json.data ? [json.data] : []
-    } catch { return [] }
+    } catch (err: any) {
+      if (err?.response?.status === 403 && err?.response?.data?.code === 'QR_ACCOUNT_MISMATCH') {
+        return 'ACCOUNT_MISMATCH'
+      }
+      return []
+    }
   }, [])
 
   // Casts a slightly wider net than before (20 vs. 10) since ranking/
@@ -332,6 +352,10 @@ export default function useLocalScanner({ onResult, active }: Options) {
 
     const products = await searchBarcode(code)
     if (!mountedRef.current) return
+    if (products === 'ACCOUNT_MISMATCH') {
+      setState(s => ({ ...s, status: 'error', error: QR_ACCOUNT_MISMATCH_MSG }))
+      return
+    }
     if (products.length > 0) {
       setState(s => ({ ...s, status: 'matches', mode: 'barcode', matches: products }))
       return
