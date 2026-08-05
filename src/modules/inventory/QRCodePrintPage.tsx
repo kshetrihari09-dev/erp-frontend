@@ -6,6 +6,8 @@ import { productsAPI } from '@/services/api'
 import type { Product } from '@/types'
 import { Button, Empty } from '@/components/ui'
 import QRCodeLabel from '@/components/barcode/QRCodeLabel'
+import useAuthStore from '@/store/authStore'
+import { buildProductQrPayload } from '@/utils/productQr'
 
 /* ── Label sizes ──────────────────────────────────────────────────────────
  * Same presets as BarcodePrintPage — common thermal/inkjet label stock
@@ -31,6 +33,11 @@ interface LabelItem {
 
 export default function QRCodePrintPage() {
   const [searchParams] = useSearchParams()
+  // Whichever account is currently logged in — this is what gets baked
+  // into every generated QR's `accountId`, so the scanner can tell a QR
+  // printed here apart from one printed under a different account. See
+  // utils/productQr.ts for the full payload shape and rationale.
+  const accountId = useAuthStore(s => s.company?.id)
 
   const [query, setQuery]     = useState('')
   const [results, setResults] = useState<Product[]>([])
@@ -145,49 +152,43 @@ export default function QRCodePrintPage() {
   // ── Print — opens a popup window with only the label sheet + print CSS,
   // same "clean print" approach as BarcodePrintPage. All label styling is
   // inline (see QRCodeLabel), so it survives the innerHTML clone into the
-  // popup unlike Tailwind classes would. QRCodeLabel now renders the QR as
-  // inline SVG rather than <canvas> — SVG markup (unlike canvas pixel
-  // data) survives innerHTML cloning natively, so no toDataURL()
-  // swap-and-restore step is needed here anymore; el.innerHTML already
-  // contains fully-formed, vector-sharp QR artwork.
+  // popup unlike Tailwind classes would. The QR itself is a <canvas>, and
+  // canvas pixel data does NOT survive innerHTML cloning — so we first
+  // swap each canvas for a data-URL <img> of the same size, then restore
+  // the canvases afterward so the live page keeps working.
   function printSheet() {
     const el = sheetRef.current
     if (!el || totalLabels === 0) return
+    const canvases = Array.from(el.querySelectorAll('canvas'))
+    const dataUrls = canvases.map(c => c.toDataURL('image/png'))
 
     const win = window.open('', '_blank', 'width=900,height=700,scrollbars=yes')
     if (!win) return
+
+    // Build the printable HTML with <img> stand-ins for the canvases so
+    // the QR pixels actually make it into the popup document.
+    const clone = el.cloneNode(true) as HTMLElement
+    const cloneCanvases = Array.from(clone.querySelectorAll('canvas'))
+    cloneCanvases.forEach((c, i) => {
+      const img = document.createElement('img')
+      img.src = dataUrls[i]
+      img.style.cssText = c.getAttribute('style') || ''
+      c.replaceWith(img)
+    })
 
     win.document.write(`
       <!DOCTYPE html>
       <html>
         <head>
           <meta charset="utf-8"/>
-          <meta name="viewport" content="width=device-width, initial-scale=1"/>
           <title>QR Code Labels</title>
           <style>
             *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-            html, body { background: #fff; width: 100%; }
-            /* Force exact colors and disable browser "shrink to fit" /
-               auto-scale behavior so labels come out at true mm size. */
-            * {
-              -webkit-print-color-adjust: exact !important;
-              print-color-adjust: exact !important;
-              color-adjust: exact !important;
-            }
-            svg { display: block; shape-rendering: geometricPrecision; }
-            @media print {
-              @page { size: A4; margin: ${PAGE_MARGIN_MM}mm; }
-              html, body { margin: 0 !important; padding: 0 !important; }
-              /* Belt-and-braces alongside each label's own inline
-                 break-inside:avoid — keeps a label from splitting across
-                 a page boundary even if the grid wraps mid-row. */
-              .qr-label-sheet > * { break-inside: avoid; page-break-inside: avoid; }
-            }
+            body { background: #fff; }
+            @media print { @page { size: A4; margin: ${PAGE_MARGIN_MM}mm; } }
           </style>
         </head>
-        <body>
-          <div class="qr-label-sheet">${el.innerHTML}</div>
-        </body>
+        <body>${clone.innerHTML}</body>
       </html>
     `)
     win.document.close()
@@ -196,12 +197,9 @@ export default function QRCodePrintPage() {
   }
 
   // ── Download PDF — html2pdf.js (html2canvas + jsPDF), same library
-  // already used by BarcodePrintPage and utils/htmlToPdfBlob.ts. html2canvas
-  // rasterizes the live DOM directly (no innerHTML clone), so the inline
-  // SVG QR codes capture correctly as-is. Scale bumped to 4 (from 2) so
-  // the rasterized output approaches print resolution (~300 DPI equivalent
-  // at these label sizes) instead of screen resolution — the SVG source
-  // has no ceiling on sharpness, so the limit is purely this capture scale.
+  // already used by BarcodePrintPage and utils/htmlToPdfBlob.ts. Unlike
+  // the print path, html2canvas rasterizes the live DOM directly (no
+  // innerHTML clone), so the <canvas> QR codes capture correctly as-is.
   async function downloadPdf() {
     const el = sheetRef.current
     if (!el || totalLabels === 0) return
@@ -213,9 +211,9 @@ export default function QRCodePrintPage() {
           margin: PAGE_MARGIN_MM,
           filename: 'qrcode-labels.pdf',
           image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: { scale: 4, useCORS: true, backgroundColor: '#ffffff' },
+          html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
           jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        } as any)
+        })
         .from(el)
         .save()
     } finally {
@@ -224,13 +222,51 @@ export default function QRCodePrintPage() {
   }
 
   return (
-    <div>
+    <div className="qrp-page">
+      <style>{`
+        /* ── QR Code Print — mobile/tablet responsive (self-contained, additive) ── */
+        .qrp-page { max-width: 100%; overflow-x: hidden; }
+
+        /* Sidebar (search/size/queue) + preview: side-by-side on desktop,
+           stacked on tablet/mobile so the preview isn't squeezed into a
+           sliver next to a fixed-min-width sidebar. */
+        .qrp-layout-grid { grid-template-columns: minmax(280px, 380px) 1fr; }
+        @media (max-width: 900px) {
+          .qrp-layout-grid { grid-template-columns: 1fr !important; }
+        }
+
+        /* Header action buttons: wrap instead of overflowing the header,
+           and stack full-width one under the other once the row is too
+           narrow for both side by side (matches .page-header's own
+           480px breakpoint elsewhere in the app, but scoped so both
+           buttons stack together rather than fighting for width). */
+        .qrp-header-actions { flex-wrap: wrap; }
+        @media (max-width: 560px) {
+          .qrp-header-actions { width: 100%; }
+          .qrp-header-actions > button { flex: 1 1 auto; }
+        }
+        @media (max-width: 400px) {
+          .qrp-header-actions { flex-direction: column; align-items: stretch; }
+          .qrp-header-actions > button { width: 100%; }
+        }
+
+        /* Preview sheet: allow horizontal scroll on narrow screens instead
+           of clipping/overflowing the card — the label grid's real mm
+           widths don't shrink (that would misrepresent the print output),
+           so a horizontal scrollbar is the correct fallback, not a bug. */
+        .qrp-preview-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+        @media (max-width: 480px) {
+          .qrp-page .table-card { padding: 12px !important; }
+        }
+      `}</style>
+
       <div className="page-header">
         <div>
           <div className="page-breadcrumb">Inventory</div>
           <h1 className="page-title">QR Code Print</h1>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 qrp-header-actions">
           <Button variant="secondary" icon={pdfBusy ? <Loader2 size={14} className="animate-spin"/> : <Download size={14}/>}
             onClick={downloadPdf} disabled={pdfBusy || totalLabels === 0}>
             Download PDF
@@ -241,7 +277,7 @@ export default function QRCodePrintPage() {
         </div>
       </div>
 
-      <div className="grid gap-4" style={{ gridTemplateColumns: 'minmax(280px, 380px) 1fr' }}>
+      <div className="grid gap-4 qrp-layout-grid">
         {/* ── Left: search + queued items + label size ─────────────────── */}
         <div className="flex flex-col gap-4">
           <div className="table-card p-4">
@@ -311,10 +347,10 @@ export default function QRCodePrintPage() {
               <div className="flex items-center gap-2">
                 <label className="text-xs text-[var(--text-3)]">Width (mm)</label>
                 <input type="number" min={10} value={customW} onChange={e => setCustomW(Number(e.target.value) || 0)}
-                  className="erp-input w-20" />
+                  className="erp-input" style={{ width: 80, flex: '0 0 auto' }} />
                 <label className="text-xs text-[var(--text-3)]">Height (mm)</label>
                 <input type="number" min={10} value={customH} onChange={e => setCustomH(Number(e.target.value) || 0)}
-                  className="erp-input w-20" />
+                  className="erp-input" style={{ width: 80, flex: '0 0 auto' }} />
               </div>
             )}
           </div>
@@ -338,7 +374,8 @@ export default function QRCodePrintPage() {
                       min={1}
                       value={item.qty}
                       onChange={e => updateQty(item.product.id, Number(e.target.value) || 1)}
-                      className="erp-input w-16 text-center"
+                      className="erp-input text-center"
+                      style={{ width: 56, flex: '0 0 auto' }}
                     />
                     <button onClick={() => removeItem(item.product.id)} className="text-[var(--text-4)] hover:text-red-500 p-1">
                       <X size={14} />
@@ -351,7 +388,7 @@ export default function QRCodePrintPage() {
         </div>
 
         {/* ── Right: live preview / actual print & PDF source ───────────── */}
-        <div className="table-card p-4 overflow-x-auto">
+        <div className="table-card p-4 overflow-x-auto qrp-preview-scroll">
           <div className="text-xs font-semibold uppercase tracking-wide text-[var(--text-3)] mb-3">
             Preview — {cols} per row on A4
           </div>
@@ -360,14 +397,11 @@ export default function QRCodePrintPage() {
           ) : (
             <div
               ref={sheetRef}
-              className="qr-label-sheet"
               style={{
                 display: 'grid',
                 gridTemplateColumns: `repeat(${cols}, ${widthMm}mm)`,
-                gridAutoRows: `${heightMm}mm`,
                 gap: '2mm',
                 justifyContent: 'start',
-                alignItems: 'start',
               }}
             >
               {flatLabels.map(({ item, i }) => (
@@ -375,7 +409,7 @@ export default function QRCodePrintPage() {
                   key={`${item.product.id}-${i}`}
                   name={item.product.name}
                   price={item.product.sales_rate}
-                  code={item.product.barcode || item.product.item_code}
+                  code={accountId ? buildProductQrPayload(item.product, accountId) : (item.product.barcode || item.product.item_code)}
                   widthMm={widthMm}
                   heightMm={heightMm}
                 />
