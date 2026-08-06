@@ -21,7 +21,9 @@ const LABEL_PRESETS = [
 type PresetKey = typeof LABEL_PRESETS[number]['key']
 
 const PAGE_WIDTH_MM  = 210   // A4 portrait
-const PAGE_MARGIN_MM = 8
+const PAGE_MARGIN_MM = 5     // safe minimum most printers accept — every extra mm here is
+                              // mm a label column doesn't get, so keep this as small as
+                              // is still reliably printable rather than a generous default.
 
 interface LabelItem {
   product: Product
@@ -191,12 +193,18 @@ export default function BarcodePrintPage() {
             /* The exact grid the on-screen preview uses, reasserted with
                !important so no user-agent print stylesheet or paper-size
                fallback can collapse it into a single block-stacked
-               column — that collapse is the bug being fixed here. */
+               column — that collapse is the bug being fixed here.
+               margin:0 auto centers the block within the printable
+               width — cols is the MAX whole labels that fit per row, so
+               there's usually some leftover width; centering splits it
+               evenly on both sides instead of piling it all on the
+               right, which is what a plain left-aligned block does. */
             .bcp-print-grid {
               display: grid !important;
               grid-template-columns: repeat(${cols}, ${widthMm}mm) !important;
               gap: ${GRID_GAP_MM}mm !important;
               width: ${gridWidthMm}mm !important;
+              margin: 0 auto !important;
             }
             @media print {
               .bcp-print-grid {
@@ -204,6 +212,7 @@ export default function BarcodePrintPage() {
                 grid-template-columns: repeat(${cols}, ${widthMm}mm) !important;
                 gap: ${GRID_GAP_MM}mm !important;
                 width: ${gridWidthMm}mm !important;
+                margin: 0 auto !important;
               }
               .bcp-print-grid > * { break-inside: avoid; page-break-inside: avoid; }
             }
@@ -450,6 +459,7 @@ export default function BarcodePrintPage() {
                 gridTemplateColumns: `repeat(${cols}, ${widthMm}mm)`,
                 gap: `${GRID_GAP_MM}mm`,
                 width: `${gridWidthMm}mm`,
+                margin: '0 auto',
               }}
             >
               {flatLabels.map(({ item, i }) => (

@@ -24,7 +24,9 @@ const LABEL_PRESETS = [
 type PresetKey = typeof LABEL_PRESETS[number]['key']
 
 const PAGE_WIDTH_MM  = 210   // A4 portrait
-const PAGE_MARGIN_MM = 8
+const PAGE_MARGIN_MM = 5     // safe minimum most printers accept — every extra mm here is
+                              // mm a label column doesn't get, so keep this as small as
+                              // is still reliably printable rather than a generous default.
 
 interface LabelItem {
   product: Product
@@ -220,13 +222,20 @@ export default function QRCodePrintPage() {
                print stylesheet or paper-size fallback can collapse it
                to a single block-stacked column — that collapse is the
                bug being fixed here. Nothing is simplified/replaced:
-               these are the same three properties set inline by the
-               React component (display, columns, width). */
+               these are the same properties set inline by the React
+               component (display, columns, gap, width, margin).
+               margin:0 auto centers the block within the printable
+               width — cols is the MAX whole labels that fit per row, so
+               unless they exactly fill the page there's always some
+               leftover width; centering splits it evenly on both sides
+               instead of dumping all of it on the right, which is what
+               a plain left-aligned block does by default. */
             .qr-print-grid {
               display: grid !important;
               grid-template-columns: repeat(${cols}, ${widthMm}mm) !important;
               gap: ${GRID_GAP_MM}mm !important;
               width: ${gridWidthMm}mm !important;
+              margin: 0 auto !important;
             }
             @media print {
               .qr-print-grid {
@@ -234,6 +243,7 @@ export default function QRCodePrintPage() {
                 grid-template-columns: repeat(${cols}, ${widthMm}mm) !important;
                 gap: ${GRID_GAP_MM}mm !important;
                 width: ${gridWidthMm}mm !important;
+                margin: 0 auto !important;
               }
               /* Keep each label intact on one page instead of Chrome's
                  print pagination splitting a row across a page break,
@@ -511,6 +521,7 @@ export default function QRCodePrintPage() {
                 gridTemplateColumns: `repeat(${cols}, ${widthMm}mm)`,
                 gap: `${GRID_GAP_MM}mm`,
                 width: `${gridWidthMm}mm`,
+                margin: '0 auto',
               }}
             >
               {flatLabels.map(({ item, i }) => (
