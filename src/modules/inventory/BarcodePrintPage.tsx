@@ -142,7 +142,12 @@ export default function BarcodePrintPage() {
   )
   const totalLabels = flatLabels.length
 
-  const cols = Math.max(1, Math.floor((PAGE_WIDTH_MM - PAGE_MARGIN_MM * 2) / widthMm))
+  const GRID_GAP_MM = 2
+  const cols = Math.max(1, Math.floor((PAGE_WIDTH_MM - PAGE_MARGIN_MM * 2 + GRID_GAP_MM) / (widthMm + GRID_GAP_MM)))
+  // Exact-fit width for the grid's own box — without this it defaults to
+  // 100% of its parent card, leaving genuine dead space to the right of
+  // the last column instead of that space holding another label.
+  const gridWidthMm = cols * widthMm + (cols - 1) * GRID_GAP_MM
 
   // ── Print — opens a popup window with only the label sheet + print CSS,
   // same "clean print" approach as hooks/usePrint.ts, but with its own
@@ -163,7 +168,16 @@ export default function BarcodePrintPage() {
           <style>
             *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
             body { background: #fff; }
-            @media print { @page { size: A4; margin: ${PAGE_MARGIN_MM}mm; } }
+            /* Same grid the live preview uses — repeated here (and
+               !important under print) purely as a defensive
+               belt-and-suspenders in case the clone's inline style ever
+               gets dropped, so the browser can't silently fall back to
+               block-stacking the labels into one column. */
+            .bcp-print-grid { display: grid; width: 100%; }
+            @media print {
+              @page { size: A4; margin: ${PAGE_MARGIN_MM}mm; }
+              .bcp-print-grid { display: grid !important; }
+            }
           </style>
         </head>
         <body>${el.innerHTML}</body>
@@ -177,11 +191,26 @@ export default function BarcodePrintPage() {
   // ── Download PDF — html2pdf.js (html2canvas + jsPDF), dynamically
   // imported so it doesn't add weight until actually used. Same library
   // already used by utils/htmlToPdfBlob.ts for Cloud Backup exports.
+  //
+  // html2canvas-specific workaround: html2canvas doesn't reliably compute
+  // CSS Grid track layout (long-standing upstream limitation) — a
+  // `display:grid` container's children can get captured stacked into a
+  // single column with the rest of the page width left blank, no matter
+  // how many grid-template-columns are defined. The live preview and the
+  // native browser print above are unaffected (real Chromium layout, no
+  // html2canvas) — this only needs fixing for this exported PDF. Fix:
+  // swap to `display:flex; flex-wrap:wrap` (pixel-identical result for
+  // same-size items, and something html2canvas renders correctly) right
+  // before capture, then swap back immediately after.
   async function downloadPdf() {
     const el = sheetRef.current
     if (!el || totalLabels === 0) return
     setPdfBusy(true)
+    const prevDisplay = el.style.display
+    const prevWrap    = el.style.flexWrap
     try {
+      el.style.display  = 'flex'
+      el.style.flexWrap = 'wrap'
       const html2pdf = (await import('html2pdf.js')).default
       await html2pdf()
         .set({
@@ -194,6 +223,8 @@ export default function BarcodePrintPage() {
         .from(el)
         .save()
     } finally {
+      el.style.display  = prevDisplay
+      el.style.flexWrap = prevWrap
       setPdfBusy(false)
     }
   }
@@ -372,11 +403,12 @@ export default function BarcodePrintPage() {
           ) : (
             <div
               ref={sheetRef}
+              className="bcp-print-grid"
               style={{
                 display: 'grid',
                 gridTemplateColumns: `repeat(${cols}, ${widthMm}mm)`,
-                gap: '2mm',
-                justifyContent: 'start',
+                gap: `${GRID_GAP_MM}mm`,
+                width: `${gridWidthMm}mm`,
               }}
             >
               {flatLabels.map(({ item, i }) => (

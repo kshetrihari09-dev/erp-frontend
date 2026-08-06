@@ -147,7 +147,14 @@ export default function QRCodePrintPage() {
   )
   const totalLabels = flatLabels.length
 
-  const cols = Math.max(1, Math.floor((PAGE_WIDTH_MM - PAGE_MARGIN_MM * 2) / widthMm))
+  const GRID_GAP_MM = 2
+  const cols = Math.max(1, Math.floor((PAGE_WIDTH_MM - PAGE_MARGIN_MM * 2 + GRID_GAP_MM) / (widthMm + GRID_GAP_MM)))
+  // The grid's own box, sized to exactly fit its columns — without this the
+  // container (a block-level element) defaults to 100% of its parent card,
+  // and `justifyContent:'start'` only shifts the *tracks* inside that
+  // oversized box, leaving genuine dead space to the right of the last
+  // column instead of actually using it for another label.
+  const gridWidthMm = cols * widthMm + (cols - 1) * GRID_GAP_MM
 
   // ── Print — opens a popup window with only the label sheet + print CSS,
   // same "clean print" approach as BarcodePrintPage. All label styling is
@@ -185,7 +192,18 @@ export default function QRCodePrintPage() {
           <style>
             *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
             body { background: #fff; }
-            @media print { @page { size: A4; margin: ${PAGE_MARGIN_MM}mm; } }
+            /* Same grid the live preview uses (see the JSX below) — kept
+               here too, and repeated !important under @media print,
+               purely as a defensive belt-and-suspenders: the inline
+               style attribute on the cloned node already carries the
+               real column count/width, this just guarantees a browser
+               can't silently fall back to block-stacking the children
+               if anything about the clone's inline style gets dropped. */
+            .qr-print-grid { display: grid; width: 100%; }
+            @media print {
+              @page { size: A4; margin: ${PAGE_MARGIN_MM}mm; }
+              .qr-print-grid { display: grid !important; }
+            }
           </style>
         </head>
         <body>${clone.innerHTML}</body>
@@ -200,11 +218,34 @@ export default function QRCodePrintPage() {
   // already used by BarcodePrintPage and utils/htmlToPdfBlob.ts. Unlike
   // the print path, html2canvas rasterizes the live DOM directly (no
   // innerHTML clone), so the <canvas> QR codes capture correctly as-is.
+  //
+  // html2canvas-specific workaround: html2canvas does not reliably
+  // compute CSS Grid track layout — it's a long-standing upstream
+  // limitation (the bundled version here is no exception) where a
+  // `display: grid` container's children get captured stacked in a
+  // single column with the rest of the container's width left blank,
+  // regardless of how many grid-template-columns are defined. That's
+  // the exact "one column, wasted page width" bug being fixed here, and
+  // it only shows up in this exported PDF — the live on-screen preview
+  // and the native browser print (both real Chromium layout, no
+  // html2canvas involved) already render the grid correctly.
+  //
+  // Fix: right before the capture, swap the SAME element from
+  // `display:grid` to `display:flex; flex-wrap:wrap` with the columns'
+  // fixed mm width preserved on each child. For same-size items wrapped
+  // at a fixed container width, flex-wrap produces a pixel-identical
+  // row/column layout to the grid — html2canvas handles flex-wrap
+  // correctly — then it's swapped back immediately after so the live
+  // page (and the next print/PDF) keeps using the real grid.
   async function downloadPdf() {
     const el = sheetRef.current
     if (!el || totalLabels === 0) return
     setPdfBusy(true)
+    const prevDisplay = el.style.display
+    const prevWrap    = el.style.flexWrap
     try {
+      el.style.display  = 'flex'
+      el.style.flexWrap = 'wrap'
       const html2pdf = (await import('html2pdf.js')).default
       await html2pdf()
         .set({
@@ -217,6 +258,8 @@ export default function QRCodePrintPage() {
         .from(el)
         .save()
     } finally {
+      el.style.display  = prevDisplay
+      el.style.flexWrap = prevWrap
       setPdfBusy(false)
     }
   }
@@ -397,11 +440,12 @@ export default function QRCodePrintPage() {
           ) : (
             <div
               ref={sheetRef}
+              className="qr-print-grid"
               style={{
                 display: 'grid',
                 gridTemplateColumns: `repeat(${cols}, ${widthMm}mm)`,
-                gap: '2mm',
-                justifyContent: 'start',
+                gap: `${GRID_GAP_MM}mm`,
+                width: `${gridWidthMm}mm`,
               }}
             >
               {flatLabels.map(({ item, i }) => (
