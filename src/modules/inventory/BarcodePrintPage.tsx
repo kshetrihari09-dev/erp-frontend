@@ -149,17 +149,35 @@ export default function BarcodePrintPage() {
   // the last column instead of that space holding another label.
   const gridWidthMm = cols * widthMm + (cols - 1) * GRID_GAP_MM
 
-  // ── Print — opens a popup window with only the label sheet + print CSS,
-  // same "clean print" approach as hooks/usePrint.ts, but with its own
-  // @page/grid rules since the shared hook doesn't take extra CSS. All
-  // label styling is inline (see BarcodeLabel), so it survives the
-  // innerHTML clone into the popup unlike Tailwind classes would.
+  // ── Print — renders the EXACT same node the preview shows into a hidden
+  // same-origin <iframe>, then prints that iframe. See QRCodePrintPage.tsx
+  // for the full rationale — a window.open() popup runs in a separate
+  // browsing context and Chrome has repeatedly been reported to lay out
+  // a popup's print rendering differently from what was on screen; an
+  // iframe shares this document's rendering pipeline and doesn't. Labels
+  // here are SVG (via JsBarcode), which — unlike <canvas> — clones and
+  // prints correctly as-is, so no image-swap step is needed.
   function printSheet() {
     const el = sheetRef.current
     if (!el || totalLabels === 0) return
-    const win = window.open('', '_blank', 'width=900,height=700,scrollbars=yes')
-    if (!win) return
-    win.document.write(`
+
+    const clone = el.cloneNode(true) as HTMLElement
+
+    const iframe = document.createElement('iframe')
+    iframe.setAttribute('aria-hidden', 'true')
+    iframe.style.position = 'fixed'
+    iframe.style.right    = '0'
+    iframe.style.bottom   = '0'
+    iframe.style.width    = '0'
+    iframe.style.height   = '0'
+    iframe.style.border   = '0'
+    document.body.appendChild(iframe)
+
+    const doc = iframe.contentDocument
+    if (!doc) { document.body.removeChild(iframe); return }
+
+    doc.open()
+    doc.write(`
       <!DOCTYPE html>
       <html>
         <head>
@@ -167,25 +185,48 @@ export default function BarcodePrintPage() {
           <title>Barcode Labels</title>
           <style>
             *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-            body { background: #fff; }
-            /* Same grid the live preview uses — repeated here (and
-               !important under print) purely as a defensive
-               belt-and-suspenders in case the clone's inline style ever
-               gets dropped, so the browser can't silently fall back to
-               block-stacking the labels into one column. */
-            .bcp-print-grid { display: grid; width: 100%; }
+            html, body { background: #fff; }
+            @page { size: A4; margin: ${PAGE_MARGIN_MM}mm; }
+
+            /* The exact grid the on-screen preview uses, reasserted with
+               !important so no user-agent print stylesheet or paper-size
+               fallback can collapse it into a single block-stacked
+               column — that collapse is the bug being fixed here. */
+            .bcp-print-grid {
+              display: grid !important;
+              grid-template-columns: repeat(${cols}, ${widthMm}mm) !important;
+              gap: ${GRID_GAP_MM}mm !important;
+              width: ${gridWidthMm}mm !important;
+            }
             @media print {
-              @page { size: A4; margin: ${PAGE_MARGIN_MM}mm; }
-              .bcp-print-grid { display: grid !important; }
+              .bcp-print-grid {
+                display: grid !important;
+                grid-template-columns: repeat(${cols}, ${widthMm}mm) !important;
+                gap: ${GRID_GAP_MM}mm !important;
+                width: ${gridWidthMm}mm !important;
+              }
+              .bcp-print-grid > * { break-inside: avoid; page-break-inside: avoid; }
             }
           </style>
         </head>
-        <body>${el.innerHTML}</body>
+        <body>${clone.outerHTML}</body>
       </html>
     `)
-    win.document.close()
-    win.focus()
-    setTimeout(() => { win.print(); win.close() }, 500)
+    doc.close()
+
+    // Don't print until every barcode SVG has actually rendered and any
+    // fonts finished loading — printing on a blind timer is exactly the
+    // kind of race that makes a print job diverge from the preview.
+    const fontsReady = (doc as any).fonts?.ready ?? Promise.resolve()
+    Promise.resolve(fontsReady).then(() => {
+      const win = iframe.contentWindow
+      if (!win) { document.body.removeChild(iframe); return }
+      const cleanup = () => { if (iframe.parentNode) document.body.removeChild(iframe) }
+      win.addEventListener('afterprint', cleanup)
+      setTimeout(cleanup, 5000)
+      win.focus()
+      win.print()
+    })
   }
 
   // ── Download PDF — html2pdf.js (html2canvas + jsPDF), dynamically

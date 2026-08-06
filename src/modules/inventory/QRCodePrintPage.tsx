@@ -156,24 +156,31 @@ export default function QRCodePrintPage() {
   // column instead of actually using it for another label.
   const gridWidthMm = cols * widthMm + (cols - 1) * GRID_GAP_MM
 
-  // ── Print — opens a popup window with only the label sheet + print CSS,
-  // same "clean print" approach as BarcodePrintPage. All label styling is
-  // inline (see QRCodeLabel), so it survives the innerHTML clone into the
-  // popup unlike Tailwind classes would. The QR itself is a <canvas>, and
-  // canvas pixel data does NOT survive innerHTML cloning — so we first
-  // swap each canvas for a data-URL <img> of the same size, then restore
-  // the canvases afterward so the live page keeps working.
+  // ── Print — renders the EXACT same node the preview shows into a hidden
+  // same-origin <iframe>, then prints that iframe.
+  //
+  // This used to open a window.open() popup instead. Popups run in a
+  // separate browsing context, and Chrome has repeatedly been reported to
+  // lay out a popup's print rendering differently from what was on
+  // screen — which is exactly the "preview shows 3 columns, Chrome Print
+  // Preview shows 1" bug being fixed here. An iframe shares this
+  // document's rendering pipeline and doesn't have that divergence.
+  //
+  // All label styling is inline (see QRCodeLabel), so it survives the
+  // clone as-is — nothing here substitutes a simplified layout. The QR
+  // itself is a <canvas>, and canvas pixel data does NOT survive cloning
+  // into another document, so canvases are swapped for data-URL <img>s
+  // (same pixels, different element) before cloning; the live page's
+  // canvases are never touched.
   function printSheet() {
     const el = sheetRef.current
     if (!el || totalLabels === 0) return
+
     const canvases = Array.from(el.querySelectorAll('canvas'))
     const dataUrls = canvases.map(c => c.toDataURL('image/png'))
 
-    const win = window.open('', '_blank', 'width=900,height=700,scrollbars=yes')
-    if (!win) return
-
-    // Build the printable HTML with <img> stand-ins for the canvases so
-    // the QR pixels actually make it into the popup document.
+    // Clone the actual live node — this is requirement #12: the print
+    // HTML must be exactly the preview HTML, not a re-derived version.
     const clone = el.cloneNode(true) as HTMLElement
     const cloneCanvases = Array.from(clone.querySelectorAll('canvas'))
     cloneCanvases.forEach((c, i) => {
@@ -183,7 +190,21 @@ export default function QRCodePrintPage() {
       c.replaceWith(img)
     })
 
-    win.document.write(`
+    const iframe = document.createElement('iframe')
+    iframe.setAttribute('aria-hidden', 'true')
+    iframe.style.position = 'fixed'
+    iframe.style.right    = '0'
+    iframe.style.bottom   = '0'
+    iframe.style.width    = '0'
+    iframe.style.height   = '0'
+    iframe.style.border   = '0'
+    document.body.appendChild(iframe)
+
+    const doc = iframe.contentDocument
+    if (!doc) { document.body.removeChild(iframe); return }
+
+    doc.open()
+    doc.write(`
       <!DOCTYPE html>
       <html>
         <head>
@@ -191,28 +212,72 @@ export default function QRCodePrintPage() {
           <title>QR Code Labels</title>
           <style>
             *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-            body { background: #fff; }
-            /* Same grid the live preview uses (see the JSX below) — kept
-               here too, and repeated !important under @media print,
-               purely as a defensive belt-and-suspenders: the inline
-               style attribute on the cloned node already carries the
-               real column count/width, this just guarantees a browser
-               can't silently fall back to block-stacking the children
-               if anything about the clone's inline style gets dropped. */
-            .qr-print-grid { display: grid; width: 100%; }
+            html, body { background: #fff; }
+            @page { size: A4; margin: ${PAGE_MARGIN_MM}mm; }
+
+            /* The exact grid the on-screen preview uses (same class,
+               same values), reasserted with !important so no user-agent
+               print stylesheet or paper-size fallback can collapse it
+               to a single block-stacked column — that collapse is the
+               bug being fixed here. Nothing is simplified/replaced:
+               these are the same three properties set inline by the
+               React component (display, columns, width). */
+            .qr-print-grid {
+              display: grid !important;
+              grid-template-columns: repeat(${cols}, ${widthMm}mm) !important;
+              gap: ${GRID_GAP_MM}mm !important;
+              width: ${gridWidthMm}mm !important;
+            }
             @media print {
-              @page { size: A4; margin: ${PAGE_MARGIN_MM}mm; }
-              .qr-print-grid { display: grid !important; }
+              .qr-print-grid {
+                display: grid !important;
+                grid-template-columns: repeat(${cols}, ${widthMm}mm) !important;
+                gap: ${GRID_GAP_MM}mm !important;
+                width: ${gridWidthMm}mm !important;
+              }
+              /* Keep each label intact on one page instead of Chrome's
+                 print pagination splitting a row across a page break,
+                 which is the other common way a printed grid ends up
+                 looking nothing like its preview. */
+              .qr-print-grid > * { break-inside: avoid; page-break-inside: avoid; }
             }
           </style>
         </head>
-        <body>${clone.innerHTML}</body>
+        <body>${clone.outerHTML}</body>
       </html>
     `)
-    win.document.close()
-    win.focus()
-    setTimeout(() => { win.print(); win.close() }, 500)
+    doc.close()
+
+    // Requirement #11 — don't print until every QR image has actually
+    // finished decoding. document.write() parses synchronously so the
+    // <img> elements exist immediately, but their bitmap data can still
+    // be mid-decode; printing on a blind setTimeout (the old approach)
+    // is exactly the kind of race that makes a print job diverge from
+    // what was on screen.
+    const imgs = Array.from(doc.images)
+    const imagesReady = imgs.length === 0
+      ? Promise.resolve()
+      : Promise.all(imgs.map(img => (
+          img.decode ? img.decode().catch(() => undefined)
+                     : new Promise<void>(resolve => {
+                         if (img.complete) resolve()
+                         else { img.onload = () => resolve(); img.onerror = () => resolve() }
+                       })
+        )))
+    const fontsReady = (doc as any).fonts?.ready ?? Promise.resolve()
+
+    Promise.all([imagesReady, fontsReady]).then(() => {
+      const win = iframe.contentWindow
+      if (!win) { document.body.removeChild(iframe); return }
+      const cleanup = () => { if (iframe.parentNode) document.body.removeChild(iframe) }
+      win.addEventListener('afterprint', cleanup)
+      // Fallback in case a browser doesn't fire afterprint for an iframe.
+      setTimeout(cleanup, 5000)
+      win.focus()
+      win.print()
+    })
   }
+
 
   // ── Download PDF — html2pdf.js (html2canvas + jsPDF), same library
   // already used by BarcodePrintPage and utils/htmlToPdfBlob.ts. Unlike
