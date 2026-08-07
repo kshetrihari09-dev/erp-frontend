@@ -105,6 +105,7 @@ export default function ProductScanModal({ open, initialMode, onBarcode, onOcrTe
           onToggleFlash={toggleFlash}
           onSwitchCamera={switchCamera}
           onClose={onClose}
+          onDone={onClose}
           onRetryPermission={retryPermission}
           title={mode === 'barcode' ? 'Scan Barcode' : 'Scan Product Label'}
           scanOverlay={

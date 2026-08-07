@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import type { UseFormRegister, FieldErrors } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Plus, Package, ScanLine, Type, Boxes, Download, Upload, Printer, QrCode } from 'lucide-react'
+import { Plus, Package, ScanLine, Type, Boxes, Download, Upload, Printer, QrCode, Filter, Pencil, Trash2 } from 'lucide-react'
 import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct, useProductOpeningBatches, useAddOpeningInventory } from '@/hooks/useQuery'
 import { Button, Modal, Badge, Pagination, SkeletonRows, Empty, SearchInput, ConfirmDialog } from '@/components/ui'
 import ManufacturerSelect from '@/components/forms/ManufacturerSelect'
@@ -27,6 +27,20 @@ type Form = ProductFormInput
 
 function hasCameraSupport(): boolean {
   return typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia
+}
+
+// Presentational only — maps a product's unit to one of the existing
+// badge-* color classes (globals.css) so the mobile card's unit chip is
+// colour-coded instead of always the same muted gray. Doesn't touch what
+// `unit` actually IS or how it's saved/validated.
+const UNIT_BADGE_CLASS: Record<string, string> = {
+  Strip: 'badge-blue', Tablet: 'badge-blue', Capsule: 'badge-blue',
+  Bottle: 'badge-teal', Sachet: 'badge-teal', Ltr: 'badge-teal',
+  Vial: 'badge-purple', Ampoule: 'badge-purple', Tube: 'badge-purple',
+  Box: 'badge-amber', Pcs: 'badge-amber', Kg: 'badge-amber',
+}
+function unitBadgeClass(unit?: string) {
+  return (unit && UNIT_BADGE_CLASS[unit]) || 'badge-muted'
 }
 
 // ── Opening Inventory — Edit Product ────────────────────────────────────────
@@ -398,17 +412,29 @@ export default function ProductsPage() {
   const [delId,   setDelId]   = useState<string | null>(null)
   const [exportOpen, setExportOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
+  // Mobile-only "Filter" button — filters the already-fetched page of
+  // rows client-side by status. Deliberately NOT wired into useProducts'
+  // query params: the search/pagination API call itself is untouched,
+  // this only decides which of the rows already on screen render as
+  // cards. Desktop table is unaffected — it always maps `rows` directly.
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
+  const [filterOpen, setFilterOpen] = useState(false)
   const del = useDeleteProduct()
 
   const { data, isLoading } = useProducts({ page, limit: 20, search: search || undefined })
   const rows  = (data?.data  as Product[]) || []
   const total = (data?.pagination as any)?.total || 0
 
+  // Mobile card list only — see statusFilter above.
+  const mobileRows = statusFilter === 'all'
+    ? rows
+    : rows.filter(p => statusFilter === 'active' ? p.is_active : !p.is_active)
+
   return (
-    <div>
-      <div className="page-header">
+    <div className="prod-page">
+      <div className="page-header prod-sticky-header">
         <div><div className="page-breadcrumb">Inventory</div><h1 className="page-title">Products</h1></div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 prod-header-desktop-actions">
           <Button variant="secondary" icon={<Upload size={14}/>} onClick={() => setImportOpen(true)}>
             Import
           </Button>
@@ -425,10 +451,60 @@ export default function ProductsPage() {
             New Product
           </Button>
         </div>
+        {/* Mobile: header keeps only the title + a prominent New Product
+            button — Import/Export/Print move to their own wrapping
+            toolbar below so the header itself stays compact. */}
+        <button
+          className="prod-new-btn-mobile"
+          onClick={() => { setEditing(null); setModal(true) }}
+          aria-label="New product"
+        >
+          <Plus size={18} strokeWidth={2.5} />
+        </button>
       </div>
 
-      <div className="flex items-center gap-2 mb-3">
+      {/* Mobile-only secondary action toolbar — same handlers as the
+          desktop buttons above, just laid out for touch: 44px tall,
+          12px radius, icon+label, wraps onto multiple rows, never
+          breaks a label across two lines. */}
+      <div className="prod-mobile-toolbar">
+        <button className="prod-toolbar-btn" onClick={() => setImportOpen(true)}>
+          <Upload size={15} /><span>Import</span>
+        </button>
+        <button className="prod-toolbar-btn" onClick={() => setExportOpen(true)}>
+          <Download size={15} /><span>Export</span>
+        </button>
+        <button className="prod-toolbar-btn" onClick={() => navigate('/barcode-print')}>
+          <Printer size={15} /><span>Barcode</span>
+        </button>
+        <button className="prod-toolbar-btn" onClick={() => navigate('/qrcode-print')}>
+          <QrCode size={15} /><span>QR</span>
+        </button>
+      </div>
+
+      <div className="flex items-center gap-2 mb-3 prod-search-row">
         <SearchInput value={searchRaw} onChange={setSearch} className="prod-search-input" />
+        <button
+          className={`prod-filter-btn ${statusFilter !== 'all' ? 'prod-filter-btn-active' : ''}`}
+          onClick={() => setFilterOpen(o => !o)}
+          aria-label="Filter products"
+          aria-expanded={filterOpen}
+        >
+          <Filter size={16} />
+        </button>
+        {filterOpen && (
+          <div className="prod-filter-sheet">
+            {(['all', 'active', 'inactive'] as const).map(f => (
+              <button
+                key={f}
+                className={`prod-filter-opt ${statusFilter === f ? 'prod-filter-opt-active' : ''}`}
+                onClick={() => { setStatusFilter(f); setFilterOpen(false) }}
+              >
+                {f === 'all' ? 'All Products' : f === 'active' ? 'Active Only' : 'Inactive Only'}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="table-card">
@@ -492,20 +568,29 @@ export default function ProductsPage() {
             <div className="prod-mobile-skel-wrap">
               {[1,2,3,4,5].map(i => <div key={i} className="prod-mobile-card prod-mobile-card-skel" />)}
             </div>
-          ) : rows.length === 0 ? (
-            <Empty message="No products found" icon={<Package size={32}/>}/>
+          ) : mobileRows.length === 0 ? (
+            <div className="prod-empty-state">
+              <div className="prod-empty-icon"><Package size={30}/></div>
+              <p className="prod-empty-title">No products found</p>
+              <p className="prod-empty-sub">
+                {statusFilter !== 'all' ? 'Try a different filter, or add a new product.' : 'Get started by adding your first product.'}
+              </p>
+              <Button variant="primary" icon={<Plus size={14}/>} onClick={() => { setEditing(null); setModal(true) }}>
+                New Product
+              </Button>
+            </div>
           ) : (
-            rows.map(p => (
+            mobileRows.map(p => (
               <div key={p.id} className="prod-mobile-card">
-                {/* Top: name + code */}
+                {/* Header: name + manufacturer (left), code badge (right) */}
                 <div className="prod-mc-top">
                   <div className="prod-mc-name-wrap">
                     <p className="prod-mc-name">{p.name}</p>
                     {p.company_name && <p className="prod-mc-company">{p.company_name}</p>}
                   </div>
-                  <div className="text-right">
+                  <div className="prod-mc-code-wrap">
                     <span className="prod-mc-code">{p.item_code}</span>
-                    {p.barcode && <div className="text-[10px] text-[var(--text-4)] mt-0.5">{p.barcode}</div>}
+                    {p.barcode && <div className="prod-mc-barcode">{p.barcode}</div>}
                   </div>
                 </div>
 
@@ -514,17 +599,17 @@ export default function ProductsPage() {
                   <div className="prod-mc-generic">{p.generic_name}</div>
                 )}
 
-                {/* Rates row */}
-                <div className="prod-mc-rates">
-                  <div className="prod-mc-rate-item">
+                {/* Three separate stat boxes: MRP / Sale / Stock */}
+                <div className="prod-mc-stats">
+                  <div className="prod-mc-stat-box">
                     <span className="prod-mc-rate-label">MRP</span>
                     <span className="prod-mc-rate-value">{fmt(p.mrp)}</span>
                   </div>
-                  <div className="prod-mc-rate-item">
-                    <span className="prod-mc-rate-label">Sale Rate</span>
+                  <div className="prod-mc-stat-box">
+                    <span className="prod-mc-rate-label">Sale</span>
                     <span className="prod-mc-rate-value">{fmt(p.sales_rate)}</span>
                   </div>
-                  <div className="prod-mc-rate-item">
+                  <div className={`prod-mc-stat-box ${p.current_stock < p.min_stock ? 'prod-mc-stat-box-low' : ''}`}>
                     <span className="prod-mc-rate-label">Stock</span>
                     <span className={`prod-mc-rate-value ${p.current_stock < p.min_stock ? 'prod-mc-stock-low' : ''}`}>
                       {p.current_stock}
@@ -536,17 +621,25 @@ export default function ProductsPage() {
                 {/* Chips + actions */}
                 <div className="prod-mc-footer">
                   <div className="prod-mc-chips">
-                    <span className="badge badge-muted">{p.unit}</span>
+                    <span className={`badge ${unitBadgeClass(p.unit)}`}>{p.unit}</span>
                     {p.is_active
                       ? <span className="badge badge-green">Active</span>
                       : <span className="badge badge-red">Inactive</span>
                     }
                   </div>
                   <div className="prod-mc-actions">
-                    <button className="prod-mc-btn" onClick={() => navigate(`/barcode-print?productId=${p.id}`)}>Print</button>
-                    <button className="prod-mc-btn" onClick={() => navigate(`/qrcode-print?productId=${p.id}`)}>QR</button>
-                    <button className="prod-mc-btn" onClick={() => { setEditing(p); setModal(true) }}>Edit</button>
-                    <button className="prod-mc-btn prod-mc-btn-danger" onClick={() => setDelId(p.id)}>Delete</button>
+                    <button className="prod-mc-btn" onClick={() => navigate(`/barcode-print?productId=${p.id}`)}>
+                      <Printer size={13}/><span>Print</span>
+                    </button>
+                    <button className="prod-mc-btn" onClick={() => navigate(`/qrcode-print?productId=${p.id}`)}>
+                      <QrCode size={13}/><span>QR</span>
+                    </button>
+                    <button className="prod-mc-btn" onClick={() => { setEditing(p); setModal(true) }}>
+                      <Pencil size={13}/><span>Edit</span>
+                    </button>
+                    <button className="prod-mc-btn prod-mc-btn-danger" onClick={() => setDelId(p.id)}>
+                      <Trash2 size={13}/><span>Delete</span>
+                    </button>
                   </div>
                 </div>
               </div>

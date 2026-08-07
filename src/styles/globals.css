@@ -4370,6 +4370,15 @@ bsp-row--disabled { cursor: not-allowed; opacity: .55; }
    Scoped with .prod- prefix. All rules additive.
 ══════════════════════════════════════════════════════════════════════════════ */
 
+/* ══════════════════════════════════════════════════════════════════════════════
+   PRODUCTS PAGE — MOBILE & TABLET RESPONSIVENESS
+   Scoped with .prod- prefix. All rules additive — desktop table/behaviour
+   (.prod-desktop-table, the desktop header actions row) is untouched;
+   everything below either only applies at ≤768px or only affects elements
+   that exist purely for the mobile layout (toolbar, filter sheet, stat
+   boxes, empty state).
+══════════════════════════════════════════════════════════════════════════════ */
+
 /* Search input: fixed width on desktop, full width on mobile */
 .prod-search-input { width: 256px; }
 @media (max-width: 640px) {
@@ -4382,21 +4391,150 @@ bsp-row--disabled { cursor: not-allowed; opacity: .55; }
   .prod-desktop-table { display: none !important; }
 }
 
+/* Mobile-only header button (prominent "+" in the sticky header) and
+   toolbar (Import/Export/Barcode/QR) — hidden on desktop, where the
+   original single-row header actions already do the job. */
+.prod-new-btn-mobile { display: none; }
+.prod-mobile-toolbar { display: none; }
+
+@media (max-width: 768px) {
+  /* ── 1. Sticky, shorter header ─────────────────────────────────────── */
+  .prod-sticky-header {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: var(--bg);
+    /* Base .page-header margin-bottom is 22px — 25% less, rounded. */
+    margin-bottom: 16px;
+    padding-top: 2px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .prod-header-desktop-actions { display: none !important; }
+  .prod-new-btn-mobile {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    border-radius: 12px;
+    border: none;
+    background: var(--brand);
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(37,99,235,.35);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .prod-new-btn-mobile:active { transform: scale(0.94); }
+
+  /* ── 2. Secondary action toolbar ──────────────────────────────────── */
+  .prod-mobile-toolbar {
+    display: flex;
+    flex-wrap: wrap;           /* wraps onto multiple rows automatically */
+    gap: 8px;
+    padding: 0 12px 12px;
+  }
+  .prod-toolbar-btn {
+    height: 44px;
+    padding: 0 14px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-2);
+    font-size: 13px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;       /* never break a label onto two lines */
+    flex: 1 1 auto;
+    justify-content: center;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .prod-toolbar-btn:active { background: var(--surface-3); }
+
+  /* ── 3. Search + Filter row ───────────────────────────────────────── */
+  .prod-search-row {
+    position: sticky;
+    top: 78px;                 /* sits directly under the sticky header */
+    z-index: 19;
+    background: var(--bg);
+    padding: 0 12px 10px;
+    margin: 0 0 4px !important;
+  }
+  .prod-search-row .prod-search-input { height: 46px; }
+  .prod-search-row .prod-search-input input {
+    height: 46px;
+    border-radius: 12px;
+    font-size: 14px;
+  }
+  .prod-search-row .prod-search-input input::placeholder { color: var(--text-4); }
+  .prod-filter-btn {
+    flex-shrink: 0;
+    width: 46px;
+    height: 46px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .prod-filter-btn-active {
+    border-color: var(--brand);
+    background: var(--brand-light);
+    color: var(--brand);
+  }
+  .prod-filter-sheet {
+    position: absolute;
+    top: 54px;
+    right: 12px;
+    z-index: 25;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.18);
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    min-width: 160px;
+  }
+  .prod-filter-opt {
+    text-align: left;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-2);
+    background: transparent;
+    border: none;
+    min-height: 44px;
+  }
+  .prod-filter-opt:active { background: var(--surface-3); }
+  .prod-filter-opt-active { color: var(--brand); background: var(--brand-light); }
+}
+
 /* Mobile card list — hidden on desktop */
 .prod-mobile-list { display: none; }
 @media (max-width: 768px) {
   .prod-mobile-list {
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    padding: 12px;
+    gap: 12px;                 /* equal spacing between cards */
+    padding: 4px 12px 12px;
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+    overflow-x: hidden;        /* no horizontal scrolling */
   }
 }
 
-.prod-mobile-skel-wrap { display: flex; flex-direction: column; gap: 10px; }
+.prod-mobile-skel-wrap { display: flex; flex-direction: column; gap: 12px; }
 .prod-mobile-card-skel {
-  height: 110px;
+  height: 152px;               /* matches the redesigned card's ~height */
   cursor: default;
+  border-radius: 16px;
   background: linear-gradient(90deg, var(--surface) 25%, var(--surface-2) 50%, var(--surface) 75%);
   background-size: 400% 100%;
   animation: prod-shimmer 1.4s ease infinite;
@@ -4406,18 +4544,22 @@ bsp-row--disabled { cursor: not-allowed; opacity: .55; }
   100% { background-position: 0%   50%; }
 }
 
-/* Individual product card */
+/* ── 8. Card shell: 16px radius, soft shadow, 16px padding, ~20% shorter
+   than the old 14px-padding/8px-gap version via tighter internal spacing
+   below rather than a fixed height (heights vary with content, so the
+   saving comes from every internal gap/padding being trimmed). ──────── */
 .prod-mobile-card {
   background:    var(--surface);
-  border:        1.5px solid var(--border);
-  border-radius: 14px;
-  padding:       14px;
+  border:        1px solid var(--border);
+  border-radius: 16px;
+  padding:       16px;
   display:       flex;
   flex-direction: column;
-  gap:           8px;
+  gap:           7px;
+  box-shadow:    0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
 }
 
-/* Top row: name + company (left) and code (right) */
+/* ── 4. Card header: name + manufacturer (left), code badge (right) ──── */
 .prod-mc-top {
   display:         flex;
   align-items:     flex-start;
@@ -4426,27 +4568,37 @@ bsp-row--disabled { cursor: not-allowed; opacity: .55; }
 }
 .prod-mc-name-wrap { flex: 1; min-width: 0; }
 .prod-mc-name {
-  font-weight: 600;
-  font-size:   14px;
-  color:       var(--text);
-  margin:      0;
-  line-height: 1.3;
+  font-weight:   700;
+  font-size:     14.5px;
+  color:         var(--text);
+  margin:        0;
+  line-height:   1.3;
+  letter-spacing: -.01em;
 }
 .prod-mc-company {
   font-size:  11.5px;
+  font-weight: 500;
   color:      var(--text-4);
   margin:     2px 0 0;
 }
+.prod-mc-code-wrap { text-align: right; flex-shrink: 0; }
 .prod-mc-code {
+  display:       inline-block;
   font-family:   var(--font-mono, monospace);
   font-size:     11px;
   font-weight:   700;
   color:         var(--brand);
-  background:    var(--surface-2);
-  padding:       2px 8px;
-  border-radius: 6px;
-  flex-shrink:   0;
+  background:    var(--brand-light);
+  border:        1px solid rgba(37,99,235,.18);
+  padding:       3px 9px;
+  border-radius: 999px;        /* badge pill */
   white-space:   nowrap;
+}
+.prod-mc-barcode {
+  font-size: 10px;
+  color: var(--text-4);
+  margin-top: 3px;
+  font-family: var(--font-mono, monospace);
 }
 
 /* Generic name line */
@@ -4455,38 +4607,43 @@ bsp-row--disabled { cursor: not-allowed; opacity: .55; }
   color:     var(--text-3);
 }
 
-/* Rates row: MRP / Sale Rate / Stock — 3 equal columns */
-.prod-mc-rates {
+/* ── 5. Three SEPARATE compact stat boxes (MRP / Sale / Stock) ───────── */
+.prod-mc-stats {
   display:               grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap:                   8px;
-  padding:               10px;
-  background:            var(--surface-2);
-  border-radius:         10px;
+  grid-template-columns: repeat(3, 1fr);   /* equal width */
+  gap:                   6px;
   margin:                2px 0;
 }
-.prod-mc-rate-item {
+.prod-mc-stat-box {
   display:        flex;
   flex-direction: column;
   align-items:    center;
-  gap:            3px;
+  gap:            2px;
+  padding:        8px 4px;
+  background:     var(--surface-2);
+  border:         1px solid var(--border);
+  border-radius:  10px;
+}
+.prod-mc-stat-box-low {
+  background: rgba(220,38,38,.06);
+  border-color: rgba(220,38,38,.25);       /* highlight low stock */
 }
 .prod-mc-rate-label {
-  font-size:      9.5px;
+  font-size:      9px;
   font-weight:    700;
-  letter-spacing: .05em;
+  letter-spacing: .06em;
   text-transform: uppercase;
   color:          var(--text-4);
 }
 .prod-mc-rate-value {
   font-family: var(--font-mono, monospace);
-  font-size:   14px;
+  font-size:   13.5px;
   font-weight: 700;
   color:       var(--text);
 }
 .prod-mc-stock-low { color: #dc2626; }
 
-/* Footer: chips left, actions right */
+/* ── 6. Footer: colour-coded pill chips (left), icon actions (right) ── */
 .prod-mc-footer {
   display:         flex;
   align-items:     center;
@@ -4497,30 +4654,74 @@ bsp-row--disabled { cursor: not-allowed; opacity: .55; }
 .prod-mc-chips {
   display: flex;
   gap:     6px;
+  flex-wrap: wrap;
 }
+.prod-mc-chips .badge { border-radius: 999px; }  /* modern pill shape */
+
+/* ── 7. Compact icon+text action buttons ─────────────────────────────── */
 .prod-mc-actions {
   display: flex;
   gap:     6px;
+  flex-wrap: wrap;
 }
 .prod-mc-btn {
-  padding:       6px 12px;
-  border-radius: 8px;
+  padding:       0 10px;
+  border-radius: 10px;
   border:        1px solid var(--border);
   background:    var(--surface-2);
   color:         var(--text-2);
-  font-size:     12px;
+  font-size:     11.5px;
   font-weight:   600;
   cursor:        pointer;
-  min-height:    34px;
+  min-height:    44px;         /* minimum touch target */
+  min-width:     44px;
+  display:       inline-flex;
+  align-items:   center;
+  gap:           5px;
   -webkit-tap-highlight-color: transparent;
 }
 .prod-mc-btn-danger {
-  border-color: rgba(220,38,38,.3);
+  border-color: rgba(220,38,38,.35);   /* red outline, per spec */
   color:        #dc2626;
-  background:   rgba(220,38,38,.06);
+  background:   transparent;
 }
 .prod-mc-btn:active { background: var(--surface-3); }
-.prod-mc-btn-danger:active { background: rgba(220,38,38,.12); }
+.prod-mc-btn-danger:active { background: rgba(220,38,38,.08); }
+
+/* ── 10. Custom empty state (illustration + message + CTA) ───────────── */
+.prod-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+  padding: 48px 20px;
+}
+.prod-empty-icon {
+  width: 56px; height: 56px;
+  border-radius: 16px;
+  background: var(--surface-2);
+  color: var(--text-4);
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 6px;
+}
+.prod-empty-title { font-size: 14.5px; font-weight: 700; color: var(--text); margin: 0; }
+.prod-empty-sub   { font-size: 12.5px; color: var(--text-4); margin: 0 0 10px; max-width: 240px; }
+
+/* ── 13. Accessibility: visible focus states + touch-friendly sizing ── */
+@media (max-width: 768px) {
+  .prod-toolbar-btn:focus-visible,
+  .prod-filter-btn:focus-visible,
+  .prod-filter-opt:focus-visible,
+  .prod-mc-btn:focus-visible,
+  .prod-new-btn-mobile:focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: 2px;
+  }
+  /* 320px–430px: keep the 3 stat boxes and 4 action buttons from ever
+     needing horizontal scroll even at the narrowest supported width. */
+  .prod-mc-actions .prod-mc-btn { flex: 1 1 auto; }
+}
 
 
 /* ══════════════════════════════════════════════════════════════════════════════
