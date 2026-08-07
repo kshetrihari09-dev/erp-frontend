@@ -4381,6 +4381,14 @@ bsp-row--disabled { cursor: not-allowed; opacity: .55; }
 
 /* Search input: fixed width on desktop, full width on mobile */
 .prod-search-input { width: 256px; }
+.prod-search-input input {
+  /* .erp-input's own padding (globals.css, later in the cascade) beats
+     Tailwind's pl-8/pr-3 on the input, collapsing the left padding back
+     down and putting the placeholder text right under the search icon.
+     Reassert explicit padding so the icon and text never overlap. */
+  padding-left: 32px !important;
+  padding-right: 12px !important;
+}
 @media (max-width: 640px) {
   .prod-search-input { width: 100% !important; }
 }
