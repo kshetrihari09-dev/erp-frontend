@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Lock, AlertCircle } from 'lucide-react'
 import { Modal, Button } from '@/components/ui'
 import { authAPI } from '@/services/api'
+import { setStepUpToken } from '@/services/stepUpToken'
 
 interface VoucherEditPasswordDialogProps {
   open: boolean
@@ -15,10 +16,13 @@ interface VoucherEditPasswordDialogProps {
 /**
  * "This voucher has already been posted. Enter your password to continue."
  * Verifies against the CURRENTLY LOGGED-IN user's own password via the
- * existing POST /auth/verify-password endpoint (unmodified) — no new
- * password-checking logic is introduced here. There is no path that skips
- * this check: the parent only unlocks the edit form from the onUnlock
- * callback, which only fires after a 200 from that endpoint.
+ * existing POST /auth/verify-password endpoint. On success this also
+ * caches the returned step-up token (services/stepUpToken.ts), which the
+ * axios interceptor then attaches automatically to the PUT
+ * /vouchers/:id/edit call that follows — the backend's
+ * requireStepUp('voucherEdit') middleware checks for exactly that token,
+ * so the actual edit request is now genuinely gated server-side, not
+ * just by this dialog existing on the frontend.
  */
 export default function VoucherEditPasswordDialog({ open, voucherLabel, onCancel, onUnlock }: VoucherEditPasswordDialogProps) {
   const [password, setPassword] = useState('')
@@ -40,7 +44,9 @@ export default function VoucherEditPasswordDialog({ open, voucherLabel, onCancel
     if (!reason.trim()) { setErrMsg('A reason for this edit is required'); return }
     setSubmitting(true)
     try {
-      await authAPI.verifyPassword(password)
+      const res = await authAPI.verifyPassword({ password })
+      const stepUp = res.data.data
+      if (stepUp) setStepUpToken(stepUp.stepUpToken, stepUp.expiresIn)
       const confirmedReason = reason.trim()
       reset()
       onUnlock(confirmedReason)

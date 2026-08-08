@@ -52,9 +52,15 @@ export const authAPI = {
   changePassword: (data: { current_password: string; new_password: string }) =>
     http.put('/auth/change-password', data),
   refresh: (data: { refresh_token: string }) => http.post('/auth/refresh', data),
-  /** Step-up confirmation: checks the current session's user's password. No tokens issued. */
-  verifyPassword: (password: string) =>
-    http.post<ApiResponse<{ message: string }>>('/auth/verify-password', { password }),
+  /** Step-up confirmation: checks the current session's user's PIN or password.
+   *  On success returns a short-lived stepUpToken to attach as
+   *  X-Step-Up-Token on subsequent sensitive requests (see stepUpToken.ts). */
+  verifyPassword: (credential: { password?: string; pin?: string }) =>
+    http.post<ApiResponse<{ stepUpToken: string; expiresIn: number }>>('/auth/verify-password', credential),
+  /** Sets/changes the 6-digit Security PIN. Always requires the current
+   *  account password, even for a first-time PIN. */
+  setSecurityPin: (data: { pin: string; current_password: string }) =>
+    http.post<ApiResponse<{ stepUpToken: string; expiresIn: number }>>('/auth/security-pin', data),
 
   // ── Multi-channel OTP ─────────────────────────────────────────────────────
   sendOTP: (data: SendOTPParams) =>

@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { User, Company, UserRole } from '@/types'
 import { ROLE_PERMISSIONS } from '@/constants'
+import { clearStepUpToken } from '@/services/stepUpToken'
 
 // ── Raw token key — exported so http.ts can read the JWT directly ─────────────
 // Zustand persist stores full JSON under 'erp_auth_state'.
@@ -44,6 +45,7 @@ const useAuthStore = create<AuthState>()(
       logout: () => {
         localStorage.removeItem(RAW_TOKEN_KEY)
         localStorage.removeItem(REFRESH_TOKEN_KEY)
+        clearStepUpToken()
         set({ token: null, user: null, company: null, isAuthenticated: false })
       },
 

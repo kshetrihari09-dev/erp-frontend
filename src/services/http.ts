@@ -12,6 +12,7 @@ import axios, {
 } from 'axios'
 import { config }      from '@/config/env'
 import { RAW_TOKEN_KEY, REFRESH_TOKEN_KEY as AUTH_REFRESH_KEY } from '@/store/authStore'
+import { getValidStepUpToken, clearStepUpToken } from './stepUpToken'
 
 // REFRESH_TOKEN_KEY is exported from authStore.ts
 export { AUTH_REFRESH_KEY as REFRESH_TOKEN_KEY }
@@ -37,6 +38,7 @@ function clearAuthAndRedirect() {
   localStorage.removeItem(RAW_TOKEN_KEY)
   localStorage.removeItem(AUTH_REFRESH_KEY)
   localStorage.removeItem('erp_auth_state')
+  clearStepUpToken()
   if (!window.location.pathname.startsWith('/login')) {
     window.location.href = '/login'
   }
@@ -49,6 +51,14 @@ http.interceptors.request.use(
 
     if (token && token !== 'null' && token !== 'undefined' && token.includes('.')) {
       config_.headers.Authorization = `Bearer ${token}`
+    }
+
+    // Step-up token — see services/stepUpToken.ts. In-memory only (never
+    // localStorage), and simply absent/expired most of the time, in which
+    // case this is a no-op and sensitive endpoints fall back to prompting.
+    const stepUpToken = getValidStepUpToken()
+    if (stepUpToken) {
+      config_.headers['X-Step-Up-Token'] = stepUpToken
     }
 
     if (config.enableApiLogs) {

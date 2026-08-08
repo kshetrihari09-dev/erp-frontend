@@ -35,6 +35,9 @@ export interface User {
   can_post_vouchers?:   boolean
   can_approve_vouchers?: boolean
   can_lock_periods?:    boolean
+  /** Whether a Security PIN is set for step-up verification (never the
+   *  hash itself — that's never sent to the frontend). */
+  hasPin?: boolean
 }
 
 export interface Company {
