@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import type { UseFormRegister, FieldErrors } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Plus, Package, ScanLine, Type, Boxes, Download, Upload, Printer, QrCode, Filter, Pencil, Trash2 } from 'lucide-react'
+import { Plus, Package, ScanLine, Boxes, Download, Upload, Printer, QrCode, Filter, Pencil, Trash2 } from 'lucide-react'
 import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct, useProductOpeningBatches, useAddOpeningInventory } from '@/hooks/useQuery'
 import { Button, Modal, Badge, Pagination, SkeletonRows, Empty, SearchInput, ConfirmDialog } from '@/components/ui'
 import ManufacturerSelect from '@/components/forms/ManufacturerSelect'
@@ -12,10 +12,8 @@ import ImportProductsModal from './ImportProductsModal'
 import { useDebounce } from '@/hooks/useDebounce'
 import { fmt } from '@/utils'
 import { PRODUCT_UNITS } from '@/constants'
-import { parseProductOcr } from '@/utils/parseProductOcr'
 import { productSchema, PRODUCT_VAT_OPTIONS, type ProductFormInput } from '@/services/productCreation'
 import type { Product, OpeningInventoryBatch } from '@/types'
-import type { CaptureMode } from '@/hooks/scanner/useProductCapture'
 
 const ProductScanModal = lazy(() => import('@/components/scanner/ProductScanModal'))
 
@@ -225,28 +223,13 @@ function ProductForm({ initial, onClose }: { initial?: Product | null; onClose: 
   })
 
   const [scanOpen, setScanOpen]   = useState(false)
-  const [scanMode, setScanMode]   = useState<CaptureMode>('barcode')
   const [scanBanner, setScanBanner] = useState<string | null>(null)
 
-  const openScan = (mode: CaptureMode) => { setScanMode(mode); setScanOpen(true) }
+  const openScan = () => setScanOpen(true)
 
   const handleBarcodeScanned = (code: string) => {
     setValue('barcode', code, { shouldDirty: true, shouldValidate: true })
     setScanBanner('Barcode filled from scan — please verify.')
-    setScanOpen(false)
-  }
-
-  const handleLabelScanned = (text: string) => {
-    const parsed = parseProductOcr(text)
-    const filled: string[] = []
-    if (parsed.name)          { setValue('name', parsed.name, { shouldDirty: true, shouldValidate: true }); filled.push('Product Name') }
-    if (parsed.generic_name)  { setValue('generic_name', parsed.generic_name, { shouldDirty: true }); filled.push('Generic Name') }
-    if (parsed.company_name)  { setValue('company_name', parsed.company_name, { shouldDirty: true }); filled.push('Company / Brand') }
-    if (parsed.mrp != null)   { setValue('mrp', parsed.mrp, { shouldDirty: true }); filled.push('MRP') }
-
-    setScanBanner(filled.length
-      ? `Filled from scan: ${filled.join(', ')} — please review before saving.`
-      : "Couldn't confidently extract any fields from that scan — please enter details manually.")
     setScanOpen(false)
   }
 
@@ -264,19 +247,6 @@ function ProductForm({ initial, onClose }: { initial?: Product | null; onClose: 
 
   return (
     <>
-      {hasCameraSupport() && (
-        <div className="flex items-center justify-between mb-4 -mt-1">
-          <button
-            type="button"
-            onClick={() => openScan('label')}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold hover:opacity-80 transition-opacity"
-            style={{ background: 'color-mix(in srgb, var(--brand) 12%, transparent)', color: 'var(--brand)' }}
-          >
-            <Type size={13} /> Scan Product Label
-          </button>
-        </div>
-      )}
-
       {scanBanner && (
         <div className="mb-4 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs font-medium flex items-start justify-between gap-2">
           <span>{scanBanner}</span>
@@ -318,7 +288,7 @@ function ProductForm({ initial, onClose }: { initial?: Product | null; onClose: 
             {hasCameraSupport() && (
               <button
                 type="button"
-                onClick={() => openScan('barcode')}
+                onClick={() => openScan()}
                 aria-label="Scan barcode"
                 className="shrink-0 w-9 h-9 rounded-lg border border-[var(--border)] flex items-center justify-center text-[var(--text-3)] hover:bg-[var(--surface-3)] transition-colors"
               >
@@ -391,9 +361,7 @@ function ProductForm({ initial, onClose }: { initial?: Product | null; onClose: 
         <Suspense fallback={null}>
           <ProductScanModal
             open={scanOpen}
-            initialMode={scanMode}
             onBarcode={handleBarcodeScanned}
-            onOcrText={handleLabelScanned}
             onClose={() => setScanOpen(false)}
           />
         </Suspense>

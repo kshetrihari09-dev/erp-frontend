@@ -79,9 +79,9 @@ export function preprocessForOcr(source: CanvasImageSource, srcWidth: number, sr
 //
 // object-fit: cover math — the video is scaled up (never letterboxed)
 // until it fills the container on both axes, then centered and cropped on
-// whichever axis overflows. That's the opposite of the "contain" math
-// used by CropOverlay for static images, so this is intentionally a
-// separate helper rather than a shared one.
+// whichever axis overflows. That's the opposite of the "contain" math a
+// static-image crop tool would use, so this is intentionally a separate
+// helper rather than a shared one.
 export function captureScanBoxFrame(
   video: HTMLVideoElement,
   containerW: number,
