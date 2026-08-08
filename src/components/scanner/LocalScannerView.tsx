@@ -170,14 +170,6 @@ export default function LocalScannerView({ open, context, onResult, onClose, onU
             </motion.div>
           )}
 
-          {/* ── Non-blocking suggestions (70–84% confidence) — scanning keeps
-              going while these are up; tapping one selects immediately ── */}
-          {state.status === 'scanning' && state.mode === 'ocr' && state.suggestions.length > 0 && (
-            <div className="absolute bottom-[172px] left-0 right-0 flex justify-center px-4 pointer-events-none">
-              <SuggestionChips products={state.suggestions} onSelect={selectProduct} />
-            </div>
-          )}
-
           {/* ── Bottom controls (mode toggle, gallery, "use another device") ── */}
           {!showDrawer && (
             <div
@@ -185,6 +177,18 @@ export default function LocalScannerView({ open, context, onResult, onClose, onU
               className="absolute bottom-0 left-0 right-0 flex flex-col items-center gap-3 px-4 pb-2"
               style={{ paddingBottom: 'max(14px, env(safe-area-inset-bottom, 0px))' }}
             >
+              {/* ── Non-blocking suggestions (70–84% confidence) — scanning
+                  keeps going while these are up; tapping one selects
+                  immediately. Placed in-flow, directly above the ratio
+                  selector, so it always stacks correctly above the other
+                  controls instead of relying on a fixed pixel offset that
+                  can drift out of place on different screen sizes. ── */}
+              {state.status === 'scanning' && state.mode === 'ocr' && state.suggestions.length > 0 && (
+                <div className="w-full flex justify-center px-4 pointer-events-none">
+                  <SuggestionChips products={state.suggestions} onSelect={selectProduct} />
+                </div>
+              )}
+
               {/* OCR scan-ratio selector — only meaningful in OCR mode, and
                   never covers the camera preview or the scan box, which sit
                   above this bottom-controls strip. */}
