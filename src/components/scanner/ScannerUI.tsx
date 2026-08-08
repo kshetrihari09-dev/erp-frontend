@@ -7,8 +7,8 @@
  * instead of duplicating JSX. No scanning/business logic lives here.
  */
 import { motion } from 'framer-motion'
-import { SCAN_BOX_WIDTH, SCAN_BOX_HEIGHT } from '@/utils/ocrImage'
 import { BARCODE_SCAN_WIDTH, BARCODE_SCAN_HEIGHT } from '@/utils/barcodeFrame'
+import { OCR_RATIO_PRESETS } from '@/utils/ocrImage'
 
 // ── Barcode scan overlay (rectangular) ───────────────────────────────────────
 // The single, shared visual guide for barcode mode on BOTH scanners — the
@@ -54,21 +54,22 @@ export function BarcodeRectOverlay({ found = false }: { found?: boolean }) {
 }
 
 // ── Scan frame overlay ────────────────────────────────────────────────────────
-// The box below is drawn at the exact same pixel size (SCAN_BOX_WIDTH x
-// SCAN_BOX_HEIGHT) that useLocalScanner's captureScanBoxFrame() crops from
-// the video — this is the literal region OCR/barcode detection reads, not
-// just a decorative guide, so what's dimmed vs. lit here must always match
-// what gets processed.
-export function ScanFrame({ mode }: { mode: string }) {
+// The box below is drawn at exactly `width` x `height` — CSS pixels
+// computed by computeScanBoxSize() in ocrImage.ts from the live camera
+// container size and the currently-selected ratio. useLocalScanner passes
+// the SAME numbers to captureScanBoxFrame() for the actual OCR crop, so
+// what's dimmed vs. lit here must always match what gets processed, at
+// every ratio and across resize/orientation changes.
+export function ScanFrame({ mode, width = 240, height = 130 }: { mode: string; width?: number; height?: number }) {
   return (
     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
       {/* Dims everything outside the box via a huge box-shadow spread —
           the box itself stays fully lit. */}
       <div
-        className="relative rounded-xl"
+        className="relative rounded-xl transition-all duration-200"
         style={{
-          width: SCAN_BOX_WIDTH,
-          height: SCAN_BOX_HEIGHT,
+          width,
+          height,
           boxShadow: '0 0 0 9999px rgba(0,0,0,0.6)',
         }}
       >
@@ -118,6 +119,66 @@ export function ModeBadge({ mode, ocrProgress }: { mode: string; ocrProgress: nu
     )
   }
   return null
+}
+
+// ── OCR scan-ratio selector ───────────────────────────────────────────────────
+// Small, mobile-friendly pill row — 2:1 | 3:2 | 4:3 | 16:9. Deliberately
+// compact (single row, short labels) so it never covers the camera
+// preview or the scan box itself; callers position it above/below those.
+// Selecting a ratio immediately updates the visible OCR box (and the
+// underlying crop) via useLocalScanner's setOcrRatio.
+export function RatioSelector({ value, onChange }: { value: string; onChange: (id: string) => void }) {
+  return (
+    <div className="flex items-center gap-1 px-1.5 py-1.5 bg-black/45 backdrop-blur-md rounded-full pointer-events-auto">
+      {OCR_RATIO_PRESETS.map(preset => (
+        <button
+          key={preset.id}
+          onClick={() => onChange(preset.id)}
+          aria-label={`OCR ratio ${preset.id} — ${preset.label}`}
+          className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-colors ${
+            value === preset.id ? 'bg-purple-600 text-white' : 'text-white/70 active:bg-white/10'
+          }`}
+        >
+          {preset.id}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+// ── Quality feedback pill ─────────────────────────────────────────────────────
+// Simple, non-technical feedback ("Move closer", "Improve lighting"...) —
+// never a raw Tesseract error — shown after several consecutive frames
+// fail to read anything usable.
+export function QualityHint({ hint }: { hint: string }) {
+  return (
+    <div className="px-3 py-1.5 rounded-full bg-amber-500/85 backdrop-blur-sm text-white text-xs font-semibold shadow-lg">
+      {hint}
+    </div>
+  )
+}
+
+// ── Inline suggestion chips (70–84% confidence band) ─────────────────────────
+// Non-blocking — scanning keeps going while these are visible. Tapping a
+// chip selects that product immediately, same as the full matches sheet.
+export function SuggestionChips({ products, onSelect }: {
+  products: ProductCardProduct[]
+  onSelect: (p: any) => void
+}) {
+  if (products.length === 0) return null
+  return (
+    <div className="flex items-center gap-1.5 overflow-x-auto px-1 pointer-events-auto max-w-full">
+      {products.slice(0, 3).map(p => (
+        <button
+          key={p.id}
+          onClick={() => onSelect(p)}
+          className="flex-shrink-0 px-3 py-1.5 rounded-full bg-white/90 backdrop-blur-sm text-slate-800 text-[11px] font-semibold shadow active:scale-95 transition-transform truncate max-w-[140px]"
+        >
+          {p.name}
+        </button>
+      ))}
+    </div>
+  )
 }
 
 // ── Product match card ────────────────────────────────────────────────────────

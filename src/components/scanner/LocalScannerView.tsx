@@ -37,7 +37,7 @@ import {
 } from 'lucide-react'
 import useLocalScanner from '@/hooks/scanner/useLocalScanner'
 import type { ScanResult } from '@/types/scanner'
-import { ScanFrame, ModeBadge, ProductCard, BarcodeRectOverlay } from './ScannerUI'
+import { ScanFrame, ModeBadge, ProductCard, BarcodeRectOverlay, RatioSelector, QualityHint, SuggestionChips } from './ScannerUI'
 import BarcodeScannerView from './BarcodeScannerView'
 import { Z } from '@/styles/zIndex'
 import { playSuccessBeep } from '@/utils/beep'
@@ -82,7 +82,7 @@ export default function LocalScannerView({ open, context, onResult, onClose, onU
   }, [onResult])
 
   const {
-    state, videoRef, containerRef, toggleFlash, switchCamera, setMode, setZoom,
+    state, videoRef, containerRef, toggleFlash, switchCamera, setMode, setZoom, setOcrRatio,
     selectProduct, rescan, retryPermission, scanImageFile,
   } = useLocalScanner({ context, onResult: handleResult, active: open })
 
@@ -134,7 +134,7 @@ export default function LocalScannerView({ open, context, onResult, onClose, onU
           onSwitchCamera={switchCamera}
           onClose={onClose}
           onRetryPermission={retryPermission}
-          scanOverlay={state.status === 'scanning' ? (state.mode === 'barcode' ? <BarcodeRectOverlay /> : <ScanFrame mode={state.mode} />) : undefined}
+          scanOverlay={state.status === 'scanning' ? (state.mode === 'barcode' ? <BarcodeRectOverlay /> : <ScanFrame mode={state.mode} width={state.boxWidth} height={state.boxHeight} />) : undefined}
           success={state.status === 'done'}
           successLabel="Added!"
           deniedExtra={
@@ -153,17 +153,29 @@ export default function LocalScannerView({ open, context, onResult, onClose, onU
             </div>
           )}
 
-          {state.status === 'scanning' && state.notice && (
+          {state.status === 'scanning' && (state.notice || state.qualityHint) && (
             <motion.div
               key="notice"
               initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
               className="absolute left-0 right-0 flex justify-center pointer-events-none"
               style={{ top: '58%' }}
             >
-              <div className="px-3 py-1.5 rounded-full bg-black/70 backdrop-blur-md text-white/90 text-xs font-medium">
-                {state.notice}
-              </div>
+              {state.notice ? (
+                <div className="px-3 py-1.5 rounded-full bg-black/70 backdrop-blur-md text-white/90 text-xs font-medium">
+                  {state.notice}
+                </div>
+              ) : (
+                <QualityHint hint={state.qualityHint!} />
+              )}
             </motion.div>
+          )}
+
+          {/* ── Non-blocking suggestions (70–84% confidence) — scanning keeps
+              going while these are up; tapping one selects immediately ── */}
+          {state.status === 'scanning' && state.mode === 'ocr' && state.suggestions.length > 0 && (
+            <div className="absolute bottom-[172px] left-0 right-0 flex justify-center px-4 pointer-events-none">
+              <SuggestionChips products={state.suggestions} onSelect={selectProduct} />
+            </div>
           )}
 
           {/* ── Bottom controls (mode toggle, gallery, "use another device") ── */}
@@ -173,6 +185,13 @@ export default function LocalScannerView({ open, context, onResult, onClose, onU
               className="absolute bottom-0 left-0 right-0 flex flex-col items-center gap-3 px-4 pb-2"
               style={{ paddingBottom: 'max(14px, env(safe-area-inset-bottom, 0px))' }}
             >
+              {/* OCR scan-ratio selector — only meaningful in OCR mode, and
+                  never covers the camera preview or the scan box, which sit
+                  above this bottom-controls strip. */}
+              {state.mode === 'ocr' && state.status === 'scanning' && (
+                <RatioSelector value={state.ocrRatio} onChange={setOcrRatio} />
+              )}
+
               <button
                 onClick={onUseAnotherDevice}
                 className="flex items-center gap-1.5 px-3.5 py-1.5 bg-white/10 backdrop-blur-md rounded-full text-white/80 text-xs font-medium"
@@ -232,7 +251,11 @@ export default function LocalScannerView({ open, context, onResult, onClose, onU
               <div className="flex items-center justify-between px-4 pb-3 border-b border-slate-100 flex-shrink-0">
                 <div>
                   <p className="font-bold text-slate-900 text-sm">
-                    {state.matches.length === 1 ? 'Medicine Found' : `${state.matches.length} Matches`}
+                    {state.matchTier === 'possible'
+                      ? 'Possible Match — Confirm'
+                      : state.matchTier === 'suggested'
+                      ? `${state.matches.length === 1 ? 'Best Guess' : `${state.matches.length} Suggestions`}`
+                      : state.matches.length === 1 ? 'Medicine Found' : `${state.matches.length} Matches`}
                   </p>
                   <p className="text-xs text-slate-400 mt-0.5">
                     {state.lastBarcode
