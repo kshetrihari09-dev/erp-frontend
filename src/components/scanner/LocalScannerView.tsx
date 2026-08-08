@@ -146,13 +146,9 @@ export default function LocalScannerView({ open, context, onResult, onClose, onU
             </button>
           }
         >
-          {/* ── Extra overlays specific to this scanner (mode badge, notice) ── */}
-          {state.status === 'scanning' && (
-            <div className="absolute bottom-[132px] left-0 right-0 flex justify-center pointer-events-none">
-              <ModeBadge mode={state.mode} ocrProgress={state.ocrProgress} />
-            </div>
-          )}
-
+          {/* ── Extra overlays specific to this scanner ── */}
+          {/* "No match yet" / quality-hint notice stays centered mid-screen,
+              well clear of the bottom controls, so it's unaffected by this. */}
           {state.status === 'scanning' && (state.notice || state.qualityHint) && (
             <motion.div
               key="notice"
@@ -170,21 +166,32 @@ export default function LocalScannerView({ open, context, onResult, onClose, onU
             </motion.div>
           )}
 
-          {/* ── Bottom controls (mode toggle, gallery, "use another device") ── */}
+          {/* ── Bottom controls (mode toggle, gallery, "use another device") ──
+              Everything that lives near the bottom of the screen — the mode
+              badge, the non-blocking suggestions, the ratio selector, and
+              the control buttons — is ONE flex column, stacked top-to-
+              bottom in natural document flow. None of it uses a fixed
+              pixel offset, so however tall any one piece gets (a longer
+              product name wrapping the suggestion chips, the OCR progress
+              bar appearing under the mode badge, etc.) it simply pushes the
+              others further up instead of overlapping them. ── */}
           {!showDrawer && (
             <div
               key="bottom-controls"
               className="absolute bottom-0 left-0 right-0 flex flex-col items-center gap-3 px-4 pb-2"
               style={{ paddingBottom: 'max(14px, env(safe-area-inset-bottom, 0px))' }}
             >
+              {state.status === 'scanning' && (
+                <div className="pointer-events-none">
+                  <ModeBadge mode={state.mode} ocrProgress={state.ocrProgress} />
+                </div>
+              )}
+
               {/* ── Non-blocking suggestions (70–84% confidence) — scanning
                   keeps going while these are up; tapping one selects
-                  immediately. Placed in-flow, directly above the ratio
-                  selector, so it always stacks correctly above the other
-                  controls instead of relying on a fixed pixel offset that
-                  can drift out of place on different screen sizes. ── */}
+                  immediately. ── */}
               {state.status === 'scanning' && state.mode === 'ocr' && state.suggestions.length > 0 && (
-                <div className="w-full flex justify-center px-4 pointer-events-none">
+                <div className="w-full flex justify-center px-4">
                   <SuggestionChips products={state.suggestions} onSelect={selectProduct} />
                 </div>
               )}
