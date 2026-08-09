@@ -202,7 +202,7 @@ function confusionAwareSimilarity(a: string, b: string): number {
   return levenshteinSimilarity(ca, cb)
 }
 
-function fieldScore(normField: string, normText: string): number {
+export function fieldScore(normField: string, normText: string): number {
   if (!normField || !normText) return 0
   return Math.max(
     levenshteinSimilarity(normField, normText),
@@ -311,4 +311,175 @@ export function combineOcrSamples(samples: string[]): ConsensusResult | null {
   groups.sort((a, b) => b.members.length - a.members.length)
   const top = groups[0]
   return { text: top.rep, count: top.members.length, total: clean.length }
+}
+
+// ── Structured (ML Kit) field-aware matching ───────────────────────────────
+//
+// Everything below EXTENDS matchProduct/tierForScore rather than
+// duplicating them — it's the same whole-text scoring as the plain
+// Tesseract/web path, with a few pieces of extra evidence blended in when
+// the caller has them (a structured ML Kit read gives us more than a
+// single OCR string: a parsed product/generic name, a strength, a
+// dosage form, a manufacturer line, ML Kit's own confidence, and how
+// consistently the last few frames agreed with each other). The plain
+// matchProduct/tierForScore pair is untouched and still used exactly as
+// before by the Tesseract fallback and the gallery-image path.
+
+// Common dosage-form abbreviations -> canonical form, shared by the
+// pharma parser (which detects the OCR side) and here (which detects the
+// candidate-product side) so both are compared on the same vocabulary.
+export const DOSAGE_FORM_WORDS: Record<string, string> = {
+  tab: 'tablet', tabs: 'tablet', tablet: 'tablet', tablets: 'tablet',
+  cap: 'capsule', caps: 'capsule', capsule: 'capsule', capsules: 'capsule',
+  syp: 'syrup', syrup: 'syrup',
+  susp: 'suspension', suspension: 'suspension',
+  inj: 'injection', injection: 'injection',
+  drop: 'drops', drops: 'drops',
+  oint: 'ointment', ointment: 'ointment',
+  cream: 'cream', gel: 'gel', lotion: 'lotion', sol: 'solution', solution: 'solution',
+}
+
+export function detectDosageForm(text: string | undefined | null): string | null {
+  if (!text) return null
+  for (const tok of normalizeOcrText(text).split(' ')) {
+    if (DOSAGE_FORM_WORDS[tok]) return DOSAGE_FORM_WORDS[tok]
+  }
+  return null
+}
+
+function clamp01(n: number): number {
+  return Math.max(0, Math.min(1, n))
+}
+
+export interface PharmaMatchInput {
+  rawText:        string             // full normalized OCR text — same role as matchProduct's ocrText
+  productName?:   string
+  genericName?:   string
+  strength?:      string             // already normalized, e.g. "500mg"
+  dosageForm?:    string             // canonical form, e.g. "tablet"
+  manufacturer?:  string
+  ocrConfidence?: number             // 0..1 — ML Kit's own recognition confidence
+  consensusRatio?: number            // 0..1 — how many of the last few frames agreed (see combineOcrSamples)
+}
+
+export interface PharmaScoredMatch<T extends MatchCandidate = MatchCandidate> extends ScoredMatch<T> {
+  // Fraction of the structured fields the caller actually supplied
+  // (generic name / strength / dosage form / manufacturer) that agreed
+  // strongly with this candidate — used by resolvePharmaTier to require
+  // "strong field agreement", not just a high whole-text score, before
+  // auto-selecting (spec: 95%+ AND strong field agreement AND a stable
+  // repeated reading).
+  fieldAgreement: number
+}
+
+// Scores candidates using the same whole-text engine as matchProduct,
+// then blends in structured-field agreement, OCR confidence, and
+// multi-frame consensus as supporting evidence — never as the primary
+// signal, same philosophy as the existing strength boost in
+// matchProduct. Never duplicates matchProduct's string-similarity logic;
+// it calls it for both the product-name and generic-name comparisons.
+export function matchPharmaProduct<T extends MatchCandidate>(
+  input: PharmaMatchInput,
+  candidates: T[],
+): PharmaScoredMatch<T>[] {
+  const base = matchProduct(input.productName || input.rawText, candidates)
+  const genericRanked = input.genericName ? matchProduct(input.genericName, candidates) : []
+  const genericScoreById = new Map(genericRanked.map(m => [m.product.id, m.score]))
+
+  return base.map(m => {
+    let score = m.score
+    let signals = 0
+    let agreement = 0
+
+    if (input.genericName) {
+      signals++
+      const gScore = genericScoreById.get(m.product.id) ?? 0
+      if (gScore >= 0.8) agreement++
+      // Name match still dominates; generic-name agreement can only pull
+      // the combined score up, never down below the name-only score.
+      score = Math.max(score, score * 0.6 + gScore * 0.4)
+    }
+
+    if (input.strength) {
+      signals++
+      const candidateStrength = extractStrength(m.product.name || '') || extractStrength(m.product.generic_name || '')
+      if (candidateStrength && candidateStrength === input.strength) {
+        agreement++
+        score = Math.min(1, score + 0.04)
+      }
+    }
+
+    if (input.dosageForm) {
+      signals++
+      const candidateForm = detectDosageForm(m.product.name || '')
+      if (candidateForm && candidateForm === input.dosageForm) {
+        agreement++
+        score = Math.min(1, score + 0.03)
+      }
+    }
+
+    if (input.manufacturer && m.product.company_name) {
+      signals++
+      const s = fieldScore(normalizeOcrText(input.manufacturer), normalizeOcrText(m.product.company_name))
+      if (s >= 0.6) {
+        agreement++
+        score = Math.min(1, score + 0.02)
+      }
+    }
+
+    // OCR confidence and repeated-frame consistency are supporting
+    // evidence, not gates on their own — a poor read of the right
+    // product should still surface as a lower-tier suggestion, just
+    // never as strong as a clean, consistent one.
+    if (typeof input.ocrConfidence === 'number') {
+      score = score * (0.85 + 0.15 * clamp01(input.ocrConfidence))
+    }
+    if (typeof input.consensusRatio === 'number') {
+      score = score * (0.9 + 0.1 * clamp01(input.consensusRatio))
+    }
+
+    return { ...m, score: Math.min(1, score), fieldAgreement: signals > 0 ? agreement / signals : 0 }
+  }).sort((a, b) => b.score - a.score)
+}
+
+// True when the top two candidates are both in/above the "auto-select"
+// band and too close together to trust a single winner — e.g. 96% vs
+// 95%. Per spec: do NOT auto-select in this case; show both suggestions
+// instead and let the user tap the correct one.
+const AMBIGUOUS_TOP2_GAP = 0.02
+
+export function isAmbiguousTop2(ranked: ScoredMatch[]): boolean {
+  if (ranked.length < 2) return false
+  return ranked[0].score >= MATCH_AUTO_THRESHOLD && (ranked[0].score - ranked[1].score) < AMBIGUOUS_TOP2_GAP
+}
+
+export interface PharmaTierOptions {
+  minFieldAgreement?: number  // required fraction of supplied fields agreeing, for auto-select (default 0.5)
+  minConsensusRatio?: number  // required repeated-frame agreement ratio, for auto-select (default 0.5)
+  consensusRatio?:    number
+}
+
+// Same threshold bands as tierForScore, but auto-select additionally
+// requires strong field agreement and a stable repeated reading, and is
+// withheld entirely when the top two candidates are too close to call —
+// exactly the three auto-select conditions from the spec ("95%+ + strong
+// field agreement + stable repeated reading").
+export function resolvePharmaTier<T extends MatchCandidate>(
+  ranked: PharmaScoredMatch<T>[],
+  opts: PharmaTierOptions = {},
+): MatchTier {
+  const best = ranked[0]
+  if (!best) return 'none'
+  const tier = tierForScore(best.score)
+  if (tier !== 'auto') return tier
+
+  if (isAmbiguousTop2(ranked)) return 'possible'
+
+  const minAgreement = opts.minFieldAgreement ?? 0.5
+  if (best.fieldAgreement > 0 && best.fieldAgreement < minAgreement) return 'possible'
+
+  const minConsensus = opts.minConsensusRatio ?? 0.5
+  if (typeof opts.consensusRatio === 'number' && opts.consensusRatio < minConsensus) return 'possible'
+
+  return 'auto'
 }

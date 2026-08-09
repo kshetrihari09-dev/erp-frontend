@@ -183,7 +183,7 @@ export default function LocalScannerView({ open, context, onResult, onClose, onU
             >
               {state.status === 'scanning' && (
                 <div className="pointer-events-none">
-                  <ModeBadge mode={state.mode} ocrProgress={state.ocrProgress} />
+                  <ModeBadge mode={state.mode} ocrProgress={state.ocrProgress} statusMessage={state.ocrStatusMessage} />
                 </div>
               )}
 

@@ -15,19 +15,24 @@ export interface ParsedProductFields {
   mrp?:           number
 }
 
-const COMPANY_HINTS = [
+// Exported (not just module-local) so pharmaOcrParser.ts — the ML Kit
+// structured-result classifier used by the live scanner — reuses these
+// exact patterns instead of maintaining a second, possibly-drifting copy.
+export const COMPANY_HINTS = [
   'pvt', 'ltd', 'limited', 'pharma', 'pharmaceutical', 'pharmaceuticals',
   'laboratories', 'labs', 'industries', 'healthcare', 'life sciences',
   'biotech', 'drugs', 'formulations',
 ]
 
-const NOISE_LINE = /^[\W_]*$/                       // punctuation-only lines
-const MRP_LINE    = /\b(?:m\.?r\.?p\.?|mrp|price)\b/i
-const BATCH_LINE  = /\b(?:batch|b\.?no|lot)\b/i
-const EXPIRY_LINE = /\b(?:exp|expiry|mfg|manufactured)\b/i
-const AMOUNT      = /(?:rs\.?|inr|npr|₹)?\s*([0-9]+(?:[.,][0-9]{1,2})?)/i
+export const NOISE_LINE = /^[\W_]*$/                       // punctuation-only lines
+export const MRP_LINE    = /\b(?:m\.?r\.?p\.?|mrp|price)\b/i
+export const BATCH_LINE  = /\b(?:batch|b\.?no|lot)\b/i
+export const EXPIRY_LINE = /\b(?:exp|expiry|mfg|manufactured)\b/i
+export const AMOUNT      = /(?:rs\.?|inr|npr|₹)?\s*([0-9]+(?:[.,][0-9]{1,2})?)/i
+// mm/yy, mm-yy, mm/yyyy — common expiry-date shapes on pharma packaging.
+export const DATE_LIKE   = /\b(0[1-9]|1[0-2])\s*[\/\-]\s*(\d{2}|\d{4})\b/
 
-function cleanLine(line: string): string {
+export function cleanLine(line: string): string {
   return line.replace(/\s+/g, ' ').trim()
 }
 
@@ -35,7 +40,7 @@ function cleanLine(line: string): string {
  * Extract a price-looking number from a line such as "MRP: Rs. 120.50"
  * or "M.R.P Rs 45/-". Returns null if nothing plausible is found.
  */
-function extractAmount(line: string): number | null {
+export function extractAmount(line: string): number | null {
   const match = line.match(AMOUNT)
   if (!match) return null
   const num = parseFloat(match[1].replace(',', '.'))

@@ -173,6 +173,85 @@ export function captureScanBoxFrame(
   return canvas
 }
 
+// ── ML Kit path: image quality gate + base64 encode ───────────────────────
+//
+// The native ML Kit engine receives the scan-box crop close to as-shot
+// (see useLocalScanner.ts's mlKitOcrTick) rather than every Tesseract
+// preprocessing variant, so a cheap on-device quality check runs first —
+// blur, brightness, resolution, and text density — and a poor frame is
+// never sent to the recognizer at all; the UI shows "Move closer / hold
+// steady" instead of trusting whatever (likely garbage) text comes back.
+
+export interface OcrQualityResult {
+  ok:          boolean
+  reason:      'blurry' | 'dark' | 'bright' | 'low-res' | 'sparse' | null
+  blurScore:   number   // Laplacian variance — higher is sharper
+  brightness:  number   // 0..255 mean luma
+  textDensity: number   // fraction of pixels far enough from mean luma to plausibly be ink/glyphs
+}
+
+const MIN_QUALITY_DIMENSION = 60
+const BLUR_VARIANCE_MIN     = 18   // below this, the crop is visibly out of focus
+const BRIGHTNESS_MIN        = 35
+const BRIGHTNESS_MAX        = 235
+const TEXT_DENSITY_MIN      = 0.015 // near-blank crop (plain background/packaging, no text in box)
+
+// Cheap, dependency-free quality gate for a single scan-box crop, run
+// BEFORE any OCR call. Laplacian variance is a standard, well-established
+// blur estimator: a sharp image has strong high-frequency edge content
+// (high variance), a blurred one is smoothed out (low variance).
+export function assessOcrImageQuality(canvas: HTMLCanvasElement): OcrQualityResult {
+  const w = canvas.width, h = canvas.height
+  if (w < MIN_QUALITY_DIMENSION || h < MIN_QUALITY_DIMENSION) {
+    return { ok: false, reason: 'low-res', blurScore: 0, brightness: 0, textDensity: 0 }
+  }
+
+  const ctx = canvas.getContext('2d')!
+  const { data } = ctx.getImageData(0, 0, w, h)
+  const gray = new Float32Array(w * h)
+  let brightnessSum = 0
+  for (let i = 0, p = 0; p < w * h; i += 4, p++) {
+    const g = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114
+    gray[p] = g
+    brightnessSum += g
+  }
+  const brightness = brightnessSum / (w * h)
+
+  let lapSum = 0, lapSumSq = 0, lapCount = 0
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const idx = y * w + x
+      const lap = 4 * gray[idx] - gray[idx - 1] - gray[idx + 1] - gray[idx - w] - gray[idx + w]
+      lapSum += lap
+      lapSumSq += lap * lap
+      lapCount++
+    }
+  }
+  const lapMean = lapCount ? lapSum / lapCount : 0
+  const blurScore = lapCount ? lapSumSq / lapCount - lapMean * lapMean : 0
+
+  let inkPixels = 0
+  for (let p = 0; p < gray.length; p++) {
+    if (Math.abs(gray[p] - brightness) > 45) inkPixels++
+  }
+  const textDensity = inkPixels / gray.length
+
+  if (brightness < BRIGHTNESS_MIN) return { ok: false, reason: 'dark', blurScore, brightness, textDensity }
+  if (brightness > BRIGHTNESS_MAX) return { ok: false, reason: 'bright', blurScore, brightness, textDensity }
+  if (blurScore < BLUR_VARIANCE_MIN) return { ok: false, reason: 'blurry', blurScore, brightness, textDensity }
+  if (textDensity < TEXT_DENSITY_MIN) return { ok: false, reason: 'sparse', blurScore, brightness, textDensity }
+
+  return { ok: true, reason: null, blurScore, brightness, textDensity }
+}
+
+// Encodes a canvas as a base64 JPEG payload (WITHOUT the "data:" prefix)
+// for handing to the native ML Kit plugin over the Capacitor bridge.
+export function canvasToBase64Jpeg(canvas: HTMLCanvasElement, quality = 0.88): string {
+  const dataUrl = canvas.toDataURL('image/jpeg', quality)
+  const comma = dataUrl.indexOf(',')
+  return comma >= 0 ? dataUrl.slice(comma + 1) : dataUrl
+}
+
 // ── Multi-variant preprocessing ────────────────────────────────────────────
 
 function otsuThreshold(histogram: number[], pixelCount: number): number {

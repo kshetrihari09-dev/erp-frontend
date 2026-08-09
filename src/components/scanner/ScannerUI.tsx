@@ -96,7 +96,13 @@ export function ScanFrame({ mode, width = 240, height = 130 }: { mode: string; w
 }
 
 // ── Mode badge ────────────────────────────────────────────────────────────────
-export function ModeBadge({ mode, ocrProgress }: { mode: string; ocrProgress: number }) {
+// `statusMessage` (from useLocalScanner's state.ocrStatusMessage) lets the
+// ML Kit path show its own scanning/reading/matching copy — "Scanning…",
+// "Reading medicine text…", "Matching product…", "Product matched ✓" — in
+// the exact same badge, without changing anything about the Tesseract
+// path, which never sets it and keeps showing the original percent-based
+// "Reading text NN%" copy.
+export function ModeBadge({ mode, ocrProgress, statusMessage }: { mode: string; ocrProgress: number; statusMessage?: string | null }) {
   if (mode === 'barcode') {
     return (
       <div className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600/80 backdrop-blur-sm rounded-full text-white text-xs font-semibold">
@@ -108,9 +114,9 @@ export function ModeBadge({ mode, ocrProgress }: { mode: string; ocrProgress: nu
     return (
       <div className="flex flex-col items-center gap-1.5">
         <div className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600/80 backdrop-blur-sm rounded-full text-white text-xs font-semibold">
-          <span>🔤</span> Reading text{ocrProgress > 0 ? ` ${ocrProgress}%` : '…'}
+          <span>🔤</span> {statusMessage || `Reading text${ocrProgress > 0 ? ` ${ocrProgress}%` : '…'}`}
         </div>
-        {ocrProgress > 0 && (
+        {!statusMessage && ocrProgress > 0 && (
           <div className="w-28 h-1 bg-white/20 rounded-full overflow-hidden">
             <div className="h-full bg-purple-400 rounded-full transition-all duration-200" style={{ width: `${ocrProgress}%` }} />
           </div>

@@ -45,13 +45,17 @@ import type { ScanResult, ScannedProduct } from '@/types/scanner'
 import useBarcodeEngine from './useBarcodeEngine'
 import {
   preprocessForOcr, captureScanBoxFrame, generateOcrVariants, computeScanBoxSize,
+  assessOcrImageQuality, canvasToBase64Jpeg,
   OCR_RATIO_PRESETS, DEFAULT_OCR_RATIO_ID, type OcrVariant,
 } from '@/utils/ocrImage'
 import {
   normalizeOcrText, matchProduct, combineOcrSamples, tierForScore,
+  matchPharmaProduct, resolvePharmaTier,
   MATCH_SUGGEST_LIMIT,
-  type MatchTier,
+  type MatchTier, type ScoredMatch,
 } from '@/utils/ocrMatch'
+import { parseMlKitResult, type ParsedPharmaFields } from '@/utils/pharmaOcrParser'
+import MlKitOcr, { isMlKitPlatform, type MlKitOcrResult } from '@/plugins/MlKitOcr'
 
 export { OCR_RATIO_PRESETS, DEFAULT_OCR_RATIO_ID } // re-exported for the ratio selector UI
 
@@ -60,6 +64,12 @@ export { OCR_RATIO_PRESETS, DEFAULT_OCR_RATIO_ID } // re-exported for the ratio 
 // recognize() call is fast, and the self-scheduling loop already prevents
 // overlap regardless of how long a given call takes.
 const OCR_TICK_GAP_MS = 250
+
+// Gap for the native ML Kit loop. ML Kit's on-device recognizer is
+// meaningfully faster than Tesseract, but this is still throttled (never
+// "every camera frame") to protect preview smoothness and battery on
+// low-end Android phones, same reasoning as OCR_TICK_GAP_MS above.
+const OCR_TICK_GAP_MS_MLKIT = 350
 
 // Page-segmentation mode per scan ratio. A narrow 2:1 box is a
 // barcode-style single line (PSM 7); the default 3:2 "product name" box
@@ -135,6 +145,8 @@ export interface LocalScannerState {
   flashSupported: boolean
   facingMode:  'environment' | 'user'
   ocrProgress: number
+  ocrEngine:   'mlkit' | 'tesseract'  // which OCR engine is actually driving the current OCR loop
+  ocrStatusMessage: string | null    // "Reading medicine text…" / "Matching product…" / "Product matched ✓" etc.
   ocrRatio:    string        // selected OCR_RATIO_PRESETS id, e.g. '3:2'
   boxWidth:    number        // current on-screen scan-box size (CSS px) — overlay + crop share this
   boxHeight:   number
@@ -162,7 +174,8 @@ interface Options {
 const INITIAL_STATE: LocalScannerState = {
   status: 'requesting-permission', mode: 'idle', matches: [], matchTier: 'none', suggestions: [],
   error: null, notice: null, qualityHint: null, flashOn: false, flashSupported: false, facingMode: 'environment',
-  ocrProgress: 0, ocrRatio: DEFAULT_OCR_RATIO_ID, boxWidth: 240, boxHeight: 160,
+  ocrProgress: 0, ocrEngine: 'tesseract', ocrStatusMessage: null,
+  ocrRatio: DEFAULT_OCR_RATIO_ID, boxWidth: 240, boxHeight: 160,
   lastBarcode: null, lastOcrText: null, lastResult: null,
   zoomSupported: true, zoomMin: 1, zoomMax: 3, zoomStep: 0.1, zoom: 1,
 }
@@ -178,6 +191,15 @@ export default function useLocalScanner({ onResult, active }: Options) {
   const ocrTimer         = useRef<ReturnType<typeof setTimeout> | null>(null)
   const ocrWorkerRef     = useRef<any>(null)    // persistent Tesseract worker for this session
   const ocrWorkerPromise = useRef<Promise<any> | null>(null) // avoids creating two workers if init overlaps
+
+  // ML Kit (Android/Capacitor) lifecycle. mlKitReadyRef tracks whether the
+  // native recognizer has been initialized this session; mlKitFailedRef
+  // latches once true so a broken bridge/native failure isn't retried on
+  // every single tick — the rest of the session falls back to Tesseract
+  // instead (see req. #13). Both reset only when the scanner view itself
+  // re-opens (see the `active` lifecycle effect below).
+  const mlKitReadyRef  = useRef(false)
+  const mlKitFailedRef = useRef(false)
   const ocrLoopActiveRef = useRef(false)        // whether the self-scheduling OCR loop should keep going
   const ocrBusyRef       = useRef(false)        // true for the duration of one recognize() call
   const noticeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -272,6 +294,29 @@ export default function useLocalScanner({ onResult, active }: Options) {
     if (worker) worker.terminate().catch(() => {})
   }, [])
 
+  // ── ML Kit recognizer lifecycle ──────────────────────────────────────────
+  // Initialized once when OCR mode actually starts using it (never per
+  // frame — see req. #11), and released once when the camera/scanner
+  // session fully closes (stopCamera, below), the same lifecycle the
+  // Tesseract worker above already follows.
+  const initMlKit = useCallback(async (): Promise<boolean> => {
+    if (mlKitReadyRef.current) return true
+    if (mlKitFailedRef.current) return false
+    try {
+      await MlKitOcr.initialize()
+      mlKitReadyRef.current = true
+      return true
+    } catch {
+      mlKitFailedRef.current = true
+      return false
+    }
+  }, [])
+
+  const releaseMlKit = useCallback(() => {
+    if (mlKitReadyRef.current) MlKitOcr.release().catch(() => {})
+    mlKitReadyRef.current = false
+  }, [])
+
   const stopOcrLoop = useCallback(() => {
     ocrLoopActiveRef.current = false
     if (ocrTimer.current) { clearTimeout(ocrTimer.current); ocrTimer.current = null }
@@ -283,7 +328,8 @@ export default function useLocalScanner({ onResult, active }: Options) {
     if (noticeTimeoutRef.current) { clearTimeout(noticeTimeoutRef.current); noticeTimeoutRef.current = null }
     ocrLoopActiveRef.current = false
     terminateOcrWorker()
-  }, [engine, terminateOcrWorker])
+    releaseMlKit()
+  }, [engine, terminateOcrWorker, releaseMlKit])
 
   // ── Product search (same backend endpoints as before) ──────────────────────
   // Return type grows a third case: the backend can now reject a scan
@@ -417,7 +463,17 @@ export default function useLocalScanner({ onResult, active }: Options) {
   // blocking matches sheet (the gallery/manual path) or should only ever
   // populate the non-blocking `suggestions` list (the live tick loop,
   // which keeps scanning at that tier).
-  const matchNormalizedText = useCallback(async (normalized: string, opts: { liveMode: boolean } = { liveMode: false }): Promise<MatchTier> => {
+  // Shared by BOTH OCR engines — the plain-text Tesseract/gallery path
+  // (opts.pharma omitted, behaves exactly as before) and the native ML
+  // Kit path (opts.pharma/ocrConfidence/consensusRatio supplied), so the
+  // structured-field-aware scoring in ocrMatch.ts's matchPharmaProduct/
+  // resolvePharmaTier is never duplicated here — this function just picks
+  // which of matchProduct/tierForScore vs. matchPharmaProduct/
+  // resolvePharmaTier to call.
+  const matchNormalizedText = useCallback(async (
+    normalized: string,
+    opts: { liveMode: boolean; pharma?: ParsedPharmaFields; ocrConfidence?: number; consensusRatio?: number } = { liveMode: false },
+  ): Promise<MatchTier> => {
     if (normalized.length < 3) {
       if (!opts.liveMode) flashNotice('Could not read any text — try again')
       return 'none'
@@ -434,10 +490,28 @@ export default function useLocalScanner({ onResult, active }: Options) {
       return 'none'
     }
 
-    const ranked = matchProduct(normalized, candidates)
+    let ranked: ScoredMatch[]
+    let tier: MatchTier
+    if (opts.pharma) {
+      const pharmaRanked = matchPharmaProduct({
+        rawText:        normalized,
+        productName:    opts.pharma.productName,
+        genericName:    opts.pharma.genericName,
+        strength:       opts.pharma.strength,
+        dosageForm:     opts.pharma.dosageForm,
+        manufacturer:   opts.pharma.manufacturer,
+        ocrConfidence:  opts.ocrConfidence,
+        consensusRatio: opts.consensusRatio,
+      }, candidates)
+      ranked = pharmaRanked
+      tier = resolvePharmaTier(pharmaRanked, { consensusRatio: opts.consensusRatio })
+    } else {
+      ranked = matchProduct(normalized, candidates)
+      tier = ranked[0] ? tierForScore(ranked[0].score) : 'none'
+    }
+
     const best = ranked[0]
     if (!best) { if (!opts.liveMode) flashNotice('No matching product found'); return 'none' }
-    const tier = tierForScore(best.score)
 
     if (tier === 'auto') {
       await selectProduct(best.product as unknown as LocalProduct)
@@ -531,14 +605,150 @@ export default function useLocalScanner({ onResult, active }: Options) {
     }
   }, [getOcrWorker, ensurePsmForRatio, matchNormalizedText, videoRef, containerRef])
 
+  // ── ML Kit tick loop (Android/Capacitor primary path) ─────────────────────
+  // Sequence per req. #3: camera frame → scan-box crop → image quality
+  // check → ML Kit recognition → confidence analysis → pharmaceutical
+  // text extraction → product matching. Self-scheduling exactly like
+  // ocrTick above — the same "never overlap, always resolve before
+  // rescheduling" structure — so both loops are structurally identical
+  // apart from which recognizer they call and how they score the result.
+  const mlKitOcrTick = useCallback(async () => {
+    if (!ocrLoopActiveRef.current || !mountedRef.current) return
+    if (!videoRef.current || videoRef.current.readyState < 2 || !containerRef.current) {
+      ocrTimer.current = setTimeout(mlKitOcrTick, OCR_TICK_GAP_MS_MLKIT)
+      return
+    }
+
+    ocrBusyRef.current = true
+    try {
+      const rect = containerRef.current.getBoundingClientRect()
+      const { width: boxW, height: boxH } = boxSizeRef.current
+      // Only the scan-box region is captured, at CSS/video resolution —
+      // never the full camera frame — same crop helper the Tesseract
+      // path uses, so the visible overlay and what ML Kit reads never
+      // disagree (req. #2).
+      const rawCanvas = captureScanBoxFrame(
+        videoRef.current, rect.width, rect.height, boxW, boxH, zoomLevelRef.current,
+      )
+      if (!rawCanvas) return
+
+      // Image quality gate BEFORE any OCR call — a bad frame never
+      // reaches the recognizer at all (req. #3).
+      const quality = assessOcrImageQuality(rawCanvas)
+      if (!quality.ok) {
+        failStreakRef.current += 1
+        const hint =
+          quality.reason === 'blurry'  ? 'Hold steady' :
+          quality.reason === 'dark'    ? 'Improve lighting' :
+          quality.reason === 'bright'  ? 'Reduce glare' :
+          quality.reason === 'low-res' ? 'Move closer' :
+          'Move closer / hold steady'
+        if (mountedRef.current) {
+          setState(s => (s.qualityHint === hint && s.ocrStatusMessage === 'Text unclear'
+            ? s : { ...s, qualityHint: hint, ocrStatusMessage: 'Text unclear' }))
+        }
+        return
+      }
+
+      if (mountedRef.current) {
+        setState(s => (s.ocrStatusMessage === 'Reading medicine text…'
+          ? s : { ...s, ocrStatusMessage: 'Reading medicine text…', qualityHint: null }))
+      }
+
+      // ML Kit is initialized once (on OCR-mode start) and reused here —
+      // never recreated per frame (req. #11).
+      const image = canvasToBase64Jpeg(rawCanvas)
+      const result: MlKitOcrResult = await MlKitOcr.recognizeText({ image })
+      if (!mountedRef.current || !ocrLoopActiveRef.current) return
+
+      const normalized = normalizeOcrText(result.text)
+      if (normalized.length < 3) {
+        failStreakRef.current += 1
+        return // nothing readable this tick — keep scanning
+      }
+      failStreakRef.current = 0
+      if (mountedRef.current) setState(s => (s.qualityHint ? { ...s, qualityHint: null } : s))
+
+      // Structured pharmaceutical field extraction from ML Kit's
+      // block/line geometry (req. #4/#5).
+      const parsed: ParsedPharmaFields = parseMlKitResult(result)
+
+      // Multi-frame consensus — same rolling-buffer mechanism the
+      // Tesseract path uses (req. #8).
+      const buf = sampleBufferRef.current
+      buf.push(normalized)
+      if (buf.length > CONSENSUS_BUFFER_SIZE) buf.shift()
+      const consensus = combineOcrSamples(buf)
+      const consensusRatio = consensus ? consensus.count / consensus.total : 0
+      const textToMatch = consensus?.text || normalized
+
+      if (mountedRef.current) setState(s => ({ ...s, ocrStatusMessage: 'Matching product…' }))
+
+      // Database-aware fuzzy matching, weighted by structured fields +
+      // ML Kit confidence + consensus (req. #6/#7/#9).
+      const outcome = await matchNormalizedText(textToMatch, {
+        liveMode: true, pharma: parsed, ocrConfidence: result.confidence, consensusRatio,
+      })
+      if (outcome === 'auto' || outcome === 'possible') {
+        ocrLoopActiveRef.current = false // stop the instant a strong match is found
+        sampleBufferRef.current = []
+        if (mountedRef.current) {
+          setState(s => ({
+            ...s,
+            ocrStatusMessage: outcome === 'auto' ? 'Product matched ✓' : 'Multiple products found',
+          }))
+        }
+      } else if (mountedRef.current) {
+        setState(s => (s.ocrStatusMessage ? { ...s, ocrStatusMessage: null } : s))
+      }
+    } catch {
+      // Any native-bridge/recognizer failure falls back to Tesseract for
+      // the rest of this session (req. #13) rather than retrying a
+      // possibly-broken native call forever. The self-scheduling `finally`
+      // below picks ocrTick (Tesseract) up immediately once this flips.
+      failStreakRef.current += 1
+      mlKitFailedRef.current = true
+    } finally {
+      ocrBusyRef.current = false
+      if (ocrLoopActiveRef.current && mountedRef.current) {
+        if (mlKitFailedRef.current) {
+          if (mountedRef.current) setState(s => ({ ...s, ocrEngine: 'tesseract' }))
+          ocrTimer.current = setTimeout(ocrTick, OCR_TICK_GAP_MS)
+        } else {
+          ocrTimer.current = setTimeout(mlKitOcrTick, OCR_TICK_GAP_MS_MLKIT)
+        }
+      }
+    }
+  }, [matchNormalizedText, ocrTick, videoRef, containerRef])
+
   const startOcrLoop = useCallback(() => {
     if (ocrLoopActiveRef.current) return // already running — never start a second overlapping loop
     ocrLoopActiveRef.current = true
     sampleBufferRef.current = []
     failStreakRef.current = 0
     lastQueriedTextRef.current = ''
-    ocrTick()
-  }, [ocrTick])
+
+    // Android/Capacitor uses ML Kit first; everywhere else (regular
+    // browser, "Use Another Device", iOS/web) keeps using the existing
+    // Tesseract.js path untouched (req. #12).
+    if (isMlKitPlatform() && !mlKitFailedRef.current) {
+      setState(s => ({ ...s, ocrEngine: 'mlkit' }))
+      initMlKit().then(ready => {
+        if (!mountedRef.current || !ocrLoopActiveRef.current) return
+        if (ready) {
+          mlKitOcrTick()
+        } else {
+          // Native init failed — never crash, silently drop to Tesseract
+          // (req. #13).
+          setState(s => ({ ...s, ocrEngine: 'tesseract' }))
+          ocrTick()
+        }
+      })
+    } else {
+      setState(s => ({ ...s, ocrEngine: 'tesseract' }))
+      ocrTick()
+    }
+  }, [ocrTick, mlKitOcrTick, initMlKit])
 
   // ── Ratio selector (OCR mode only) ──────────────────────────────────────
   // Changing ratio never touches the barcode engine/loop — OCR and
@@ -706,6 +916,10 @@ export default function useLocalScanner({ onResult, active }: Options) {
     if (!active) {
       stopCamera()
       ocrRatioRef.current = DEFAULT_OCR_RATIO_ID
+      // A fresh scanner session deserves a fresh ML Kit attempt even if
+      // the native bridge failed earlier in the app's lifetime.
+      mlKitReadyRef.current = false
+      mlKitFailedRef.current = false
       setState(INITIAL_STATE)
       return
     }
