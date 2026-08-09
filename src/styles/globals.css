@@ -4436,29 +4436,33 @@ bsp-row--disabled { cursor: not-allowed; opacity: .55; }
   .prod-new-btn-mobile:active { transform: scale(0.94); }
 
   /* ── 2. Secondary action toolbar ──────────────────────────────────── */
+  /* Fixed 4-column grid (not flex-wrap) so Import/Export/Barcode/QR
+     always sit in a single row on phone-width screens instead of the
+     4th button wrapping onto its own full-width row. */
   .prod-mobile-toolbar {
-    display: flex;
-    flex-wrap: wrap;           /* wraps onto multiple rows automatically */
-    gap: 8px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
     padding: 0 12px 12px;
   }
   .prod-toolbar-btn {
-    height: 44px;
-    padding: 0 14px;
-    border-radius: 12px;
+    height: 42px;
+    padding: 0 6px;
+    border-radius: 10px;
     border: 1px solid var(--border);
     background: var(--surface);
     color: var(--text-2);
-    font-size: 13px;
+    font-size: 11.5px;
     font-weight: 600;
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    white-space: nowrap;       /* never break a label onto two lines */
-    flex: 1 1 auto;
     justify-content: center;
+    gap: 4px;
+    white-space: nowrap;       /* never break a label onto two lines */
+    overflow: hidden;
     -webkit-tap-highlight-color: transparent;
   }
+  .prod-toolbar-btn span { overflow: hidden; text-overflow: ellipsis; }
   .prod-toolbar-btn:active { background: var(--surface-3); }
 
   /* ── 3. Search + Filter row ───────────────────────────────────────── */
@@ -5471,10 +5475,15 @@ bsp-row--disabled { cursor: not-allowed; opacity: .55; }
   .tpl-preview-scroll    { padding: 12px !important; }
 }
 
-/* ── Page header: allow New User / Save button to stack on narrow screens ─── */
+/* ── Page header: allow New User / Save button to stack on narrow screens ───
+   NOTE: excludes .prod-new-btn-mobile — that one is an intentional 44×44
+   icon-only square (see the @media (max-width: 768px) block above), and
+   this generic `button` selector was overriding it back to full width
+   since `.page-header button` (0,1,1) beats `.prod-new-btn-mobile` (0,1,0)
+   on specificity. */
 @media (max-width: 480px) {
   .page-header { flex-wrap: wrap; }
-  .page-header button { width: 100%; justify-content: center; }
+  .page-header button:not(.prod-new-btn-mobile) { width: 100%; justify-content: center; }
 }
 
 
