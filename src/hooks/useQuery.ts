@@ -33,6 +33,24 @@ export function useProduct(id: string) {
   })
 }
 
+/**
+ * Fetches the next auto-generated barcode to pre-fill the Create Product
+ * form's barcode field as soon as it opens. `enabled` lets the caller fire
+ * this only for new products (never while editing), and only once per form
+ * mount — see ProductForm's `!initial` + empty-deps effect.
+ */
+export function useNextBarcode(enabled: boolean) {
+  return useQuery({
+    queryKey: [QK.PRODUCTS, 'next-barcode'],
+    queryFn:  () => productsAPI.nextBarcode().then(unwrap),
+    enabled,
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnWindowFocus: false,
+    refetchOnMount: 'always',
+  })
+}
+
 export function useCreateProduct() {
   const qc = useQueryClient()
   const { success, error } = useUIStore()

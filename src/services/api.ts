@@ -130,6 +130,15 @@ export const productsAPI = {
    */
   search: (q: string, limit = 20) =>
     http.get<ApiResponse<Product[]>>('/products/search', { params: { q, limit } }),
+
+  /**
+   * Pre-fetches the next auto-generated barcode (same global
+   * product_auto_barcode_seq / nextAutoBarcode() used as the fallback on
+   * create) so the Create Product form can show it immediately instead of
+   * only after submit. Purely a preview — the backend still generates its
+   * own fallback barcode on create if none is submitted.
+   */
+  nextBarcode: () => http.get<ApiResponse<{ barcode: string }>>('/products/next-barcode'),
 }
 
 // ─── Sales ────────────────────────────────────────────────────────────────────

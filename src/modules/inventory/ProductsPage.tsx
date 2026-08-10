@@ -1,10 +1,10 @@
-import { useState, lazy, Suspense } from 'react'
+import { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import type { UseFormRegister, FieldErrors } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Plus, Package, ScanLine, Boxes, Download, Upload, Printer, QrCode, Filter, Pencil, Trash2 } from 'lucide-react'
-import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct, useProductOpeningBatches, useAddOpeningInventory } from '@/hooks/useQuery'
+import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct, useProductOpeningBatches, useAddOpeningInventory, useNextBarcode } from '@/hooks/useQuery'
 import { Button, Modal, Badge, Pagination, SkeletonRows, Empty, SearchInput, ConfirmDialog } from '@/components/ui'
 import ManufacturerSelect from '@/components/forms/ManufacturerSelect'
 import ExportProductsModal from './ExportProductsModal'
@@ -224,6 +224,26 @@ function ProductForm({ initial, onClose }: { initial?: Product | null; onClose: 
 
   const [scanOpen, setScanOpen]   = useState(false)
   const [scanBanner, setScanBanner] = useState<string | null>(null)
+
+  // Create Product only: pre-fetch the next auto-generated barcode (same
+  // global product_auto_barcode_seq / nextAutoBarcode() the backend already
+  // falls back to on submit) so the field is filled the moment the form
+  // opens, instead of only after save. Never runs for Edit Product — the
+  // `!initial` guard below and `enabled: !initial` on the hook both key off
+  // the prop this component was mounted with, so this fires at most once
+  // per form open, never again on re-render.
+  const { data: nextBarcodeData } = useNextBarcode(!initial)
+  const barcodeAutoFilled = useRef(false)
+
+  useEffect(() => {
+    if (initial || barcodeAutoFilled.current) return
+    if (!nextBarcodeData?.barcode) return
+    // Don't stomp a barcode the user already typed or scanned while the
+    // request was in flight.
+    if (dirtyFields.barcode) return
+    setValue('barcode', nextBarcodeData.barcode, { shouldDirty: false, shouldValidate: false })
+    barcodeAutoFilled.current = true
+  }, [initial, nextBarcodeData, dirtyFields.barcode, setValue])
 
   const openScan = () => setScanOpen(true)
 
