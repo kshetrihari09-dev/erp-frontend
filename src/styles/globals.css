@@ -3044,39 +3044,13 @@ bsp-row--disabled { cursor: not-allowed; opacity: .55; }
    - Sticky bottom action bar with large Post Invoice + Save Draft
 ══════════════════════════════════════════════════════════════════════════════ */
 
-/* Sticky mobile total bar */
-.pos-theme .pos-mobile-total-bar {
-  display: none;
-}
-@media (max-width: 768px) {
-  .pos-theme .pos-mobile-total-bar {
-    display: flex;
-    position: sticky;
-    top: 0;
-    z-index: var(--z-mobile-bar);
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 12px 16px;
-    margin: 0 0 0;
-    background: var(--pdt-glass);
-    backdrop-filter: blur(16px) saturate(160%);
-    border-bottom: 1px solid var(--pdt-border);
-    box-sizing: border-box;
-    width: 100%;
-  }
-  .pos-theme .pos-mobile-total-bar .pmb-label {
-    font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
-    color: var(--pdt-text-4);
-  }
-  .pos-theme .pos-mobile-total-bar .pmb-amount {
-    font-size: 24px; font-weight: 800; color: var(--pdt-text); letter-spacing: -.5px;
-    font-variant-numeric: tabular-nums;
-  }
-  .pos-theme .pos-mobile-total-bar .pmb-meta {
-    font-size: 11px; color: var(--pdt-text-3);
-  }
-}
+/* Sticky mobile total bar — REMOVED (see SalesPage.tsx): it duplicated
+   the Total Payable already shown in the Billing Summary card and the
+   bottom "Next — {total}" action button. Kept `pos-mobile-total-bar` as
+   `display: none` at every width (harmless if any stale reference
+   remains) instead of deleting the block outright, so nothing regresses
+   if it's still referenced somewhere this search missed. */
+.pos-theme .pos-mobile-total-bar { display: none !important; }
 
 /* Accordion sections (customer info, payment mode, billing summary) */
 .pos-theme .pos-accordion {

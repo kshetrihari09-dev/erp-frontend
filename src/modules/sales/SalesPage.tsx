@@ -591,19 +591,6 @@ export default function SalesPage() {
               : <Alert type={flash.type} message={flash.msg} onClose={() => setFlash(null)} />
           )}
 
-          {/* ── MOBILE ONLY: sticky total bar ─────────────────────────
-              display:none on desktop via CSS (.pos-mobile-total-bar)   */}
-          <div className="pos-mobile-total-bar">
-            <div>
-              <div className="pmb-label">Total Payable</div>
-              <div className="pmb-amount">{fmt(grandTotal)}</div>
-            </div>
-            <div className="pmb-meta">
-              {rows.filter(r => r.product_id).length} item(s)
-              {discountAmt > 0 && ` · −${fmt(discountAmt)} off`}
-            </div>
-          </div>
-
           {/* ════════════════════════════════════════════════════════════
               ROW 1: Customer info card + Total payable card
               DESKTOP: "1fr 280px" grid — pixel-perfect to original
