@@ -266,8 +266,19 @@ export default function BarcodePrintPage() {
         .set({
           margin: PAGE_MARGIN_MM,
           filename: 'barcode-labels.pdf',
-          image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+          // PNG, not JPEG — JPEG's compression puts soft "ringing" halos
+          // around hard black/white edges, which is exactly what a
+          // barcode is made of. That ringing is invisible on screen but
+          // is enough to shift a bar's apparent width class and make a
+          // scanner misread it. PNG is lossless, so bar edges land in
+          // the PDF exactly as rasterized.
+          image: { type: 'png' },
+          // scale 2 → 4: doubles the raster resolution html2canvas
+          // captures at before jsPDF places it, so thin bars get several
+          // sharp source pixels each instead of being reconstructed from
+          // just one or two — the difference between a bar printing as a
+          // clean edge vs. a blurred, unreliable-to-scan smear.
+          html2canvas: { scale: 4, useCORS: true, backgroundColor: '#ffffff' },
           jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
         })
         .from(el)
@@ -332,6 +343,18 @@ export default function BarcodePrintPage() {
           </Button>
         </div>
       </div>
+
+      {/* Print dialogs default to "Fit to page", which rescales every
+          barcode by whatever odd factor gets the sheet onto paper —
+          exactly the kind of post-render scaling that blurs bars and
+          breaks scans (same reason the label component itself avoids
+          CSS-scaling the barcode). The labels here are already sized in
+          real mm, so this only needs the printer to reproduce them
+          1:1 — the one setting a person could still get wrong. */}
+      <p className="bcp-scale-hint" style={{ fontSize: '12px', color: 'var(--text-2, #6b7280)', margin: '4px 0 12px' }}>
+        For accurate scanning, set <strong>Scale</strong> to <strong>100% / Actual size</strong> in the print
+        dialog (turn off "Fit to page") — any auto-scaling shrinks the barcode bars unevenly and can make them unreadable.
+      </p>
 
       <div className="grid gap-4 bcp-layout-grid">
         {/* ── Left: search + queued items + label size ─────────────────── */}
