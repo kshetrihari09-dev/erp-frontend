@@ -30,10 +30,6 @@ interface Props {
   context:   'sales' | 'purchase'
   onResult:  (result: ScanResult) => void
   disabled?: boolean
-  // Which camera mode this button opens into — see useLocalScanner's
-  // Options.initialMode. Defaults to 'barcode' (unchanged prior
-  // behavior for any existing caller that doesn't pass this).
-  initialMode?: 'barcode' | 'ocr'
   // Optional label/icon override so the same component can render as
   // e.g. two distinct "Scan Barcode" / "Scan Medicine" buttons without
   // duplicating any of the scanning logic below. Defaults preserve the
@@ -51,7 +47,7 @@ function hasCameraSupport(): boolean {
   return typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia
 }
 
-export default function ScanButton({ context, onResult, disabled, initialMode, label, icon, className }: Props) {
+export default function ScanButton({ context, onResult, disabled, label, icon, className }: Props) {
   const [localOpen, setLocalOpen] = useState(false)
 
   // Existing cross-device session hook — completely unchanged.
@@ -107,7 +103,6 @@ export default function ScanButton({ context, onResult, disabled, initialMode, l
           onResult={onResult}
           onClose={() => setLocalOpen(false)}
           onUseAnotherDevice={handleUseAnotherDevice}
-          initialMode={initialMode}
         />
       </Suspense>
 

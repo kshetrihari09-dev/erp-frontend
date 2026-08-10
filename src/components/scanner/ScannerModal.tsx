@@ -288,7 +288,7 @@ export default function ScannerModal({ state, context, onClose, onRetry }: Props
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Added to invoice</p>
                     <p className="text-sm font-bold text-slate-900 truncate">{lastResult.product?.name}</p>
                     <p className="text-[10px] text-slate-400">
-                      via {lastResult.scanMethod === 'barcode' ? '📷 Barcode' : lastResult.scanMethod === 'ocr' ? '🔤 OCR' : '👆 Manual'}
+                      via {lastResult.scanMethod === 'barcode' ? '📷 Barcode' : '👆 Manual'}
                     </p>
                   </div>
                 </motion.div>

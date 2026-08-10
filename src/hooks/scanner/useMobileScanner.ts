@@ -8,18 +8,15 @@
  *   1. GET /scanner/session/:token/ping   → verify session, get JWT + context
  *   2. Start camera
  *   3. Run @zxing/browser barcode scan loop (300ms interval)
- *   4. If no barcode after 8s → switch to Tesseract.js OCR mode
- *   5. On match found → show list for user to pick
- *   6. POST /scanner/session/:token/result with selected productId
+ *   4. On match found → show list for user to pick
+ *   5. POST /scanner/session/:token/result with selected productId
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 
-const BARCODE_TIMEOUT_MS  = 8_000
 const BARCODE_INTERVAL_MS = 300
-const OCR_INTERVAL_MS     = 3_000
 
-export type ScanMode     = 'barcode' | 'ocr' | 'idle'
+export type ScanMode     = 'barcode' | 'idle'
 export type MobileStatus = 'connecting' | 'ready' | 'scanning' | 'matches' | 'submitting' | 'done' | 'error'
 
 export interface MobileProduct {
@@ -41,9 +38,7 @@ export interface MobileScannerState {
   matches:     MobileProduct[]
   error:       string | null
   flashOn:     boolean
-  ocrProgress: number
   lastBarcode: string | null
-  lastOcrText: string | null
   // Digital zoom — see useLocalScanner.ts / useProductCapture.ts for why
   // this isn't tied to MediaTrackConstraints.zoom (unreliable capability,
   // async-and-stuttery to apply). Always available here.
@@ -66,15 +61,13 @@ const ZOOM_STEP = 0.1
 export default function useMobileScanner({ token, apiBase }: Options) {
   const [state, setState] = useState<MobileScannerState>({
     status: 'connecting', mode: 'idle', context: null, matches: [],
-    error: null, flashOn: false, ocrProgress: 0, lastBarcode: null, lastOcrText: null,
+    error: null, flashOn: false, lastBarcode: null,
     zoomSupported: true, zoomMin: ZOOM_MIN, zoomMax: ZOOM_MAX, zoomStep: ZOOM_STEP, zoom: ZOOM_MIN,
   })
 
   const videoRef      = useRef<HTMLVideoElement | null>(null)
   const streamRef     = useRef<MediaStream | null>(null)
   const barcodeTimer  = useRef<ReturnType<typeof setInterval> | null>(null)
-  const ocrTimer      = useRef<ReturnType<typeof setInterval> | null>(null)
-  const barcodeStart  = useRef<number>(0)
   const jwtRef        = useRef<string | null>(null)
   const mountedRef    = useRef(true)
 
@@ -127,7 +120,6 @@ export default function useMobileScanner({ token, apiBase }: Options) {
     streamRef.current?.getTracks().forEach(t => t.stop())
     streamRef.current = null
     if (barcodeTimer.current) { clearInterval(barcodeTimer.current); barcodeTimer.current = null }
-    if (ocrTimer.current)     { clearInterval(ocrTimer.current);     ocrTimer.current = null }
   }, [])
 
   // ── Flash ──────────────────────────────────────────────────────────────────
@@ -146,8 +138,8 @@ export default function useMobileScanner({ token, apiBase }: Options) {
     setState(s => (s.zoom === clamped ? s : { ...s, zoom: clamped }))
   }, [])
 
-  // Mirrors state.zoom for the barcode/OCR interval closures, which are
-  // created once per session and must always read the *current* zoom.
+  // Mirrors state.zoom for the barcode interval closure, which is created
+  // once per session and must always read the *current* zoom.
   const zoomRef = useRef(ZOOM_MIN)
   useEffect(() => { zoomRef.current = state.zoom }, [state.zoom])
 
@@ -180,46 +172,10 @@ export default function useMobileScanner({ token, apiBase }: Options) {
     } catch { return [] }
   }, [apiBase, authFetch])
 
-  // ── OCR handler ────────────────────────────────────────────────────────────
-  const runOcr = useCallback(async () => {
-    if (!videoRef.current || videoRef.current.readyState < 2 || !mountedRef.current) return
-    try {
-      const { createWorker } = await import('tesseract.js')
-      const canvas = document.createElement('canvas')
-      canvas.width  = videoRef.current.videoWidth  || 640
-      canvas.height = videoRef.current.videoHeight || 480
-      const ctx = canvas.getContext('2d')!
-      ctx.drawImage(videoRef.current, 0, 0)
-
-      const worker = await createWorker('eng', 1, {
-        logger: (m: any) => {
-          if (m.status === 'recognizing text' && mountedRef.current) {
-            setState(s => ({ ...s, ocrProgress: Math.round(m.progress * 100) }))
-          }
-        },
-      })
-      const { data: { text } } = await worker.recognize(canvas)
-      await worker.terminate()
-      if (!mountedRef.current) return
-
-      const trimmed = text.trim()
-      if (trimmed.length < 3) return
-
-      setState(s => ({ ...s, lastOcrText: trimmed }))
-      const products = await searchFuzzy(trimmed)
-      if (!mountedRef.current) return
-      if (products.length > 0) {
-        if (ocrTimer.current) { clearInterval(ocrTimer.current); ocrTimer.current = null }
-        setState(s => ({ ...s, status: 'matches', matches: products }))
-      }
-    } catch { /* OCR failed — retry next interval */ }
-  }, [searchFuzzy])
-
   // ── Barcode scanning loop ──────────────────────────────────────────────────
   const startBarcodeLoop = useCallback(async () => {
     const { BrowserMultiFormatReader } = await import('@zxing/browser')
     const reader = new BrowserMultiFormatReader()
-    barcodeStart.current = Date.now()
 
     barcodeTimer.current = setInterval(async () => {
       if (!videoRef.current || videoRef.current.readyState < 2 || !mountedRef.current) return
@@ -261,27 +217,15 @@ export default function useMobileScanner({ token, apiBase }: Options) {
           if (!mountedRef.current) return
           if (fuzzy.length > 0) {
             setState(s => ({ ...s, status: 'matches', mode: 'barcode', matches: fuzzy }))
-          } else {
-            // Switch to OCR
-            setState(s => ({ ...s, mode: 'ocr' }))
-            await runOcr()
-            ocrTimer.current = setInterval(runOcr, OCR_INTERVAL_MS)
           }
+          // No match at all — the outer setInterval below keeps ticking
+          // and will simply try again on the next frame.
         }
       } catch (err: any) {
-        if (err?.name === 'NotFoundException') {
-          // No barcode in frame — check timeout
-          if (Date.now() - barcodeStart.current > BARCODE_TIMEOUT_MS) {
-            clearInterval(barcodeTimer.current!); barcodeTimer.current = null
-            if (!mountedRef.current) return
-            setState(s => ({ ...s, mode: 'ocr' }))
-            await runOcr()
-            ocrTimer.current = setInterval(runOcr, OCR_INTERVAL_MS)
-          }
-        }
+        // No barcode in frame this tick — keep scanning, nothing to do.
       }
     }, BARCODE_INTERVAL_MS)
-  }, [searchBarcode, searchFuzzy, runOcr])
+  }, [searchBarcode, searchFuzzy])
 
   // ── Submit result ──────────────────────────────────────────────────────────
   const selectProduct = useCallback(async (product: MobileProduct) => {
@@ -294,9 +238,8 @@ export default function useMobileScanner({ token, apiBase }: Options) {
         body:   JSON.stringify({
           productId:   product.id,
           productName: product.name,
-          scanMethod:  state.lastBarcode ? 'barcode' : state.lastOcrText ? 'ocr' : 'manual',
+          scanMethod:  'barcode',
           barcode:     state.lastBarcode,
-          ocrText:     state.lastOcrText,
         }),
       })
       if (!mountedRef.current) return
@@ -309,13 +252,12 @@ export default function useMobileScanner({ token, apiBase }: Options) {
     } catch (err: any) {
       if (mountedRef.current) setState(s => ({ ...s, status: 'error', error: 'Network error. Are you on the same WiFi?' }))
     }
-  }, [token, apiBase, authFetch, state.lastBarcode, state.lastOcrText, stopCamera])
+  }, [token, apiBase, authFetch, state.lastBarcode, stopCamera])
 
   // ── Rescan ─────────────────────────────────────────────────────────────────
   const rescan = useCallback(async () => {
     if (barcodeTimer.current) { clearInterval(barcodeTimer.current); barcodeTimer.current = null }
-    if (ocrTimer.current)     { clearInterval(ocrTimer.current);     ocrTimer.current = null }
-    setState(s => ({ ...s, status: 'scanning', mode: 'barcode', matches: [], error: null, lastBarcode: null, lastOcrText: null, ocrProgress: 0 }))
+    setState(s => ({ ...s, status: 'scanning', mode: 'barcode', matches: [], error: null, lastBarcode: null }))
     await startBarcodeLoop()
   }, [startBarcodeLoop])
 

@@ -42,9 +42,8 @@ export function captureBarcodeFrame(
   const vh = video.videoHeight
   if (!vw || !vh || !containerW || !containerH) return null
 
-  // object-fit: cover mapping — same technique as ocrImage.ts's
-  // captureScanBoxFrame, kept as a separate helper since the crop shape
-  // and the zoom handling below are specific to barcode decoding.
+  // object-fit: cover mapping, kept as a separate helper since the crop
+  // shape and the zoom handling below are specific to barcode decoding.
   const scale = Math.max(containerW / vw, containerH / vh)
   const dispW = vw * scale
   const dispH = vh * scale

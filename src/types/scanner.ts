@@ -36,8 +36,7 @@ export interface ScannedProduct {
 
 export interface ScanResult {
   product:    ScannedProduct
-  scanMethod: 'barcode' | 'ocr' | 'manual'
+  scanMethod: 'barcode' | 'manual'
   barcode?:   string | null
-  ocrText?:   string | null
   scannedAt:  number
 }

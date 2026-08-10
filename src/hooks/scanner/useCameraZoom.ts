@@ -3,7 +3,7 @@
  *
  * A modern, camera-app-style zoom engine for the local barcode scanner's
  * preview. This is a presentation-layer addition that sits *on top of*
- * useLocalScanner.ts — it never touches barcode/OCR decode logic, product
+ * useLocalScanner.ts — it never touches barcode decode logic, product
  * matching, or API calls. All it produces is: (a) a smoothly-animated CSS
  * scale to hand to the <video> element, and (b) calls into
  * useLocalScanner's existing `setZoom()` for the digital portion, which

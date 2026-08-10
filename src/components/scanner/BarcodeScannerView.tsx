@@ -20,10 +20,8 @@
  *
  * Callers still own their own bottom controls (mode toggles, gallery
  * button, capture button, matches drawer, crop step, etc.) via `children`,
- * and decide which scan guide to show via `scanOverlay` — barcode mode
- * uses BarcodeRectOverlay everywhere; a caller in a different capture
- * mode (e.g. OCR) can swap in its own guide without duplicating any of the
- * chrome above.
+ * and decide which scan guide to show via `scanOverlay` — every caller
+ * uses BarcodeRectOverlay, without duplicating any of the chrome above.
  */
 
 import { useRef, useCallback } from 'react'

@@ -2,18 +2,17 @@
  * LocalScannerView.tsx
  *
  * The default scanner entry point for Sales/Purchase: full-screen camera
- * opens instantly, scanning starts automatically (barcode → OCR fallback),
- * and a result is returned the moment a match is picked — no QR, no
- * second device, no waiting screen.
+ * opens instantly, barcode scanning starts automatically, and a result is
+ * returned the moment a match is picked — no QR, no second device, no
+ * waiting screen.
  *
  * All camera chrome — the video, circular scan overlay, top glass bar
  * (close/flash/switch camera), zoom slider, permission/error/loading
- * states, and the success check animation — is now the single shared
+ * states, and the success check animation — is the single shared
  * BarcodeScannerView component (see BarcodeScannerView.tsx), the exact
  * same component ProductScanModal (Product Add's scanner) renders. Only
- * what's specific to billing lookups lives here: the OCR mode badge, the
- * "no match yet" notice, the barcode/OCR mode toggle, and the matches
- * bottom sheet.
+ * what's specific to billing lookups lives here: the mode badge, the
+ * "no match yet" notice, and the matches bottom sheet.
  *
  * The QR / cross-device flow (ScannerModal + useScannerSession) is
  * untouched and still available — via the "Use Another Device" affordance
@@ -31,13 +30,10 @@
 import { useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import {
-  X, ImageIcon, ScanLine, Type,
-  RotateCcw, Smartphone, Loader2,
-} from 'lucide-react'
+import { X, RotateCcw, Smartphone, Loader2 } from 'lucide-react'
 import useLocalScanner from '@/hooks/scanner/useLocalScanner'
 import type { ScanResult } from '@/types/scanner'
-import { ScanFrame, ModeBadge, ProductCard, BarcodeRectOverlay, RatioSelector, QualityHint, SuggestionChips } from './ScannerUI'
+import { ModeBadge, ProductCard, BarcodeRectOverlay } from './ScannerUI'
 import BarcodeScannerView from './BarcodeScannerView'
 import { Z } from '@/styles/zIndex'
 import { playSuccessBeep } from '@/utils/beep'
@@ -53,18 +49,13 @@ interface Props {
   onResult:           (result: ScanResult) => void
   onClose:            () => void
   onUseAnotherDevice: () => void
-  // Starting camera mode — see useLocalScanner's Options.initialMode.
-  // Defaults to 'barcode', matching prior behavior exactly for any
-  // existing caller that doesn't pass this.
-  initialMode?:       'barcode' | 'ocr'
 }
 
 function vibrate(pattern: number | number[]) {
   try { navigator.vibrate?.(pattern) } catch {}
 }
 
-export default function LocalScannerView({ open, context, onResult, onClose, onUseAnotherDevice, initialMode }: Props) {
-  const galleryInputRef = useRef<HTMLInputElement>(null)
+export default function LocalScannerView({ open, context, onResult, onClose, onUseAnotherDevice }: Props) {
   const vibratedRef      = useRef(false)
 
   // rescan() only exists once useLocalScanner has been called below, but
@@ -86,9 +77,9 @@ export default function LocalScannerView({ open, context, onResult, onClose, onU
   }, [onResult])
 
   const {
-    state, videoRef, containerRef, toggleFlash, switchCamera, setMode, setZoom, setOcrRatio,
-    selectProduct, rescan, retryPermission, scanImageFile,
-  } = useLocalScanner({ context, onResult: handleResult, active: open, initialMode })
+    state, videoRef, containerRef, toggleFlash, switchCamera, setZoom,
+    selectProduct, rescan, retryPermission,
+  } = useLocalScanner({ context, onResult: handleResult, active: open })
 
   useEffect(() => { rescanRef.current = rescan }, [rescan])
 
@@ -138,7 +129,7 @@ export default function LocalScannerView({ open, context, onResult, onClose, onU
           onSwitchCamera={switchCamera}
           onClose={onClose}
           onRetryPermission={retryPermission}
-          scanOverlay={state.status === 'scanning' ? (state.mode === 'barcode' ? <BarcodeRectOverlay /> : <ScanFrame mode={state.mode} width={state.boxWidth} height={state.boxHeight} />) : undefined}
+          scanOverlay={state.status === 'scanning' ? <BarcodeRectOverlay /> : undefined}
           success={state.status === 'done'}
           successLabel="Added!"
           deniedExtra={
@@ -151,34 +142,22 @@ export default function LocalScannerView({ open, context, onResult, onClose, onU
           }
         >
           {/* ── Extra overlays specific to this scanner ── */}
-          {/* "No match yet" / quality-hint notice stays centered mid-screen,
-              well clear of the bottom controls, so it's unaffected by this. */}
-          {state.status === 'scanning' && (state.notice || state.qualityHint) && (
+          {/* "No match yet" notice stays centered mid-screen, well clear
+              of the bottom controls, so it's unaffected by this. */}
+          {state.status === 'scanning' && state.notice && (
             <motion.div
               key="notice"
               initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
               className="absolute left-0 right-0 flex justify-center pointer-events-none"
               style={{ top: '58%' }}
             >
-              {state.notice ? (
-                <div className="px-3 py-1.5 rounded-full bg-black/70 backdrop-blur-md text-white/90 text-xs font-medium">
-                  {state.notice}
-                </div>
-              ) : (
-                <QualityHint hint={state.qualityHint!} />
-              )}
+              <div className="px-3 py-1.5 rounded-full bg-black/70 backdrop-blur-md text-white/90 text-xs font-medium">
+                {state.notice}
+              </div>
             </motion.div>
           )}
 
-          {/* ── Bottom controls (mode toggle, gallery, "use another device") ──
-              Everything that lives near the bottom of the screen — the mode
-              badge, the non-blocking suggestions, the ratio selector, and
-              the control buttons — is ONE flex column, stacked top-to-
-              bottom in natural document flow. None of it uses a fixed
-              pixel offset, so however tall any one piece gets (a longer
-              product name wrapping the suggestion chips, the OCR progress
-              bar appearing under the mode badge, etc.) it simply pushes the
-              others further up instead of overlapping them. ── */}
+          {/* ── Bottom controls ──────────────────────────────────────────── */}
           {!showDrawer && (
             <div
               key="bottom-controls"
@@ -187,24 +166,8 @@ export default function LocalScannerView({ open, context, onResult, onClose, onU
             >
               {state.status === 'scanning' && (
                 <div className="pointer-events-none">
-                  <ModeBadge mode={state.mode} ocrProgress={state.ocrProgress} statusMessage={state.ocrStatusMessage} />
+                  <ModeBadge mode={state.mode} />
                 </div>
-              )}
-
-              {/* ── Non-blocking suggestions (70–84% confidence) — scanning
-                  keeps going while these are up; tapping one selects
-                  immediately. ── */}
-              {state.status === 'scanning' && state.mode === 'ocr' && state.suggestions.length > 0 && (
-                <div className="w-full flex justify-center px-4">
-                  <SuggestionChips products={state.suggestions} onSelect={selectProduct} />
-                </div>
-              )}
-
-              {/* OCR scan-ratio selector — only meaningful in OCR mode, and
-                  never covers the camera preview or the scan box, which sit
-                  above this bottom-controls strip. */}
-              {state.mode === 'ocr' && state.status === 'scanning' && (
-                <RatioSelector value={state.ocrRatio} onChange={setOcrRatio} />
               )}
 
               <button
@@ -213,40 +176,6 @@ export default function LocalScannerView({ open, context, onResult, onClose, onU
               >
                 <Smartphone size={12} /> Use Another Device
               </button>
-
-              <div className="flex items-center justify-center gap-3">
-                <button
-                  onClick={() => galleryInputRef.current?.click()}
-                  aria-label="Scan from gallery"
-                  className="w-12 h-12 rounded-full bg-white/12 backdrop-blur-md flex items-center justify-center text-white active:scale-90 transition-transform"
-                >
-                  <ImageIcon size={19} />
-                </button>
-                <button
-                  onClick={() => setMode('barcode')}
-                  aria-label="Barcode mode"
-                  className={`w-14 h-14 rounded-full flex items-center justify-center transition-transform active:scale-90 ${
-                    state.mode === 'barcode' ? 'bg-blue-600 text-white' : 'bg-white/15 backdrop-blur-md text-white'
-                  }`}
-                >
-                  <ScanLine size={22} />
-                </button>
-                <button
-                  onClick={() => setMode('ocr')}
-                  aria-label="OCR mode"
-                  className={`w-12 h-12 rounded-full flex items-center justify-center transition-transform active:scale-90 ${
-                    state.mode === 'ocr' ? 'bg-purple-600 text-white' : 'bg-white/12 backdrop-blur-md text-white'
-                  }`}
-                >
-                  <Type size={19} />
-                </button>
-              </div>
-
-              <input
-                ref={galleryInputRef}
-                type="file" accept="image/*" className="hidden"
-                onChange={e => { const f = e.target.files?.[0]; if (f) scanImageFile(f); e.target.value = '' }}
-              />
             </div>
           )}
         </BarcodeScannerView>
@@ -266,18 +195,10 @@ export default function LocalScannerView({ open, context, onResult, onClose, onU
               <div className="flex items-center justify-between px-4 pb-3 border-b border-slate-100 flex-shrink-0">
                 <div>
                   <p className="font-bold text-slate-900 text-sm">
-                    {state.matchTier === 'possible'
-                      ? 'Possible Match — Confirm'
-                      : state.matchTier === 'suggested'
-                      ? `${state.matches.length === 1 ? 'Best Guess' : `${state.matches.length} Suggestions`}`
-                      : state.matches.length === 1 ? 'Medicine Found' : `${state.matches.length} Matches`}
+                    {state.matches.length === 1 ? 'Medicine Found' : `${state.matches.length} Matches`}
                   </p>
                   <p className="text-xs text-slate-400 mt-0.5">
-                    {state.lastBarcode
-                      ? `Barcode: ${state.lastBarcode}`
-                      : state.lastOcrText
-                      ? `Text: "${state.lastOcrText.slice(0, 35)}…"`
-                      : 'Tap to add to invoice'}
+                    {state.lastBarcode ? `Barcode: ${state.lastBarcode}` : 'Tap to add to invoice'}
                   </p>
                 </div>
                 <button onClick={rescan} className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500">

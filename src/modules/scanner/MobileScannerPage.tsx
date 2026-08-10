@@ -20,7 +20,7 @@ import {
   RotateCcw, X, Zap,
 } from 'lucide-react'
 import useMobileScanner from '@/hooks/scanner/useMobileScanner'
-import { ScanFrame, ModeBadge, ProductCard } from '@/components/scanner/ScannerUI'
+import { BarcodeRectOverlay, ModeBadge, ProductCard } from '@/components/scanner/ScannerUI'
 
 /**
  * getApiBase() — figures out the correct backend URL from the phone's browser.
@@ -123,7 +123,6 @@ export default function MobileScannerPage() {
   }
 
   const showDrawer   = state.status === 'matches' || state.status === 'submitting'
-  const scanMethod   = state.lastBarcode ? 'barcode' : 'ocr'
 
   // ── Pinch-to-zoom — same pattern as LocalScannerView.tsx ────────────────────
   const pinchStartDist = useRef<number | null>(null)
@@ -169,7 +168,7 @@ export default function MobileScannerPage() {
         <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/60 pointer-events-none" />
 
         {/* Scan frame */}
-        {(state.status === 'scanning') && <ScanFrame mode={state.mode} />}
+        {(state.status === 'scanning') && <BarcodeRectOverlay />}
 
         {/* Zoom slider — pure digital zoom, always available (see
             useMobileScanner.ts for why this isn't gated on hardware
@@ -214,7 +213,7 @@ export default function MobileScannerPage() {
         {/* Mode badge */}
         {state.status === 'scanning' && (
           <div className="absolute bottom-5 left-0 right-0 flex justify-center">
-            <ModeBadge mode={state.mode} ocrProgress={state.ocrProgress} />
+            <ModeBadge mode={state.mode} />
           </div>
         )}
 
@@ -249,12 +248,7 @@ export default function MobileScannerPage() {
                   {state.matches.length === 1 ? 'Medicine Found' : `${state.matches.length} Matches`}
                 </p>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  {state.lastBarcode
-                    ? `Barcode: ${state.lastBarcode}`
-                    : state.lastOcrText
-                    ? `Text: "${state.lastOcrText.slice(0, 35)}…"`
-                    : 'Tap to add to invoice'
-                  }
+                  {state.lastBarcode ? `Barcode: ${state.lastBarcode}` : 'Tap to add to invoice'}
                 </p>
               </div>
               <button onClick={rescan} className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500">

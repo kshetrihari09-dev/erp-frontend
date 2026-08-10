@@ -42,7 +42,6 @@
  *   - What to do with a decoded barcode (product lookup vs. filling a
  *     form field) — that's business logic, passed in as a callback to
  *     startScanning().
- *   - OCR / label capture — unrelated to barcode decoding.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'

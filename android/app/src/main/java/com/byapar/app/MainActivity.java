@@ -31,10 +31,6 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
-        // Must run BEFORE super.onCreate() — that's when the Capacitor
-        // bridge actually wires up its plugin registry.
-        registerPlugin(MlKitOcrPlugin.class);
-
         super.onCreate(savedInstanceState);
 
         // IMPORTANT: this must run AFTER super.onCreate(), because that's

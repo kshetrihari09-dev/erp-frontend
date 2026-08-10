@@ -23,7 +23,7 @@ import {
   CalendarDays, CreditCard, User, MapPin, Hash,
   Phone as PhoneIcon, ChevronDown, AlertCircle,
   CheckCircle2, RotateCcw, Save, Plus, UserPlus,
-  ScanLine, Camera, Pill,
+  ScanLine, Pill,
 } from 'lucide-react'
 import { salesAPI, partiesAPI, productsAPI } from '@/services/api'
 import useUIStore from '@/store/uiStore'
@@ -752,33 +752,19 @@ export default function SalesPage() {
                   onNotFound={handleBarcodeNotFound}
                   onAccountMismatch={handleAccountMismatch}
                 />
-                {/* Desktop: unchanged, single combined camera-scan button
-                    (barcode/OCR toggle lives inside the modal itself). */}
+                {/* Desktop: single camera-scan button. */}
                 <div className="pos-scan-single-desktop">
                   <ScanButton context="sales" onResult={handleScanResult} />
                 </div>
-                {/* Mobile-only: two dedicated buttons so Barcode vs Medicine
-                    scanning is a single tap instead of open-then-toggle.
-                    Both reuse the exact same ScanButton/scanning pipeline —
-                    only the requested starting camera mode differs — so
-                    this is a purely additive UI change, not new scanning
-                    logic (see ScanButton's initialMode prop). */}
+                {/* Mobile-only: same button, reusing the exact same
+                    ScanButton/scanning pipeline as desktop. */}
                 <div className="pos-scan-row pos-mobile-only">
                   <ScanButton
                     context="sales"
                     onResult={handleScanResult}
-                    initialMode="barcode"
                     label="Scan Barcode"
                     icon={<ScanLine size={15} />}
                     className="pos-scan-btn pos-scan-btn-barcode"
-                  />
-                  <ScanButton
-                    context="sales"
-                    onResult={handleScanResult}
-                    initialMode="ocr"
-                    label="Scan Medicine"
-                    icon={<Camera size={15} />}
-                    className="pos-scan-btn pos-scan-btn-medicine"
                   />
                 </div>
                 {/* pos-kbd-hints: hidden on mobile via CSS addendum */}

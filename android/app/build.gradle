@@ -1,5 +1,4 @@
 apply plugin: 'com.android.application'
-apply plugin: 'org.jetbrains.kotlin.android' // for MlKitOcrPlugin.kt — see android/build.gradle
 
 android {
     namespace = "com.byapar.app"
@@ -23,12 +22,6 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
-    // Matches capacitor.build.gradle's Java 21 compileOptions so the
-    // Kotlin source set (MlKitOcrPlugin.kt) targets the same bytecode
-    // level as the rest of the module.
-    kotlinOptions {
-        jvmTarget = "21"
-    }
 }
 
 repositories {
@@ -47,11 +40,6 @@ dependencies {
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
     implementation project(':capacitor-cordova-android-plugins')
-
-    // Current standalone ML Kit Text Recognition v2 SDK (bundled Latin
-    // model, fully on-device) — NOT the deprecated Firebase ML Vision
-    // APIs. Backs MlKitOcrPlugin.kt, the primary Android OCR engine.
-    implementation 'com.google.mlkit:text-recognition:16.0.1'
 }
 
 apply from: 'capacitor.build.gradle'
