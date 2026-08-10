@@ -45,7 +45,7 @@ export default function ProductScanModal({ open, onBarcode, onClose }: Props) {
 
   const {
     state, videoRef, containerRef,
-    retryPermission, setZoom, toggleFlash, switchCamera,
+    retryPermission, setZoom, toggleFlash, switchCamera, scanFromGallery,
   } = useProductCapture({ active: open, onBarcode: handleBarcode })
 
   // Reset the success beat if the modal is re-opened for another scan.
@@ -78,10 +78,12 @@ export default function ProductScanModal({ open, onBarcode, onClose }: Props) {
           onToggleFlash={toggleFlash}
           onSwitchCamera={switchCamera}
           onClose={onClose}
-          onDone={onClose}
           onRetryPermission={retryPermission}
           title="Scan Barcode"
+          subtitle="Align the barcode within the frame"
           scanOverlay={<BarcodeRectOverlay />}
+          statusLabel={state.status === 'ready' && !success ? 'Scanning barcode…' : undefined}
+          onGalleryPick={scanFromGallery}
           success={success}
           successLabel="Barcode captured!"
         >
@@ -93,13 +95,15 @@ export default function ProductScanModal({ open, onBarcode, onClose }: Props) {
             </div>
           )}
 
-          {/* Bottom hint */}
-          <div
-            className="absolute bottom-0 left-0 right-0 flex flex-col items-center gap-3 px-4 pb-2"
-            style={{ paddingBottom: 'max(14px, env(safe-area-inset-bottom, 0px))' }}
-          >
-            <p className="text-white/60 text-[11px] font-medium">Hold steady over the barcode</p>
-          </div>
+          {/* "No barcode found" feedback after a gallery pick that didn't
+              decode — centered mid-screen, clear of the bottom controls. */}
+          {state.notice && (
+            <div className="absolute left-0 right-0 flex justify-center pointer-events-none" style={{ top: '58%' }}>
+              <div className="px-3 py-1.5 rounded-full bg-black/70 backdrop-blur-md text-white/90 text-xs font-medium">
+                {state.notice}
+              </div>
+            </div>
+          )}
         </BarcodeScannerView>
       </motion.div>
     </AnimatePresence>,

@@ -255,6 +255,21 @@ export default function useLocalScanner({ onResult, active }: Options) {
 
   const setZoom = useCallback((value: number) => engine.setZoom(value), [engine])
 
+  // ── Gallery pick — decode a barcode from a photo instead of the live
+  //    camera feed. On a hit it feeds straight into the same
+  //    handleBarcodeDetected path a camera read would (product lookup,
+  //    fuzzy fallback, matches drawer) — a gallery scan is indistinguishable
+  //    from a camera scan to every downstream consumer. ─────────────────────
+  const scanFromGallery = useCallback(async (file: File) => {
+    const hit = await engine.scanImageFile(file)
+    if (!mountedRef.current) return
+    if (hit) {
+      handleBarcodeDetected(hit.code)
+    } else {
+      flashNotice('No barcode found in that photo')
+    }
+  }, [engine, handleBarcodeDetected, flashNotice])
+
   // ── Rescan / retry ──────────────────────────────────────────────────────────
   const rescan = useCallback(async () => {
     engine.stopScanning()
@@ -319,6 +334,6 @@ export default function useLocalScanner({ onResult, active }: Options) {
   return {
     state, videoRef, containerRef,
     toggleFlash, switchCamera, setZoom,
-    selectProduct, rescan, retryPermission,
+    selectProduct, rescan, retryPermission, scanFromGallery,
   }
 }

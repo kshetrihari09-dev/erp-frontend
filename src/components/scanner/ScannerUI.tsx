@@ -19,7 +19,7 @@ export function BarcodeRectOverlay({ found = false }: { found?: boolean }) {
   return (
     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
       <div
-        className="relative rounded-2xl"
+        className="relative rounded-[28px]"
         style={{
           width: BARCODE_SCAN_WIDTH,
           height: BARCODE_SCAN_HEIGHT,
@@ -27,22 +27,33 @@ export function BarcodeRectOverlay({ found = false }: { found?: boolean }) {
         }}
       >
         <div
-          className={`absolute inset-0 rounded-2xl border-2 transition-colors duration-200 ${
-            found ? 'border-green-400/90' : 'border-white/40'
+          className={`absolute inset-0 rounded-[28px] border transition-colors duration-200 ${
+            found ? 'border-green-400/90' : 'border-white/20'
           }`}
         />
-        {/* Corner marks — classic barcode-scanner viewfinder styling */}
+        {/* Corner brackets — classic barcode-scanner viewfinder styling,
+            softened with a larger radius and heavier stroke to read as a
+            deliberate "frame" rather than a plain rectangle. */}
         {!found && [
-          'top-0 left-0 border-t-2 border-l-2 rounded-tl-2xl',
-          'top-0 right-0 border-t-2 border-r-2 rounded-tr-2xl',
-          'bottom-0 left-0 border-b-2 border-l-2 rounded-bl-2xl',
-          'bottom-0 right-0 border-b-2 border-r-2 rounded-br-2xl',
+          'top-0 left-0 border-t-[3px] border-l-[3px] rounded-tl-[20px]',
+          'top-0 right-0 border-t-[3px] border-r-[3px] rounded-tr-[20px]',
+          'bottom-0 left-0 border-b-[3px] border-l-[3px] rounded-bl-[20px]',
+          'bottom-0 right-0 border-b-[3px] border-r-[3px] rounded-br-[20px]',
         ].map((cls, i) => (
-          <div key={i} className={`absolute w-7 h-7 border-white/90 ${cls}`} />
+          <div key={i} className={`absolute w-9 h-9 border-white ${cls}`} />
         ))}
+        {found && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="w-14 h-14 rounded-full bg-green-500/90 flex items-center justify-center">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+                <path d="M5 13l4 4L19 7" stroke="white" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
+          </div>
+        )}
         {!found && (
           <motion.div
-            className="absolute left-3 right-3 h-0.5 rounded-full bg-blue-400/80 shadow-lg shadow-blue-400/50"
+            className="absolute left-3 right-3 h-0.5 rounded-full bg-green-400/90 shadow-lg shadow-green-400/50"
             animate={{ top: ['12%', '86%', '12%'] }}
             transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
           />
@@ -52,16 +63,26 @@ export function BarcodeRectOverlay({ found = false }: { found?: boolean }) {
   )
 }
 
-// ── Mode badge ────────────────────────────────────────────────────────────────
+// ── Scan status pill ─────────────────────────────────────────────────────────
+// Small dark pill with a pulsing dot — the single shared "here's what's
+// happening" indicator both scanners show while the camera is live.
+export function ScanStatusPill({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-black/55 backdrop-blur-md text-white text-xs font-semibold">
+      <span className="relative flex h-2 w-2 flex-shrink-0">
+        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+        <span className="relative inline-flex rounded-full h-2 w-2 bg-green-400" />
+      </span>
+      {label}
+    </div>
+  )
+}
+
+// Kept as a thin backward-compatible wrapper in case anything else still
+// imports the old name/shape.
 export function ModeBadge({ mode }: { mode: string }) {
-  if (mode === 'barcode') {
-    return (
-      <div className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600/80 backdrop-blur-sm rounded-full text-white text-xs font-semibold">
-        <span>📷</span> Scanning barcode…
-      </div>
-    )
-  }
-  return null
+  if (mode !== 'barcode') return null
+  return <ScanStatusPill label="Scanning barcode…" />
 }
 
 // ── Product match card ────────────────────────────────────────────────────────

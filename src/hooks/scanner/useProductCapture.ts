@@ -27,6 +27,10 @@ export type CaptureStatus =
 export interface CaptureState {
   status:      CaptureStatus
   error:       string | null
+  // Transient "no barcode found in that photo" feedback after a gallery
+  // pick that didn't decode — distinct from `error`, which is reserved
+  // for camera-level failures (denied/hardware).
+  notice:      string | null
   // Camera state mirrored from the shared engine — see useBarcodeEngine.ts.
   flashOn:        boolean
   flashSupported: boolean
@@ -50,12 +54,13 @@ export default function useProductCapture({ active, onBarcode }: Options) {
   const { videoRef, containerRef } = engine
 
   const [state, setState] = useState<CaptureState>({
-    status: 'requesting-permission', error: null,
+    status: 'requesting-permission', error: null, notice: null,
     flashOn: false, flashSupported: false, facingMode: 'environment',
     zoom: engine.state.zoom, zoomMin: engine.state.zoomMin, zoomMax: engine.state.zoomMax, zoomStep: engine.state.zoomStep,
   })
 
   const mountedRef = useRef(true)
+  const noticeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // ── Mirror the shared engine's camera state into this hook's state so
   //    ProductScanModal keeps reading a single, familiar `state` shape ──────
@@ -75,7 +80,13 @@ export default function useProductCapture({ active, onBarcode }: Options) {
   const setZoom = useCallback((value: number) => engine.setZoom(value), [engine])
   const toggleFlash = useCallback(() => engine.toggleFlash(), [engine])
 
-  useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false } }, [])
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      if (noticeTimeoutRef.current) clearTimeout(noticeTimeoutRef.current)
+    }
+  }, [])
 
   const stopCamera = useCallback(() => {
     engine.closeCamera()
@@ -89,6 +100,24 @@ export default function useProductCapture({ active, onBarcode }: Options) {
 
   const startBarcodeLoop = useCallback(() => {
     engine.startScanning(handleBarcodeDetected)
+  }, [engine, handleBarcodeDetected])
+
+  // ── Gallery pick — decode a barcode from a photo instead of the live
+  //    camera feed. Doesn't touch the live decode loop at all; on a hit it
+  //    runs through the exact same handleBarcodeDetected → onBarcode path
+  //    a camera read would, so the caller sees no difference in outcome. ──
+  const scanFromGallery = useCallback(async (file: File) => {
+    const hit = await engine.scanImageFile(file)
+    if (!mountedRef.current) return
+    if (hit) {
+      handleBarcodeDetected(hit.code)
+    } else {
+      if (noticeTimeoutRef.current) clearTimeout(noticeTimeoutRef.current)
+      setState(s => ({ ...s, notice: 'No barcode found in that photo' }))
+      noticeTimeoutRef.current = setTimeout(() => {
+        if (mountedRef.current) setState(s => ({ ...s, notice: null }))
+      }, 2200)
+    }
   }, [engine, handleBarcodeDetected])
 
   const switchCamera = useCallback(async () => {
@@ -111,7 +140,7 @@ export default function useProductCapture({ active, onBarcode }: Options) {
     if (!active) {
       stopCamera()
       setState(s => ({
-        status: 'requesting-permission', error: null,
+        status: 'requesting-permission', error: null, notice: null,
         flashOn: false, flashSupported: false, facingMode: 'environment',
         zoom: 1, zoomMin: s.zoomMin, zoomMax: s.zoomMax, zoomStep: s.zoomStep,
       }))
@@ -158,6 +187,6 @@ export default function useProductCapture({ active, onBarcode }: Options) {
 
   return {
     state, videoRef, containerRef,
-    retryPermission, setZoom, toggleFlash, switchCamera,
+    retryPermission, setZoom, toggleFlash, switchCamera, scanFromGallery,
   }
 }

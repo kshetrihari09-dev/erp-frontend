@@ -24,14 +24,15 @@
  * uses BarcodeRectOverlay, without duplicating any of the chrome above.
  */
 
-import { useRef, useCallback } from 'react'
-import type { TouchEvent as ReactTouchEvent, RefObject, ReactNode } from 'react'
+import { useRef, useCallback, useState } from 'react'
+import type { TouchEvent as ReactTouchEvent, RefObject, ReactNode, ChangeEvent } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   X, Zap, ZapOff, RefreshCw, CameraOff, AlertCircle, RotateCcw,
-  Loader2, CheckCircle2,
+  Loader2, CheckCircle2, ImageIcon,
 } from 'lucide-react'
 import type { CameraStatus } from '@/hooks/scanner/useBarcodeEngine'
+import { ScanStatusPill } from './ScannerUI'
 
 interface Props {
   cameraStatus: CameraStatus
@@ -62,8 +63,20 @@ interface Props {
   doneLabel?: string
 
   title?: string
+  /** Small line under the title, e.g. "Align the barcode within the frame". */
+  subtitle?: string
   scanOverlay?: ReactNode   // e.g. <BarcodeRectOverlay /> — omit to show none
   showTopBar?: boolean
+
+  /** Pill with a pulsing dot shown above the bottom controls, e.g.
+   *  "Scanning barcode…" — omit to show nothing. */
+  statusLabel?: string
+
+  /** Renders a "Gallery" button in the bottom-left that opens the native
+   *  file/photo picker; the picked file is handed back here to decode.
+   *  Omit entirely to hide the button (e.g. while a results drawer is up). */
+  onGalleryPick?: (file: File) => void
+  galleryLabel?: string
 
   success?:      boolean
   successLabel?: string
@@ -78,10 +91,36 @@ export default function BarcodeScannerView({
   zoom, zoomMin, zoomMax, zoomStep, onZoomChange, showZoomSlider = true,
   flashOn, flashSupported, onToggleFlash, onSwitchCamera, onClose, onRetryPermission,
   onDone, doneLabel = 'Done',
-  title, scanOverlay, showTopBar = true,
+  title, subtitle, scanOverlay, showTopBar = true,
+  statusLabel,
+  onGalleryPick, galleryLabel = 'Gallery',
   success = false, successLabel = 'Scanned!',
   deniedExtra, children,
 }: Props) {
+  const galleryInputRef = useRef<HTMLInputElement>(null)
+  const [galleryBusy, setGalleryBusy] = useState(false)
+
+  const handleGalleryChange = useCallback(async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = '' // allow picking the same file again next time
+    if (!file || !onGalleryPick) return
+    setGalleryBusy(true)
+    try {
+      await onGalleryPick(file)
+    } finally {
+      setGalleryBusy(false)
+    }
+  }, [onGalleryPick])
+
+  // Digital-zoom presets spread across the actual [zoomMin, zoomMax] range
+  // this device/session supports — never a hardcoded number that could
+  // exceed it. Deduplicated so a narrow range (e.g. min===max) doesn't
+  // render repeat pills.
+  const zoomPresets = Array.from(new Set([
+    zoomMin,
+    Math.round(((zoomMin + zoomMax) / 2) * 10) / 10,
+    zoomMax,
+  ]))
   // ── Pinch-to-zoom ──────────────────────────────────────────────────────────
   // Two-finger pinch on the preview adjusts digital zoom, alongside the
   // slider (for precision / non-touch devices). Lives here once so both
@@ -205,31 +244,39 @@ export default function BarcodeScannerView({
           {/* Top glass bar */}
           {showTopBar && (
             <div
-              className="absolute top-0 left-0 right-0 flex items-center justify-between p-3.5"
+              className="absolute top-0 left-0 right-0 flex items-start justify-between p-3.5"
               style={{ paddingTop: 'max(14px, env(safe-area-inset-top, 0px))' }}
             >
               <button
                 onClick={onClose}
                 aria-label="Close scanner"
-                className="w-10 h-10 rounded-full bg-white/15 backdrop-blur-md flex items-center justify-center text-white active:scale-90 transition-transform"
+                className="w-10 h-10 rounded-full bg-white/15 backdrop-blur-md flex items-center justify-center text-white active:scale-90 transition-transform flex-shrink-0"
               >
                 <X size={18} />
               </button>
 
-              {title && (
-                <div className="px-3 py-1.5 rounded-full bg-white/15 backdrop-blur-md text-white text-xs font-semibold">
-                  {title}
+              {(title || subtitle) && (
+                <div className="flex-1 flex flex-col items-center px-2 pt-1.5 min-w-0">
+                  {title && (
+                    <p className="text-white text-base font-bold leading-tight truncate max-w-full">{title}</p>
+                  )}
+                  {subtitle && (
+                    <p className="text-white/60 text-[11px] font-medium leading-tight mt-0.5 truncate max-w-full">{subtitle}</p>
+                  )}
                 </div>
               )}
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-shrink-0">
                 {flashSupported && (
                   <button
                     onClick={onToggleFlash}
                     aria-label="Toggle flash"
-                    className="w-10 h-10 rounded-full bg-white/15 backdrop-blur-md flex items-center justify-center text-white active:scale-90 transition-transform"
+                    className={`flex items-center gap-1.5 h-10 px-3 rounded-full backdrop-blur-md text-xs font-semibold active:scale-90 transition-all ${
+                      flashOn ? 'bg-amber-400 text-slate-900' : 'bg-white/15 text-white'
+                    }`}
                   >
-                    {flashOn ? <ZapOff size={17} /> : <Zap size={17} />}
+                    {flashOn ? <Zap size={15} /> : <ZapOff size={15} />}
+                    {flashOn ? 'On' : 'Off'}
                   </button>
                 )}
                 <button
@@ -251,33 +298,71 @@ export default function BarcodeScannerView({
             </div>
           )}
 
-          {/* Zoom slider — pure digital zoom, so it's always available
-              regardless of hardware zoom support. */}
-          {showZoomSlider && !success && (
+          <AnimatePresence>{children}</AnimatePresence>
+
+          {/* Bottom stack: status pill, then the gallery / zoom-preset row.
+              Both fade with `success` so the check animation isn't crowded. */}
+          {!success && (
             <div
-              className="absolute right-3 flex flex-col items-center gap-1.5"
-              style={{ top: '50%', transform: 'translateY(-50%)' }}
+              className="absolute bottom-0 left-0 right-0 flex flex-col items-center gap-3 px-4 pointer-events-none"
+              style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom, 0px))' }}
             >
-              <span className="text-white/80 text-[10px] font-bold bg-black/40 backdrop-blur-md px-1.5 py-0.5 rounded-full">
-                {zoom.toFixed(1)}×
-              </span>
-              <div className="h-32 w-8 flex items-center justify-center">
-                <input
-                  type="range"
-                  aria-label="Camera zoom"
-                  min={zoomMin}
-                  max={zoomMax}
-                  step={zoomStep}
-                  value={zoom}
-                  onChange={e => onZoomChange(Number(e.target.value))}
-                  className="accent-blue-500"
-                  style={{ width: '112px', transform: 'rotate(-90deg)' }}
-                />
-              </div>
+              {statusLabel && (
+                <div className="pointer-events-auto">
+                  <ScanStatusPill label={statusLabel} />
+                </div>
+              )}
+
+              {(showZoomSlider || onGalleryPick) && (
+                <div className="w-full flex items-center justify-between pointer-events-auto">
+                  {onGalleryPick ? (
+                    <button
+                      onClick={() => galleryInputRef.current?.click()}
+                      disabled={galleryBusy}
+                      className="flex flex-col items-center gap-1 w-14 text-white active:scale-90 transition-transform disabled:opacity-50"
+                      aria-label="Pick barcode photo from gallery"
+                    >
+                      <span className="w-12 h-12 rounded-full bg-white/15 backdrop-blur-md flex items-center justify-center">
+                        {galleryBusy ? <Loader2 size={18} className="animate-spin" /> : <ImageIcon size={18} />}
+                      </span>
+                      <span className="text-[10px] font-medium">{galleryLabel}</span>
+                    </button>
+                  ) : (
+                    <div className="w-14" />
+                  )}
+
+                  {showZoomSlider && (
+                    <div className="flex items-center gap-1 p-1 rounded-full bg-black/45 backdrop-blur-md">
+                      {zoomPresets.map(preset => {
+                        const active = Math.abs(zoom - preset) < 0.15
+                        return (
+                          <button
+                            key={preset}
+                            onClick={() => onZoomChange(preset)}
+                            className={`h-8 min-w-[2.25rem] px-2 rounded-full text-xs font-bold tabular-nums transition-colors ${
+                              active ? 'bg-white text-slate-900' : 'text-white/80'
+                            }`}
+                          >
+                            {preset}×
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+
+                  <div className="w-14" />
+                </div>
+              )}
+
+              <input
+                ref={galleryInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleGalleryChange}
+                className="hidden"
+              />
             </div>
           )}
-
-          <AnimatePresence>{children}</AnimatePresence>
         </div>
       )}
     </>

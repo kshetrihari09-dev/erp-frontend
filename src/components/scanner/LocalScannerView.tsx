@@ -29,7 +29,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { X, RotateCcw, Loader2 } from 'lucide-react'
 import useLocalScanner from '@/hooks/scanner/useLocalScanner'
 import type { ScanResult } from '@/types/scanner'
-import { ModeBadge, ProductCard, BarcodeRectOverlay } from './ScannerUI'
+import { ProductCard, BarcodeRectOverlay } from './ScannerUI'
 import BarcodeScannerView from './BarcodeScannerView'
 import { Z } from '@/styles/zIndex'
 import { playSuccessBeep } from '@/utils/beep'
@@ -73,7 +73,7 @@ export default function LocalScannerView({ open, context, onResult, onClose }: P
 
   const {
     state, videoRef, containerRef, toggleFlash, switchCamera, setZoom,
-    selectProduct, rescan, retryPermission,
+    selectProduct, rescan, retryPermission, scanFromGallery,
   } = useLocalScanner({ context, onResult: handleResult, active: open })
 
   useEffect(() => { rescanRef.current = rescan }, [rescan])
@@ -124,7 +124,11 @@ export default function LocalScannerView({ open, context, onResult, onClose }: P
           onSwitchCamera={switchCamera}
           onClose={onClose}
           onRetryPermission={retryPermission}
+          title="Scan Barcode"
+          subtitle="Align the barcode within the frame"
           scanOverlay={state.status === 'scanning' ? <BarcodeRectOverlay /> : undefined}
+          statusLabel={state.status === 'scanning' ? 'Scanning barcode…' : undefined}
+          onGalleryPick={showDrawer ? undefined : scanFromGallery}
           success={state.status === 'done'}
           successLabel="Added!"
         >
@@ -142,17 +146,6 @@ export default function LocalScannerView({ open, context, onResult, onClose }: P
                 {state.notice}
               </div>
             </motion.div>
-          )}
-
-          {/* ── Bottom controls ──────────────────────────────────────────── */}
-          {!showDrawer && state.status === 'scanning' && (
-            <div
-              key="bottom-controls"
-              className="absolute bottom-0 left-0 right-0 flex flex-col items-center gap-3 px-4 pb-2 pointer-events-none"
-              style={{ paddingBottom: 'max(14px, env(safe-area-inset-bottom, 0px))' }}
-            >
-              <ModeBadge mode={state.mode} />
-            </div>
           )}
         </BarcodeScannerView>
 

@@ -297,6 +297,28 @@ export default function useBarcodeEngine() {
     setState(s => (s.zoom === clamped ? s : { ...s, zoom: clamped }))
   }, [])
 
+  // ── Decode a barcode from a still image (gallery / file picker) ─────────────
+  // Reuses the same lazily-created ZXing reader instance as the live decode
+  // loop — no separate decoder, no extra bundle weight. Independent of
+  // camera state entirely, so it works even before/without the camera ever
+  // opening (e.g. picking a photo while permission is still pending).
+  const scanImageFile = useCallback(async (file: File): Promise<{ code: string; format?: string } | null> => {
+    const reader = await getReader()
+    const url = URL.createObjectURL(file)
+    try {
+      const result = await reader.decodeFromImageUrl(url)
+      const code = result?.getText?.()
+      if (!code) return null
+      let format: string | undefined
+      try { format = result.getBarcodeFormat?.()?.toString?.() } catch {}
+      return { code, format }
+    } catch {
+      return null // no decodable barcode in the image — expected/common, not an error state
+    } finally {
+      URL.revokeObjectURL(url)
+    }
+  }, [getReader])
+
   // ── Camera switch (front / back) ────────────────────────────────────────────
   // If a decode loop was running, it's restarted against the new stream
   // once it's live — callers don't need to remember to re-arm scanning
@@ -384,7 +406,7 @@ export default function useBarcodeEngine() {
     videoRef, containerRef,
     openCamera, closeCamera, retryPermission, attachStream,
     toggleFlash, switchCamera, setZoom,
-    startScanning, stopScanning,
+    startScanning, stopScanning, scanImageFile,
   }
 }
 
