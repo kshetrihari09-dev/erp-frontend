@@ -44,8 +44,8 @@ export type LocalScanStatus =
   | 'done'
   | 'error'
 
-// Same shape as useMobileScanner's MobileProduct — intermediate list item
-// before a match is hydrated into a full ScannedProduct on selection.
+// Intermediate list item before a match is hydrated into a full
+// ScannedProduct on selection.
 export interface LocalProduct {
   id:             string
   item_code:      string

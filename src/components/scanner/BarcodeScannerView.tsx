@@ -13,7 +13,7 @@
  *     torch support), switch camera
  *   - "opening camera…" loading state
  *   - camera-access-denied screen (with an optional extra action slot for
- *     e.g. LocalScannerView's "Use Another Device")
+ *     LocalScannerView's denied-permission screen)
  *   - hard camera-error screen
  *   - the success check animation shown for the brief beat after a scan
  *     before the caller closes the view
