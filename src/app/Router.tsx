@@ -26,9 +26,6 @@ const LedgerPage   = lazy(() => import('@/modules/accounting/LedgerPage'))
 const ReportsPage  = lazy(() => import('@/modules/reports/ReportsPage'))
 const SettingsPage = lazy(() => import('@/modules/settings/SettingsPage'))
 
-// NEW: Mobile scanner page — public route, no auth, no layout
-const MobileScannerPage = lazy(() => import('@/modules/scanner/MobileScannerPage'))
-
 function PageLoader() {
   return (
     <div className="flex items-center justify-center h-64">
@@ -45,9 +42,6 @@ export default function Router() {
           {/* Public */}
           <Route path={PATHS.LOGIN}  element={<RequireGuest><LoginPage /></RequireGuest>} />
           <Route path={PATHS.SIGNUP} element={<RequireGuest><SignupPage /></RequireGuest>} />
-
-          {/* NEW: Mobile scanner — public, no auth, no AppLayout wrapper */}
-          <Route path="/scan" element={<MobileScannerPage />} />
 
           {/* Protected */}
           <Route path="/" element={<RequireAuth><AppLayout /></RequireAuth>}>

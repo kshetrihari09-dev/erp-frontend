@@ -14,10 +14,6 @@
  * what's specific to billing lookups lives here: the mode badge, the
  * "no match yet" notice, and the matches bottom sheet.
  *
- * The QR / cross-device flow (ScannerModal + useScannerSession) is
- * untouched and still available — via the "Use Another Device" affordance
- * here, which simply closes this view and opens that existing modal.
- *
  * CONTINUOUS MULTI-SCAN (billing flow):
  *   Tap Scan once → camera opens → scan item #1 → product added → beep +
  *   vibrate + a brief green "Added!" flash (~200ms) → scanning resumes
@@ -30,7 +26,7 @@
 import { useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { X, RotateCcw, Smartphone, Loader2 } from 'lucide-react'
+import { X, RotateCcw, Loader2 } from 'lucide-react'
 import useLocalScanner from '@/hooks/scanner/useLocalScanner'
 import type { ScanResult } from '@/types/scanner'
 import { ModeBadge, ProductCard, BarcodeRectOverlay } from './ScannerUI'
@@ -44,18 +40,17 @@ import { playSuccessBeep } from '@/utils/beep'
 const SCANNER_Z_INDEX = Z.scanner
 
 interface Props {
-  open:               boolean
-  context:            'sales' | 'purchase'
-  onResult:           (result: ScanResult) => void
-  onClose:            () => void
-  onUseAnotherDevice: () => void
+  open:     boolean
+  context:  'sales' | 'purchase'
+  onResult: (result: ScanResult) => void
+  onClose:  () => void
 }
 
 function vibrate(pattern: number | number[]) {
   try { navigator.vibrate?.(pattern) } catch {}
 }
 
-export default function LocalScannerView({ open, context, onResult, onClose, onUseAnotherDevice }: Props) {
+export default function LocalScannerView({ open, context, onResult, onClose }: Props) {
   const vibratedRef      = useRef(false)
 
   // rescan() only exists once useLocalScanner has been called below, but
@@ -132,14 +127,6 @@ export default function LocalScannerView({ open, context, onResult, onClose, onU
           scanOverlay={state.status === 'scanning' ? <BarcodeRectOverlay /> : undefined}
           success={state.status === 'done'}
           successLabel="Added!"
-          deniedExtra={
-            <button
-              onClick={onUseAnotherDevice}
-              className="flex items-center justify-center gap-2 px-5 py-2.5 text-slate-400 text-xs font-medium mt-1"
-            >
-              <Smartphone size={13} /> Use Another Device Instead
-            </button>
-          }
         >
           {/* ── Extra overlays specific to this scanner ── */}
           {/* "No match yet" notice stays centered mid-screen, well clear
@@ -158,24 +145,13 @@ export default function LocalScannerView({ open, context, onResult, onClose, onU
           )}
 
           {/* ── Bottom controls ──────────────────────────────────────────── */}
-          {!showDrawer && (
+          {!showDrawer && state.status === 'scanning' && (
             <div
               key="bottom-controls"
-              className="absolute bottom-0 left-0 right-0 flex flex-col items-center gap-3 px-4 pb-2"
+              className="absolute bottom-0 left-0 right-0 flex flex-col items-center gap-3 px-4 pb-2 pointer-events-none"
               style={{ paddingBottom: 'max(14px, env(safe-area-inset-bottom, 0px))' }}
             >
-              {state.status === 'scanning' && (
-                <div className="pointer-events-none">
-                  <ModeBadge mode={state.mode} />
-                </div>
-              )}
-
-              <button
-                onClick={onUseAnotherDevice}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 bg-white/10 backdrop-blur-md rounded-full text-white/80 text-xs font-medium"
-              >
-                <Smartphone size={12} /> Use Another Device
-              </button>
+              <ModeBadge mode={state.mode} />
             </div>
           )}
         </BarcodeScannerView>

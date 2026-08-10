@@ -18,9 +18,9 @@
  *     a session (very common at a real counter) costs zero extra
  *     network round-trips after the first time.
  *   - Resolves via the exact same GET /scanner/products/barcode/:code
- *     endpoint the camera scanners already use (see useLocalScanner.ts,
- *     useMobileScanner.ts) — one source of truth for "what product does
- *     this code map to," so behaviour never drifts between scan methods.
+ *     endpoint the camera scanner already uses (see useLocalScanner.ts) —
+ *     one source of truth for "what product does this code map to," so
+ *     behaviour never drifts between scan methods.
  *   - Success -> onResolved(product), input clears, success beep.
  *   - Not found -> onNotFound(code), input clears, error beep.
  *   - Never throws / never shows a raw error state — a barcode that

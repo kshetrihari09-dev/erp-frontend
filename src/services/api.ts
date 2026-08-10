@@ -289,68 +289,24 @@ export const reportsAPI = {
   partyBalance:(params?: Params) => http.get('/reports/party-balance',{ params }),
 }
 
-// ─── Mobile Scanner ───────────────────────────────────────────────────────────
+// ─── Barcode Scanner ────────────────────────────────────────────────────────────
 //
-// All calls go through the same `http` axios instance as every other API in
-// the app.  The request interceptor attaches the current JWT automatically,
-// and the response interceptor silently refreshes an expired token and
-// retries — so there is no way to get a 401 just from opening the modal.
+// Product lookups used by the local (same-device) camera scanner. Calls go
+// through the same `http` axios instance as every other API in the app —
+// the request interceptor attaches the current JWT automatically, and the
+// response interceptor silently refreshes an expired token and retries.
 //
 // Endpoints:
-//   POST   /scanner/session              — create session (desktop, auth required)
-//   GET    /scanner/session/:token/poll  — desktop polls for result (auth required)
-//   DELETE /scanner/session/:token       — cancel session (auth required)
-//   GET    /scanner/network-info         — returns server LAN IP for QR URL (auth required)
+//   GET /scanner/products/barcode/:code — barcode lookup (auth required)
+//   GET /scanner/products/fuzzy?q=...   — contains search, barcode-miss fallback (auth required)
 //
 export const scannerAPI = {
   /**
-   * Create a new scanning session.
-   * Returns { token, expiresAt, ttlSeconds }.
-   */
-  createSession: (context: 'sales' | 'purchase') =>
-    http.post<ApiResponse<{ token: string; expiresAt: number; ttlSeconds: number }>>(
-      '/scanner/session',
-      { context },
-    ),
-
-  /**
-   * Poll for a scan result from the mobile device.
-   * Returns { status, result }.
-   */
-  pollSession: (token: string) =>
-    http.get<ApiResponse<{ status: string; result: unknown }>>(
-      `/scanner/session/${token}/poll`,
-    ),
-
-  /**
-   * Cancel / clean up a session when the modal closes.
-   */
-  cancelSession: (token: string) =>
-    http.delete(`/scanner/session/${token}`),
-
-  /**
-   * Ask the server what LAN IP it is listening on.
-   * Used to build a QR URL the mobile phone can actually reach
-   * (avoids encoding "localhost" which only works on the desktop itself).
-   * Returns { ip, port }.
-   */
-  networkInfo: () =>
-    http.get<ApiResponse<{ ip: string; port: number; lanDetected: boolean }>>(
-      '/scanner/network-info',
-    ),
-
-  /**
-   * Local (same-device) product lookups — used by the instant camera
-   * scanner (useLocalScanner). Same two endpoints the cross-device mobile
-   * flow already uses; called here through the normal authenticated `http`
-   * instance since this runs in the user's own logged-in tab (no session
-   * token / forwarded JWT needed).
+   * Product lookups used by the instant camera scanner (useLocalScanner).
    *
    * lookupBarcode() returns the FULL product shape (current_stock +
    * batches) — it's also used to hydrate a fuzzy-search pick into a
-   * complete ScannedProduct before returning the final scan result,
-   * exactly mirroring what the backend already does server-side for the
-   * cross-device flow.
+   * complete ScannedProduct before returning the final scan result.
    */
   lookupBarcode: (code: string) =>
     http.get<ApiResponse<ScannedProduct>>(
