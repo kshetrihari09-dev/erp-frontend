@@ -57,11 +57,12 @@ export default function BarcodeLabel({ name, price, code, widthMm, heightMm, cla
   const heightPx = heightMm * MM_TO_PX
 
   // Fixed, real-px budgets for each text row, clamped for legibility.
-  const namePx  = Math.min(20, Math.max(8, heightPx * 0.20))
-  const codePx  = Math.min(12, Math.max(7, heightPx * 0.13))
-  const pricePx = Math.min(22, Math.max(10, heightPx * 0.22))
+  // Kept deliberately small/tight — these are price-tag labels, not posters.
+  const namePx  = Math.min(13, Math.max(6, heightPx * 0.13))
+  const codePx  = Math.min(8, Math.max(5, heightPx * 0.08))
+  const pricePx = Math.min(15, Math.max(7, heightPx * 0.15))
   const rulePx  = 1              // hairline thickness
-  const rowGapPx = Math.max(2, heightPx * 0.04) // breathing room between rows
+  const rowGapPx = Math.max(1.5, heightPx * 0.025) // breathing room between rows
 
   // Everything not spent on text/rules/gaps is the barcode bars' budget.
   const chromePx = namePx + codePx + pricePx + rulePx * 2 + rowGapPx * 5
