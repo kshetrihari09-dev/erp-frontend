@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useSearchParams } from 'react-router-dom'
-import { Printer, Download, Search, X, Loader2, Package } from 'lucide-react'
+import { Printer, Download, Search, X, Loader2, Package, AlertTriangle } from 'lucide-react'
 import { productsAPI } from '@/services/api'
 import type { Product } from '@/types'
 import { Button, Empty } from '@/components/ui'
 import BarcodeLabel from '@/components/barcode/BarcodeLabel'
+import { isValidEan13 } from '@/utils/barcodeFormat'
 
 /* ── Label sizes ──────────────────────────────────────────────────────────
  * Presets match the common thermal/inkjet label stock sizes for pharmacy
@@ -44,6 +45,44 @@ export default function BarcodePrintPage() {
 
   const sheetRef = useRef<HTMLDivElement>(null)
   const [pdfBusy, setPdfBusy] = useState(false)
+
+  // ── Pre-print validation ─────────────────────────────────────────────
+  // The only authoritative barcode value anywhere on this page is
+  // `product.barcode`, taken verbatim — no `|| item_code` fallback. A
+  // product with no barcode assigned is a genuinely missing value, not
+  // something to paper over with a different identifier at print time,
+  // so it's surfaced here and blocks printing instead of silently
+  // printing the wrong code.
+  const missingBarcodeItems = useMemo(
+    () => items.filter(i => !i.product.barcode || !i.product.barcode.trim()),
+    [items]
+  )
+  // A 13-digit value that claims to be EAN-13 but fails the check-digit
+  // test still prints fine as CODE128 (see barcodeFormat.ts) — it isn't
+  // blocked. This list is purely informational, surfaced so whoever
+  // queued the product knows why it isn't rendering as EAN-13.
+  const badEan13Items = useMemo(
+    () => items.filter(i => {
+      const b = i.product.barcode?.trim()
+      return !!b && /^\d{13}$/.test(b) && !isValidEan13(b)
+    }),
+    [items]
+  )
+
+  /** Returns true if printing/exporting may proceed. When it can't, it
+   *  names the specific product(s) blocking it rather than silently
+   *  generating or substituting a barcode for them. */
+  function assertPrintable(): boolean {
+    if (missingBarcodeItems.length > 0) {
+      const names = missingBarcodeItems.map(i => i.product.name).join(', ')
+      window.alert(
+        `Cannot print — the following product(s) have no barcode assigned: ${names}. ` +
+        `Assign a barcode on the product page first, or remove them from this queue.`
+      )
+      return false
+    }
+    return true
+  }
 
   // ── Dropdown position — portaled to document.body ───────────────────────
   // The left-hand search box lives inside a `.table-card`, and that class
@@ -162,6 +201,7 @@ export default function BarcodePrintPage() {
   function printSheet() {
     const el = sheetRef.current
     if (!el || totalLabels === 0) return
+    if (!assertPrintable()) return
 
     const clone = el.cloneNode(true) as HTMLElement
 
@@ -255,6 +295,7 @@ export default function BarcodePrintPage() {
   async function downloadPdf() {
     const el = sheetRef.current
     if (!el || totalLabels === 0) return
+    if (!assertPrintable()) return
     setPdfBusy(true)
     const prevDisplay = el.style.display
     const prevWrap    = el.style.flexWrap
@@ -356,6 +397,31 @@ export default function BarcodePrintPage() {
         dialog (turn off "Fit to page") — any auto-scaling shrinks the barcode bars unevenly and can make them unreadable.
       </p>
 
+      {missingBarcodeItems.length > 0 && (
+        <p className="bcp-missing-hint" style={{
+          display: 'flex', alignItems: 'flex-start', gap: 6,
+          fontSize: '12px', color: '#b91c1c', margin: '0 0 12px',
+          background: 'rgba(185,28,28,0.08)', border: '1px solid rgba(185,28,28,0.25)',
+          borderRadius: 8, padding: '8px 10px',
+        }}>
+          <AlertTriangle size={14} style={{ flexShrink: 0, marginTop: 1 }} />
+          <span>
+            <strong>No barcode assigned</strong> for: {missingBarcodeItems.map(i => i.product.name).join(', ')}.
+            Printing is blocked for these until a barcode is assigned on the product page — a barcode is never
+            substituted or generated here.
+          </span>
+        </p>
+      )}
+
+      {badEan13Items.length > 0 && (
+        <p className="bcp-badean-hint" style={{
+          fontSize: '12px', color: 'var(--text-2, #6b7280)', margin: '0 0 12px',
+        }}>
+          Note: {badEan13Items.map(i => i.product.name).join(', ')} — stored barcode is 13 digits but fails the
+          EAN-13 check digit, so it will print as CODE128 with the exact same digits (not regenerated).
+        </p>
+      )}
+
       <div className="grid gap-4 bcp-layout-grid">
         {/* ── Left: search + queued items + label size ─────────────────── */}
         <div className="flex flex-col gap-4">
@@ -446,7 +512,12 @@ export default function BarcodePrintPage() {
                   <div key={item.product.id} className="flex items-center gap-2 border rounded-lg px-3 py-2" style={{ borderColor: 'var(--border)' }}>
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-semibold truncate">{item.product.name}</div>
-                      <div className="text-[10px] text-[var(--text-4)] font-mono">{item.product.barcode || item.product.item_code}</div>
+                      <div
+                        className="text-[10px] font-mono"
+                        style={item.product.barcode ? { color: 'var(--text-4)' } : { color: '#b91c1c', fontWeight: 600 }}
+                      >
+                        {item.product.barcode || 'Barcode not assigned'}
+                      </div>
                     </div>
                     <input
                       type="number"
@@ -490,7 +561,7 @@ export default function BarcodePrintPage() {
                   key={`${item.product.id}-${i}`}
                   name={item.product.name}
                   price={item.product.sales_rate}
-                  code={item.product.barcode || item.product.item_code}
+                  code={item.product.barcode || ''}
                   widthMm={widthMm}
                   heightMm={heightMm}
                 />

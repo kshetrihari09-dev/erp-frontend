@@ -1,5 +1,6 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import JsBarcode from 'jsbarcode'
+import { detectBarcodeFormat } from '@/utils/barcodeFormat'
 
 // CSS reference pixel density: 96px per inch, 25.4mm per inch.
 const MM_TO_PX = 96 / 25.4
@@ -53,6 +54,11 @@ export interface BarcodeLabelProps {
  */
 export default function BarcodeLabel({ name, price, code, widthMm, heightMm, className }: BarcodeLabelProps) {
   const svgRef = useRef<SVGSVGElement>(null)
+  // Set only when JsBarcode itself rejects `code` (characters it can't
+  // encode) — surfaced to the label instead of silently leaving a blank
+  // SVG, so a bad stored value is visibly wrong rather than invisibly
+  // blank. Never triggers a different value being drawn.
+  const [renderError, setRenderError] = useState(false)
 
   const heightPx = heightMm * MM_TO_PX
 
@@ -68,20 +74,35 @@ export default function BarcodeLabel({ name, price, code, widthMm, heightMm, cla
   const chromePx = namePx + codePx + pricePx + rulePx * 2 + rowGapPx * 5
   const barsHeightPx = Math.max(10, heightPx - chromePx)
 
+  // `code` here is always `product.barcode`, verbatim — no `|| item_code`
+  // fallback, no padding/truncation, nothing regenerated. The format is
+  // *detected* from that exact string (13 digits + valid EAN-13 check
+  // digit → EAN13, everything else → CODE128); the digits handed to
+  // JsBarcode are never altered based on which format gets picked.
   useEffect(() => {
-    if (!svgRef.current || !code) return
+    if (!svgRef.current) return
+    setRenderError(false)
+    if (!code) {
+      // No barcode stored for this product — leave the SVG blank and let
+      // the "Barcode not assigned" row (rendered below) carry the state.
+      // Never substitute item_code or generate a new code here.
+      svgRef.current.innerHTML = ''
+      return
+    }
     try {
       JsBarcode(svgRef.current, code, {
-        format: 'CODE128',
+        format: detectBarcodeFormat(code),
         displayValue: false, // human-readable code is rendered as its own styled row below
         margin: 0,
         height: barsHeightPx,
         width: heightMm >= 30 ? 1.3 : 1.0,
       })
     } catch {
-      // Empty/invalid code (e.g. mid-search, before a product is picked) —
-      // leave the SVG blank instead of crashing the whole print page.
+      // JsBarcode rejected the stored value outright (e.g. characters
+      // invalid even for CODE128). Surface this rather than silently
+      // drawing a blank/different barcode.
       svgRef.current.innerHTML = ''
+      setRenderError(true)
     }
   }, [code, barsHeightPx, heightMm])
 
@@ -153,13 +174,15 @@ export default function BarcodeLabel({ name, price, code, widthMm, heightMm, cla
       <div
         style={{
           fontSize: `${codePx}px`,
-          fontWeight: 400,
-          letterSpacing: '1px',
+          fontWeight: code ? 400 : 600,
+          fontStyle: code ? 'normal' : 'italic',
+          letterSpacing: code ? '1px' : 'normal',
           lineHeight: 1,
           whiteSpace: 'nowrap',
+          color: code && !renderError ? 'inherit' : '#b91c1c',
         }}
       >
-        {code}
+        {code ? (renderError ? 'Invalid barcode' : code) : 'Barcode not assigned'}
       </div>
 
       {rule}
