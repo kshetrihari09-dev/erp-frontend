@@ -23,7 +23,7 @@ import {
   CalendarDays, CreditCard, User, MapPin, Hash,
   Phone as PhoneIcon, ChevronDown, AlertCircle,
   CheckCircle2, RotateCcw, Save, Plus, UserPlus,
-  ScanLine, Camera,
+  ScanLine, Camera, Pill,
 } from 'lucide-react'
 import { salesAPI, partiesAPI, productsAPI } from '@/services/api'
 import useUIStore from '@/store/uiStore'
@@ -868,21 +868,35 @@ export default function SalesPage() {
                         </svg>
                       </button>
                     </div>
-                    <div className="pmic-psc-wrap">
-                      <ProductSearchCell
-                        value={row.product_id}
-                        products={products}
-                        onChange={p => {
-                          const { amount, cc_amount } = reCalc({ rate: Number(p.sales_rate) })
-                          // batch_no/expiry cleared: they belonged to whatever
-                          // product was previously in this row, if any.
-                          updateRow({ product_id: p.id, product_name: p.name, rate: p.sales_rate, amount, cc_amount, batch_no: '', expiry: '' })
-                        }}
-                        onCreated={p => setProducts(prev => prev.some(x => x.id === p.id) ? prev : [...prev, p])}
-                      />
+                    <div className="pmic-row-with-thumb">
+                      <div className="pmic-thumb" aria-hidden="true"><Pill size={16} /></div>
+                      <div className="pmic-psc-wrap">
+                        <ProductSearchCell
+                          value={row.product_id}
+                          products={products}
+                          onChange={p => {
+                            const { amount, cc_amount } = reCalc({ rate: Number(p.sales_rate) })
+                            // batch_no/expiry cleared: they belonged to whatever
+                            // product was previously in this row, if any.
+                            updateRow({ product_id: p.id, product_name: p.name, rate: p.sales_rate, amount, cc_amount, batch_no: '', expiry: '' })
+                          }}
+                          onCreated={p => setProducts(prev => prev.some(x => x.id === p.id) ? prev : [...prev, p])}
+                        />
+                      </div>
                     </div>
+                    {/* Read-only summary of the batch/expiry the expandable
+                        panel below already holds — nothing here is a new
+                        value or a second source of truth, it's just always
+                        showing what row.batch_no/row.expiry already are. */}
+                    {(row.batch_no || row.expiry) && (
+                      <div className="pmic-batch-summary">
+                        {row.batch_no && <span>Batch: {row.batch_no}</span>}
+                        {row.batch_no && row.expiry && <span className="pmic-batch-dot">·</span>}
+                        {row.expiry && <span className="pmic-batch-expiry">Exp: {row.expiry}</span>}
+                      </div>
+                    )}
 
-                    {/* ── Row 2: Qty · Rate · Bonus ── */}
+                    {/* ── Row 2: Qty · Rate · Amount ── */}
                     <div className="pmic-fields-3">
                       <div className="pmic-field">
                         <label>Qty</label>
@@ -905,23 +919,9 @@ export default function SalesPage() {
                         />
                       </div>
                       <div className="pmic-field">
-                        <label>Bonus</label>
-                        <input
-                          type="number" inputMode="numeric" min={0} step="1"
-                          value={row.bonus === 0 ? '' : row.bonus}
-                          placeholder="0"
-                          onChange={e => {
-                            const bonus = e.target.value === '' ? 0 : Number(e.target.value)
-                            updateRow({ bonus, ...reCalc({ bonus }) })
-                          }}
-                        />
+                        <label>Amount</label>
+                        <div className="pmic-amount-readout">{fmt(row.amount)}</div>
                       </div>
-                    </div>
-
-                    {/* ── Amount bar ── */}
-                    <div className="pmic-amount-bar">
-                      <span className="pmic-amount-label">Amount</span>
-                      <span className="pmic-amount-value">{fmt(row.amount)}</span>
                     </div>
 
                     {/* ── Expand toggle ── */}
@@ -930,12 +930,12 @@ export default function SalesPage() {
                         size={13}
                         style={{ transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform .2s' }}
                       />
-                      {expanded ? 'Hide' : 'Show'} Batch · Expiry · C.C %
+                      {expanded ? 'Hide' : 'Show'} Batch · Expiry · C.C % · Bonus
                     </button>
 
-                    {/* ── Expanded: Batch · Expiry · C.C% ── */}
+                    {/* ── Expanded: Batch · Expiry · C.C% · Bonus ── */}
                     {expanded && (
-                      <div className="pmic-fields-3 pmic-extra">
+                      <div className="pmic-fields-3 pmic-extra" style={{ gridTemplateColumns: '1fr 1fr' }}>
                         <div className="pmic-field">
                           <label>Batch</label>
                           <BatchSelect
@@ -966,6 +966,18 @@ export default function SalesPage() {
                             onChange={e => {
                               const cc_pct = e.target.value === '' ? 0 : Number(e.target.value)
                               updateRow({ cc_pct, ...reCalc({ cc_pct }) })
+                            }}
+                          />
+                        </div>
+                        <div className="pmic-field">
+                          <label>Bonus</label>
+                          <input
+                            type="number" inputMode="numeric" min={0} step="1"
+                            value={row.bonus === 0 ? '' : row.bonus}
+                            placeholder="0"
+                            onChange={e => {
+                              const bonus = e.target.value === '' ? 0 : Number(e.target.value)
+                              updateRow({ bonus, ...reCalc({ bonus }) })
                             }}
                           />
                         </div>

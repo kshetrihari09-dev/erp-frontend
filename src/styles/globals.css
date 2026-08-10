@@ -3647,6 +3647,29 @@ bsp-row--disabled { cursor: not-allowed; opacity: .55; }
 /* PSC wrapper — ensures dropdown has something to anchor to */
 .pos-theme .pmic-psc-wrap {
   position: relative;
+  flex:     1;
+  min-width: 0;
+}
+
+/* Decorative product "thumbnail" chip (Sales page mobile cards) — no
+   image data anywhere, just a generic icon so the row has the same
+   visual anchor point the mockup's product photo does. */
+.pos-theme .pmic-row-with-thumb {
+  display:     flex;
+  align-items: center;
+  gap:         10px;
+}
+.pos-theme .pmic-thumb {
+  flex-shrink:     0;
+  width:           40px;
+  height:          40px;
+  border-radius:   10px;
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  background:      var(--pdt-overlay-06, var(--surface-3));
+  border:          1px solid var(--pdt-border, var(--border));
+  color:           var(--pdt-text-3, var(--text-3));
 }
 
 /* 3-column field grid: Qty / Rate / Bonus  and  Batch / Expiry / CC% */
@@ -3763,6 +3786,43 @@ bsp-row--disabled { cursor: not-allowed; opacity: .55; }
   font-family: var(--font-mono, monospace);
   letter-spacing: -.3px;
 }
+
+/* Inline Amount readout — used inside .pmic-fields-3 next to Qty/Rate
+   (Sales page) so the primary row reads Qty · Rate · Amount, matching
+   the mockup. Not an <input> — same read-only value pmic-amount-value
+   showed, just laid out like the other two fields in the row instead of
+   its own separate full-width bar (.pmic-amount-bar/-label/-value above
+   are left in place — Purchase page's cards still use that layout as-is). */
+.pos-theme .pmic-field .pmic-amount-readout {
+  height:        44px;
+  display:       flex;
+  align-items:   center;
+  padding:       0 12px;
+  border-radius: 10px;
+  background:    var(--pdt-overlay-04, var(--surface-2));
+  border:        1px solid var(--pdt-border, var(--border));
+  font-size:     15px;
+  font-weight:   800;
+  color:         var(--pdt-accent, var(--brand));
+  font-family:   var(--font-mono, monospace);
+}
+
+/* Always-visible Batch/Expiry summary line under the product name, once
+   both are set — purely a read-only display of row.batch_no/row.expiry,
+   which the expandable Batch/Expiry/C.C%/Bonus panel below still owns as
+   the single place to actually change them. */
+.pos-theme .pmic-batch-summary {
+  display:      flex;
+  align-items:  center;
+  gap:          6px;
+  padding:      0 2px 8px;
+  margin-top:   -4px;
+  font-size:    12px;
+  font-weight:  600;
+  color:        var(--pdt-text-3, var(--text-3));
+}
+.pos-theme .pmic-batch-expiry { color: #16a34a; }
+.pos-theme .pmic-batch-dot { color: var(--pdt-text-4, var(--text-4)); }
 
 /* Expand / collapse toggle */
 .pos-theme .pmic-toggle {
