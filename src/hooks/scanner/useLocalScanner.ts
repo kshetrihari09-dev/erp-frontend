@@ -169,6 +169,11 @@ interface Options {
   context:  'sales' | 'purchase'
   onResult: (result: ScanResult) => void
   active:   boolean   // whether the scanner view is currently open
+  // Which mode the camera opens into. Purely a starting point — the
+  // in-modal Barcode/OCR toggle (setMode, below) still works exactly as
+  // before either way. Defaults to 'barcode' (unchanged prior behavior)
+  // so existing callers that don't pass this see no change at all.
+  initialMode?: 'barcode' | 'ocr'
 }
 
 const INITIAL_STATE: LocalScannerState = {
@@ -180,7 +185,7 @@ const INITIAL_STATE: LocalScannerState = {
   zoomSupported: true, zoomMin: 1, zoomMax: 3, zoomStep: 0.1, zoom: 1,
 }
 
-export default function useLocalScanner({ onResult, active }: Options) {
+export default function useLocalScanner({ onResult, active, initialMode = 'barcode' }: Options) {
   const [state, setState] = useState<LocalScannerState>(INITIAL_STATE)
 
   const engine = useBarcodeEngine()
@@ -930,8 +935,16 @@ export default function useLocalScanner({ onResult, active }: Options) {
     async function init() {
       const ok = await engine.openCamera('environment')
       if (cancelled || !mountedRef.current || !ok) return
-      setState(s => ({ ...s, status: 'scanning', mode: 'barcode' }))
-      startBarcodeLoop()
+      // NOTE: intentionally does NOT touch manualModeRef — that ref means
+      // "the user explicitly locked the mode via the in-modal toggle" and
+      // gates handleBarcodeDetected's existing auto-fallback-to-OCR (see
+      // above). initialMode is just a starting point, not a lock, so a
+      // barcode-first open still falls through to OCR on a miss exactly
+      // as before, and an OCR-first open doesn't change barcode behavior
+      // at all.
+      setState(s => ({ ...s, status: 'scanning', mode: initialMode }))
+      if (initialMode === 'ocr') startOcrLoop()
+      else startBarcodeLoop()
     }
     init()
 

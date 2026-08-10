@@ -3709,6 +3709,36 @@ bsp-row--disabled { cursor: not-allowed; opacity: .55; }
 }
 .pos-theme .pmic-field input[type="number"] { -moz-appearance: textfield; }
 
+/* Qty stepper — −/+ buttons flanking the same QtyGate input used
+   elsewhere (see QtyStepper.tsx). Both buttons call the exact same
+   onChange as typing a value, so this is purely a visual wrapper. */
+.pos-theme .qty-stepper {
+  display:     flex;
+  align-items: center;
+  gap:         4px;
+}
+.pos-theme .qty-stepper-btn {
+  flex-shrink:   0;
+  width:         32px;
+  height:        44px;
+  min-width:     32px;
+  border-radius: 8px;
+  border:        1.5px solid var(--pdt-border-2, var(--border));
+  background:    var(--pdt-overlay-04, var(--surface));
+  color:         var(--pdt-text, var(--text));
+  display:       flex;
+  align-items:   center;
+  justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+}
+.pos-theme .qty-stepper-btn:disabled { opacity: .4; cursor: not-allowed; }
+.pos-theme .qty-stepper-btn:active:not(:disabled) { background: var(--pdt-overlay-06, var(--surface-2)); }
+.pos-theme .qty-stepper .qty-stepper-input {
+  flex:      1;
+  min-width: 0;
+  padding:   0 2px;
+}
+
 /* Amount bar — spans full width between label and value */
 .pos-theme .pmic-amount-bar {
   display:         flex;
@@ -6118,7 +6148,11 @@ canvas{
   to { transform: rotate(360deg); }
 }
 @media (max-width: 768px) {
-  .bsi-root { flex: 1 1 140px; min-width: 0; width: auto; }
+  /* Full-width row of its own (like the mockup's search bar), with the
+     two scan buttons wrapping onto the row below via .pos-invoice-actions'
+     existing flex-wrap. */
+  .bsi-root { flex: 1 1 100%; min-width: 0; width: 100%; }
+  .bsi-input { height: 46px; border-radius: 12px; font-size: 14px; }
 }
 
 /* Invoice Items header (title + barcode field + Scan Medicine button +
@@ -6141,4 +6175,52 @@ canvas{
     flex-wrap: wrap;
   }
 }
+
+/* ── Mobile "Scan Barcode" / "Scan Medicine" pair ─────────────────────────
+   Two dedicated, full-width, single-tap buttons that each open the exact
+   same camera scanner as the desktop's single combined button, just
+   pre-selecting which mode it starts in (see ScanButton's initialMode
+   prop / useLocalScanner's Options.initialMode) — no scanning logic is
+   duplicated, only the entry point. The original single button stays
+   exactly as it was, just now desktop-only. */
+.pos-scan-single-desktop { display: inline-flex; }
+@media (max-width: 768px) {
+  .pos-scan-single-desktop { display: none !important; }
+}
+.pos-scan-row {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+.pos-scan-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 44px;
+  padding: 0 10px;
+  border-radius: 10px;
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  font-size: 13px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  white-space: nowrap;
+  transition: background .12s, border-color .12s;
+  -webkit-tap-highlight-color: transparent;
+}
+.pos-scan-btn-barcode {
+  color: var(--brand);
+  border-color: rgba(37,99,235,.35);
+  background: var(--brand-light);
+}
+.pos-scan-btn-medicine {
+  color: #9333ea;
+  border-color: rgba(147,51,234,.35);
+  background: rgba(147,51,234,.07);
+}
+.dark .pos-scan-btn-medicine { background: rgba(147,51,234,.12); }
+.pos-scan-btn-active { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px currentColor; }
+.pos-scan-btn:active { transform: scale(0.98); }
 

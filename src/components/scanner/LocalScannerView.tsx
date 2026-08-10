@@ -53,13 +53,17 @@ interface Props {
   onResult:           (result: ScanResult) => void
   onClose:            () => void
   onUseAnotherDevice: () => void
+  // Starting camera mode — see useLocalScanner's Options.initialMode.
+  // Defaults to 'barcode', matching prior behavior exactly for any
+  // existing caller that doesn't pass this.
+  initialMode?:       'barcode' | 'ocr'
 }
 
 function vibrate(pattern: number | number[]) {
   try { navigator.vibrate?.(pattern) } catch {}
 }
 
-export default function LocalScannerView({ open, context, onResult, onClose, onUseAnotherDevice }: Props) {
+export default function LocalScannerView({ open, context, onResult, onClose, onUseAnotherDevice, initialMode }: Props) {
   const galleryInputRef = useRef<HTMLInputElement>(null)
   const vibratedRef      = useRef(false)
 
@@ -84,7 +88,7 @@ export default function LocalScannerView({ open, context, onResult, onClose, onU
   const {
     state, videoRef, containerRef, toggleFlash, switchCamera, setMode, setZoom, setOcrRatio,
     selectProduct, rescan, retryPermission, scanImageFile,
-  } = useLocalScanner({ context, onResult: handleResult, active: open })
+  } = useLocalScanner({ context, onResult: handleResult, active: open, initialMode })
 
   useEffect(() => { rescanRef.current = rescan }, [rescan])
 
