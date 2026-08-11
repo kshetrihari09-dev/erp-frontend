@@ -5160,72 +5160,28 @@ bsp-row--disabled { cursor: not-allowed; opacity: .55; }
 
 
 /* ══════════════════════════════════════════════════════════════════════════════
-   ACCOUNTING PAGE — RESPONSIVE
-   Scoped with the .acc- prefix / .acc-page ancestor. This is the single
-   source of truth for Accounting responsive styling (no duplicate rules in
-   AccountingPage.tsx). Desktop (>1024px) layout, business logic, data, and
-   calculations are untouched — every rule below only changes at the
-   breakpoints listed.
-   Breakpoints covered: 320 / 360 / 375 / 390 / 412 / 430 / 480 / 560 / 640 /
-   767 / 768–1024.
+   ACCOUNTING PAGE — MOBILE & TABLET RESPONSIVENESS
+   Scoped with the .acc- prefix / .acc-page ancestor. All rules are additive
+   and override inline styles only via !important at the breakpoints below —
+   desktop (>1024px) layout, business logic, data, and calculations are
+   completely untouched.
+   Breakpoints covered: 320 / 360 / 375 / 390 / 414 / 480 / 640 / 768 / 820 /
+   912 / 1024.
 ══════════════════════════════════════════════════════════════════════════════ */
 
-/* ── Root cause of page-wide horizontal overflow ──────────────────────────────
-   .page-content is `flex: 1` inside the flex `.app-layout` shell. Flex items
-   default to `min-width: auto`, which means they refuse to shrink below the
-   intrinsic width of their content (e.g. a wide table or the tab bar) even
-   though inner elements use overflow-x:auto to scroll themselves. Scoping
-   min-width:0 to the Accounting page (rather than a blanket `* { min-width:0 }`)
-   lets .page-content shrink to the viewport while leaving every other page's
-   flex behavior untouched. Container sizing pattern (width/max-width/min-width/
-   box-sizing) is then applied down the tree to the elements that actually hold
-   scrollable/animated content. */
-.page-content:has(.acc-page) { min-width: 0; }
-
-.acc-page {
-  width: 100%;
-  max-width: 100%;
-  min-width: 0;
-  box-sizing: border-box;
-}
-.acc-card,
-.acc-tab-content,
-.acc-tab-anim {
-  width: 100%;
-  max-width: 100%;
-  min-width: 0;
-  box-sizing: border-box;
-}
-.acc-tabbar {
-  width: 100%;
-  max-width: 100%;
-  min-width: 0;
-  box-sizing: border-box;
-  -webkit-overflow-scrolling: touch;
-  scroll-behavior: smooth;
-  overscroll-behavior-x: contain;
-}
-/* The tab bar's own inner row is intentionally wider than the viewport
-   (min-width:max-content) so all 8 tabs stay on one scrollable line — but it
-   must never be allowed to stretch .acc-tabbar/.acc-card/.acc-page with it. */
-.acc-tabbar > div { flex-shrink: 0; }
-
 /* ── KPI grid (top of Accounting page): 4 → 2 → 1 ─────────────────────────── */
-.acc-kpi-grid, .acc-tb-kpi-grid { min-width: 0; }
-.acc-kpi-grid > *, .acc-tb-kpi-grid > * { min-width: 0; }
 @media (max-width: 1024px) {
   .acc-kpi-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 12px !important; }
-  .acc-tb-kpi-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important; }
 }
 @media (max-width: 560px) {
   .acc-kpi-grid { grid-template-columns: 1fr !important; gap: 10px !important; margin-bottom: 14px !important; }
 }
 @media (max-width: 480px) {
   .acc-kpi-card { padding: 14px 16px !important; }
-  .acc-tb-kpi-grid { grid-template-columns: 1fr !important; gap: 8px !important; }
 }
 
-/* ── Tab bar: tap-friendly buttons, never affect parent card width ───────── */
+/* ── Tab bar: keep horizontally scrollable, tap-friendly buttons ─────────── */
+.acc-tabbar { -webkit-overflow-scrolling: touch; }
 @media (max-width: 768px) {
   .acc-tab-btn { min-height: 44px !important; padding: 11px 14px !important; font-size: 12px !important; }
 }
@@ -5270,8 +5226,8 @@ bsp-row--disabled { cursor: not-allowed; opacity: .55; }
   .acc-page .erp-input { width: 100% !important; min-height: 44px !important; box-sizing: border-box; }
   /* Dialogs (Modal component) render via a Portal to document.body, so they're
      no longer nested under .acc-page — matched generically here instead so
-     voucher/receipt/payment/account (and every other) modal keeps the same
-     touch-target sizing on mobile regardless of which page opened it. */
+     voucher/receipt/payment (and every other) modal keeps the same touch-target
+     sizing on mobile regardless of which page opened it. */
   [role="dialog"] .erp-input { width: 100% !important; min-height: 44px !important; box-sizing: border-box; }
 }
 
@@ -5279,20 +5235,6 @@ bsp-row--disabled { cursor: not-allowed; opacity: .55; }
 @media (max-width: 767px) {
   .acc-page .h-7, .acc-page .h-8 { min-height: 40px !important; height: auto !important; padding-top: 6px !important; padding-bottom: 6px !important; }
   .acc-page .page-btn { min-width: 36px !important; min-height: 36px !important; }
-}
-
-/* ── New Account modal: Cancel/Create Account actions ─────────────────────── */
-.acc-form-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 20px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border);
-}
-@media (max-width: 480px) {
-  .acc-form-actions { flex-direction: column; }
-  .acc-form-actions button { width: 100%; min-height: 44px; }
 }
 
 /* ── Trial Balance: filter card (date range / type / actions) ────────────── */
@@ -5309,6 +5251,15 @@ bsp-row--disabled { cursor: not-allowed; opacity: .55; }
   .acc-tb-filter-actions { grid-column: span 2; }
 }
 
+/* ── Trial Balance: KPI summary cards: 4 → 2 → 1 ──────────────────────────── */
+@media (max-width: 1024px) {
+  .acc-tb-kpi-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important; }
+  .acc-tb-kpi-grid > div { padding: 14px 16px !important; }
+}
+@media (max-width: 480px) {
+  .acc-tb-kpi-grid { grid-template-columns: 1fr !important; gap: 8px !important; }
+}
+
 /* ── Trial Balance: table toolbar (search + view controls) ───────────────── */
 @media (max-width: 640px) {
   .acc-tb-toolbar { flex-direction: column !important; align-items: stretch !important; }
@@ -5316,6 +5267,10 @@ bsp-row--disabled { cursor: not-allowed; opacity: .55; }
   .acc-tb-search-wrap input { width: 100% !important; min-height: 44px !important; box-sizing: border-box; }
   .acc-tb-toolbar-actions { width: 100% !important; justify-content: flex-start !important; }
 }
+
+/* ── Prevent any residual horizontal page overflow inside the Accounting page */
+.acc-page { max-width: 100%; overflow-x: hidden; }
+.acc-page .acc-tab-content { max-width: 100%; }
 
 /* ══════════════════════════════════════════════════════════════════════════════
    SETTINGS PAGE — MOBILE & TABLET RESPONSIVENESS
@@ -5598,7 +5553,7 @@ bsp-row--disabled { cursor: not-allowed; opacity: .55; }
 
 /* ══════════════════════════════════════════════════════════════════════════════
    ACCOUNTING — MOBILE TABLE → CARD TOGGLE + CARD ANATOMY
-   Breakpoint: 767px (matches the "ACCOUNTING PAGE — RESPONSIVE" section above).
+   Breakpoint: 767px (matches AccountingPage.tsx inline <style>).
    Tablet 768-1024px: table stays with h-scroll + compact cells.
 ══════════════════════════════════════════════════════════════════════════════ */
 
@@ -5758,75 +5713,90 @@ bsp-row--disabled { cursor: not-allowed; opacity: .55; }
 .dark .acc-mobile-card        { background: var(--surface);   border-color: var(--border); }
 .dark .acc-mobile-card:active { background: var(--surface-2); }
 
-/* ── Account card fields (AccountsTab mobile list) ────────────────────────
-   Code: compact, single line. Name: majority of the width, wraps safely
-   (never truncated — long names must never create overflow, but shouldn't
-   be hidden either). Balance: its own row so it's always fully readable.
-   Badges + sub-type: wrap naturally in a footer row. */
-.acc-acct-card { gap: 8px; }
-.acc-acct-head {
-  display:     flex;
-  align-items: baseline;
-  gap:         8px;
-  min-width:   0;
-}
-.acc-acct-code {
-  font-family: var(--font-mono, monospace);
-  font-size:   12px;
-  font-weight: 700;
-  color:       var(--brand);
-  flex-shrink: 0;
-  max-width:   34%;
-  overflow:    hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.acc-acct-name {
-  font-size:      13.5px;
-  font-weight:    600;
-  color:          var(--text);
-  flex:           1 1 auto;
-  min-width:      0;
-  overflow-wrap:  anywhere;
-}
-.acc-acct-balance-row { display: flex; justify-content: flex-end; }
-.acc-acct-balance {
-  font-family:   var(--font-mono, monospace);
-  font-size:     15px;
-  font-weight:   800;
-  color:         var(--text);
-  overflow-wrap: anywhere;
-  text-align:    right;
-}
-.acc-acct-foot {
-  display:         flex;
-  align-items:     center;
-  justify-content: space-between;
-  flex-wrap:       wrap;
-  gap:             6px;
-  padding-top:     6px;
-  border-top:      1px solid var(--border);
-}
-.acc-acct-subtype {
-  font-size:     11px;
-  color:         var(--text-3);
-  max-width:     100%;
-  overflow-wrap: anywhere;
+/* ===========================
+   ACCOUNTING RESPONSIVE FIX
+=========================== */
+
+*{
+    min-width:0;
 }
 
-.table-card {
-  width: 100%;
-  max-width: 100%;
-  min-width: 0;
-  overflow: hidden;
-  box-sizing: border-box;
-}
-.table-card .overflow-x-auto {
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  scroll-behavior: smooth;
+.acc-page,
+.acc-content,
+.acc-tab-content{
+    width:100%;
+    max-width:100%;
+    overflow-x:hidden;
 }
 
+
+.acc-filter-select,
+.acc-filter-field,
+.acc-filter-input{
+    width:100%;
+}
+
+.table-card{
+    width:100%;
+    overflow:hidden;
+}
+
+.table-card .overflow-x-auto{
+    overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
+}
+
+.erp-table{
+    min-width:900px;
+}
+
+.acc-kpi-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+    gap:16px;
+}
+
+img,
+svg,
+canvas{
+    max-width:100%;
+}
+
+@media (max-width:768px){
+
+.page-content{
+    padding:12px;
+}
+
+.form-grid{
+    grid-template-columns:1fr;
+}
+
+.form-grid.col3{
+    grid-template-columns:1fr;
+}
+
+.form-grid .span2{
+    grid-column:auto;
+}
+
+.acc-filter-row{
+    flex-direction:column;
+    align-items:stretch;
+}
+
+.acc-filter-row>*{
+    width:100%;
+}
+
+.acc-kpi-grid{
+    grid-template-columns:1fr;
+}
+
+.erp-table{
+    min-width:700px;
+}
+}
 .page-loader {
   position: fixed;
   inset: 0;
