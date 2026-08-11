@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import QRCode from 'qrcode'
 
 // CSS reference pixel density: 96px per inch, 25.4mm per inch.
@@ -7,6 +7,11 @@ const MM_TO_PX = 96 / 25.4
 export interface QRCodeLabelProps {
   name: string
   price: number | string
+  /** MUST be exactly `product.barcode`, verbatim — no JSON, no product
+   *  id, no account id, no prefix/suffix, nothing else appended. Pass
+   *  `''` (not a fallback identifier) when the product has no barcode;
+   *  the label then shows "Barcode not assigned" instead of drawing a
+   *  QR for a different identifier. See utils/productQr.ts. */
   code: string
   widthMm: number
   heightMm: number
@@ -28,6 +33,7 @@ export interface QRCodeLabelProps {
  */
 export default function QRCodeLabel({ name, price, code, widthMm, heightMm, className }: QRCodeLabelProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [renderError, setRenderError] = useState(false)
 
   const heightPx = heightMm * MM_TO_PX
   const widthPx  = widthMm * MM_TO_PX
@@ -42,8 +48,18 @@ export default function QRCodeLabel({ name, price, code, widthMm, heightMm, clas
   const qrBudgetPx = Math.max(14, Math.min(heightPx - namePx - pricePx - gapsPx, widthPx * 0.9))
 
   useEffect(() => {
-    if (!canvasRef.current || !code) return
+    if (!canvasRef.current) return
     const canvas = canvasRef.current
+    setRenderError(false)
+    if (!code) {
+      // No barcode stored for this product — leave the canvas blank and
+      // let the "Barcode not assigned" row (rendered below) carry the
+      // state. Never encode item_code, product id, or anything else in
+      // its place — that would just be a different silent substitution.
+      const ctx = canvas.getContext('2d')
+      if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height)
+      return
+    }
     // Render at 4x the display size so it stays crisp when scaled up for
     // print / PDF export (matches the >1x density BarcodeLabel gets for
     // free from its SVG's vector bars).
@@ -58,6 +74,9 @@ export default function QRCodeLabel({ name, price, code, widthMm, heightMm, clas
     // display budget — the oversized buffer stays for crispness, only
     // the on-screen size changes.
     const renderPx = Math.round(qrBudgetPx * 4)
+    // `code` is encoded exactly as given — always `product.barcode`
+    // verbatim, never JSON/prefixed/combined with any other field. A QR
+    // scan of this label must decode to exactly this string.
     QRCode.toCanvas(canvas, code, {
       width: renderPx,
       margin: 0,
@@ -67,10 +86,11 @@ export default function QRCodeLabel({ name, price, code, widthMm, heightMm, clas
       canvas.style.width = `${qrBudgetPx}px`
       canvas.style.height = `${qrBudgetPx}px`
     }).catch(() => {
-      // Empty/invalid code (e.g. mid-search, before a product is picked) —
-      // leave the canvas blank instead of crashing the whole print page.
+      // QRCode rejected the value outright — surface it rather than
+      // silently leaving a blank/different code.
       const ctx = canvas.getContext('2d')
       if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height)
+      setRenderError(true)
     })
   }, [code, qrBudgetPx])
 
@@ -112,13 +132,34 @@ export default function QRCodeLabel({ name, price, code, widthMm, heightMm, clas
       <canvas
         ref={canvasRef}
         style={{
-          display: 'block',
+          display: code && !renderError ? 'block' : 'none',
           width: `${qrBudgetPx}px`,
           height: `${qrBudgetPx}px`,
           maxWidth: '100%',
           maxHeight: `${qrBudgetPx}px`,
         }}
       />
+      {(!code || renderError) && (
+        <div
+          style={{
+            width: `${qrBudgetPx}px`,
+            height: `${qrBudgetPx}px`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            textAlign: 'center',
+            border: '1px dashed #b91c1c',
+            boxSizing: 'border-box',
+            padding: '2px',
+            fontSize: Math.max(6, Math.min(9, qrBudgetPx * 0.12)),
+            fontWeight: 600,
+            color: '#b91c1c',
+            lineHeight: 1.15,
+          }}
+        >
+          {!code ? 'Barcode not assigned' : 'Invalid barcode'}
+        </div>
+      )}
       <div style={{ fontSize: `${pricePx}px`, fontWeight: 700, lineHeight: 1.1 }}>
         Rs. {price}
       </div>

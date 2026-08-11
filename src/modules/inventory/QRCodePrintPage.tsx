@@ -1,13 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useSearchParams } from 'react-router-dom'
-import { Printer, Download, Search, X, Loader2, Package, QrCode } from 'lucide-react'
+import { Printer, Download, Search, X, Loader2, Package, QrCode, AlertTriangle } from 'lucide-react'
 import { productsAPI } from '@/services/api'
 import type { Product } from '@/types'
 import { Button, Empty } from '@/components/ui'
 import QRCodeLabel from '@/components/barcode/QRCodeLabel'
-import useAuthStore from '@/store/authStore'
-import { buildProductQrPayload } from '@/utils/productQr'
 
 /* ── Label sizes ──────────────────────────────────────────────────────────
  * Same presets as BarcodePrintPage — common thermal/inkjet label stock
@@ -35,11 +33,6 @@ interface LabelItem {
 
 export default function QRCodePrintPage() {
   const [searchParams] = useSearchParams()
-  // Whichever account is currently logged in — this is what gets baked
-  // into every generated QR's `accountId`, so the scanner can tell a QR
-  // printed here apart from one printed under a different account. See
-  // utils/productQr.ts for the full payload shape and rationale.
-  const accountId = useAuthStore(s => s.company?.id)
 
   const [query, setQuery]     = useState('')
   const [results, setResults] = useState<Product[]>([])
@@ -52,6 +45,32 @@ export default function QRCodePrintPage() {
 
   const sheetRef = useRef<HTMLDivElement>(null)
   const [pdfBusy, setPdfBusy] = useState(false)
+
+  // ── Pre-print validation ─────────────────────────────────────────────
+  // The QR content is exactly `product.barcode`, verbatim — no fallback
+  // to item_code or any other identifier (see utils/productQr.ts /
+  // QRCodeLabel.tsx). A product with no barcode assigned genuinely has
+  // nothing to encode, so it's surfaced here and blocks printing rather
+  // than a QR silently going out encoding something else.
+  const missingBarcodeItems = useMemo(
+    () => items.filter(i => !i.product.barcode || !i.product.barcode.trim()),
+    [items]
+  )
+
+  /** Returns true if printing/exporting may proceed. When it can't, it
+   *  names the specific product(s) blocking it rather than silently
+   *  encoding a different identifier for them. */
+  function assertPrintable(): boolean {
+    if (missingBarcodeItems.length > 0) {
+      const names = missingBarcodeItems.map(i => i.product.name).join(', ')
+      window.alert(
+        `Cannot print — the following product(s) have no barcode assigned: ${names}. ` +
+        `Assign a barcode on the product page first, or remove them from this queue.`
+      )
+      return false
+    }
+    return true
+  }
 
   // ── Dropdown position — portaled to document.body ───────────────────────
   // Same ancestor-clipping fix as BarcodePrintPage/ProductSearchCell: the
@@ -177,6 +196,7 @@ export default function QRCodePrintPage() {
   function printSheet() {
     const el = sheetRef.current
     if (!el || totalLabels === 0) return
+    if (!assertPrintable()) return
 
     const canvases = Array.from(el.querySelectorAll('canvas'))
     const dataUrls = canvases.map(c => c.toDataURL('image/png'))
@@ -315,6 +335,7 @@ export default function QRCodePrintPage() {
   async function downloadPdf() {
     const el = sheetRef.current
     if (!el || totalLabels === 0) return
+    if (!assertPrintable()) return
     setPdfBusy(true)
     const prevDisplay = el.style.display
     const prevWrap    = el.style.flexWrap
@@ -394,6 +415,22 @@ export default function QRCodePrintPage() {
           </Button>
         </div>
       </div>
+
+      {missingBarcodeItems.length > 0 && (
+        <p className="qrp-missing-hint" style={{
+          display: 'flex', alignItems: 'flex-start', gap: 6,
+          fontSize: '12px', color: '#b91c1c', margin: '4px 0 12px',
+          background: 'rgba(185,28,28,0.08)', border: '1px solid rgba(185,28,28,0.25)',
+          borderRadius: 8, padding: '8px 10px',
+        }}>
+          <AlertTriangle size={14} style={{ flexShrink: 0, marginTop: 1 }} />
+          <span>
+            <strong>No barcode assigned</strong> for: {missingBarcodeItems.map(i => i.product.name).join(', ')}.
+            A QR code needs a barcode value to encode — printing is blocked for these until a barcode is
+            assigned on the product page.
+          </span>
+        </p>
+      )}
 
       <div className="grid gap-4 qrp-layout-grid">
         {/* ── Left: search + queued items + label size ─────────────────── */}
@@ -485,7 +522,12 @@ export default function QRCodePrintPage() {
                   <div key={item.product.id} className="flex items-center gap-2 border rounded-lg px-3 py-2" style={{ borderColor: 'var(--border)' }}>
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-semibold truncate">{item.product.name}</div>
-                      <div className="text-[10px] text-[var(--text-4)] font-mono">{item.product.barcode || item.product.item_code}</div>
+                      <div
+                        className="text-[10px] font-mono"
+                        style={item.product.barcode ? { color: 'var(--text-4)' } : { color: '#b91c1c', fontWeight: 600 }}
+                      >
+                        {item.product.barcode || 'Barcode not assigned'}
+                      </div>
                     </div>
                     <input
                       type="number"
@@ -529,7 +571,7 @@ export default function QRCodePrintPage() {
                   key={`${item.product.id}-${i}`}
                   name={item.product.name}
                   price={item.product.sales_rate}
-                  code={accountId ? buildProductQrPayload(item.product, accountId) : (item.product.barcode || item.product.item_code)}
+                  code={item.product.barcode || ''}
                   widthMm={widthMm}
                   heightMm={heightMm}
                 />

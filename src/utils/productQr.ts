@@ -1,29 +1,30 @@
 /**
  * productQr.ts
  *
- * Single source of truth for the structured payload encoded into a
- * product's QR code — see QRCodePrintPage.tsx (generation) and the
- * backend's GET /scanner/products/barcode/:code (scanning).
+ * QR content contract for products — see QRCodePrintPage.tsx (generation)
+ * and the backend's GET /scanner/products/barcode/:code (scanning).
  *
- * ── Why this exists ──────────────────────────────────────────────────────
- * This app is multi-tenant: every account (company) has its own
- * completely independent product master. A product's `item_code` /
- * `barcode` is only ever unique *within* its own account — two different
- * accounts can (and routinely do) both have a product coded "MD-1" for
- * two completely unrelated medicines. Encoding just that code into a QR
- * meant scanning Account A's QR while logged into Account B could return
- * Account B's unrelated "MD-1" product instead of an error.
+ * ── Current contract ─────────────────────────────────────────────────────
+ * A product's QR code encodes EXACTLY `product.barcode`, verbatim — no
+ * JSON, no accountId, no productId, no prefix/suffix, nothing else. A QR
+ * scan and a linear-barcode scan of the same product must decode to the
+ * identical string and resolve through the identical exact-match lookup;
+ * see QRCodeLabel.tsx / BarcodeLabel.tsx and useLocalScanner.ts.
  *
- * The fix: the QR payload now carries *which account* it was generated
- * for (`accountId`) and the product's own globally-unique database id
- * (`productId`), not just the account-local code. The scanner checks
- * `accountId` against whoever is currently logged in BEFORE it ever
- * searches for a product — see scannerRoutes.js.
+ * ── Legacy structured payload (read-only, decode-side only) ─────────────
+ * QR labels printed before this contract encoded a JSON payload instead
+ * — `{ v, accountId, productId, medicineCode }` — specifically to guard
+ * against two different multi-tenant accounts coincidentally sharing the
+ * same medicine code (Account A's "MD-1" resolving to Account B's
+ * unrelated product when scanned under Account B). That collision risk
+ * doesn't apply to a real barcode value the same way a short internal
+ * code does, and the current contract requires plain-text QR content, so
+ * NEW QRs no longer build this payload.
  *
- * `medicineCode` is kept as a fallback field only — used if `productId`
- * doesn't resolve to a live row (e.g. an old QR reprinted from a payload
- * that predates this field, or the exact product was later deleted) —
- * and even then only ever searched within the already-verified account.
+ * `parseProductQrPayload` is kept only so old, already-printed labels in
+ * the field keep decoding correctly (see scannerRoutes.js's legacy
+ * branch) until they're reprinted — it is never used by QR generation
+ * anymore.
  */
 
 export const PRODUCT_QR_VERSION = 1
@@ -35,25 +36,11 @@ export interface ProductQrPayload {
   medicineCode?: string
 }
 
-/** Builds the JSON string to encode into a product's QR code. */
-export function buildProductQrPayload(
-  product: { id: string; barcode?: string | null; item_code?: string | null },
-  accountId: string | number
-): string {
-  const payload: ProductQrPayload = {
-    v: PRODUCT_QR_VERSION,
-    accountId,
-    productId: product.id,
-    medicineCode: product.barcode || product.item_code || undefined,
-  }
-  return JSON.stringify(payload)
-}
-
 /**
- * Best-effort decode, for any UI that wants to show/preview what a QR
- * encodes without round-tripping to the server (e.g. a debug view).
- * Returns null for legacy plain-string codes — those aren't malformed,
- * they're just the old format, so this deliberately doesn't throw.
+ * Best-effort decode of a LEGACY structured QR payload, for any UI that
+ * wants to recognize/preview an old-format code (e.g. a debug view).
+ * Returns null for the current plain-barcode-string format — that isn't
+ * malformed, it's simply not this legacy shape.
  */
 export function parseProductQrPayload(raw: string): ProductQrPayload | null {
   const trimmed = raw.trim()

@@ -25,14 +25,10 @@ import useBarcodeEngine from './useBarcodeEngine'
 // currently logged into. Kept as a literal here (rather than trusting
 // whatever string the server sends) so the UI copy stays consistent even
 // if a future response is malformed; the `code` field is still what
-// actually drives the branch below.
+// actually drives the branch below. Only ever fires for a legacy
+// structured-JSON QR printed before QR content was simplified to the
+// raw barcode string — see utils/productQr.ts.
 const QR_ACCOUNT_MISMATCH_MSG = 'This QR Code belongs to another account and cannot be used in the current account.'
-
-// Strips punctuation/extra whitespace from a decoded barcode string
-// before it's used as a fuzzy-search fallback query.
-function normalizeScanText(text: string): string {
-  return text.replace(/[^a-zA-Z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim()
-}
 
 export type LocalScanMode   = 'barcode' | 'idle'
 export type LocalScanStatus =
@@ -128,9 +124,14 @@ export default function useLocalScanner({ onResult, active }: Options) {
 
   // ── Product search (same backend endpoints as before) ──────────────────────
   // The backend can reject a scan outright (403 QR_ACCOUNT_MISMATCH) when
-  // the decoded QR is a structured payload printed under a *different*
-  // account than the one currently logged in. That's a deliberate,
-  // permanent "no" — handleBarcodeDetected surfaces it immediately.
+  // the decoded QR is a legacy structured payload printed under a
+  // *different* account than the one currently logged in. That's a
+  // deliberate, permanent "no" — handleBarcodeDetected surfaces it
+  // immediately. New QR labels no longer encode that payload (see
+  // utils/productQr.ts) — a QR now decodes to the exact same barcode
+  // string a linear-barcode scan of the same product would produce, so
+  // this is the ONLY lookup either scan method ever calls: one function,
+  // one exact `product.barcode` match, for both.
   //
   // Every lookup is scoped to the products belonging to the current
   // account (scannerAPI carries the logged-in account's auth context),
@@ -147,15 +148,6 @@ export default function useLocalScanner({ onResult, active }: Options) {
       }
       return []
     }
-  }, [])
-
-  const searchFuzzy = useCallback(async (normalizedText: string): Promise<LocalProduct[]> => {
-    try {
-      if (normalizedText.length < 2) return []
-      const res  = await scannerAPI.fuzzySearch(normalizedText.slice(0, 60), 20)
-      const json: any = res.data
-      return json.success ? (json.data || []) : []
-    } catch { return [] }
   }, [])
 
   const flashNotice = useCallback((message: string) => {
@@ -209,8 +201,14 @@ export default function useLocalScanner({ onResult, active }: Options) {
     }
   }, [onResult, engine, state.lastBarcode])
 
-  // ── Barcode scanning — delegates the actual decode loop to the shared
-  //    engine; this is purely "what to do with a decoded code" ───────────────
+  // ── Barcode/QR scanning — delegates the actual decode loop to the shared
+  //    engine; this is purely "what to do with a decoded code." Both a
+  //    linear-barcode decode and a QR decode land here through the exact
+  //    same path — the engine hands over decoded TEXT with no notion of
+  //    which symbology it came from, and from this point on there is only
+  //    one lookup: exact `product.barcode` match. No fuzzy/name search is
+  //    ever used to resolve a scan — a miss is reported as-is so a scan
+  //    can never silently resolve to the wrong product. ─────────────────
   const handleBarcodeDetected = useCallback(async (code: string) => {
     if (!mountedRef.current) return
     setState(s => ({ ...s, lastBarcode: code }))
@@ -226,15 +224,11 @@ export default function useLocalScanner({ onResult, active }: Options) {
       return
     }
 
-    const normalizedCode = normalizeScanText(code)
-    const fuzzy = await searchFuzzy(normalizedCode)
-    if (!mountedRef.current) return
-    if (fuzzy.length > 0) {
-      setState(s => ({ ...s, status: 'matches', mode: 'barcode', matches: fuzzy }))
-    } else {
-      flashNotice('No matching product found — keep scanning')
-    }
-  }, [searchBarcode, searchFuzzy, flashNotice])
+    // No exact product.barcode match — never fall back to a fuzzy/name
+    // search here; a scan that doesn't exactly match is reported as not
+    // found rather than silently offering a "close enough" product.
+    flashNotice('Product not found — keep scanning')
+  }, [searchBarcode, flashNotice])
 
   const startBarcodeLoop = useCallback(() => {
     engine.startScanning(handleBarcodeDetected)

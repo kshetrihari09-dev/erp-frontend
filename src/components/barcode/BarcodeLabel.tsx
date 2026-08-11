@@ -18,7 +18,20 @@ export interface BarcodeLabelProps {
    *  the PDF export, and neither of those picks up the app's Tailwind
    *  bundle — only inline styles survive both paths. */
   className?: string
+  /** Fires whenever this label's own too-dense-to-scan-reliably state
+   *  changes (see ACCURATE SCANNING below). Optional — callers that just
+   *  want a visual (like the Product page's single-label preview) can
+   *  ignore it; BarcodePrintPage uses it to roll up a page-level warning
+   *  naming the specific products affected. */
+  onTooDense?: (tooDense: boolean) => void
 }
+
+// Absolute floor for the narrow-bar module width, in real px at 96dpi.
+// Below this, bars are thinner than what commodity laser/thermal
+// printers and handheld/POS scanners reliably resolve together — GS1
+// guidance treats ~0.19mm (X-dimension) as the practical minimum, which
+// is ~0.72px at 96dpi; 0.75 keeps a small safety margin above that.
+const MIN_MODULE_WIDTH_PX = 0.75
 
 /**
  * A single scannable price label, styled to match a clean printed
@@ -52,13 +65,20 @@ export interface BarcodeLabelProps {
  * legible on tiny labels without ballooning on large ones and without
  * ever summing to more than the label itself.
  */
-export default function BarcodeLabel({ name, price, code, widthMm, heightMm, className }: BarcodeLabelProps) {
+export default function BarcodeLabel({ name, price, code, widthMm, heightMm, className, onTooDense }: BarcodeLabelProps) {
   const svgRef = useRef<SVGSVGElement>(null)
   // Set only when JsBarcode itself rejects `code` (characters it can't
   // encode) — surfaced to the label instead of silently leaving a blank
   // SVG, so a bad stored value is visibly wrong rather than invisibly
   // blank. Never triggers a different value being drawn.
   const [renderError, setRenderError] = useState(false)
+  // ACCURATE SCANNING: set when the encoded data is too long to fit this
+  // label's physical width even at the minimum reliably-scannable module
+  // width (see MIN_MODULE_WIDTH_PX below). Rather than let CSS
+  // (`maxWidth: 100%`) silently squeeze the bars past that floor — which
+  // is exactly how a barcode can look fine on screen and fail under a
+  // real scanner — we stop shrinking and surface it instead.
+  const [tooDense, setTooDense] = useState(false)
 
   const heightPx = heightMm * MM_TO_PX
 
@@ -79,9 +99,32 @@ export default function BarcodeLabel({ name, price, code, widthMm, heightMm, cla
   // *detected* from that exact string (13 digits + valid EAN-13 check
   // digit → EAN13, everything else → CODE128); the digits handed to
   // JsBarcode are never altered based on which format gets picked.
+  //
+  // ACCURATE SCANNING — two real, previously-silent failure modes fixed here:
+  //
+  //  1. Quiet zone: `margin: 0` (the old setting) removes the blank
+  //     space a scanner needs on either side of the bars to find the
+  //     start/stop pattern. On a print sheet with labels packed edge to
+  //     edge, that reads as "some labels just don't scan" with no
+  //     visible defect. We now reserve a real quiet zone via
+  //     marginLeft/marginRight (vertical margin stays 0 — our own layout
+  //     already budgets the space above/below the bars).
+  //
+  //  2. Silent over-shrink: the SVG previously had `maxWidth: 100%` as
+  //     its only defense against overflowing a small label, which lets
+  //     the browser scale the whole barcode down uniformly — including
+  //     below the minimum bar width a scanner can resolve — with nothing
+  //     in the UI showing it happened. We now measure the actual
+  //     rendered width JsBarcode produced and, if it doesn't fit,
+  //     recompute a smaller module width ourselves and redraw at that
+  //     exact width. If even the minimum reliable module width
+  //     (MIN_MODULE_WIDTH_PX) doesn't fit, we stop and flag `tooDense`
+  //     instead of drawing bars we already know won't scan.
   useEffect(() => {
     if (!svgRef.current) return
     setRenderError(false)
+    setTooDense(false)
+    onTooDense?.(false)
     if (!code) {
       // No barcode stored for this product — leave the SVG blank and let
       // the "Barcode not assigned" row (rendered below) carry the state.
@@ -89,22 +132,63 @@ export default function BarcodeLabel({ name, price, code, widthMm, heightMm, cla
       svgRef.current.innerHTML = ''
       return
     }
-    try {
-      JsBarcode(svgRef.current, code, {
-        format: detectBarcodeFormat(code),
-        displayValue: false, // human-readable code is rendered as its own styled row below
-        margin: 0,
-        height: barsHeightPx,
-        width: heightMm >= 30 ? 1.3 : 1.0,
-      })
-    } catch {
-      // JsBarcode rejected the stored value outright (e.g. characters
-      // invalid even for CODE128). Surface this rather than silently
-      // drawing a blank/different barcode.
+
+    const format = detectBarcodeFormat(code)
+    const baseModuleWidthPx = heightMm >= 30 ? 1.3 : 1.0
+    // Reserve quiet zone proportional to module width (roughly the "8-10
+    // modules" real barcode specs call for), floored so tiny labels still
+    // get a usable minimum rather than none.
+    const quietZonePx = (moduleWidthPx: number) =>
+      Math.max(moduleWidthPx * 8, 1.2 * MM_TO_PX)
+
+    // Physical space actually available for the SVG: label width minus
+    // the 1mm content padding and border on each side (matches the
+    // container's own box model below).
+    const availableWidthPx = widthMm * MM_TO_PX - 2 * MM_TO_PX - 2 * 1.2
+
+    function draw(moduleWidthPx: number): number | null {
+      const qz = quietZonePx(moduleWidthPx)
+      try {
+        JsBarcode(svgRef.current!, code, {
+          format,
+          displayValue: false, // human-readable code is rendered as its own styled row below
+          margin: 0,
+          marginLeft: qz,
+          marginRight: qz,
+          height: barsHeightPx,
+          width: moduleWidthPx,
+        })
+      } catch {
+        return null
+      }
+      // JsBarcode sets the `width` attribute directly to the rendered
+      // pixel width (no viewBox scaling in play), so this is the true
+      // on-page size of what we just drew.
+      return svgRef.current!.width.baseVal.value
+    }
+
+    let renderedWidthPx = draw(baseModuleWidthPx)
+    if (renderedWidthPx == null) {
       svgRef.current.innerHTML = ''
       setRenderError(true)
+      return
     }
-  }, [code, barsHeightPx, heightMm])
+
+    if (renderedWidthPx > availableWidthPx) {
+      const scale = availableWidthPx / renderedWidthPx
+      const fittedModuleWidthPx = baseModuleWidthPx * scale
+      if (fittedModuleWidthPx < MIN_MODULE_WIDTH_PX) {
+        // Even the minimum reliably-scannable module width doesn't fit
+        // this label at this data length — stop rather than draw bars
+        // we already know are too thin to trust, and surface it.
+        svgRef.current.innerHTML = ''
+        setTooDense(true)
+        onTooDense?.(true)
+        return
+      }
+      draw(fittedModuleWidthPx)
+    }
+  }, [code, barsHeightPx, heightMm, widthMm, onTooDense])
 
   const rule = (
     <div
@@ -179,10 +263,16 @@ export default function BarcodeLabel({ name, price, code, widthMm, heightMm, cla
           letterSpacing: code ? '1px' : 'normal',
           lineHeight: 1,
           whiteSpace: 'nowrap',
-          color: code && !renderError ? 'inherit' : '#b91c1c',
+          color: code && !renderError && !tooDense ? 'inherit' : '#b91c1c',
         }}
       >
-        {code ? (renderError ? 'Invalid barcode' : code) : 'Barcode not assigned'}
+        {!code
+          ? 'Barcode not assigned'
+          : renderError
+          ? 'Invalid barcode'
+          : tooDense
+          ? `${code} (too dense to scan reliably)`
+          : code}
       </div>
 
       {rule}

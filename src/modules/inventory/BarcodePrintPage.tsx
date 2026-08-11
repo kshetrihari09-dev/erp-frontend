@@ -69,6 +69,20 @@ export default function BarcodePrintPage() {
     [items]
   )
 
+  const [denseIds, setDenseIds] = useState<Set<string>>(new Set())
+  const denseItems = useMemo(
+    () => items.filter(i => denseIds.has(i.product.id)),
+    [items, denseIds]
+  )
+  function handleTooDense(productId: string, isDense: boolean) {
+    setDenseIds(prev => {
+      if (isDense === prev.has(productId)) return prev
+      const next = new Set(prev)
+      if (isDense) next.add(productId); else next.delete(productId)
+      return next
+    })
+  }
+
   /** Returns true if printing/exporting may proceed. When it can't, it
    *  names the specific product(s) blocking it rather than silently
    *  generating or substituting a barcode for them. */
@@ -78,6 +92,15 @@ export default function BarcodePrintPage() {
       window.alert(
         `Cannot print — the following product(s) have no barcode assigned: ${names}. ` +
         `Assign a barcode on the product page first, or remove them from this queue.`
+      )
+      return false
+    }
+    if (denseItems.length > 0) {
+      const names = denseItems.map(i => i.product.name).join(', ')
+      window.alert(
+        `Cannot print — the barcode for the following product(s) is too dense to render reliably ` +
+        `at this label size: ${names}. Pick a larger label size for these, or shorten/regenerate ` +
+        `their barcode from the product page.`
       )
       return false
     }
@@ -422,6 +445,22 @@ export default function BarcodePrintPage() {
         </p>
       )}
 
+      {denseItems.length > 0 && (
+        <p className="bcp-dense-hint" style={{
+          display: 'flex', alignItems: 'flex-start', gap: 6,
+          fontSize: '12px', color: '#b91c1c', margin: '0 0 12px',
+          background: 'rgba(185,28,28,0.08)', border: '1px solid rgba(185,28,28,0.25)',
+          borderRadius: 8, padding: '8px 10px',
+        }}>
+          <AlertTriangle size={14} style={{ flexShrink: 0, marginTop: 1 }} />
+          <span>
+            <strong>Too dense to scan reliably</strong> at this label size: {denseItems.map(i => i.product.name).join(', ')}.
+            Their barcode's bars would have to be squeezed thinner than a scanner can resolve to fit —
+            printing is blocked for these until you pick a larger label size.
+          </span>
+        </p>
+      )}
+
       <div className="grid gap-4 bcp-layout-grid">
         {/* ── Left: search + queued items + label size ─────────────────── */}
         <div className="flex flex-col gap-4">
@@ -564,6 +603,7 @@ export default function BarcodePrintPage() {
                   code={item.product.barcode || ''}
                   widthMm={widthMm}
                   heightMm={heightMm}
+                  onTooDense={dense => handleTooDense(item.product.id, dense)}
                 />
               ))}
             </div>

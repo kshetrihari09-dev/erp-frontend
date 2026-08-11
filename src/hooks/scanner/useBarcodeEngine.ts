@@ -34,9 +34,11 @@
  *     impossible), only the small on-screen scan-guide region is decoded
  *     (see barcodeFrame.ts) rather than the full camera frame, a single
  *     ZXing reader instance is created once and reused for the life of
- *     the engine (never re-initialized per tick or per mode switch), and
- *     the loop stops itself the instant a barcode is found so callers
- *     never see a duplicate read.
+ *     the engine (never re-initialized per tick or per mode switch), a
+ *     barcode is only accepted once the same value decodes on
+ *     CONFIRM_TICKS consecutive frames (guards against a single stray
+ *     misread from blur/glare/occlusion), and the loop stops itself the
+ *     instant a barcode is confirmed so callers never see a duplicate read.
  *
  * What this hook deliberately does NOT own (left to each feature hook):
  *   - What to do with a decoded barcode (product lookup vs. filling a
@@ -76,6 +78,16 @@ export const ZOOM_STEP = 0.1
 // smooth. Faster than the old 300ms polling interval for quicker reads,
 // while still leaving headroom for a full decode pass on modest devices.
 const SCAN_THROTTLE_MS = 120
+
+// ACCURATE SCANNING: a barcode is only accepted once the SAME value has
+// been decoded on this many consecutive ticks. A single-frame accept is
+// vulnerable to motion blur, partial occlusion, or a stray reflection
+// producing one wrong decode — CODE128 in particular has no mandatory
+// checksum in the default ZXing config, so a bad single-frame read isn't
+// even guaranteed to get caught downstream. At the 120ms tick cadence,
+// requiring 2 consecutive matches adds at most ~120-240ms of latency —
+// imperceptible against the accuracy gained.
+const CONFIRM_TICKS = 2
 
 const INITIAL_STATE: BarcodeEngineState = {
   cameraStatus: 'requesting-permission',
@@ -198,6 +210,10 @@ export default function useBarcodeEngine() {
   const scanBusyRef   = useRef(false)
   const lastTickRef   = useRef(0)
   const onDetectedRef = useRef<((code: string, format?: string) => void) | null>(null)
+  // ACCURATE SCANNING — consecutive-match confirmation state (see
+  // CONFIRM_TICKS above). Reset whenever a fresh loop starts (startScanning)
+  // so a previous scan's pending candidate never carries over.
+  const pendingRef = useRef<{ code: string; format?: string; count: number } | null>(null)
 
   useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false } }, [])
 
@@ -219,6 +235,7 @@ export default function useBarcodeEngine() {
 
   const stopScanning = useCallback(() => {
     scanActiveRef.current = false
+    pendingRef.current = null
     if (rafRef.current != null) { cancelAnimationFrame(rafRef.current); rafRef.current = null }
   }, [])
 
@@ -343,6 +360,7 @@ export default function useBarcodeEngine() {
     if (scanActiveRef.current) return // already running — never start a second overlapping loop
     scanActiveRef.current = true
     lastTickRef.current = 0
+    pendingRef.current = null
 
     const tick = async () => {
       if (scanBusyRef.current || !mountedRef.current) return
@@ -362,13 +380,34 @@ export default function useBarcodeEngine() {
         const result = await reader.decodeFromCanvas(canvas)
         const code = result?.getText?.()
         if (code && mountedRef.current && scanActiveRef.current) {
-          // Stop the instant a barcode is found — the single most
-          // important guard against duplicate reads. Everything after
-          // this is the caller's business logic, not this engine's.
-          stopScanning()
           let format: string | undefined
           try { format = result.getBarcodeFormat?.()?.toString?.() } catch {}
-          onDetectedRef.current?.(code, format)
+
+          // ACCURATE SCANNING: require CONFIRM_TICKS consecutive identical
+          // decodes before accepting. A single stray misread (motion
+          // blur, partial occlusion, glare) resets the streak instead of
+          // being handed straight to the caller.
+          const pending = pendingRef.current
+          if (pending && pending.code === code) {
+            pending.count += 1
+          } else {
+            pendingRef.current = { code, format, count: 1 }
+          }
+
+          if ((pendingRef.current?.count ?? 0) >= CONFIRM_TICKS) {
+            // Stop the instant a barcode is confirmed — the single most
+            // important guard against duplicate reads. Everything after
+            // this is the caller's business logic, not this engine's.
+            const confirmed = pendingRef.current!
+            stopScanning()
+            onDetectedRef.current?.(confirmed.code, confirmed.format)
+          }
+        } else {
+          // No decodable code on this frame — a genuine miss (not a
+          // conflicting read) doesn't reset the streak, since scanners
+          // routinely have a handful of no-decode frames between two
+          // valid reads of the same physical barcode (motion, focus
+          // hunting). Only a *different* decoded value resets it above.
         }
       } catch {
         // NotFoundException on frames with no decodable code — expected
