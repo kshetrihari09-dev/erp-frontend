@@ -74,6 +74,7 @@ export default function LocalScannerView({ open, context, onResult, onClose }: P
   const {
     state, videoRef, containerRef, toggleFlash, switchCamera, setZoom,
     selectProduct, rescan, retryPermission, scanFromGallery,
+    scanMode, setScanMode,
   } = useLocalScanner({ context, onResult: handleResult, active: open })
 
   useEffect(() => { rescanRef.current = rescan }, [rescan])
@@ -125,9 +126,11 @@ export default function LocalScannerView({ open, context, onResult, onClose }: P
           onClose={onClose}
           onRetryPermission={retryPermission}
           title="Scan Barcode"
-          subtitle="Align the barcode within the frame"
+          subtitle={scanMode === 'qr' ? 'Align the QR code within the frame' : 'Align the barcode within the frame'}
           scanOverlay={state.status === 'scanning' ? <BarcodeRectOverlay /> : undefined}
-          statusLabel={state.status === 'scanning' ? 'Scanning barcode…' : undefined}
+          statusLabel={state.status === 'scanning' ? (scanMode === 'qr' ? 'Scanning QR…' : 'Scanning barcode…') : undefined}
+          scanMode={showDrawer ? undefined : scanMode}
+          onScanModeChange={showDrawer ? undefined : setScanMode}
           onGalleryPick={showDrawer ? undefined : scanFromGallery}
           success={state.status === 'done'}
           successLabel="Added!"

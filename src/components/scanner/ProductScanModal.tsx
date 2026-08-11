@@ -46,6 +46,7 @@ export default function ProductScanModal({ open, onBarcode, onClose }: Props) {
   const {
     state, videoRef, containerRef,
     retryPermission, setZoom, toggleFlash, switchCamera, scanFromGallery,
+    scanMode, setScanMode,
   } = useProductCapture({ active: open, onBarcode: handleBarcode })
 
   // Reset the success beat if the modal is re-opened for another scan.
@@ -80,9 +81,11 @@ export default function ProductScanModal({ open, onBarcode, onClose }: Props) {
           onClose={onClose}
           onRetryPermission={retryPermission}
           title="Scan Barcode"
-          subtitle="Align the barcode within the frame"
+          subtitle={scanMode === 'qr' ? 'Align the QR code within the frame' : 'Align the barcode within the frame'}
           scanOverlay={<BarcodeRectOverlay />}
-          statusLabel={state.status === 'ready' && !success ? 'Scanning barcode…' : undefined}
+          statusLabel={state.status === 'ready' && !success ? (scanMode === 'qr' ? 'Scanning QR…' : 'Scanning barcode…') : undefined}
+          scanMode={scanMode}
+          onScanModeChange={setScanMode}
           onGalleryPick={scanFromGallery}
           success={success}
           successLabel="Barcode captured!"

@@ -31,8 +31,8 @@ import {
   X, Zap, ZapOff, RefreshCw, CameraOff, AlertCircle, RotateCcw,
   Loader2, CheckCircle2, ImageIcon,
 } from 'lucide-react'
-import type { CameraStatus } from '@/hooks/scanner/useBarcodeEngine'
-import { ScanStatusPill } from './ScannerUI'
+import type { CameraStatus, ScanMode } from '@/hooks/scanner/useBarcodeEngine'
+import { ScanStatusPill, ScanModeToggle } from './ScannerUI'
 
 interface Props {
   cameraStatus: CameraStatus
@@ -68,6 +68,13 @@ interface Props {
   scanOverlay?: ReactNode   // e.g. <BarcodeRectOverlay /> — omit to show none
   showTopBar?: boolean
 
+  /** Compact Barcode/QR segmented toggle shown in the top bar next to the
+   *  title (see ScannerUI.tsx's ScanModeToggle). Both props are required
+   *  together — omit either to hide the toggle entirely, e.g. for a
+   *  scanner that only ever wants one symbology. */
+  scanMode?: ScanMode
+  onScanModeChange?: (mode: ScanMode) => void
+
   /** Pill with a pulsing dot shown above the bottom controls, e.g.
    *  "Scanning barcode…" — omit to show nothing. */
   statusLabel?: string
@@ -92,6 +99,7 @@ export default function BarcodeScannerView({
   flashOn, flashSupported, onToggleFlash, onSwitchCamera, onClose, onRetryPermission,
   onDone, doneLabel = 'Done',
   title, subtitle, scanOverlay, showTopBar = true,
+  scanMode, onScanModeChange,
   statusLabel,
   onGalleryPick, galleryLabel = 'Gallery',
   success = false, successLabel = 'Scanned!',
@@ -267,6 +275,9 @@ export default function BarcodeScannerView({
               )}
 
               <div className="flex items-center gap-2 flex-shrink-0">
+                {scanMode && onScanModeChange && (
+                  <ScanModeToggle mode={scanMode} onChange={onScanModeChange} />
+                )}
                 {flashSupported && (
                   <button
                     onClick={onToggleFlash}

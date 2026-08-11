@@ -188,5 +188,8 @@ export default function useProductCapture({ active, onBarcode }: Options) {
   return {
     state, videoRef, containerRef,
     retryPermission, setZoom, toggleFlash, switchCamera, scanFromGallery,
+    // Barcode-vs-QR symbology toggle — thin passthrough to the shared
+    // engine (see useBarcodeEngine.ts).
+    scanMode: engine.state.mode, setScanMode: engine.setMode,
   }
 }

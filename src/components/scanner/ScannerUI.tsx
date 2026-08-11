@@ -7,7 +7,9 @@
  * scanning/business logic lives here.
  */
 import { motion } from 'framer-motion'
+import { ScanLine, QrCode } from 'lucide-react'
 import { BARCODE_SCAN_WIDTH, BARCODE_SCAN_HEIGHT } from '@/utils/barcodeFrame'
+import type { ScanMode } from '@/hooks/scanner/useBarcodeEngine'
 
 // ── Barcode scan overlay (rectangular) ───────────────────────────────────────
 // The single, shared visual guide for the scanner — the exact rectangle
@@ -59,6 +61,47 @@ export function BarcodeRectOverlay({ found = false }: { found?: boolean }) {
           />
         )}
       </div>
+    </div>
+  )
+}
+
+// ── Barcode / QR mode toggle ─────────────────────────────────────────────────
+// Lets the person explicitly tell the scanner which symbology to look for
+// (see useBarcodeEngine.ts's ScanMode) instead of it silently trying every
+// format on every frame. Barcode mode decodes with a reader scoped to
+// EAN/UPC/CODE_128 only; QR mode switches to a dedicated QR-only decoder
+// and stops the instant a code is read. Deliberately compact — a small
+// segmented control, not another full-size button — so it sits comfortably
+// in the scanner's top bar next to the title instead of competing with the
+// main scan target for attention.
+export function ScanModeToggle({ mode, onChange }: { mode: ScanMode; onChange: (mode: ScanMode) => void }) {
+  const optionClass = (active: boolean) =>
+    `flex items-center gap-1 h-8 px-2.5 rounded-full text-[11px] font-semibold transition-colors ${
+      active ? 'bg-white text-slate-900' : 'text-white/75'
+    }`
+
+  return (
+    <div
+      role="group"
+      aria-label="Scan mode"
+      className="flex items-center p-0.5 rounded-full bg-white/15 backdrop-blur-md flex-shrink-0"
+    >
+      <button
+        type="button"
+        onClick={() => onChange('barcode')}
+        aria-pressed={mode === 'barcode'}
+        className={optionClass(mode === 'barcode')}
+      >
+        <ScanLine size={13} /> Barcode
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange('qr')}
+        aria-pressed={mode === 'qr'}
+        className={optionClass(mode === 'qr')}
+      >
+        <QrCode size={13} /> QR
+      </button>
     </div>
   )
 }

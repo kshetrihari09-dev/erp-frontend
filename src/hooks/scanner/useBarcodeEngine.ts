@@ -54,6 +54,13 @@ export type CameraStatus =
   | 'error'
   | 'ready'
 
+// Which symbology family the decode loop is currently looking for. An
+// explicit choice from the UI (see ScannerUI.tsx's ScanModeToggle) rather
+// than something inferred after the fact — the engine hands each mode its
+// own purpose-scoped decoder (see getReader below) instead of running
+// every format on every frame regardless of what's actually being scanned.
+export type ScanMode = 'barcode' | 'qr'
+
 export interface BarcodeEngineState {
   cameraStatus:   CameraStatus
   error:          string | null
@@ -64,6 +71,7 @@ export interface BarcodeEngineState {
   zoomMin:        number
   zoomMax:        number
   zoomStep:       number
+  mode:           ScanMode
 }
 
 export const ZOOM_MIN  = 1
@@ -87,7 +95,15 @@ const SCAN_THROTTLE_MS = 120
 // even guaranteed to get caught downstream. At the 120ms tick cadence,
 // requiring 2 consecutive matches adds at most ~120-240ms of latency —
 // imperceptible against the accuracy gained.
-const CONFIRM_TICKS = 2
+const CONFIRM_TICKS_BARCODE = 2
+
+// QR mode intentionally skips the consecutive-match confirmation: a QR
+// code carries its own Reed–Solomon error correction, so a decode that
+// comes back at all is already far more trustworthy than a bare CODE128
+// read — and the whole point of QR mode is to stop and return the value
+// the instant one is read, not add a second frame of latency waiting to
+// re-confirm it.
+const CONFIRM_TICKS_QR = 1
 
 const INITIAL_STATE: BarcodeEngineState = {
   cameraStatus: 'requesting-permission',
@@ -99,6 +115,7 @@ const INITIAL_STATE: BarcodeEngineState = {
   zoomMin: ZOOM_MIN,
   zoomMax: ZOOM_MAX,
   zoomStep: ZOOM_STEP,
+  mode: 'barcode',
 }
 
 async function requestCameraStream(facingMode: 'environment' | 'user'): Promise<MediaStream> {
@@ -139,11 +156,15 @@ async function requestCameraStream(facingMode: 'environment' | 'user'): Promise<
   }
 }
 
-// All formats the barcode loop should recognize, built once at module
-// scope. Covers every common retail/invoice barcode symbology plus QR —
-// requesting exactly this set (rather than every format ZXing knows)
-// keeps each decode attempt as fast as possible.
-async function buildHints() {
+// Barcode-mode formats — scoped to what this app actually issues/accepts:
+// EAN-13/EAN-8/UPC-A/UPC-E (real retail barcodes, and the EAN-13 shape
+// auto-generated barcodes are encoded as — see erp-unified-backend's
+// buildAutoBarcode()) plus CODE_128 (legacy/manual entries). QR is
+// deliberately NOT in this set — it has its own dedicated decoder/path
+// below — so the barcode-mode reader never spends a decode pass looking
+// for a QR finder pattern while the person has explicitly selected
+// Barcode mode.
+async function buildBarcodeHints() {
   const { BarcodeFormat, DecodeHintType } = await import('@zxing/library')
   const hints = new Map<any, any>()
   hints.set(DecodeHintType.POSSIBLE_FORMATS, [
@@ -152,17 +173,23 @@ async function buildHints() {
     BarcodeFormat.UPC_A,
     BarcodeFormat.UPC_E,
     BarcodeFormat.CODE_128,
-    BarcodeFormat.CODE_39,
-    BarcodeFormat.CODE_93,
-    BarcodeFormat.CODABAR,
-    BarcodeFormat.ITF,
-    BarcodeFormat.QR_CODE,
-    BarcodeFormat.DATA_MATRIX,
-    BarcodeFormat.AZTEC,
-    BarcodeFormat.PDF_417,
   ])
   // Helps recover blurry/low-light reads at a small cost to raw speed —
   // worth it since the loop already only decodes a small cropped region.
+  hints.set(DecodeHintType.TRY_HARDER, true)
+  return hints
+}
+
+// QR-mode hints — only used as a fallback if this build's @zxing/browser
+// doesn't export a dedicated QR-only reader class (see getReader below).
+// A real QR-only reader doesn't need POSSIBLE_FORMATS at all since its
+// detector never looks for anything but QR finder patterns in the first
+// place; this Map exists purely so the fallback multi-format reader can
+// be scoped down to the same behavior.
+async function buildQrOnlyHints() {
+  const { BarcodeFormat, DecodeHintType } = await import('@zxing/library')
+  const hints = new Map<any, any>()
+  hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.QR_CODE])
   hints.set(DecodeHintType.TRY_HARDER, true)
   return hints
 }
@@ -182,26 +209,58 @@ export default function useBarcodeEngine() {
   const zoomRef = useRef(ZOOM_MIN)
   useEffect(() => { zoomRef.current = state.zoom }, [state.zoom])
 
-  // A single ZXing reader for the lifetime of this engine instance —
-  // created lazily on first use and reused for every subsequent tick,
-  // mode toggle, or camera switch. Never re-instantiated mid-session, so
-  // there's no duplicate-decoder-initialization overhead.
-  const readerRef        = useRef<any>(null)
-  const readerPromiseRef = useRef<Promise<any> | null>(null)
-  const getReader = useCallback(async () => {
-    if (readerRef.current) return readerRef.current
-    if (!readerPromiseRef.current) {
-      readerPromiseRef.current = (async () => {
+  // Current scan mode mirrored into a ref for the same reason as zoom
+  // above — the decode loop's closure always reads the *current* mode
+  // without the loop needing to be torn down/recreated on every toggle.
+  const modeRef = useRef<ScanMode>('barcode')
+
+  // Two independently lazy, independently cached ZXing readers — one
+  // scoped to barcode formats, one scoped to QR — rather than a single
+  // shared reader reconfigured on every mode switch. Each is created at
+  // most once (on first use of that mode) and reused for the rest of the
+  // engine's lifetime, same as before; there are just two of them now
+  // instead of one, so switching modes never re-pays decoder init cost.
+  const barcodeReaderRef        = useRef<any>(null)
+  const barcodeReaderPromiseRef = useRef<Promise<any> | null>(null)
+  const qrReaderRef             = useRef<any>(null)
+  const qrReaderPromiseRef      = useRef<Promise<any> | null>(null)
+
+  const getReader = useCallback(async (mode: ScanMode) => {
+    if (mode === 'qr') {
+      if (qrReaderRef.current) return qrReaderRef.current
+      if (!qrReaderPromiseRef.current) {
+        qrReaderPromiseRef.current = (async () => {
+          const zxingBrowser: any = await import('@zxing/browser')
+          const hints = await buildQrOnlyHints()
+          // Prefer a dedicated QR-only decoder when this build exports
+          // one — it skips the 1D/multi-format dispatch entirely and
+          // goes straight to QR's own finder-pattern detector, which is
+          // the actual "faster QR decoding path" this mode exists to
+          // provide. Fall back to the multi-format reader scoped to
+          // QR_CODE only if not, so QR mode still works either way.
+          const reader = zxingBrowser.BrowserQRCodeReader
+            ? new zxingBrowser.BrowserQRCodeReader(hints)
+            : new zxingBrowser.BrowserMultiFormatReader(hints)
+          qrReaderRef.current = reader
+          return reader
+        })()
+      }
+      return qrReaderPromiseRef.current
+    }
+
+    if (barcodeReaderRef.current) return barcodeReaderRef.current
+    if (!barcodeReaderPromiseRef.current) {
+      barcodeReaderPromiseRef.current = (async () => {
         const [{ BrowserMultiFormatReader }, hints] = await Promise.all([
           import('@zxing/browser'),
-          buildHints(),
+          buildBarcodeHints(),
         ])
         const reader = new BrowserMultiFormatReader(hints)
-        readerRef.current = reader
+        barcodeReaderRef.current = reader
         return reader
       })()
     }
-    return readerPromiseRef.current
+    return barcodeReaderPromiseRef.current
   }, [])
 
   // requestAnimationFrame-driven decode loop state.
@@ -320,7 +379,7 @@ export default function useBarcodeEngine() {
   // camera state entirely, so it works even before/without the camera ever
   // opening (e.g. picking a photo while permission is still pending).
   const scanImageFile = useCallback(async (file: File): Promise<{ code: string; format?: string } | null> => {
-    const reader = await getReader()
+    const reader = await getReader(modeRef.current)
     const url = URL.createObjectURL(file)
     try {
       const result = await reader.decodeFromImageUrl(url)
@@ -354,6 +413,23 @@ export default function useBarcodeEngine() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.facingMode, openCamera, closeCamera])
 
+  // ── Scan mode (barcode vs QR) ────────────────────────────────────────────
+  const setMode = useCallback((mode: ScanMode) => {
+    if (modeRef.current === mode) return
+    modeRef.current = mode
+    setState(s => (s.mode === mode ? s : { ...s, mode }))
+    // If a scan is already running, restart it immediately against the
+    // new mode's reader rather than waiting for the current loop to end
+    // on its own — the person just told the scanner what to look for, so
+    // honor it from the very next frame instead of the next stray miss.
+    if (scanActiveRef.current) {
+      const cb = onDetectedRef.current
+      stopScanning()
+      if (cb) startScanning(cb)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stopScanning])
+
   // ── Barcode decode loop ─────────────────────────────────────────────────────
   const startScanning = useCallback((onDetected: (code: string, format?: string) => void) => {
     onDetectedRef.current = onDetected
@@ -375,7 +451,7 @@ export default function useBarcodeEngine() {
         const canvas = captureBarcodeFrame(video, rect.width, rect.height, zoomRef.current)
         if (!canvas) return
 
-        const reader = await getReader()
+        const reader = await getReader(modeRef.current)
         if (!mountedRef.current || !scanActiveRef.current) return
         const result = await reader.decodeFromCanvas(canvas)
         const code = result?.getText?.()
@@ -383,10 +459,13 @@ export default function useBarcodeEngine() {
           let format: string | undefined
           try { format = result.getBarcodeFormat?.()?.toString?.() } catch {}
 
-          // ACCURATE SCANNING: require CONFIRM_TICKS consecutive identical
-          // decodes before accepting. A single stray misread (motion
-          // blur, partial occlusion, glare) resets the streak instead of
-          // being handed straight to the caller.
+          // ACCURATE SCANNING: require CONFIRM_TICKS_BARCODE consecutive
+          // identical decodes before accepting in barcode mode (guards
+          // against a single stray misread from blur/glare/occlusion).
+          // QR mode uses CONFIRM_TICKS_QR (1) instead — see its docblock
+          // above for why a single QR decode is already trustworthy
+          // enough to accept immediately.
+          const requiredTicks = modeRef.current === 'qr' ? CONFIRM_TICKS_QR : CONFIRM_TICKS_BARCODE
           const pending = pendingRef.current
           if (pending && pending.code === code) {
             pending.count += 1
@@ -394,7 +473,7 @@ export default function useBarcodeEngine() {
             pendingRef.current = { code, format, count: 1 }
           }
 
-          if ((pendingRef.current?.count ?? 0) >= CONFIRM_TICKS) {
+          if ((pendingRef.current?.count ?? 0) >= requiredTicks) {
             // Stop the instant a barcode is confirmed — the single most
             // important guard against duplicate reads. Everything after
             // this is the caller's business logic, not this engine's.
@@ -432,11 +511,16 @@ export default function useBarcodeEngine() {
   useEffect(() => () => {
     stopScanning()
     closeCamera()
-    if (readerRef.current) {
-      try { readerRef.current.reset?.() } catch {}
-      readerRef.current = null
+    if (barcodeReaderRef.current) {
+      try { barcodeReaderRef.current.reset?.() } catch {}
+      barcodeReaderRef.current = null
     }
-    readerPromiseRef.current = null
+    if (qrReaderRef.current) {
+      try { qrReaderRef.current.reset?.() } catch {}
+      qrReaderRef.current = null
+    }
+    barcodeReaderPromiseRef.current = null
+    qrReaderPromiseRef.current = null
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -446,6 +530,7 @@ export default function useBarcodeEngine() {
     openCamera, closeCamera, retryPermission, attachStream,
     toggleFlash, switchCamera, setZoom,
     startScanning, stopScanning, scanImageFile,
+    setMode,
   }
 }
 

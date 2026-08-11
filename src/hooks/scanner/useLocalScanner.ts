@@ -329,5 +329,10 @@ export default function useLocalScanner({ onResult, active }: Options) {
     state, videoRef, containerRef,
     toggleFlash, switchCamera, setZoom,
     selectProduct, rescan, retryPermission, scanFromGallery,
+    // Barcode-vs-QR symbology toggle — thin passthrough to the shared
+    // engine (see useBarcodeEngine.ts). Deliberately exposed under a
+    // different name than this hook's own `state.mode` (which tracks
+    // scan-loop lifecycle: 'idle' | 'barcode') to avoid confusing the two.
+    scanMode: engine.state.mode, setScanMode: engine.setMode,
   }
 }
