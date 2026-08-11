@@ -25,10 +25,19 @@
 
 // Size of the rectangular scan guide, in CSS pixels. Wide/short like a
 // classic barcode-scanner viewfinder — comfortably wide enough for linear
-// barcodes (EAN/UPC/Code-128/Code-39) held at a natural distance, and
-// still tall enough for QR/2D codes to fit within it.
+// barcodes (EAN/UPC/Code-128/Code-39) held at a natural distance.
 export const BARCODE_SCAN_WIDTH  = 280
 export const BARCODE_SCAN_HEIGHT = 170
+
+// QR codes are square, not wide/short like a linear barcode, and a QR
+// symbol needs its *entire* square visible in one frame to decode at all
+// (unlike a 1D barcode, which only needs a horizontal strip crossing it).
+// Cropping to the same 280×170 barcode rectangle left QR codes held at a
+// natural distance clipped on the vertical edges on almost every frame,
+// so QR mode gets its own square guide/crop instead — large enough to
+// hold a QR at a comfortable distance without clipping, still small
+// enough to keep the decode region (and on-screen guide) tight.
+export const QR_SCAN_SIZE = 230
 
 export function captureBarcodeFrame(
   video: HTMLVideoElement,

@@ -127,7 +127,7 @@ export default function LocalScannerView({ open, context, onResult, onClose }: P
           onRetryPermission={retryPermission}
           title="Scan Barcode"
           subtitle={scanMode === 'qr' ? 'Align the QR code within the frame' : 'Align the barcode within the frame'}
-          scanOverlay={state.status === 'scanning' ? <BarcodeRectOverlay /> : undefined}
+          scanOverlay={state.status === 'scanning' ? <BarcodeRectOverlay mode={scanMode} /> : undefined}
           statusLabel={state.status === 'scanning' ? (scanMode === 'qr' ? 'Scanning QR…' : 'Scanning barcode…') : undefined}
           scanMode={showDrawer ? undefined : scanMode}
           onScanModeChange={showDrawer ? undefined : setScanMode}

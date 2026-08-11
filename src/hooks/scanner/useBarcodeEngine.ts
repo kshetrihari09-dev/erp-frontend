@@ -447,8 +447,16 @@ export default function useBarcodeEngine() {
       scanBusyRef.current = true
       try {
         const rect = container.getBoundingClientRect()
-        const { captureBarcodeFrame } = await import('@/utils/barcodeFrame')
-        const canvas = captureBarcodeFrame(video, rect.width, rect.height, zoomRef.current)
+        const { captureBarcodeFrame, BARCODE_SCAN_WIDTH, BARCODE_SCAN_HEIGHT, QR_SCAN_SIZE } =
+          await import('@/utils/barcodeFrame')
+        // QR needs its whole square visible in one frame to decode at
+        // all, unlike a 1D barcode which only needs a strip crossing it —
+        // crop to the square QR guide in QR mode instead of the
+        // wide/short barcode rectangle, or a QR held at a natural
+        // distance gets clipped on the vertical edges on every frame.
+        const canvas = modeRef.current === 'qr'
+          ? captureBarcodeFrame(video, rect.width, rect.height, zoomRef.current, QR_SCAN_SIZE, QR_SCAN_SIZE)
+          : captureBarcodeFrame(video, rect.width, rect.height, zoomRef.current, BARCODE_SCAN_WIDTH, BARCODE_SCAN_HEIGHT)
         if (!canvas) return
 
         const reader = await getReader(modeRef.current)

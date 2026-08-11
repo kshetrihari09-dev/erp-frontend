@@ -8,23 +8,25 @@
  */
 import { motion } from 'framer-motion'
 import { ScanLine, QrCode } from 'lucide-react'
-import { BARCODE_SCAN_WIDTH, BARCODE_SCAN_HEIGHT } from '@/utils/barcodeFrame'
+import { BARCODE_SCAN_WIDTH, BARCODE_SCAN_HEIGHT, QR_SCAN_SIZE } from '@/utils/barcodeFrame'
 import type { ScanMode } from '@/hooks/scanner/useBarcodeEngine'
 
 // ── Barcode scan overlay (rectangular) ───────────────────────────────────────
-// The single, shared visual guide for the scanner — the exact rectangle
-// size here is BARCODE_SCAN_WIDTH/HEIGHT, the same constants
-// useBarcodeEngine's decode loop crops from the video (via
-// captureBarcodeFrame in barcodeFrame.ts), so what's lit up on screen is
-// always exactly the region actually being decoded.
-export function BarcodeRectOverlay({ found = false }: { found?: boolean }) {
+// The single, shared visual guide for the scanner. Sized from the exact
+// same constants useBarcodeEngine's decode loop crops from the video (see
+// barcodeFrame.ts) — square QR_SCAN_SIZE guide in QR mode, wide/short
+// BARCODE_SCAN_WIDTH/HEIGHT guide otherwise — so what's lit up on screen
+// is always exactly the region actually being decoded.
+export function BarcodeRectOverlay({ found = false, mode = 'barcode' }: { found?: boolean; mode?: ScanMode }) {
+  const width  = mode === 'qr' ? QR_SCAN_SIZE : BARCODE_SCAN_WIDTH
+  const height = mode === 'qr' ? QR_SCAN_SIZE : BARCODE_SCAN_HEIGHT
   return (
     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
       <div
         className="relative rounded-[28px]"
         style={{
-          width: BARCODE_SCAN_WIDTH,
-          height: BARCODE_SCAN_HEIGHT,
+          width,
+          height,
           boxShadow: '0 0 0 9999px rgba(0,0,0,0.55)',
         }}
       >

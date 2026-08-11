@@ -82,7 +82,7 @@ export default function ProductScanModal({ open, onBarcode, onClose }: Props) {
           onRetryPermission={retryPermission}
           title="Scan Barcode"
           subtitle={scanMode === 'qr' ? 'Align the QR code within the frame' : 'Align the barcode within the frame'}
-          scanOverlay={<BarcodeRectOverlay />}
+          scanOverlay={<BarcodeRectOverlay mode={scanMode} />}
           statusLabel={state.status === 'ready' && !success ? (scanMode === 'qr' ? 'Scanning QR…' : 'Scanning barcode…') : undefined}
           scanMode={scanMode}
           onScanModeChange={setScanMode}
