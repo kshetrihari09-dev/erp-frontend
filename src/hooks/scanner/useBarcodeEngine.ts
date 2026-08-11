@@ -39,6 +39,13 @@
  *     CONFIRM_TICKS consecutive frames (guards against a single stray
  *     misread from blur/glare/occlusion), and the loop stops itself the
  *     instant a barcode is confirmed so callers never see a duplicate read.
+ *   - QR fallback preprocessing (QR mode only, see utils/qrFallback.ts):
+ *     when the primary, unprocessed decode fails on a frame, a throttled
+ *     fallback tries a handful of image-processing variants (upscale,
+ *     grayscale, contrast stretch, sharpen, adaptive threshold) of that
+ *     same cropped frame through the same ZXing reader — for faded/gray/
+ *     low-contrast/slightly-blurred QR codes the raw frame can't decode.
+ *     Barcode mode and good-quality QR decodes are entirely unaffected.
  *
  * What this hook deliberately does NOT own (left to each feature hook):
  *   - What to do with a decoded barcode (product lookup vs. filling a
@@ -104,6 +111,17 @@ const CONFIRM_TICKS_BARCODE = 2
 // the instant one is read, not add a second frame of latency waiting to
 // re-confirm it.
 const CONFIRM_TICKS_QR = 1
+
+// QR FALLBACK PREPROCESSING (see utils/qrFallback.ts): only attempted when
+// the primary, unprocessed decode on a given frame already failed AND
+// we're in QR mode — never on barcode mode, never instead of the primary
+// attempt. This throttle is separate from (and longer than) the normal
+// SCAN_THROTTLE_MS tick cadence: the primary decode still runs on every
+// tick at full speed (so good-quality QR codes are unaffected), but the
+// heavier multi-variant preprocessing pipeline only fires this often at
+// most, so pointing the camera at a blank/non-QR scene doesn't burn CPU
+// running 5 image-processing passes ~8x/second for nothing.
+const QR_FALLBACK_THROTTLE_MS = 350
 
 const INITIAL_STATE: BarcodeEngineState = {
   cameraStatus: 'requesting-permission',
@@ -268,6 +286,10 @@ export default function useBarcodeEngine() {
   const scanActiveRef = useRef(false)
   const scanBusyRef   = useRef(false)
   const lastTickRef   = useRef(0)
+  // Separate throttle clock for the QR fallback pipeline — see
+  // QR_FALLBACK_THROTTLE_MS above. Reset whenever a fresh loop starts
+  // (startScanning) so a previous session's timing never carries over.
+  const lastFallbackTickRef = useRef(0)
   const onDetectedRef = useRef<((code: string, format?: string) => void) | null>(null)
   // ACCURATE SCANNING — consecutive-match confirmation state (see
   // CONFIRM_TICKS above). Reset whenever a fresh loop starts (startScanning)
@@ -436,6 +458,7 @@ export default function useBarcodeEngine() {
     if (scanActiveRef.current) return // already running — never start a second overlapping loop
     scanActiveRef.current = true
     lastTickRef.current = 0
+    lastFallbackTickRef.current = 0
     pendingRef.current = null
 
     const tick = async () => {
@@ -461,7 +484,45 @@ export default function useBarcodeEngine() {
 
         const reader = await getReader(modeRef.current)
         if (!mountedRef.current || !scanActiveRef.current) return
-        const result = await reader.decodeFromCanvas(canvas)
+
+        // Primary attempt — the original, unprocessed cropped frame.
+        // This is the exact same call as before this fallback existed,
+        // so good-quality codes (barcode or QR) decode on this alone,
+        // at the same speed as before.
+        let result: any = null
+        try {
+          result = await reader.decodeFromCanvas(canvas)
+        } catch {
+          // NotFoundException on frames with no decodable code — expected
+          // on nearly every tick; fall through (possibly to the QR
+          // fallback below) rather than treating it as an error.
+        }
+
+        // QR FALLBACK (see utils/qrFallback.ts): only reached when the
+        // primary attempt above found nothing, we're specifically in QR
+        // mode, and not more often than QR_FALLBACK_THROTTLE_MS. Barcode
+        // mode's decode logic is completely untouched — this block is
+        // structurally unreachable for it.
+        if (
+          !result &&
+          modeRef.current === 'qr' &&
+          mountedRef.current &&
+          scanActiveRef.current
+        ) {
+          const now = performance.now()
+          if (now - lastFallbackTickRef.current >= QR_FALLBACK_THROTTLE_MS) {
+            lastFallbackTickRef.current = now
+            try {
+              const { decodeWithFallback } = await import('@/utils/qrFallback')
+              result = await decodeWithFallback(reader, canvas)
+            } catch {
+              // No variant in the fallback pipeline decoded either —
+              // expected for most hard frames; just try again next tick.
+              result = null
+            }
+          }
+        }
+
         const code = result?.getText?.()
         if (code && mountedRef.current && scanActiveRef.current) {
           let format: string | undefined
@@ -497,8 +558,11 @@ export default function useBarcodeEngine() {
           // hunting). Only a *different* decoded value resets it above.
         }
       } catch {
-        // NotFoundException on frames with no decodable code — expected
-        // on nearly every tick; just try again next frame.
+        // Unexpected errors elsewhere in the tick (frame capture, module
+        // import, etc.) — the primary/fallback decode attempts above
+        // already handle their own NotFoundException cases inline, so
+        // reaching here is not the normal "no code in frame" case; just
+        // try again next frame either way.
       } finally {
         scanBusyRef.current = false
       }
