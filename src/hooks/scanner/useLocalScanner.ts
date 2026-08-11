@@ -30,6 +30,21 @@ import useBarcodeEngine from './useBarcodeEngine'
 // raw barcode string — see utils/productQr.ts.
 const QR_ACCOUNT_MISMATCH_MSG = 'This QR Code belongs to another account and cannot be used in the current account.'
 
+// A "not found" lookup is a transient miss, not a stop condition — the
+// scanner has to keep decoding afterwards. But the physical barcode
+// typically sits in front of the camera for well over a second after the
+// miss is reported, and the decode loop resumes on the very next frame,
+// so without this guard the exact same code would immediately re-trigger
+// another lookup/notice/beep every couple of frames until the user
+// physically moves the item away. This cooldown makes a given not-found
+// code inert for a short window (long enough to cover the "keep
+// scanning" notice below) — the loop keeps running underneath so a
+// *different* barcode is still picked up instantly, but a repeat of the
+// same miss is silently ignored until the cooldown lapses or the code
+// changes (i.e. the item left frame and something else, or nothing, is
+// there now).
+const NOT_FOUND_COOLDOWN_MS = 1500
+
 export type LocalScanMode   = 'barcode' | 'idle'
 export type LocalScanStatus =
   | 'requesting-permission'
@@ -98,6 +113,10 @@ export default function useLocalScanner({ onResult, active }: Options) {
 
   const mountedRef       = useRef(true)
   const noticeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Duplicate-guard for the "not found" path — see NOT_FOUND_COOLDOWN_MS
+  // above. Cleared the moment a lookup succeeds or a different code comes
+  // in, so it never suppresses a genuine new scan.
+  const lastNotFoundRef  = useRef<{ code: string; at: number } | null>(null)
 
   useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false } }, [])
 
@@ -211,6 +230,18 @@ export default function useLocalScanner({ onResult, active }: Options) {
   //    can never silently resolve to the wrong product. ─────────────────
   const handleBarcodeDetected = useCallback(async (code: string) => {
     if (!mountedRef.current) return
+
+    // Same code that just missed and is presumably still sitting in front
+    // of the camera — the decode loop already stopped itself (see
+    // useBarcodeEngine's startScanning), so just re-arm it and skip
+    // re-querying/re-notifying. Product found flow is completely
+    // untouched by this: it only ever short-circuits a repeat MISS.
+    const recentMiss = lastNotFoundRef.current
+    if (recentMiss && recentMiss.code === code && Date.now() - recentMiss.at < NOT_FOUND_COOLDOWN_MS) {
+      engine.startScanning(handleBarcodeDetected)
+      return
+    }
+
     setState(s => ({ ...s, lastBarcode: code }))
 
     const products = await searchBarcode(code)
@@ -220,6 +251,10 @@ export default function useLocalScanner({ onResult, active }: Options) {
       return
     }
     if (products.length > 0) {
+      // Found — existing behavior, completely unchanged: hand the
+      // matches over and stop here. The decode loop stays stopped;
+      // selectProduct()/rescan() are what resume it, exactly as before.
+      lastNotFoundRef.current = null
       setState(s => ({ ...s, status: 'matches', mode: 'barcode', matches: products }))
       return
     }
@@ -227,8 +262,21 @@ export default function useLocalScanner({ onResult, active }: Options) {
     // No exact product.barcode match — never fall back to a fuzzy/name
     // search here; a scan that doesn't exactly match is reported as not
     // found rather than silently offering a "close enough" product.
+    //
+    // This is a failed LOOKUP, not a failed SCANNER — the camera stream
+    // and scanner view stay exactly as they are. All that happens is:
+    //   1. show the existing "not found" notice,
+    //   2. remember this code+timestamp so the same barcode sitting
+    //      under the camera doesn't immediately refire the same miss
+    //      (the cooldown check above), and
+    //   3. re-arm the decode loop right away — engine.startScanning()
+    //      itself resets the confirm/duplicate-guard state (pendingRef)
+    //      for a clean read next detection — so scanning resumes
+    //      automatically with no reopen required.
+    lastNotFoundRef.current = { code, at: Date.now() }
     flashNotice('Product not found — keep scanning')
-  }, [searchBarcode, flashNotice])
+    engine.startScanning(handleBarcodeDetected)
+  }, [searchBarcode, flashNotice, engine])
 
   const startBarcodeLoop = useCallback(() => {
     engine.startScanning(handleBarcodeDetected)
@@ -267,6 +315,7 @@ export default function useLocalScanner({ onResult, active }: Options) {
   // ── Rescan / retry ──────────────────────────────────────────────────────────
   const rescan = useCallback(async () => {
     engine.stopScanning()
+    lastNotFoundRef.current = null
     setState(s => ({
       ...s, status: 'scanning', mode: 'barcode', matches: [],
       error: null, notice: null, lastBarcode: null,
@@ -288,11 +337,13 @@ export default function useLocalScanner({ onResult, active }: Options) {
   useEffect(() => {
     if (!active) {
       stopCamera()
+      lastNotFoundRef.current = null
       setState(INITIAL_STATE)
       return
     }
 
     let cancelled = false
+    lastNotFoundRef.current = null
     setState(() => ({ ...INITIAL_STATE, status: 'requesting-permission' }))
 
     async function init() {
