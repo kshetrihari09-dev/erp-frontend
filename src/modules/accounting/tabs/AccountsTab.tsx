@@ -33,7 +33,7 @@ function AccountForm({ onClose }: { onClose: () => void }) {
   return (
     <>
       <div className="form-grid">
-        <div style={{ gridColumn: 'span 2' }}>
+        <div className="span2">
           <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">Account Name *</label>
           <input className="erp-input" placeholder="e.g. Cash in Hand" {...register('name')} />
           {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name.message}</p>}
@@ -66,7 +66,7 @@ function AccountForm({ onClose }: { onClose: () => void }) {
           </select>
         </div>
       </div>
-      <div className="flex justify-end gap-2 mt-5 pt-4 border-t border-[var(--border)]">
+      <div className="acc-form-actions">
         <Button variant="secondary" onClick={onClose}>Cancel</Button>
         <Button variant="primary" loading={isSubmitting} onClick={onSubmit}>Create Account</Button>
       </div>
@@ -134,15 +134,15 @@ export default function AccountsTab({ onCount }: { onCount?: (count: number) => 
           ) : accounts.length === 0 ? (
             <Empty message="No accounts found — create one to get started" />
           ) : accounts.map(a => (
-            <div key={a.id} className="acc-mobile-card">
-              <div className="acc-mc-top">
-                <div className="acc-mc-line">
-                  <span className="acc-mc-no">{a.code}</span>
-                  <span className="acc-mc-party" style={{ fontWeight: 600, color: 'var(--text)' }}>{a.name}</span>
-                </div>
-                <span className="acc-mc-amount">{fmt(a.balance ?? 0)}</span>
+            <div key={a.id} className="acc-mobile-card acc-acct-card">
+              <div className="acc-acct-head">
+                <span className="acc-acct-code">{a.code}</span>
+                <span className="acc-acct-name">{a.name}</span>
               </div>
-              <div className="acc-mc-sub">
+              <div className="acc-acct-balance-row">
+                <span className="acc-acct-balance">{fmt(a.balance ?? 0)}</span>
+              </div>
+              <div className="acc-acct-foot">
                 <div className="acc-mc-chips">
                   <span className="badge badge-blue">{a.type}</span>
                   {a.is_group
@@ -150,7 +150,7 @@ export default function AccountsTab({ onCount }: { onCount?: (count: number) => 
                     : <span className="badge badge-muted">Ledger</span>
                   }
                 </div>
-                <span className="acc-mc-date">{a.sub_type || '—'}</span>
+                <span className="acc-acct-subtype">{a.sub_type || '—'}</span>
               </div>
             </div>
           ))}

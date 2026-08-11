@@ -159,57 +159,9 @@ export default function AccountingPage() {
 
   return (
     <div className="acc-page" style={{ minHeight: '100vh' }}>
-      <style>{`
-        /* ── Accounting page — mobile/tablet responsive (self-contained, additive) ── */
-        .acc-page { max-width: 100%; overflow-x: hidden; }
-        .acc-kpi-grid, .acc-tb-kpi-grid { min-width: 0; }
-        .acc-kpi-grid > *, .acc-tb-kpi-grid > * { min-width: 0; }
-
-        @media (max-width: 1024px) {
-          .acc-kpi-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 12px !important; }
-          .acc-tb-kpi-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important; }
-        }
-        @media (max-width: 767px) {
-          .acc-page .acc-filter-row { flex-direction: column !important; align-items: stretch !important; gap: 10px !important; }
-          .acc-page .acc-filter-row > * { width: 100% !important; }
-          .acc-page .acc-filter-row .erp-input { width: 100% !important; }
-          .acc-page .acc-filter-row .acc-filter-count { text-align: left !important; margin-left: 0 !important; }
-          .acc-page .erp-input { width: 100% !important; min-height: 44px !important; box-sizing: border-box; }
-          .acc-page .h-7, .acc-page .h-8 { min-height: 40px !important; height: auto !important; padding-top: 6px !important; padding-bottom: 6px !important; }
-          .acc-page .page-btn { min-width: 36px !important; min-height: 36px !important; }
-          .acc-tab-btn { min-height: 44px !important; padding: 11px 14px !important; font-size: 12px !important; }
-          .acc-tab-content { padding: 14px 12px !important; }
-          .acc-tb-filter-row { flex-direction: column !important; align-items: stretch !important; gap: 10px !important; }
-          .acc-tb-filter-field { width: 100% !important; }
-          .acc-tb-filter-field .erp-input { width: 100% !important; min-height: 44px !important; box-sizing: border-box; }
-          .acc-tb-filter-actions { width: 100% !important; }
-          .acc-tb-filter-actions button { flex: 1 1 calc(50% - 8px) !important; min-height: 44px !important; justify-content: center !important; }
-          .acc-tb-toolbar { flex-direction: column !important; align-items: stretch !important; }
-          .acc-tb-search-wrap { width: 100% !important; }
-          .acc-tb-search-wrap input { width: 100% !important; min-height: 44px !important; box-sizing: border-box; }
-          .acc-tb-toolbar-actions { width: 100% !important; justify-content: flex-start !important; }
-        }
-        @media (min-width: 768px) and (max-width: 1024px) {
-          .acc-page .acc-filter-row { display: grid !important; grid-template-columns: 1fr 1fr; align-items: center; }
-          .acc-page .acc-filter-row .acc-filter-btn,
-          .acc-page .acc-filter-row .acc-filter-count { grid-column: span 2; }
-          .acc-tb-filter-row { display: grid !important; grid-template-columns: 1fr 1fr; align-items: end; gap: 12px !important; }
-          .acc-tb-filter-actions { grid-column: span 2; }
-        }
-        @media (max-width: 560px) {
-          .acc-kpi-grid { grid-template-columns: 1fr !important; gap: 10px !important; margin-bottom: 14px !important; }
-        }
-        @media (max-width: 480px) {
-          .acc-kpi-card { padding: 14px 16px !important; }
-          .acc-tb-kpi-grid { grid-template-columns: 1fr !important; gap: 8px !important; }
-        }
-        @media (max-width: 640px) {
-          .acc-tab-content { padding: 12px 8px !important; }
-        }
-        @media (max-width: 420px) {
-          .acc-tab-btn { padding: 10px 11px !important; font-size: 11.5px !important; gap: 5px !important; }
-        }
-      `}</style>
+      {/* All responsive styling for the Accounting page lives in
+          src/styles/globals.css under "ACCOUNTING PAGE — RESPONSIVE" —
+          kept out of this component so there's exactly one place to look. */}
 
       {/* KPIs */}
       <div className="acc-kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16, marginBottom: 20 }}>
@@ -224,6 +176,7 @@ export default function AccountingPage() {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, delay: 0.25 }}
+        className="acc-card"
         style={{ ...tk.card, borderRadius: 16, overflow: 'hidden' }}
       >
         {/* Tab bar */}
@@ -271,7 +224,7 @@ export default function AccountingPage() {
         {/* Content */}
         <div className="acc-tab-content" style={{ padding: '20px 22px' }}>
           <AnimatePresence mode="wait">
-            <motion.div key={tab} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.18 }}>
+            <motion.div key={tab} className="acc-tab-anim" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.18 }}>
               {tab === 'vouchers'         && <VouchersTab />}
               {tab === 'receipts'         && <ReceiptsTab />}
               {tab === 'payments'         && <PaymentsTab />}
