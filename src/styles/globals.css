@@ -6255,6 +6255,17 @@ canvas{
   background: rgba(147,51,234,.07);
 }
 .dark .pos-scan-btn-medicine { background: rgba(147,51,234,.12); }
+/* "Scan QR" — the second half of the mobile Scan Barcode/Scan QR pair
+   (see SalesPage.tsx). Same purple accent as .pos-scan-btn-medicine
+   above so the two 2D-code-ish entry points (QR/Data Matrix) read as a
+   family distinct from the blue barcode button, without touching that
+   existing (currently unused) class. */
+.pos-scan-btn-qr {
+  color: #9333ea;
+  border-color: rgba(147,51,234,.35);
+  background: rgba(147,51,234,.07);
+}
+.dark .pos-scan-btn-qr { background: rgba(147,51,234,.12); }
 .pos-scan-btn-active { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px currentColor; }
 .pos-scan-btn:active { transform: scale(0.98); }
 

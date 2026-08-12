@@ -17,7 +17,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { scannerAPI } from '@/services/api'
 import type { ScanResult, ScannedProduct } from '@/types/scanner'
-import useBarcodeEngine from './useBarcodeEngine'
+import useBarcodeEngine, { type ScanMode } from './useBarcodeEngine'
 
 // Exact copy of the message the backend returns for QR_ACCOUNT_MISMATCH
 // (see erp-unified-backend/src/scanner/scannerRoutes.js) — a structured
@@ -96,6 +96,15 @@ interface Options {
   context:  'sales' | 'purchase'
   onResult: (result: ScanResult) => void
   active:   boolean   // whether the scanner view is currently open
+  // Which symbology (see useBarcodeEngine.ts's ScanMode) this scanner
+  // should be looking for the moment it opens — e.g. a dedicated "Scan
+  // QR" entry point can jump straight into QR mode instead of the
+  // default 'barcode', without needing any new scanner engine/hook of
+  // its own. Purely an initial value: once the camera is open, the
+  // in-scanner Barcode|QR toggle (see ScannerUI.tsx / setScanMode below)
+  // still works exactly as before and can switch away from it freely.
+  // Defaults to 'barcode' to match every existing caller's behavior.
+  initialMode?: ScanMode
 }
 
 const INITIAL_STATE: LocalScannerState = {
@@ -105,7 +114,7 @@ const INITIAL_STATE: LocalScannerState = {
   zoomSupported: true, zoomMin: 1, zoomMax: 3, zoomStep: 0.1, zoom: 1,
 }
 
-export default function useLocalScanner({ onResult, active }: Options) {
+export default function useLocalScanner({ onResult, active, initialMode }: Options) {
   const [state, setState] = useState<LocalScannerState>(INITIAL_STATE)
 
   const engine = useBarcodeEngine()
@@ -349,6 +358,14 @@ export default function useLocalScanner({ onResult, active }: Options) {
     async function init() {
       const ok = await engine.openCamera('environment')
       if (cancelled || !mountedRef.current || !ok) return
+      // Apply the requested entry-point symbology (see Options.initialMode
+      // above) before the decode loop starts, so e.g. a "Scan QR" button
+      // opens straight into QR mode on the very first frame rather than
+      // briefly scanning for barcodes first. engine.setMode() is a no-op
+      // if it's already the current mode (see useBarcodeEngine.ts), so
+      // this is exactly as cheap as the previous hardcoded default.
+      engine.setMode(initialMode ?? 'barcode')
+      if (cancelled || !mountedRef.current) return
       setState(s => ({ ...s, status: 'scanning', mode: 'barcode' }))
       startBarcodeLoop()
     }

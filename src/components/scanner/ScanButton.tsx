@@ -20,6 +20,7 @@
 import { lazy, Suspense, useCallback, useState, type ReactNode } from 'react'
 import { ScanLine } from 'lucide-react'
 import type { ScanResult } from '@/types/scanner'
+import type { ScanMode } from '@/hooks/scanner/useBarcodeEngine'
 
 const LocalScannerView = lazy(() => import('./LocalScannerView'))
 
@@ -28,12 +29,21 @@ interface Props {
   onResult:  (result: ScanResult) => void
   disabled?: boolean
   // Optional label/icon override so the same component can render as
-  // e.g. two distinct "Scan Barcode" / "Scan Medicine" buttons without
+  // e.g. two distinct "Scan Barcode" / "Scan QR" buttons without
   // duplicating any of the scanning logic below. Defaults preserve the
   // exact previous single-button copy and icon.
   label?: string
   icon?: ReactNode
   className?: string
+  // Which symbology the scanner should open directly into (see
+  // useBarcodeEngine's ScanMode) — e.g. a "Scan QR" button passes 'qr'
+  // here so tapping it jumps straight into QR mode instead of the
+  // default 'barcode', while still opening the exact same scanner
+  // (LocalScannerView/useLocalScanner/useBarcodeEngine) as every other
+  // entry point. The in-scanner Barcode|QR toggle still works normally
+  // afterwards — this only decides what it starts on. Defaults to
+  // 'barcode' so every existing caller's behavior is unchanged.
+  initialMode?: ScanMode
 }
 
 // A camera counts as "available" if the browser exposes the mediaDevices
@@ -44,7 +54,7 @@ function hasCameraSupport(): boolean {
   return typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia
 }
 
-export default function ScanButton({ context, onResult, disabled, label, icon, className }: Props) {
+export default function ScanButton({ context, onResult, disabled, label, icon, className, initialMode }: Props) {
   const [localOpen, setLocalOpen] = useState(false)
   const cameraSupported = hasCameraSupport()
 
@@ -83,6 +93,7 @@ export default function ScanButton({ context, onResult, disabled, label, icon, c
           context={context}
           onResult={onResult}
           onClose={() => setLocalOpen(false)}
+          initialMode={initialMode}
         />
       </Suspense>
     </>

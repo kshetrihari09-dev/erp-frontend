@@ -23,7 +23,7 @@ import {
   CalendarDays, CreditCard, User, MapPin, Hash,
   Phone as PhoneIcon, ChevronDown, AlertCircle,
   CheckCircle2, RotateCcw, Save, Plus, UserPlus,
-  ScanLine, Pill,
+  ScanLine, Pill, QrCode,
 } from 'lucide-react'
 import { salesAPI, partiesAPI, productsAPI } from '@/services/api'
 import useUIStore from '@/store/uiStore'
@@ -757,7 +757,13 @@ export default function SalesPage() {
                   <ScanButton context="sales" onResult={handleScanResult} />
                 </div>
                 {/* Mobile-only: same button, reusing the exact same
-                    ScanButton/scanning pipeline as desktop. */}
+                    ScanButton/scanning pipeline as desktop — just two
+                    entry points into it, each pre-selecting which mode
+                    the scanner should open in (see ScanButton's
+                    initialMode prop). Neither duplicates the scanner:
+                    both render the same LocalScannerView/useLocalScanner/
+                    useBarcodeEngine chain, just parameterized. The
+                    in-scanner Barcode|QR toggle is untouched either way. */}
                 <div className="pos-scan-row pos-mobile-only">
                   <ScanButton
                     context="sales"
@@ -765,6 +771,15 @@ export default function SalesPage() {
                     label="Scan Barcode"
                     icon={<ScanLine size={15} />}
                     className="pos-scan-btn pos-scan-btn-barcode"
+                    initialMode="barcode"
+                  />
+                  <ScanButton
+                    context="sales"
+                    onResult={handleScanResult}
+                    label="Scan QR"
+                    icon={<QrCode size={15} />}
+                    className="pos-scan-btn pos-scan-btn-qr"
+                    initialMode="qr"
                   />
                 </div>
                 {/* pos-kbd-hints: hidden on mobile via CSS addendum */}

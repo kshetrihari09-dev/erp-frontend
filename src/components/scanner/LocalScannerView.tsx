@@ -29,6 +29,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { X, RotateCcw, Loader2 } from 'lucide-react'
 import useLocalScanner from '@/hooks/scanner/useLocalScanner'
 import type { ScanResult } from '@/types/scanner'
+import type { ScanMode } from '@/hooks/scanner/useBarcodeEngine'
 import { ProductCard, BarcodeRectOverlay } from './ScannerUI'
 import BarcodeScannerView from './BarcodeScannerView'
 import { Z } from '@/styles/zIndex'
@@ -44,13 +45,20 @@ interface Props {
   context:  'sales' | 'purchase'
   onResult: (result: ScanResult) => void
   onClose:  () => void
+  // Which symbology the scanner should open into (see useBarcodeEngine's
+  // ScanMode and useLocalScanner's Options.initialMode) — lets a
+  // dedicated entry point (e.g. a "Scan QR" button) jump straight into
+  // QR mode. Defaults to 'barcode', matching every existing caller.
+  // The in-scanner Barcode|QR toggle is completely unaffected by this —
+  // it's only the mode the camera starts in, not a restriction.
+  initialMode?: ScanMode
 }
 
 function vibrate(pattern: number | number[]) {
   try { navigator.vibrate?.(pattern) } catch {}
 }
 
-export default function LocalScannerView({ open, context, onResult, onClose }: Props) {
+export default function LocalScannerView({ open, context, onResult, onClose, initialMode }: Props) {
   const vibratedRef      = useRef(false)
 
   // rescan() only exists once useLocalScanner has been called below, but
@@ -75,7 +83,7 @@ export default function LocalScannerView({ open, context, onResult, onClose }: P
     state, videoRef, containerRef, toggleFlash, switchCamera, setZoom,
     selectProduct, rescan, retryPermission, scanFromGallery,
     scanMode, setScanMode,
-  } = useLocalScanner({ context, onResult: handleResult, active: open })
+  } = useLocalScanner({ context, onResult: handleResult, active: open, initialMode })
 
   useEffect(() => { rescanRef.current = rescan }, [rescan])
 
