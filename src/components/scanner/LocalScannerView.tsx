@@ -140,6 +140,15 @@ export default function LocalScannerView({ open, context, onResult, onClose, ini
           scanMode={showDrawer ? undefined : scanMode}
           onScanModeChange={showDrawer ? undefined : setScanMode}
           onGalleryPick={showDrawer ? undefined : scanFromGallery}
+          // "Done" bottom-right — see BarcodeScannerView's onDone doc for
+          // why this exists alongside the X: this is a continuous
+          // multi-scan flow (tap Scan once, scan several items in a row),
+          // so a quick, thumb-reachable "I'm finished" matters here more
+          // than in a single-shot scanner. Wired straight to the same
+          // onClose the X already uses — no new teardown path. Hidden
+          // while the matches drawer covers this area, same as the
+          // gallery button/zoom slider above.
+          onDone={showDrawer ? undefined : onClose}
           success={state.status === 'done'}
           successLabel="Added!"
         >

@@ -29,7 +29,7 @@ import type { TouchEvent as ReactTouchEvent, RefObject, ReactNode, ChangeEvent }
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   X, Zap, ZapOff, RefreshCw, CameraOff, AlertCircle, RotateCcw,
-  Loader2, CheckCircle2, ImageIcon,
+  Loader2, CheckCircle2, ImageIcon, Check,
 } from 'lucide-react'
 import type { CameraStatus, ScanMode } from '@/hooks/scanner/useBarcodeEngine'
 import { ScanStatusPill, ScanModeToggle } from './ScannerUI'
@@ -51,14 +51,17 @@ interface Props {
   onClose: () => void
   onRetryPermission: () => void
 
-  /** Optional "Done" pill in the top bar, alongside the existing X close
-   *  button — only rendered when a caller passes it, so scanners that
-   *  don't (LocalScannerView) are completely unaffected. Distinct from
-   *  onClose only in that a caller could wire different handlers if it
-   *  ever needed to; ProductScanModal wires both to the same close flow,
-   *  since "Done" here just means "I'm finished, exit the scanner" —
-   *  the same full teardown (camera stream stopped, decoder destroyed,
-   *  modal closed) either button already triggers by unmounting. */
+  /** Optional "Done" button, bottom-right of the scanner (same row as the
+   *  gallery button/zoom slider) — only rendered when a caller passes it,
+   *  so scanners that don't (ProductScanModal) are completely unaffected.
+   *  Meant for a continuous multi-scan flow (LocalScannerView's Sales/
+   *  Purchase scanner): the X top-left already closes the scanner at any
+   *  time, but after adding several items in a row, reaching back up to
+   *  the top-left corner is awkward one-handed — this puts "I'm finished
+   *  scanning" within the same thumb-reachable bottom area as the rest of
+   *  the scanning controls. Same full teardown (camera stream stopped,
+   *  decoder destroyed, scanner closed) as the X — callers typically wire
+   *  this straight to the same onClose. */
   onDone?: () => void
   doneLabel?: string
 
@@ -297,14 +300,6 @@ export default function BarcodeScannerView({
                 >
                   <RefreshCw size={16} />
                 </button>
-                {onDone && (
-                  <button
-                    onClick={onDone}
-                    className="px-3.5 h-10 rounded-full bg-white/15 backdrop-blur-md flex items-center justify-center text-white text-xs font-semibold active:scale-90 transition-transform"
-                  >
-                    {doneLabel}
-                  </button>
-                )}
               </div>
             </div>
           )}
@@ -324,7 +319,7 @@ export default function BarcodeScannerView({
                 </div>
               )}
 
-              {(showZoomSlider || onGalleryPick) && (
+              {(showZoomSlider || onGalleryPick || onDone) && (
                 <div className="w-full flex items-center justify-between pointer-events-auto">
                   {onGalleryPick ? (
                     <button
@@ -361,7 +356,17 @@ export default function BarcodeScannerView({
                     </div>
                   )}
 
-                  <div className="w-14" />
+                  {onDone ? (
+                    <button
+                      onClick={onDone}
+                      aria-label="Finish scanning"
+                      className="flex-shrink-0 px-4 h-10 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center gap-1.5 active:scale-90 transition-transform shadow-lg shadow-blue-900/30"
+                    >
+                      <Check size={14} /> {doneLabel}
+                    </button>
+                  ) : (
+                    <div className="w-14" />
+                  )}
                 </div>
               )}
 
