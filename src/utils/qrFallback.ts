@@ -1,19 +1,24 @@
 /**
  * qrFallback.ts
  *
- * FALLBACK-ONLY preprocessing for hard-to-read QR codes (faded, gray,
- * old/worn print, low contrast, uneven lighting, slight blur). This never
- * runs on the fast path — useBarcodeEngine's decode loop always tries the
- * raw camera crop with ZXing first, exactly as before, and only reaches
- * into this module when that attempt comes back empty AND the engine is
- * in QR mode. Good-quality QR codes are decoded on the very first frame
- * exactly as fast as before this file existed.
+ * FALLBACK-ONLY preprocessing for hard-to-read 2D matrix codes — QR,
+ * Data Matrix, and Aztec alike (faded, gray, old/worn print, low
+ * contrast, uneven lighting, slight blur). This never runs on the fast
+ * path — useBarcodeEngine's decode loop always tries the raw camera crop
+ * with ZXing first, exactly as before, and only reaches into this module
+ * when that attempt comes back empty AND the engine is in "qr" mode
+ * (which covers all three of those formats). Good-quality codes of any
+ * of these formats are decoded on the very first frame exactly as fast
+ * as before this file existed.
  *
  * ZXing itself is never modified or replaced — every function below just
  * produces a new HTMLCanvasElement, which the caller hands to the same
  * ZXing reader instance already in use (reader.decodeFromCanvas). This
- * file has no opinion about barcode formats, product matching, or the QR
- * payload shape; it only improves the *image* ZXing gets to look at.
+ * file has no opinion about barcode *formats* at all (it never inspects
+ * or branches on which symbology it's helping) — it only improves the
+ * *image* ZXing gets to look at, so it applies equally to QR, Data
+ * Matrix, and Aztec without any changes needed here when a new format is
+ * added to the reader's hints elsewhere.
  */
 
 // Upscaling a small/blurry crop before ZXing's own finder-pattern search
@@ -229,14 +234,16 @@ export function adaptiveThresholdCanvas(
 
 /**
  * Runs the ordered fallback pipeline against a single already-cropped
- * native-resolution QR frame, stopping the instant any variant decodes.
- * Only called by useBarcodeEngine, and only after the primary (fast,
- * unprocessed) decode attempt on that same frame has already failed.
+ * native-resolution 2D-code frame (QR, Data Matrix, or Aztec — this
+ * function has no idea which, and doesn't need to), stopping the instant
+ * any variant decodes. Only called by useBarcodeEngine, and only after
+ * the primary (fast, unprocessed) decode attempt on that same frame has
+ * already failed.
  *
- * Order matches the spec: grayscale → contrast → sharpen → adaptive
- * threshold → inverted adaptive threshold. Cheapest/most-likely-to-help
- * variants are tried first so the common case (mild fade/gray print)
- * resolves in 1-2 extra decode attempts, not all 5.
+ * Order: grayscale → contrast → sharpen → adaptive threshold → inverted
+ * adaptive threshold. Cheapest/most-likely-to-help variants are tried
+ * first so the common case (mild fade/gray print) resolves in 1-2 extra
+ * decode attempts, not all 5.
  */
 export async function decodeWithFallback(
   reader: { decodeFromCanvas: (canvas: HTMLCanvasElement) => Promise<any> },

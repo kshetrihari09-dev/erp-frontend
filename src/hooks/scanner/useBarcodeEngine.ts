@@ -39,13 +39,23 @@
  *     CONFIRM_TICKS consecutive frames (guards against a single stray
  *     misread from blur/glare/occlusion), and the loop stops itself the
  *     instant a barcode is confirmed so callers never see a duplicate read.
- *   - QR fallback preprocessing (QR mode only, see utils/qrFallback.ts):
+ *   - 2D matrix format support in "qr" mode: QR_CODE, DATA_MATRIX, and
+ *     AZTEC all decode through the same reader/pass in this mode (see
+ *     build2DHints/getReader below) — Data Matrix in particular is what
+ *     pharmaceutical/GS1 packaging codes use instead of QR, so this mode
+ *     is really "2D matrix codes" even though it's still surfaced to the
+ *     person as the "QR" toggle option. Barcode mode's formats (EAN/UPC/
+ *     CODE_128) are untouched and still decode via a separate reader.
+ *   - QR/2D fallback preprocessing ("qr" mode only, see utils/qrFallback.ts):
  *     when the primary, unprocessed decode fails on a frame, a throttled
  *     fallback tries a handful of image-processing variants (upscale,
  *     grayscale, contrast stretch, sharpen, adaptive threshold) of that
  *     same cropped frame through the same ZXing reader — for faded/gray/
- *     low-contrast/slightly-blurred QR codes the raw frame can't decode.
- *     Barcode mode and good-quality QR decodes are entirely unaffected.
+ *     low-contrast/slightly-blurred codes the raw frame can't decode.
+ *     The pipeline has no format-specific logic (it only ever hands a
+ *     processed canvas to whichever reader is passed in), so it applies
+ *     equally to QR, Data Matrix, and Aztec. Barcode mode and good-
+ *     quality decodes of any format are entirely unaffected.
  *
  * What this hook deliberately does NOT own (left to each feature hook):
  *   - What to do with a decoded barcode (product lookup vs. filling a
@@ -66,6 +76,10 @@ export type CameraStatus =
 // than something inferred after the fact — the engine hands each mode its
 // own purpose-scoped decoder (see getReader below) instead of running
 // every format on every frame regardless of what's actually being scanned.
+// 'qr' covers every 2D matrix symbology this app supports (QR_CODE,
+// DATA_MATRIX, AZTEC) rather than QR alone — kept as the 'qr' string
+// (not renamed to e.g. '2d') so the existing UI toggle, state shape, and
+// every other caller of this hook need no changes.
 export type ScanMode = 'barcode' | 'qr'
 
 export interface BarcodeEngineState {
@@ -104,23 +118,25 @@ const SCAN_THROTTLE_MS = 120
 // imperceptible against the accuracy gained.
 const CONFIRM_TICKS_BARCODE = 2
 
-// QR mode intentionally skips the consecutive-match confirmation: a QR
-// code carries its own Reed–Solomon error correction, so a decode that
-// comes back at all is already far more trustworthy than a bare CODE128
-// read — and the whole point of QR mode is to stop and return the value
-// the instant one is read, not add a second frame of latency waiting to
-// re-confirm it.
+// "qr" mode (QR/Data Matrix/Aztec) intentionally skips the consecutive-
+// match confirmation: all three formats carry their own Reed–Solomon
+// error correction, so a decode that comes back at all is already far
+// more trustworthy than a bare CODE128 read — and the whole point of this
+// mode is to stop and return the value the instant one is read, not add a
+// second frame of latency waiting to re-confirm it.
 const CONFIRM_TICKS_QR = 1
 
-// QR FALLBACK PREPROCESSING (see utils/qrFallback.ts): only attempted when
-// the primary, unprocessed decode on a given frame already failed AND
-// we're in QR mode — never on barcode mode, never instead of the primary
-// attempt. This throttle is separate from (and longer than) the normal
-// SCAN_THROTTLE_MS tick cadence: the primary decode still runs on every
-// tick at full speed (so good-quality QR codes are unaffected), but the
-// heavier multi-variant preprocessing pipeline only fires this often at
-// most, so pointing the camera at a blank/non-QR scene doesn't burn CPU
-// running 5 image-processing passes ~8x/second for nothing.
+// QR/2D FALLBACK PREPROCESSING (see utils/qrFallback.ts): only attempted
+// when the primary, unprocessed decode on a given frame already failed
+// AND we're in "qr" mode (which covers QR_CODE, DATA_MATRIX, and AZTEC —
+// see build2DHints below) — never on barcode mode, never instead of the
+// primary attempt. This throttle is separate from (and longer than) the
+// normal SCAN_THROTTLE_MS tick cadence: the primary decode still runs on
+// every tick at full speed (so good-quality decodes of any of these
+// formats are unaffected), but the heavier multi-variant preprocessing
+// pipeline only fires this often at most, so pointing the camera at a
+// blank/non-code scene doesn't burn CPU running 5 image-processing passes
+// ~8x/second for nothing.
 const QR_FALLBACK_THROTTLE_MS = 350
 
 const INITIAL_STATE: BarcodeEngineState = {
@@ -177,11 +193,11 @@ async function requestCameraStream(facingMode: 'environment' | 'user'): Promise<
 // Barcode-mode formats — scoped to what this app actually issues/accepts:
 // EAN-13/EAN-8/UPC-A/UPC-E (real retail barcodes, and the EAN-13 shape
 // auto-generated barcodes are encoded as — see erp-unified-backend's
-// buildAutoBarcode()) plus CODE_128 (legacy/manual entries). QR is
-// deliberately NOT in this set — it has its own dedicated decoder/path
-// below — so the barcode-mode reader never spends a decode pass looking
-// for a QR finder pattern while the person has explicitly selected
-// Barcode mode.
+// buildAutoBarcode()) plus CODE_128 (legacy/manual entries). QR, Data
+// Matrix, and Aztec are deliberately NOT in this set — they have their
+// own dedicated 2D decoder/path below (see build2DHints) — so the
+// barcode-mode reader never spends a decode pass looking for a 2D matrix
+// finder pattern while the person has explicitly selected Barcode mode.
 async function buildBarcodeHints() {
   const { BarcodeFormat, DecodeHintType } = await import('@zxing/library')
   const hints = new Map<any, any>()
@@ -198,16 +214,21 @@ async function buildBarcodeHints() {
   return hints
 }
 
-// QR-mode hints — only used as a fallback if this build's @zxing/browser
-// doesn't export a dedicated QR-only reader class (see getReader below).
-// A real QR-only reader doesn't need POSSIBLE_FORMATS at all since its
-// detector never looks for anything but QR finder patterns in the first
-// place; this Map exists purely so the fallback multi-format reader can
-// be scoped down to the same behavior.
-async function buildQrOnlyHints() {
+// 2D-mode hints — used for every symbology this mode looks for (QR,
+// Data Matrix, Aztec). All three are 2D matrix symbologies with their own
+// finder pattern and their own error correction (QR/Aztec: Reed–Solomon;
+// Data Matrix: Reed–Solomon), which is why they share one reader/pass
+// instead of each needing a dedicated decoder the way 1D formats do.
+// Data Matrix in particular is required for pharmaceutical/GS1 codes on
+// medicine packaging, which don't use QR at all.
+async function build2DHints() {
   const { BarcodeFormat, DecodeHintType } = await import('@zxing/library')
   const hints = new Map<any, any>()
-  hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.QR_CODE])
+  hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+    BarcodeFormat.QR_CODE,
+    BarcodeFormat.DATA_MATRIX,
+    BarcodeFormat.AZTEC,
+  ])
   hints.set(DecodeHintType.TRY_HARDER, true)
   return hints
 }
@@ -233,11 +254,12 @@ export default function useBarcodeEngine() {
   const modeRef = useRef<ScanMode>('barcode')
 
   // Two independently lazy, independently cached ZXing readers — one
-  // scoped to barcode formats, one scoped to QR — rather than a single
-  // shared reader reconfigured on every mode switch. Each is created at
-  // most once (on first use of that mode) and reused for the rest of the
-  // engine's lifetime, same as before; there are just two of them now
-  // instead of one, so switching modes never re-pays decoder init cost.
+  // scoped to 1D barcode formats, one scoped to 2D matrix formats (QR,
+  // Data Matrix, Aztec) — rather than a single shared reader reconfigured
+  // on every mode switch. Each is created at most once (on first use of
+  // that mode) and reused for the rest of the engine's lifetime, same as
+  // before; there are just two of them now instead of one, so switching
+  // modes never re-pays decoder init cost.
   const barcodeReaderRef        = useRef<any>(null)
   const barcodeReaderPromiseRef = useRef<Promise<any> | null>(null)
   const qrReaderRef             = useRef<any>(null)
@@ -248,17 +270,20 @@ export default function useBarcodeEngine() {
       if (qrReaderRef.current) return qrReaderRef.current
       if (!qrReaderPromiseRef.current) {
         qrReaderPromiseRef.current = (async () => {
-          const zxingBrowser: any = await import('@zxing/browser')
-          const hints = await buildQrOnlyHints()
-          // Prefer a dedicated QR-only decoder when this build exports
-          // one — it skips the 1D/multi-format dispatch entirely and
-          // goes straight to QR's own finder-pattern detector, which is
-          // the actual "faster QR decoding path" this mode exists to
-          // provide. Fall back to the multi-format reader scoped to
-          // QR_CODE only if not, so QR mode still works either way.
-          const reader = zxingBrowser.BrowserQRCodeReader
-            ? new zxingBrowser.BrowserQRCodeReader(hints)
-            : new zxingBrowser.BrowserMultiFormatReader(hints)
+          const [{ BrowserMultiFormatReader }, hints] = await Promise.all([
+            import('@zxing/browser'),
+            build2DHints(),
+          ])
+          // Always the multi-format reader here, never BrowserQRCodeReader:
+          // that class is hardwired internally to only ever construct a
+          // QRCodeReader, so no hint can make it decode Data Matrix or
+          // Aztec — it doesn't consult POSSIBLE_FORMATS at all. The
+          // multi-format reader, scoped down to exactly these three
+          // formats via build2DHints(), is what actually gives this mode
+          // Data Matrix/Aztec support while keeping the same "only look
+          // for 2D matrix codes, skip 1D entirely" fast path this mode
+          // has always had.
+          const reader = new BrowserMultiFormatReader(hints)
           qrReaderRef.current = reader
           return reader
         })()
@@ -397,9 +422,12 @@ export default function useBarcodeEngine() {
 
   // ── Decode a barcode from a still image (gallery / file picker) ─────────────
   // Reuses the same lazily-created ZXing reader instance as the live decode
-  // loop — no separate decoder, no extra bundle weight. Independent of
-  // camera state entirely, so it works even before/without the camera ever
-  // opening (e.g. picking a photo while permission is still pending).
+  // loop — no separate decoder, no extra bundle weight, and identical format
+  // support: in "qr" mode this decodes QR, Data Matrix, or Aztec from the
+  // picked image exactly as the live camera loop would, since both paths
+  // call the same getReader(modeRef.current). Independent of camera state
+  // entirely, so it works even before/without the camera ever opening (e.g.
+  // picking a photo while permission is still pending).
   const scanImageFile = useCallback(async (file: File): Promise<{ code: string; format?: string } | null> => {
     const reader = await getReader(modeRef.current)
     const url = URL.createObjectURL(file)
