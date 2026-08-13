@@ -73,14 +73,15 @@ export default function QRCodeLabel({ name, price, code, widthMm, heightMm, clas
   const heightPx = heightMm * MM_TO_PX
   const widthPx  = widthMm * MM_TO_PX
 
-  const namePx  = Math.min(10, Math.max(5, heightPx * 0.10))
-  const pricePx = Math.min(16, Math.max(7, heightPx * 0.16))
+  // Name/price text rows were removed from the printed label — a scanner
+  // only ever reads the QR square itself, and the extra text ate into the
+  // vertical budget available to it, forcing smaller modules (and, on
+  // small labels, often the "too dense to scan" fallback below). The QR
+  // now gets the label's full budget in both dimensions, minus a small
+  // gap so it doesn't touch the label's edge/border.
   const gapsPx  = 3 // breathing room around the QR block
 
-  // Whatever's left over vertically is the QR's budget — but it also
-  // can't exceed the label's own width, since the QR square must fit
-  // both dimensions of the label.
-  const qrBudgetPx = Math.max(14, Math.min(heightPx - namePx - pricePx - gapsPx, widthPx * 0.9))
+  const qrBudgetPx = Math.max(14, Math.min(heightPx - gapsPx, widthPx * 0.9))
 
   useEffect(() => {
     if (!canvasRef.current) return
@@ -189,19 +190,6 @@ export default function QRCodeLabel({ name, price, code, widthMm, heightMm, clas
         pageBreakInside: 'avoid',
       }}
     >
-      <div
-        style={{
-          fontSize: `${namePx}px`,
-          fontWeight: 700,
-          whiteSpace: 'nowrap',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          maxWidth: '100%',
-          lineHeight: 1.1,
-        }}
-      >
-        {name}
-      </div>
       <canvas
         ref={canvasRef}
         style={{
@@ -233,9 +221,6 @@ export default function QRCodeLabel({ name, price, code, widthMm, heightMm, clas
           {!code ? 'Barcode not assigned' : renderError ? 'Invalid barcode' : 'Too dense to scan reliably'}
         </div>
       )}
-      <div style={{ fontSize: `${pricePx}px`, fontWeight: 700, lineHeight: 1.1 }}>
-        Rs. {price}
-      </div>
     </div>
   )
 }
