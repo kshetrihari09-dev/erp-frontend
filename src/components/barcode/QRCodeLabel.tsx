@@ -4,6 +4,29 @@ import QRCode from 'qrcode'
 // CSS reference pixel density: 96px per inch, 25.4mm per inch.
 const MM_TO_PX = 96 / 25.4
 
+// ISO/IEC 18004's own minimum quiet zone for a QR code is 4 modules on
+// every side — the blank border a scanner's detector uses to find the
+// code's edges in the first place. Passed straight to qrcode's own
+// `margin` option (which is specified in modules, not px) so it's baked
+// into the rendered bitmap itself, not left to whatever incidental
+// whitespace the surrounding label layout happens to leave. That matters
+// because the previous `margin: 0` relied entirely on this label's own
+// 1mm side padding / 0.5mm row gap for a quiet zone — thin, and shared
+// with the printed name/price text and the label's dashed cut line, so
+// it could (and in practice did) fall short once actually printed and
+// trimmed, even though the on-screen preview looked fine.
+const QUIET_ZONE_MODULES = 4
+
+// Minimum module size we'll draw at, mirroring BarcodeLabel's
+// MIN_MODULE_WIDTH_PX guard for the same reason: below this, a scanner
+// can no longer reliably resolve individual modules, and letting CSS
+// silently shrink the canvas past it produces a code that looks fine on
+// screen but fails under a real scanner with no visible sign why. Set a
+// little higher than the linear barcode's floor (0.75px) because a QR
+// module has to be resolved cleanly in both dimensions, not just one, so
+// it's more sensitive to the same amount of print/optical blur.
+const MIN_QR_MODULE_PX = 1.0
+
 export interface QRCodeLabelProps {
   name: string
   price: number | string
@@ -20,6 +43,13 @@ export interface QRCodeLabelProps {
    *  this same markup survives the print-popup innerHTML clone and the
    *  html2canvas rasterization used for PDF export. */
   className?: string
+  /** Fires whenever this code would have to render with modules smaller
+   *  than MIN_QR_MODULE_PX to fit widthMm/heightMm — i.e. whenever this
+   *  label is blocked from being scannable at this size. Mirrors
+   *  BarcodeLabel's identical onTooDense so callers (QRCodePrintPage) can
+   *  block printing/exporting for just the affected product(s) instead
+   *  of silently shipping a code that won't scan. */
+  onTooDense?: (tooDense: boolean) => void
 }
 
 /**
@@ -31,9 +61,14 @@ export interface QRCodeLabelProps {
  * budget, so nothing overflows a small label the way an unclamped
  * barcode height did before.
  */
-export default function QRCodeLabel({ name, price, code, widthMm, heightMm, className }: QRCodeLabelProps) {
+export default function QRCodeLabel({ name, price, code, widthMm, heightMm, className, onTooDense }: QRCodeLabelProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [renderError, setRenderError] = useState(false)
+  // See MIN_QR_MODULE_PX above — set when this code's data size (which
+  // grows with the length/error-correction of `code`, not with label
+  // size) would need modules smaller than that floor to fit this exact
+  // label size.
+  const [tooDense, setTooDense] = useState(false)
 
   const heightPx = heightMm * MM_TO_PX
   const widthPx  = widthMm * MM_TO_PX
@@ -51,6 +86,8 @@ export default function QRCodeLabel({ name, price, code, widthMm, heightMm, clas
     if (!canvasRef.current) return
     const canvas = canvasRef.current
     setRenderError(false)
+    setTooDense(false)
+    onTooDense?.(false)
     if (!code) {
       // No barcode stored for this product — leave the canvas blank and
       // let the "Barcode not assigned" row (rendered below) carry the
@@ -60,6 +97,42 @@ export default function QRCodeLabel({ name, price, code, widthMm, heightMm, clas
       if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height)
       return
     }
+
+    // ACCURATE SCANNING — measure BEFORE drawing anything, the same way
+    // BarcodeLabel measures its actual rendered width before deciding
+    // whether to shrink or give up: QRCode.create() (synchronous) gives
+    // us the data grid size in modules for this exact code + error-
+    // correction level, *not* counting the quiet zone — so we can work
+    // out the real on-label module size this label size would produce
+    // and catch it before committing to a draw we already know won't be
+    // reliably scannable.
+    let dataModules: number
+    try {
+      dataModules = QRCode.create(code, { errorCorrectionLevel: 'M' }).modules.size
+    } catch {
+      // QRCode rejected the value outright — surface it rather than
+      // silently leaving a blank/different code.
+      const ctx = canvas.getContext('2d')
+      if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height)
+      setRenderError(true)
+      return
+    }
+
+    const totalGridModules = dataModules + QUIET_ZONE_MODULES * 2
+    const moduleSizePx = qrBudgetPx / totalGridModules
+    if (moduleSizePx < MIN_QR_MODULE_PX) {
+      // Even with a correct 4-module quiet zone reserved, an individual
+      // module would render smaller than MIN_QR_MODULE_PX at this label
+      // size — stop rather than draw a QR we already know is likely to
+      // fail under a scanner, and surface it (mirrors BarcodeLabel's
+      // identical tooDense behavior).
+      const ctx = canvas.getContext('2d')
+      if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height)
+      setTooDense(true)
+      onTooDense?.(true)
+      return
+    }
+
     // Render at 4x the display size so it stays crisp when scaled up for
     // print / PDF export (matches the >1x density BarcodeLabel gets for
     // free from its SVG's vector bars).
@@ -79,7 +152,7 @@ export default function QRCodeLabel({ name, price, code, widthMm, heightMm, clas
     // scan of this label must decode to exactly this string.
     QRCode.toCanvas(canvas, code, {
       width: renderPx,
-      margin: 0,
+      margin: QUIET_ZONE_MODULES,
       errorCorrectionLevel: 'M',
       color: { dark: '#000000', light: '#ffffff' },
     }).then(() => {
@@ -92,7 +165,7 @@ export default function QRCodeLabel({ name, price, code, widthMm, heightMm, clas
       if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height)
       setRenderError(true)
     })
-  }, [code, qrBudgetPx])
+  }, [code, qrBudgetPx, onTooDense])
 
   return (
     <div
@@ -132,14 +205,14 @@ export default function QRCodeLabel({ name, price, code, widthMm, heightMm, clas
       <canvas
         ref={canvasRef}
         style={{
-          display: code && !renderError ? 'block' : 'none',
+          display: code && !renderError && !tooDense ? 'block' : 'none',
           width: `${qrBudgetPx}px`,
           height: `${qrBudgetPx}px`,
           maxWidth: '100%',
           maxHeight: `${qrBudgetPx}px`,
         }}
       />
-      {(!code || renderError) && (
+      {(!code || renderError || tooDense) && (
         <div
           style={{
             width: `${qrBudgetPx}px`,
@@ -157,7 +230,7 @@ export default function QRCodeLabel({ name, price, code, widthMm, heightMm, clas
             lineHeight: 1.15,
           }}
         >
-          {!code ? 'Barcode not assigned' : 'Invalid barcode'}
+          {!code ? 'Barcode not assigned' : renderError ? 'Invalid barcode' : 'Too dense to scan reliably'}
         </div>
       )}
       <div style={{ fontSize: `${pricePx}px`, fontWeight: 700, lineHeight: 1.1 }}>

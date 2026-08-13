@@ -69,7 +69,32 @@ export default function QRCodePrintPage() {
       )
       return false
     }
+    if (denseItems.length > 0) {
+      const names = denseItems.map(i => i.product.name).join(', ')
+      window.alert(
+        `Cannot print — the QR code for the following product(s) is too dense to render reliably ` +
+        `at this label size: ${names}. Pick a larger label size for these, or shorten/regenerate ` +
+        `their barcode from the product page.`
+      )
+      return false
+    }
     return true
+  }
+
+  // Same "too dense to scan" guard as BarcodePrintPage's denseIds — see
+  // QRCodeLabel's onTooDense doc for what it actually measures.
+  const [denseIds, setDenseIds] = useState<Set<string>>(new Set())
+  const denseItems = useMemo(
+    () => items.filter(i => denseIds.has(i.product.id)),
+    [items, denseIds]
+  )
+  function handleTooDense(productId: string, isDense: boolean) {
+    setDenseIds(prev => {
+      if (isDense === prev.has(productId)) return prev
+      const next = new Set(prev)
+      if (isDense) next.add(productId); else next.delete(productId)
+      return next
+    })
   }
 
   // ── Dropdown position — portaled to document.body ───────────────────────
@@ -332,6 +357,22 @@ export default function QRCodePrintPage() {
   // row/column layout to the grid — html2canvas handles flex-wrap
   // correctly — then it's swapped back immediately after so the live
   // page (and the next print/PDF) keeps using the real grid.
+  // Same html2canvas grid-collapse workaround as printSheet's sibling
+  // issue — see the comment above.
+  //
+  // IMAGE QUALITY — mirrors the identical fix already applied to
+  // BarcodePrintPage.tsx's downloadPdf():
+  //   1. `image: { type: 'jpeg' }` was the previous setting here. JPEG's
+  //      lossy DCT compression puts soft "ringing" halos around hard
+  //      black/white edges — exactly the edges a QR/barcode scanner's
+  //      binarizer depends on to find module boundaries. type: 'png' is
+  //      lossless, so those edges come out of the PDF exactly as crisp
+  //      as the on-screen canvas already renders them.
+  //   2. `html2canvas: { scale: 2 }` → `scale: 4`. QR modules need clean
+  //      edges in *two* dimensions (unlike a barcode's bars, which only
+  //      need horizontal resolution), so they're more sensitive to a low
+  //      raster scale than barcodes are — scale: 4 gives each module
+  //      several source pixels on every side instead of one or two.
   async function downloadPdf() {
     const el = sheetRef.current
     if (!el || totalLabels === 0) return
@@ -347,8 +388,8 @@ export default function QRCodePrintPage() {
         .set({
           margin: PAGE_MARGIN_MM,
           filename: 'qrcode-labels.pdf',
-          image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+          image: { type: 'png' },
+          html2canvas: { scale: 4, useCORS: true, backgroundColor: '#ffffff' },
           jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
         })
         .from(el)
@@ -428,6 +469,22 @@ export default function QRCodePrintPage() {
             <strong>No barcode assigned</strong> for: {missingBarcodeItems.map(i => i.product.name).join(', ')}.
             A QR code needs a barcode value to encode — printing is blocked for these until a barcode is
             assigned on the product page.
+          </span>
+        </p>
+      )}
+
+      {denseItems.length > 0 && (
+        <p className="qrp-dense-hint" style={{
+          display: 'flex', alignItems: 'flex-start', gap: 6,
+          fontSize: '12px', color: '#b91c1c', margin: '0 0 12px',
+          background: 'rgba(185,28,28,0.08)', border: '1px solid rgba(185,28,28,0.25)',
+          borderRadius: 8, padding: '8px 10px',
+        }}>
+          <AlertTriangle size={14} style={{ flexShrink: 0, marginTop: 1 }} />
+          <span>
+            <strong>Too dense to scan reliably</strong> at this label size: {denseItems.map(i => i.product.name).join(', ')}.
+            Their QR code's modules would have to be squeezed smaller than a scanner can resolve to fit —
+            printing is blocked for these until you pick a larger label size.
           </span>
         </p>
       )}
@@ -574,6 +631,7 @@ export default function QRCodePrintPage() {
                   code={item.product.barcode || ''}
                   widthMm={widthMm}
                   heightMm={heightMm}
+                  onTooDense={dense => handleTooDense(item.product.id, dense)}
                 />
               ))}
             </div>
