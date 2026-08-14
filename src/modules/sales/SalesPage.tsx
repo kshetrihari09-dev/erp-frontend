@@ -948,15 +948,10 @@ export default function SalesPage() {
                           value={row.product_id}
                           products={products}
                           onChange={p => {
-                            // Saved C.C % from the Product page (aliased to
-                            // cc_pct by the /search route) is applied
-                            // automatically whenever a product is selected,
-                            // same as the desktop and scanner flows.
-                            const cc_pct = p.cc_pct ?? 0
-                            const { amount, cc_amount } = reCalc({ rate: Number(p.sales_rate), cc_pct })
+                            const { amount, cc_amount } = reCalc({ rate: Number(p.sales_rate) })
                             // batch_no/expiry cleared: they belonged to whatever
                             // product was previously in this row, if any.
-                            updateRow({ product_id: p.id, product_name: p.name, rate: p.sales_rate, cc_pct, amount, cc_amount, batch_no: '', expiry: '' })
+                            updateRow({ product_id: p.id, product_name: p.name, rate: p.sales_rate, amount, cc_amount, batch_no: '', expiry: '' })
                           }}
                           onCreated={p => setProducts(prev => prev.some(x => x.id === p.id) ? prev : [...prev, p])}
                         />
