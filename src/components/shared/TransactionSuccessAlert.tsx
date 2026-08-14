@@ -69,11 +69,11 @@ export default function TransactionSuccessAlert({
           transition={{ duration: 0.18 }}
           style={{
             position: 'fixed',
-            // OfflineStatusIndicator occupies the top-right corner
-            // (top:10, right:10, ~28px tall) whenever a company is logged
-            // in — which is always true here, since posting a sale/purchase
-            // requires being logged in. Start below it (10 + ~28 + 8px gap)
-            // so the two never overlap.
+            // OfflineStatusIndicator's floating corner pill (top:10,
+            // right:10, ~28px tall) now only renders on mobile — on
+            // desktop it moved inline into the topbar, next to search.
+            // Keep this offset anyway so mobile (where a sale/purchase
+            // can still be posted) never overlaps it.
             top: 46,
             right: 16,
             zIndex: Z.toast,
