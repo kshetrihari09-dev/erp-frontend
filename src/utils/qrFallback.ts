@@ -11,6 +11,15 @@
  * of these formats are decoded on the very first frame exactly as fast
  * as before this file existed.
  *
+ * PERFORMANCE: the preprocessing variants (grayscale/contrast/sharpen/
+ * adaptive-threshold) are tried at the crop's native resolution FIRST —
+ * this alone recovers the large majority of hard frames (faded/gray
+ * print, uneven lighting, mild blur) without the extra cost of upscaling
+ * anything. The 2.5x upscale (see DEFAULT_UPSCALE_FACTOR) is only used
+ * as a last-resort second tier, retrying the same variants against the
+ * larger canvas, and only when every native-resolution attempt already
+ * failed. See decodeWithFallback's docblock below for the full order.
+ *
  * ZXing itself is never modified or replaced — every function below just
  * produces a new HTMLCanvasElement, which the caller hands to the same
  * ZXing reader instance already in use (reader.decodeFromCanvas). This
@@ -25,8 +34,11 @@
 // gives the detector more pixels per module to work with, which is what
 // actually helps with slight blur and small print — text/edge algorithms
 // like ZXing's benefit far more from "more pixels, smoothly interpolated"
-// than from any single filter alone.
+// than from any single filter alone. Only used as the LAST-RESORT tier in
+// decodeWithFallback now — see that function's docblock — since it's real
+// extra cost that most hard frames don't actually need.
 const DEFAULT_UPSCALE_FACTOR = 2.5
+
 
 function cloneCanvas(src: HTMLCanvasElement): HTMLCanvasElement {
   const canvas = document.createElement('canvas')
@@ -240,26 +252,45 @@ export function adaptiveThresholdCanvas(
  * the primary (fast, unprocessed) decode attempt on that same frame has
  * already failed.
  *
- * Order: grayscale → contrast → sharpen → adaptive threshold → inverted
- * adaptive threshold. Cheapest/most-likely-to-help variants are tried
+ * TWO TIERS, native resolution first:
+ *
+ *   Tier 1 (native resolution, no upscale): grayscale → contrast →
+ *   sharpen → adaptive threshold → inverted adaptive threshold, all run
+ *   directly on `originalCrop` at its native (already capped by
+ *   captureBarcodeFrame's MAX_CROP_DIMENSION) size. This covers the
+ *   overwhelming majority of hard-but-recoverable frames — faded/gray
+ *   print, uneven lighting, mild blur — and each pass is cheap precisely
+ *   *because* it skips the upscale: no variant here processes more
+ *   pixels than the original crop already has.
+ *
+ *   Tier 2 (2.5x upscale, LAST RESORT ONLY): only reached if every tier-1
+ *   variant failed to decode. Upscaling gives the detector more
+ *   interpolated pixels per module, which helps specifically with small/
+ *   distant codes or blur where tier 1's native-resolution passes aren't
+ *   enough — but it's real extra cost (more pixels through every filter
+ *   and through ZXing itself), so it only runs when everything cheaper
+ *   already came back empty. Reuses the same grayscale/contrast/sharpen/
+ *   adaptive-threshold variants, just against the upscaled canvas.
+ *
+ * Within each tier, cheapest/most-likely-to-help variants are tried
  * first so the common case (mild fade/gray print) resolves in 1-2 extra
- * decode attempts, not all 5.
+ * decode attempts, not all of them — and the loop returns the instant any
+ * variant decodes, in either tier, so a successful read never triggers
+ * further processing.
  */
 export async function decodeWithFallback(
   reader: { decodeFromCanvas: (canvas: HTMLCanvasElement) => Promise<any> },
   originalCrop: HTMLCanvasElement,
 ): Promise<any | null> {
-  const upscaled = upscaleCanvas(originalCrop)
-
-  const variants: Array<() => HTMLCanvasElement> = [
-    () => toGrayscaleCanvas(upscaled),
-    () => increaseContrastCanvas(upscaled),
-    () => sharpenCanvas(increaseContrastCanvas(upscaled)),
-    () => adaptiveThresholdCanvas(upscaled, false),
-    () => adaptiveThresholdCanvas(upscaled, true),
+  const nativeVariants: Array<() => HTMLCanvasElement> = [
+    () => toGrayscaleCanvas(originalCrop),
+    () => increaseContrastCanvas(originalCrop),
+    () => sharpenCanvas(increaseContrastCanvas(originalCrop)),
+    () => adaptiveThresholdCanvas(originalCrop, false),
+    () => adaptiveThresholdCanvas(originalCrop, true),
   ]
 
-  for (const buildVariant of variants) {
+  for (const buildVariant of nativeVariants) {
     try {
       const candidate = buildVariant()
       const result = await reader.decodeFromCanvas(candidate)
@@ -267,6 +298,30 @@ export async function decodeWithFallback(
     } catch {
       // This variant didn't decode either — expected for most variants
       // on most frames; just move on to the next one.
+    }
+  }
+
+  // LAST RESORT: nothing at native resolution decoded — upscale once and
+  // retry the same variant set against the larger canvas. Deliberately
+  // built lazily here (not upfront) so the upscale's cost is only ever
+  // paid on the frames that actually need it.
+  const upscaled = upscaleCanvas(originalCrop)
+  const upscaledVariants: Array<() => HTMLCanvasElement> = [
+    () => toGrayscaleCanvas(upscaled),
+    () => increaseContrastCanvas(upscaled),
+    () => sharpenCanvas(increaseContrastCanvas(upscaled)),
+    () => adaptiveThresholdCanvas(upscaled, false),
+    () => adaptiveThresholdCanvas(upscaled, true),
+  ]
+
+  for (const buildVariant of upscaledVariants) {
+    try {
+      const candidate = buildVariant()
+      const result = await reader.decodeFromCanvas(candidate)
+      if (result) return result
+    } catch {
+      // No variant in either tier decoded this frame — expected for most
+      // hard frames; the caller just tries again next tick.
     }
   }
   return null
