@@ -151,6 +151,11 @@ const InvoiceRowsTable = forwardRef<InvoiceRowsTableHandle, Props>(function Invo
         product_id:   p.id,
         product_name: p.name,
         rate:         p.sales_rate,
+        // Saved C.C % from the Product page (aliased to cc_pct by the
+        // /search route — see types/index.ts) is applied automatically
+        // whenever a product is (re)selected here, same as the scanner
+        // path already does.
+        cc_pct:       p.cc_pct ?? 0,
         // A previously-picked batch belongs to the OLD product — carrying
         // it over would silently submit the wrong batch. The new
         // BatchSelect fetches this product's own batches fresh and the
