@@ -47,7 +47,7 @@ export default function OfflineStatusIndicator() {
       style={{
         position: 'fixed',
         bottom: 10,
-        right: 10,
+        left: 10,
         zIndex: Z.offlineIndicator,
         maxWidth: 'calc(100vw - 20px)',
         padding: '5px 10px',
