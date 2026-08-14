@@ -18,6 +18,10 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { scannerAPI } from '@/services/api'
 import type { ScanResult, ScannedProduct } from '@/types/scanner'
 import useBarcodeEngine, { type ScanMode } from './useBarcodeEngine'
+import useAuthStore from '@/store/authStore'
+import { useOffline } from '@/offline/OfflineProvider'
+import { lookupByCodeOffline } from '@/offline/productLookup'
+import { isNetworkError } from '@/offline/syncEngine'
 
 // Exact copy of the message the backend returns for QR_ACCOUNT_MISMATCH
 // (see erp-unified-backend/src/scanner/scannerRoutes.js) — a structured
@@ -119,6 +123,8 @@ export default function useLocalScanner({ onResult, active, initialMode }: Optio
 
   const engine = useBarcodeEngine()
   const { videoRef, containerRef } = engine
+  const companyId = useAuthStore(s => s.company?.id)
+  const { isOnline } = useOffline()
 
   const mountedRef       = useRef(true)
   const noticeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -166,6 +172,18 @@ export default function useLocalScanner({ onResult, active, initialMode }: Optio
   // so matching can never surface — let alone select — a product
   // belonging to a different company/account.
   const searchBarcode = useCallback(async (code: string): Promise<LocalProduct[] | 'ACCOUNT_MISMATCH'> => {
+    // Offline (requirement #3 + #12 — scanner keeps working, same exact
+    // camera/decode path, only the product lookup after a successful
+    // decode changes): skip the network call entirely and go straight to
+    // the IndexedDB catalog cache (see offline/productLookup.ts), which
+    // catalogSync.ts already kept populated while online. Same exact-
+    // match-on-barcode contract as the online lookup below — QR and
+    // barcode still resolve through this one function either way.
+    if (!isOnline) {
+      if (!companyId) return []
+      const product = await lookupByCodeOffline(companyId, code)
+      return product ? [product as unknown as LocalProduct] : []
+    }
     try {
       const res = await scannerAPI.lookupBarcode(code)
       const json: any = res.data
@@ -174,9 +192,17 @@ export default function useLocalScanner({ onResult, active, initialMode }: Optio
       if (err?.response?.status === 403 && err?.response?.data?.code === 'QR_ACCOUNT_MISMATCH') {
         return 'ACCOUNT_MISMATCH'
       }
+      // Connection dropped between the indicator's last check and this
+      // request — fall back to the offline cache exactly as the
+      // isOnline-false branch above does, rather than reporting a false
+      // "not found" for a product that's actually in the offline catalog.
+      if (isNetworkError(err) && companyId) {
+        const product = await lookupByCodeOffline(companyId, code)
+        if (product) return [product as unknown as LocalProduct]
+      }
       return []
     }
-  }, [])
+  }, [isOnline, companyId])
 
   const flashNotice = useCallback((message: string) => {
     if (noticeTimeoutRef.current) clearTimeout(noticeTimeoutRef.current)

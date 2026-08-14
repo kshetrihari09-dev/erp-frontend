@@ -14,11 +14,11 @@
  * this file replaces.
  *
  * Order, low to high: sticky headers < dropdowns/popovers/tooltips <
- * mobile bars/FAB < drawers/sidebars < modal backdrop < modal panel <
- * full-screen scanner overlay < a modal launched from within another
- * modal or dropdown (e.g. Quick Add Product, opened from a row's
- * autocomplete dropdown) < toast notifications (always the top-most
- * layer) < dev-only badge.
+ * mobile bars/FAB < offline status indicator < drawers/sidebars < modal
+ * backdrop < modal panel < full-screen scanner overlay < a modal launched
+ * from within another modal or dropdown (e.g. Quick Add Product, opened
+ * from a row's autocomplete dropdown) < toast notifications (always the
+ * top-most layer) < dev-only badge.
  */
 export const Z = {
   base:          1,
@@ -27,6 +27,11 @@ export const Z = {
   dropdown:      1000,
   fab:           1100,
   mobileBar:     1150,
+  // Small persistent corner pill (see components/offline/
+  // OfflineStatusIndicator.tsx) — above ordinary page content and the
+  // mobile bar so it's never hidden, but below drawers/modals so opening
+  // one doesn't visually fight with it.
+  offlineIndicator: 1170,
   drawer:        1200,
   modalBackdrop: 1300,
   modal:         1310,

@@ -40,6 +40,14 @@ export interface PrintData {
   dueAmount?:   number
   paymentMode?: string
   company?:     Company | null
+  /** Set only for a sale created by the offline sync queue that hasn't
+   *  reached the server yet (see src/offline/) — voucherNo in that case
+   *  is the temporary "OFFLINE-xxxxxx" reference (offline/idGen.ts), NOT
+   *  a real invoice number. Drives the banner + relabeled "Invoice No"
+   *  row below so a printed copy can never be mistaken for the final
+   *  tax invoice (requirement #9). Once synced, re-printing from the
+   *  Sales list uses the server's real record and this is simply absent. */
+  offlinePending?: boolean
 }
 
 export interface PrintItem {
@@ -238,6 +246,18 @@ const InvoiceTemplate = forwardRef<HTMLDivElement, {
       {/* ── Document title ──────────────────────────────────────────────── */}
       <div style={s.typeTitle}>{docTitle}</div>
 
+      {/* ── Offline-pending banner (see PrintData.offlinePending) ────────── */}
+      {data.offlinePending && (
+        <div style={{
+          textAlign: 'center', fontWeight: 'bold', color: '#92400e',
+          background: '#fef3c7', border: '1px solid #d97706',
+          borderRadius: 4, padding: isA4 ? '6px 10px' : '3px 5px',
+          fontSize: isA4 ? '11px' : '9px', marginBottom: isA4 ? '10px' : '5px',
+        }}>
+          ⚠ OFFLINE COPY — PENDING SYNC. NOT A FINAL INVOICE.
+        </div>
+      )}
+
       {/* ── Header meta ─────────────────────────────────────────────────── */}
       {isA4 ? (
         <div style={s.metaRow}>
@@ -258,7 +278,7 @@ const InvoiceTemplate = forwardRef<HTMLDivElement, {
             <table style={{ fontSize: '11px' }}>
               <tbody>
                 <tr>
-                  <td style={s.metaLabel}>Invoice No:</td>
+                  <td style={s.metaLabel}>{data.offlinePending ? 'Offline Ref:' : 'Invoice No:'}</td>
                   <td style={s.metaVal}>{data.voucherNo}</td>
                 </tr>
                 <tr>
@@ -289,7 +309,7 @@ const InvoiceTemplate = forwardRef<HTMLDivElement, {
         </div>
       ) : (
         <div style={{ fontSize: '9px', marginBottom: '4px', color: '#000' }}>
-          <div><b>No:</b> {data.voucherNo} &nbsp; <b>Date:</b> {formatDisplayDate(data.date, dateMode)}</div>
+          <div><b>{data.offlinePending ? 'Offline Ref:' : 'No:'}</b> {data.voucherNo} &nbsp; <b>Date:</b> {formatDisplayDate(data.date, dateMode)}</div>
           {tpl.showDateBS && data.dateBS && <div><b>BS:</b> {data.dateBS}</div>}
           {data.partyName   && <div><b>Party:</b> {data.partyName}</div>}
           {data.paymentMode && <div style={{ textTransform: 'capitalize' }}><b>Mode:</b> {data.paymentMode}</div>}

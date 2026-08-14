@@ -331,6 +331,15 @@ export interface Sale {
   status:       InvoiceStatus
   items?:       SaleItem[]
   created_at:   string
+  /** Only ever set on a sale that was created via the offline sync engine
+   *  replaying a queued transaction — see erp-unified-backend migration
+   *  024 and src/offline/. Absent on every normal (online) sale. */
+  client_txn_id?: string
+  /** true only on the specific response that replayed an already-synced
+   *  offline sale (see routes/sales.js POST / idempotency check) rather
+   *  than creating a new one — lets the sync engine log/display this
+   *  distinctly from a fresh success without treating it as an error. */
+  replayed?:      boolean
 }
 
 // ─── Purchases ────────────────────────────────────────────────────────────────

@@ -147,7 +147,11 @@ export const salesAPI = {
   get:    (id: string)      => http.get<ApiResponse<Sale>>(`/sales/${id}`),
   create: (data: {
     party_id?: string; date_ad: string; payment_mode: string;
-    discount_pct?: number; notes?: string; items: SaleItem[]
+    discount_pct?: number; notes?: string; items: SaleItem[];
+    /** Present only when this create is the offline sync engine replaying
+     *  a queued sale (see src/offline/syncEngine.ts) — omitted entirely
+     *  for a normal online sale, identical to before this field existed. */
+    client_txn_id?: string
   }) => http.post<ApiResponse<Sale>>('/sales', data),
   cancel: (id: string, data?: { reason?: string }) => http.put(`/sales/${id}/cancel`, data || {}),
   stats:  (params?: Params) => http.get<ApiResponse<DashboardStats>>('/sales/summary/stats', { params }),

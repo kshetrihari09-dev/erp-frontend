@@ -26,6 +26,8 @@ import {
   ScanLine, Pill, QrCode,
 } from 'lucide-react'
 import { salesAPI, partiesAPI, productsAPI } from '@/services/api'
+import { useOffline } from '@/offline/OfflineProvider'
+import { isNetworkError } from '@/offline/syncEngine'
 import useUIStore from '@/store/uiStore'
 import {
   Button, Tabs, Modal, Badge, Pagination,
@@ -116,6 +118,10 @@ export default function SalesPage() {
   const [printData,   setPrintData]   = useState<PrintData | null>(null)
   const [detailId,    setDetailId]    = useState<string | null>(null)
   const [detail,      setDetail]      = useState<Sale | null>(null)
+  // Offline-first billing (see src/offline/) — isOnline gates whether
+  // onSubmit even attempts the network call at all; enqueueOfflineSale is
+  // the fallback path when it can't reach the server. See onSubmit below.
+  const { isOnline, enqueueOfflineSale } = useOffline()
   const [tender,      setTender]      = useState<number | ''>('')
 
   // Mobile accordion states (ignored on desktop — CSS keeps bodies visible)
@@ -400,65 +406,144 @@ export default function SalesPage() {
       return
     }
     setSaving(true); setFlash(null)
-    try {
-      // Resolve the final per-line discount_pct from whichever scope is
-      // active (Invoice / Company / Product) — see discountUtils.ts.
-      const { pctById } = computeItemDiscounts(
-        rows, products, discountScope, invoiceDiscount, companyDiscounts, productDiscounts,
-      )
-      const res = await salesAPI.create({
-        party_id: data.customer_id || undefined,
-        date_ad: data.date, payment_mode: data.payment_mode,
-        notes: data.notes,
-        items: validRows.map(r => ({
-          product_id: r.product_id, product_name: r.product_name,
-          batch_no: r.batch_no || undefined, batch_id: r.batch_id || undefined, expiry: r.expiry || undefined,
-          qty: Number(r.qty), bonus: Number(r.bonus) || 0,
-          rate: Number(r.rate), cc_pct: Number(r.cc_pct) || 0,
-          amount: r.amount, cc_amount: r.cc_amount,
-          discount_pct: pctById[r._id] || 0,
-        })),
-      })
-      const saved      = res.data.data
-      // Prefer the server's saved items (already carrying the applied
-      // discount_pct/amount) so the print preview matches exactly what was
-      // posted; validRows is only a fallback for older/unexpected responses.
-      const savedItems: any[] = Array.isArray(saved.items) && saved.items.length ? saved.items : validRows
-      setPrintData({
-        voucherNo: saved.invoice_no, type: 'SALE',
-        date: saved.date_ad || saved.date_bs || data.date,
-        paymentMode: saved.payment_mode,
-        partyName: customers.find(c => c.id === data.customer_id)?.name,
-        items: savedItems.map((it: any) => ({
-          product_name: it.product_name, batch_no: it.batch_no, expiry: it.expiry,
-          qty: Number(it.qty), bonus: Number(it.bonus) || 0, rate: Number(it.rate),
-          discount_pct: Number(it.discount_pct) || 0, cc_pct: Number(it.cc_pct) || 0,
-          cc_amount: Number(it.cc_amount) || 0, amount: Number(it.amount),
-        })),
-        subtotal: saved.subtotal, ccAmount: saved.cc_amount,
-        roundOff: Number(saved.round_off) || 0,
-        netTotal: saved.net_total, paidAmount: saved.paid_amount, dueAmount: saved.due_amount,
-      })
-      // Success confirmation only fires here, after the backend has
-      // actually confirmed the sale was saved (res.data.data above) —
-      // same rule PurchasePage.tsx follows for its own success alert.
-      setFlash({
-        type: 'success',
-        info: {
-          voucherLabel: 'Invoice',
-          voucherNo:    saved.invoice_no,
-          partyLabel:   'Customer',
-          partyName:    customers.find(c => c.id === data.customer_id)?.name,
-          grandTotal:   Number(saved.net_total),
-        },
-      })
+    // Resolve the final per-line discount_pct from whichever scope is
+    // active (Invoice / Company / Product) — see discountUtils.ts. Built
+    // once, shared by both the online and offline paths below so the
+    // exact same figures end up on the printed receipt either way.
+    const { pctById } = computeItemDiscounts(
+      rows, products, discountScope, invoiceDiscount, companyDiscounts, productDiscounts,
+    )
+    const payload = {
+      party_id: data.customer_id || undefined,
+      date_ad: data.date, payment_mode: data.payment_mode,
+      notes: data.notes,
+      items: validRows.map(r => ({
+        product_id: r.product_id, product_name: r.product_name,
+        batch_no: r.batch_no || undefined, batch_id: r.batch_id || undefined, expiry: r.expiry || undefined,
+        qty: Number(r.qty), bonus: Number(r.bonus) || 0,
+        rate: Number(r.rate), cc_pct: Number(r.cc_pct) || 0,
+        amount: r.amount, cc_amount: r.cc_amount,
+        discount_pct: pctById[r._id] || 0,
+      })),
+    }
+    const resetFormAfterSave = () => {
       reset(); setRows([newRow()]); setTender('')
       setDiscountModalOpen(false)
       setDiscountScope('invoice'); setInvoiceDiscount(emptyDiscount())
       setCompanyDiscounts({}); setProductDiscounts({})
       requestAnimationFrame(() => barcodeInputRef.current?.focus())
-    } catch (e: any) { setFlash({ type: 'danger', msg: e.message }) }
-    finally { setSaving(false) }
+    }
+
+    // ── Online path ──────────────────────────────────────────────────────
+    // Skipped entirely when the offline indicator already knows we're
+    // offline (see useOffline() above) — no point waiting out a doomed
+    // request before falling through to the queue.
+    if (isOnline) {
+      try {
+        const res = await salesAPI.create(payload)
+        const saved      = res.data.data
+        // Prefer the server's saved items (already carrying the applied
+        // discount_pct/amount) so the print preview matches exactly what was
+        // posted; validRows is only a fallback for older/unexpected responses.
+        const savedItems: any[] = Array.isArray(saved.items) && saved.items.length ? saved.items : validRows
+        setPrintData({
+          voucherNo: saved.invoice_no, type: 'SALE',
+          date: saved.date_ad || saved.date_bs || data.date,
+          paymentMode: saved.payment_mode,
+          partyName: customers.find(c => c.id === data.customer_id)?.name,
+          items: savedItems.map((it: any) => ({
+            product_name: it.product_name, batch_no: it.batch_no, expiry: it.expiry,
+            qty: Number(it.qty), bonus: Number(it.bonus) || 0, rate: Number(it.rate),
+            discount_pct: Number(it.discount_pct) || 0, cc_pct: Number(it.cc_pct) || 0,
+            cc_amount: Number(it.cc_amount) || 0, amount: Number(it.amount),
+          })),
+          subtotal: saved.subtotal, ccAmount: saved.cc_amount,
+          roundOff: Number(saved.round_off) || 0,
+          netTotal: saved.net_total, paidAmount: saved.paid_amount, dueAmount: saved.due_amount,
+        })
+        // Success confirmation only fires here, after the backend has
+        // actually confirmed the sale was saved (res.data.data above) —
+        // same rule PurchasePage.tsx follows for its own success alert.
+        setFlash({
+          type: 'success',
+          info: {
+            voucherLabel: 'Invoice',
+            voucherNo:    saved.invoice_no,
+            partyLabel:   'Customer',
+            partyName:    customers.find(c => c.id === data.customer_id)?.name,
+            grandTotal:   Number(saved.net_total),
+          },
+        })
+        resetFormAfterSave()
+        setSaving(false)
+        return
+      } catch (e: any) {
+        if (!isNetworkError(e)) {
+          // A real response came back and the server rejected the sale
+          // (validation, stock conflict, etc.) — surface it immediately
+          // so the cashier can fix it now (pick a different batch, etc.)
+          // rather than silently queuing something the server has
+          // already told us it won't accept.
+          setFlash({ type: 'danger', msg: e.message })
+          setSaving(false)
+          return
+        }
+        // Network error — connection genuinely dropped between the
+        // indicator's last check and this request. Fall through to the
+        // offline queue below exactly as if isOnline had already been
+        // false.
+      }
+    }
+
+    // ── Offline path (requirement #3) ───────────────────────────────────
+    // Same payload, same validation already done above — just queued in
+    // IndexedDB instead of posted directly. The server is still the only
+    // thing that will ever actually deduct stock or post accounting
+    // entries for this sale (requirement #7) — this only stores it for
+    // syncEngine.ts to upload once the connection returns.
+    try {
+      const txn = await enqueueOfflineSale(payload)
+      const ccTotal = validRows.reduce((s, r) => s + (Number(r.cc_amount) || 0), 0)
+      setPrintData({
+        // txn.temp_ref ("OFFLINE-xxxxxx") — deliberately NOT invoice-
+        // number-shaped, and offlinePending below makes sure the printed
+        // copy itself says so too (requirement #9).
+        voucherNo: txn.temp_ref, type: 'SALE',
+        date: data.date, paymentMode: data.payment_mode,
+        partyName: customers.find(c => c.id === data.customer_id)?.name,
+        items: validRows.map(r => ({
+          product_name: r.product_name, batch_no: r.batch_no, expiry: r.expiry,
+          qty: Number(r.qty), bonus: Number(r.bonus) || 0, rate: Number(r.rate),
+          discount_pct: pctById[r._id] || 0, cc_pct: Number(r.cc_pct) || 0,
+          cc_amount: Number(r.cc_amount) || 0, amount: Number(r.amount),
+        })),
+        // Client-computed — the same figures already on screen (see
+        // subtotal/roundOff/grandTotal above), since there's no server
+        // response to read them from yet. Provisional until synced; the
+        // server recomputes and owns the real numbers the moment it does.
+        subtotal, ccAmount: ccTotal, roundOff, netTotal: grandTotal,
+        paidAmount: grandTotal, dueAmount: 0,
+        offlinePending: true,
+      })
+      setFlash({
+        type: 'success',
+        info: {
+          voucherLabel: 'Offline Ref (Pending Sync)',
+          voucherNo:    txn.temp_ref,
+          partyLabel:   'Customer',
+          partyName:    customers.find(c => c.id === data.customer_id)?.name,
+          grandTotal,
+        },
+      })
+      resetFormAfterSave()
+    } catch (e: any) {
+      // Couldn't even queue it locally — this is a real failure (e.g.
+      // IndexedDB unavailable/full), not just "no network", so it's
+      // surfaced rather than silently losing the sale.
+      setFlash({ type: 'danger', msg: `Could not save sale: ${e.message}` })
+    } finally {
+      setSaving(false)
+    }
   })
 
   function saveDraft() { setFlash({ type: 'info', msg: 'Draft saved locally.' }) }

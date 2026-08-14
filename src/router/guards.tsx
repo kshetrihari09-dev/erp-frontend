@@ -4,13 +4,27 @@ import { ShieldAlert } from 'lucide-react'
 import useAuthStore, { RAW_TOKEN_KEY } from '@/store/authStore'
 import { authAPI } from '@/services/api'
 import { PATHS } from '@/constants'
+import { isNetworkError } from '@/offline/syncEngine'
 
 // ─── Auth guard — validates session on mount via /auth/me ─────────────────────
 // Prevents 401 redirect loop after page refresh:
 // Zustand rehydrates isAuthenticated=true but the token in the Bearer header
 // must be validated against the backend before trusting it.
+//
+// OFFLINE-FIRST (requirement #11 — refresh/close-reopen must survive an
+// internet outage; requirement #14 — offline access is for a device/user
+// that already authenticated online before, not a live check every load):
+// a rejection from /auth/me is only trusted as "log this person out" when
+// the server actually responded and said so (401/403 — a real, expired,
+// or revoked token). If the request fails because there's no network at
+// all, that's not evidence the session is invalid — it's evidence we
+// can't ask right now. In that case, fall back to trusting the token +
+// user/company zustand already rehydrated from localStorage (the same
+// persisted state requirement #11 relies on), so a refresh while offline
+// lands back on the billing screen instead of a login page the person
+// has no way to submit anyway.
 export function RequireAuth({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, logout, updateUser, setCompany } = useAuthStore()
+  const { isAuthenticated, logout, updateUser, setCompany, user, company } = useAuthStore()
   const location = useLocation()
   const [checking, setChecking] = useState(true)
   const [valid,    setValid]    = useState(false)
@@ -33,7 +47,19 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
         if (company) setCompany(company)
         setValid(true)
       })
-      .catch(() => {
+      .catch((err) => {
+        if (isNetworkError(err) && isAuthenticated && user && company) {
+          // Couldn't reach the server to confirm — not the same thing as
+          // the server confirming the session is invalid. Trust the
+          // already-persisted session (this is exactly what lets offline
+          // billing keep working across a refresh) rather than logging
+          // out over a connectivity problem.
+          setValid(true)
+          return
+        }
+        // A real response came back and said no (or there's simply no
+        // usable persisted session to fall back to) — this IS a genuine
+        // "not logged in," log out for real.
         logout()
         setValid(false)
       })
