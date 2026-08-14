@@ -69,7 +69,12 @@ export default function TransactionSuccessAlert({
           transition={{ duration: 0.18 }}
           style={{
             position: 'fixed',
-            top: 16,
+            // OfflineStatusIndicator occupies the top-right corner
+            // (top:10, right:10, ~28px tall) whenever a company is logged
+            // in — which is always true here, since posting a sale/purchase
+            // requires being logged in. Start below it (10 + ~28 + 8px gap)
+            // so the two never overlap.
+            top: 46,
             right: 16,
             zIndex: Z.toast,
             width: 'min(400px, calc(100vw - 32px))',
