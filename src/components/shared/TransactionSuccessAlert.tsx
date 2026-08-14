@@ -69,12 +69,7 @@ export default function TransactionSuccessAlert({
           transition={{ duration: 0.18 }}
           style={{
             position: 'fixed',
-            // OfflineStatusIndicator's floating corner pill (top:10,
-            // right:10, ~28px tall) now only renders on mobile — on
-            // desktop it moved inline into the topbar, next to search.
-            // Keep this offset anyway so mobile (where a sale/purchase
-            // can still be posted) never overlaps it.
-            top: 46,
+            top: 16,
             right: 16,
             zIndex: Z.toast,
             width: 'min(400px, calc(100vw - 32px))',
