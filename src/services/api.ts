@@ -320,10 +320,22 @@ export const scannerAPI = {
    * lookupBarcode() returns the FULL product shape (current_stock +
    * batches) — it's also used to hydrate a fuzzy-search pick into a
    * complete ScannedProduct before returning the final scan result.
+   *
+   * `timeoutMs` overrides the default 20s app-wide API timeout
+   * (config.apiTimeout) for just this call — see useLocalScanner.ts's
+   * searchBarcode(), which passes a short one (SCAN_LOOKUP_TIMEOUT_MS)
+   * so a live camera scan under a dead-but-still-"connected" network
+   * (Wi-Fi associated, no actual internet — the case navigator.onLine
+   * can't detect) fails fast into the offline IndexedDB fallback instead
+   * of leaving the scanner stuck waiting out the full 20s per code. Every
+   * other caller (manual barcode entry, product search) keeps the
+   * default — those are deliberate one-off submits where a slower
+   * network is better tolerated than a scan is.
    */
-  lookupBarcode: (code: string) =>
+  lookupBarcode: (code: string, opts?: { timeoutMs?: number }) =>
     http.get<ApiResponse<ScannedProduct>>(
       `/scanner/products/barcode/${encodeURIComponent(code)}`,
+      opts?.timeoutMs ? { timeout: opts.timeoutMs } : undefined,
     ),
   fuzzySearch: (q: string, limit = 15) =>
     http.get<ApiResponse<Array<Omit<ScannedProduct, 'current_stock' | 'batches'>>>>(

@@ -49,6 +49,22 @@ const QR_ACCOUNT_MISMATCH_MSG = 'This QR Code belongs to another account and can
 // there now).
 const NOT_FOUND_COOLDOWN_MS = 1500
 
+// A live camera scan needs to feel instant regardless of connectivity —
+// the app-wide 20s API timeout (config.apiTimeout) is fine for a
+// deliberate one-off submit, but is far too long to sit and wait on for
+// EVERY scanned code. This matters specifically for the case
+// useOnlineStatus can't catch instantly: Wi-Fi/mobile data still
+// "connected" at the interface level (so no browser 'offline' event
+// fires, and isOnline can still read true) while the actual internet
+// path is dead — a real, common situation (weak signal, captive portal,
+// backend down). Without a short cap here, a scan in that state would
+// hang for up to 20s before searchBarcode's network-error catch ever
+// gets a chance to fall back to the offline IndexedDB lookup. 2.5s is
+// long enough for a slow-but-real network response to still land
+// normally, short enough that a dead connection resolves to the offline
+// fallback fast enough to not feel broken.
+const SCAN_LOOKUP_TIMEOUT_MS = 2500
+
 export type LocalScanMode   = 'barcode' | 'idle'
 export type LocalScanStatus =
   | 'requesting-permission'
@@ -185,17 +201,20 @@ export default function useLocalScanner({ onResult, active, initialMode }: Optio
       return product ? [product as unknown as LocalProduct] : []
     }
     try {
-      const res = await scannerAPI.lookupBarcode(code)
+      const res = await scannerAPI.lookupBarcode(code, { timeoutMs: SCAN_LOOKUP_TIMEOUT_MS })
       const json: any = res.data
       return json.success && json.data ? [json.data] : []
     } catch (err: any) {
       if (err?.response?.status === 403 && err?.response?.data?.code === 'QR_ACCOUNT_MISMATCH') {
         return 'ACCOUNT_MISMATCH'
       }
-      // Connection dropped between the indicator's last check and this
-      // request — fall back to the offline cache exactly as the
-      // isOnline-false branch above does, rather than reporting a false
-      // "not found" for a product that's actually in the offline catalog.
+      // Covers two cases identically: a real network failure, AND a
+      // request that hit SCAN_LOOKUP_TIMEOUT_MS without the server ever
+      // responding (axios timeouts also have no `err.response`, so
+      // isNetworkError treats them the same way) — either way, fall back
+      // to the offline cache exactly as the isOnline-false branch above
+      // does, rather than reporting a false "not found" for a product
+      // that's actually in the offline catalog.
       if (isNetworkError(err) && companyId) {
         const product = await lookupByCodeOffline(companyId, code)
         if (product) return [product as unknown as LocalProduct]
@@ -231,9 +250,21 @@ export default function useLocalScanner({ onResult, active, initialMode }: Optio
       if (typeof (product as any).current_stock === 'number' && (product as any).batches) {
         full = product as unknown as ScannedProduct
       } else {
-        const res = await scannerAPI.lookupBarcode(product.item_code)
-        const json: any = res.data
-        full = json.success ? json.data : null
+        try {
+          const res = await scannerAPI.lookupBarcode(product.item_code, { timeoutMs: SCAN_LOOKUP_TIMEOUT_MS })
+          const json: any = res.data
+          full = json.success ? json.data : null
+        } catch (err: any) {
+          // Same short-timeout-then-offline-fallback rule as
+          // searchBarcode above — this hydration step is only reached
+          // for a fuzzy-search pick (searchBarcode's own offline path
+          // always returns an already-full object), but keeping the same
+          // fallback here means a fuzzy pick made right as the
+          // connection drops still resolves instead of erroring out.
+          if (isNetworkError(err) && companyId) {
+            full = await lookupByCodeOffline(companyId, product.item_code)
+          }
+        }
       }
       if (!mountedRef.current) return
       if (!full) {
@@ -253,7 +284,7 @@ export default function useLocalScanner({ onResult, active, initialMode }: Optio
     } catch {
       if (mountedRef.current) setState(s => ({ ...s, status: 'error', error: 'Something went wrong. Please try again.' }))
     }
-  }, [onResult, engine, state.lastBarcode])
+  }, [onResult, engine, state.lastBarcode, companyId])
 
   // ── Barcode/QR scanning — delegates the actual decode loop to the shared
   //    engine; this is purely "what to do with a decoded code." Both a
