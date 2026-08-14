@@ -16,7 +16,6 @@ import { todayBS as computeTodayBS } from '@/utils/nepaliDate'
 import { authAPI, reportsAPI } from '@/services/api'
 import ToastContainer from '@/components/shared/ToastContainer'
 import CompanySwitcher from '@/modules/company/CompanySwitcher'
-import OfflineStatusIndicator from '@/components/offline/OfflineStatusIndicator'
 
 const SIDEBAR_W       = 260
 const SIDEBAR_W_COLL  = 72
@@ -487,12 +486,6 @@ export default function AppLayout() {
               )}
             </div>
           )}
-
-          {/* Offline/online status — inline next to the search box on
-              desktop; the component itself falls back to its floating
-              corner pill on mobile, where there's no search box for it
-              to sit beside. */}
-          {!isMobile && <OfflineStatusIndicator inline />}
 
           <div className="ml-auto flex items-center gap-2">
             {/* Notifications */}
