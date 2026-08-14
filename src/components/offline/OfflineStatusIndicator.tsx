@@ -46,7 +46,7 @@ export default function OfflineStatusIndicator() {
       aria-live="polite"
       style={{
         position: 'fixed',
-        top: 10,
+        bottom: 10,
         right: 10,
         zIndex: Z.offlineIndicator,
         maxWidth: 'calc(100vw - 20px)',
