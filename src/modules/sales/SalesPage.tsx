@@ -57,6 +57,21 @@ import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 
 const LIMIT = 20
 
+// Aggregate line-level discount for the printed invoice's Discount row.
+// total = sum(qty × rate × discount_pct / 100), rounded to 2dp. Computed
+// fresh from the actual saved/valid items passed in — never derived from
+// subtotal − netTotal, since round-off and other totals-level adjustments
+// would corrupt that figure (see requirement #7 in the fix spec).
+function calcDiscountAmt(items: Array<{ qty?: number; rate?: number; discount_pct?: number }>): number {
+  const total = (items || []).reduce((sum, it) => {
+    const qty = Number(it.qty) || 0
+    const rate = Number(it.rate) || 0
+    const pct = Number(it.discount_pct) || 0
+    return sum + (qty * rate * pct) / 100
+  }, 0)
+  return Math.round(total * 100) / 100
+}
+
 /* ── Flash — now the same Alert/TransactionSuccessAlert used by Purchase ──
  * (see PurchasePage.tsx). The bespoke local component that used to live
  * here has been removed so both pages share one implementation instead of
@@ -458,6 +473,7 @@ export default function SalesPage() {
             cc_amount: Number(it.cc_amount) || 0, amount: Number(it.amount),
           })),
           subtotal: saved.subtotal, ccAmount: saved.cc_amount,
+          discountAmt: calcDiscountAmt(savedItems),
           roundOff: Number(saved.round_off) || 0,
           netTotal: saved.net_total, paidAmount: saved.paid_amount, dueAmount: saved.due_amount,
         })
@@ -521,7 +537,9 @@ export default function SalesPage() {
         // subtotal/roundOff/grandTotal above), since there's no server
         // response to read them from yet. Provisional until synced; the
         // server recomputes and owns the real numbers the moment it does.
-        subtotal, ccAmount: ccTotal, roundOff, netTotal: grandTotal,
+        subtotal, ccAmount: ccTotal,
+        discountAmt: calcDiscountAmt(validRows.map(r => ({ qty: r.qty, rate: r.rate, discount_pct: pctById[r._id] || 0 }))),
+        roundOff, netTotal: grandTotal,
         paidAmount: grandTotal, dueAmount: 0,
         offlinePending: true,
       })
@@ -1286,6 +1304,7 @@ export default function SalesPage() {
                                         cc_amount: Number(it.cc_amount)||0, amount: Number(it.amount),
                                       })),
                                       subtotal: Number(d.subtotal||0), ccAmount: Number(d.cc_amount||0),
+                                      discountAmt: calcDiscountAmt(d.items || []),
                                       roundOff: Number(d.round_off) || 0,
                                       netTotal: Number(d.net_total), paidAmount: Number(d.paid_amount), dueAmount: Number(d.due_amount),
                                     })
@@ -1364,6 +1383,7 @@ export default function SalesPage() {
                               cc_amount: Number(it.cc_amount)||0, amount: Number(it.amount),
                             })),
                             subtotal: Number(d.subtotal||0), ccAmount: Number(d.cc_amount||0),
+                            discountAmt: calcDiscountAmt(d.items || []),
                             roundOff: Number(d.round_off) || 0,
                             netTotal: Number(d.net_total), paidAmount: Number(d.paid_amount), dueAmount: Number(d.due_amount),
                           })
@@ -1399,6 +1419,7 @@ export default function SalesPage() {
                   discount_pct: Number(it.discount_pct)||0, cc_pct: Number(it.cc_pct)||0,
                   cc_amount: Number(it.cc_amount)||0, amount: Number(it.amount),
                 })),
+                discountAmt: calcDiscountAmt(d.items || []),
                 netTotal: Number(d.net_total), paidAmount: Number(d.paid_amount), dueAmount: Number(d.due_amount),
                 roundOff: Number(d.round_off) || 0,
               }), 50)
