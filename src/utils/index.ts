@@ -190,6 +190,9 @@ export const statusColor = (status: string) => {
     pending:   'badge-amber',
     locked:    'badge-red',
     open:      'badge-green',
+    // Device status (Settings → Devices & Sync) — additive, no existing
+    // status value collides with this key.
+    revoked:   'badge-red',
   }
   return map[status?.toLowerCase()] || 'badge-muted'
 }

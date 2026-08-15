@@ -5,7 +5,7 @@
  * stay distinct (see requirement #9):
  *   - client_txn_id : a real UUID, sent to the server, used as the
  *                      idempotency key (erp-unified-backend migration
- *                      024) — never shown to the cashier.
+ *                      025) — never shown to the cashier.
  *   - temp_ref       : a short human-readable label ("OFFLINE-3F2A9C")
  *                      shown on screen/print while the sale is still
  *                      queued, replaced by the server's real invoice_no

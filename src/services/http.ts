@@ -13,6 +13,7 @@ import axios, {
 import { config }      from '@/config/env'
 import { RAW_TOKEN_KEY, REFRESH_TOKEN_KEY as AUTH_REFRESH_KEY } from '@/store/authStore'
 import { getValidStepUpToken, clearStepUpToken } from './stepUpToken'
+import { getDeviceId } from '@/offline/idGen'
 
 // REFRESH_TOKEN_KEY is exported from authStore.ts
 export { AUTH_REFRESH_KEY as REFRESH_TOKEN_KEY }
@@ -60,6 +61,15 @@ http.interceptors.request.use(
     if (stepUpToken) {
       config_.headers['X-Step-Up-Token'] = stepUpToken
     }
+
+    // This device's persistent identity (offline/idGen.ts) — lets the
+    // server attribute sales/purchases to a specific registered device
+    // (migration 025's device_id column) and, on the sync/device
+    // endpoints, enforce that only an active, non-revoked device is
+    // accepted (requireActiveDevice). Harmless to send on every request:
+    // routes that don't care about it (the overwhelming majority) just
+    // ignore the header.
+    config_.headers['X-Device-Id'] = getDeviceId()
 
     if (config.enableApiLogs) {
       console.debug(

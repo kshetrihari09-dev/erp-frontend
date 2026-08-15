@@ -76,7 +76,7 @@ export interface OfflineParty {
   current_balance: number
 }
 
-export type SyncStatus = 'pending' | 'syncing' | 'synced' | 'failed'
+export type SyncStatus = 'pending' | 'syncing' | 'synced' | 'failed' | 'conflict'
 
 /** One queued offline transaction. Deliberately generic (`type` +
  *  `payload`) rather than a sales-only shape — requirement #6 lists
@@ -114,6 +114,13 @@ export interface QueuedTransaction {
   /** Set once status becomes 'synced' — the real server response, so the
    *  UI can show the real invoice number without a second network call. */
   server_response?: Record<string, unknown>
+  /** Set once status becomes 'conflict' — the server's structured rejection
+   *  (see erp-unified-backend routes/sales.js POST / and migration 028's
+   *  sync_conflicts table). A conflict is deliberately NOT auto-retried:
+   *  it needs a person to edit the quantity / cancel / pick another batch
+   *  before re-submitting, per requirement #17 — see conflicts.ts and
+   *  the "View Conflicts" panel in Settings → Devices & Sync. */
+  conflict?: { code: string; available: number; requested: number; message: string; conflict_id?: string }
 }
 
 interface OfflineDBSchema extends DBSchema {

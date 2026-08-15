@@ -423,3 +423,56 @@ export const cloudStorageAPI = {
     http.put<ApiResponse<CloudStorageConnection>>(`/cloud-storage/connections/${provider}/settings`, data),
   setDefault:   (provider: string) => http.post<ApiResponse<CloudStorageConnection[]>>('/cloud-storage/default', { provider }),
 }
+
+// ─── Devices & LAN/Cloud Sync (new, additive) ──────────────────────────────────
+// See offline/syncEngine.ts for the client-side queue that calls these, and
+// components/offline/OfflineStatusIndicator.tsx for where conflict/device
+// state surfaces in the UI — this file only wraps the HTTP calls.
+export interface DeviceInfo {
+  id:                string
+  device_name:       string
+  platform:          string | null
+  app_version:       string | null
+  status:            'active' | 'revoked'
+  branch_id:         string | null
+  registered_at:     string
+  last_seen_at:      string | null
+  last_synced_at:    string | null
+  user_name:         string | null
+  pending_conflicts: number
+}
+
+export interface SyncConflict {
+  id:                string
+  transaction_id:    string | null
+  device_id:         string | null
+  device_name?:       string | null
+  conflict_type:     string
+  transaction_type:  string
+  local_state:       Record<string, any>
+  server_state:      Record<string, any>
+  reason:            string | null
+  status:            'open' | 'resolved'
+  resolved_by:       string | null
+  resolved_at:       string | null
+  resolution_reason: string | null
+  created_at:        string
+}
+
+export const devicesAPI = {
+  list:      () => http.get<ApiResponse<DeviceInfo[]>>('/devices'),
+  register:  (data: { device_id: string; device_name: string; platform?: string; app_version?: string; branch_id?: string }) =>
+    http.post<ApiResponse<DeviceInfo>>('/devices/register', data),
+  heartbeat: (device_id: string) => http.post<ApiResponse<{ status: string; last_seen_at: string }>>('/devices/heartbeat', { device_id }),
+  rename:    (id: string, device_name: string) => http.patch<ApiResponse<DeviceInfo>>(`/devices/${id}`, { device_name }),
+  revoke:    (id: string) => http.post<ApiResponse<DeviceInfo>>(`/devices/${id}/revoke`),
+  conflicts: (status: 'open' | 'resolved' = 'open') => http.get<ApiResponse<SyncConflict[]>>('/devices/conflicts', { params: { status } }),
+  resolveConflict: (id: string, resolution_reason?: string) =>
+    http.post<ApiResponse<SyncConflict>>(`/devices/conflicts/${id}/resolve`, { resolution_reason }),
+  // Pairing — see components/settings/DevicesSyncSection.tsx for the QR
+  // display/scan UI built on top of these two calls.
+  pairStart: (branch_id?: string) => http.post<ApiResponse<{ token: string; expires_at: string; ttl_seconds: number }>>('/devices/pair/start', { branch_id }),
+  pairClaim: (data: { token: string; device_id: string; device_name: string; platform?: string; app_version?: string }) =>
+    http.post<ApiResponse<{ device: DeviceInfo; company_id: string; branch_id: string | null }>>('/devices/pair/claim', data),
+}
+
