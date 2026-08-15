@@ -34,12 +34,6 @@ export interface SyncRunResult {
   attempted: number
   synced:    number
   failed:    number
-  /** Structured server rejections (insufficient stock, etc.) — these stop
-   *  being retried automatically and need a person to resolve them; see
-   *  Settings → Devices & Sync → View Conflicts. Counted separately from
-   *  `failed` so the indicator can say "1 transaction requires attention"
-   *  instead of a generic failure count. */
-  conflicts: number
   /** true only when the run stopped early because the connection dropped
    *  again mid-sync — distinct from "failed", which means the server
    *  actively rejected a transaction. */
@@ -58,28 +52,9 @@ export function isNetworkError(err: any): boolean {
 
 function isDue(item: QueuedTransaction): boolean {
   if (item.status === 'synced') return false
-  if (item.status === 'conflict') return false // needs a person, not a retry — see below
   if (item.status === 'failed' && item.retry_count >= MAX_RETRIES) return false
   if (!item.next_retry_at) return true
   return new Date(item.next_retry_at).getTime() <= Date.now()
-}
-
-/** True when the server rejected a queued sale with the structured
- *  CONFLICT/INSUFFICIENT_STOCK shape from routes/sales.js POST / (see
- *  migration 028's sync_conflicts table on the server), as opposed to an
- *  ordinary validation error. http.ts's response interceptor exposes the
- *  raw response body as `err.original?.data`. */
-function extractConflict(err: any): QueuedTransaction['conflict'] | null {
-  const data = err?.original?.response?.data
-  if (data?.status === 'CONFLICT' && data?.code) {
-    return {
-      code:      data.code,
-      available: data.available,
-      requested: data.requested,
-      message:   data.message || err.message,
-    }
-  }
-  return null
 }
 
 /** Runs one sync pass. Caller (OfflineProvider) is responsible for only
@@ -90,7 +65,7 @@ export async function runSync(
   companyId: string,
   onItemSynced?: (item: QueuedTransaction) => void,
 ): Promise<SyncRunResult> {
-  const result: SyncRunResult = { attempted: 0, synced: 0, failed: 0, conflicts: 0, stoppedOffline: false }
+  const result: SyncRunResult = { attempted: 0, synced: 0, failed: 0, stoppedOffline: false }
   const queue = (await listQueue(companyId)).filter(isDue)
 
   for (const item of queue) {
@@ -123,33 +98,13 @@ export async function runSync(
       }
 
       // A real response came back and it was a rejection — the server
-      // is reachable, this specific transaction just isn't acceptable.
-      //
-      // A structured CONFLICT (see extractConflict above) is NOT the same
-      // as an ordinary validation failure: it means the server's atomic
-      // stock check (routes/sales.js) genuinely rejected this exact sale
-      // because the stock it needed is gone — most likely another device
-      // sold it first while this one was offline (requirement #8's worked
-      // example). Retrying that automatically would just fail again and
-      // again; it needs a person to edit the quantity, cancel, or pick a
-      // different batch, so it's parked as 'conflict' and left out of the
-      // normal backoff/retry cycle (see isDue above) — but never silently
-      // deleted, per requirement #8's "Do NOT silently delete B's
-      // transaction."
-      const conflict = extractConflict(err)
-      if (conflict) {
-        await updateQueueItem(companyId, item.client_txn_id, {
-          status: 'conflict',
-          last_error: conflict.message,
-          conflict,
-        })
-        result.conflicts++
-        continue
-      }
-
-      // Ordinary rejection (validation error, permission error, etc.) —
-      // schedule a backoff retry rather than giving up after one, since
-      // some causes (a stale permission snapshot) can resolve on their own.
+      // is reachable, this specific transaction just isn't acceptable
+      // (or isn't acceptable *yet* — e.g. a stock conflict from
+      // requirement #8, which err.message already describes in plain
+      // language since sales.js's stock checks are message-only, no
+      // separate error code). Schedule a backoff retry rather than
+      // giving up after one rejection, since some causes (a stale
+      // stock/permission snapshot) can resolve on their own.
       const retry_count = item.retry_count + 1
       const permanentlyFailed = retry_count >= MAX_RETRIES
       await updateQueueItem(companyId, item.client_txn_id, {
@@ -175,14 +130,5 @@ export async function runSync(
 export async function pendingSyncCount(companyId: string): Promise<number> {
   const db = await getOfflineDb(companyId)
   const all = await db.getAll('syncQueue')
-  return all.filter(t => t.status !== 'synced' && t.status !== 'conflict').length
-}
-
-/** Items parked with a structured conflict, waiting on a person — feeds
- *  the indicator's "Sync conflict • N transactions require attention"
- *  tooltip state (see components/offline/OfflineStatusIndicator.tsx). */
-export async function conflictSyncCount(companyId: string): Promise<number> {
-  const db = await getOfflineDb(companyId)
-  const all = await db.getAll('syncQueue')
-  return all.filter(t => t.status === 'conflict').length
+  return all.filter(t => t.status !== 'synced').length
 }

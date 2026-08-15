@@ -45,6 +45,7 @@ import DateSystemInput from '@/components/shared/DateSystemInput'
 import DiscountReviewModal from '@/components/forms/discount/DiscountReviewModal'
 import {
   computeItemDiscounts, computeTotals, emptyDiscount, validRows as validDiscountRows,
+  derivePrintDiscount,
   type DiscountScope, type DiscountEntry,
 } from '@/components/forms/discount/discountUtils'
 import { PrintPreviewModal } from '@/components/print'
@@ -56,21 +57,6 @@ import PostingStatusBadge from '@/components/PostingStatusBadge'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 
 const LIMIT = 20
-
-// Aggregate line-level discount for the printed invoice's Discount row.
-// total = sum(qty × rate × discount_pct / 100), rounded to 2dp. Computed
-// fresh from the actual saved/valid items passed in — never derived from
-// subtotal − netTotal, since round-off and other totals-level adjustments
-// would corrupt that figure (see requirement #7 in the fix spec).
-function calcDiscountAmt(items: Array<{ qty?: number; rate?: number; discount_pct?: number }>): number {
-  const total = (items || []).reduce((sum, it) => {
-    const qty = Number(it.qty) || 0
-    const rate = Number(it.rate) || 0
-    const pct = Number(it.discount_pct) || 0
-    return sum + (qty * rate * pct) / 100
-  }, 0)
-  return Math.round(total * 100) / 100
-}
 
 /* ── Flash — now the same Alert/TransactionSuccessAlert used by Purchase ──
  * (see PurchasePage.tsx). The bespoke local component that used to live
@@ -461,6 +447,14 @@ export default function SalesPage() {
         // discount_pct/amount) so the print preview matches exactly what was
         // posted; validRows is only a fallback for older/unexpected responses.
         const savedItems: any[] = Array.isArray(saved.items) && saved.items.length ? saved.items : validRows
+        // `saved.subtotal` from the backend is the sum of already-discounted
+        // item amounts (see routes/sales.js), not a pre-discount gross figure,
+        // and the API doesn't return a discount total either. Recover both
+        // for display from the actual saved item amounts — see
+        // derivePrintDiscount in discountUtils.ts. This does not touch how
+        // the discount/total were calculated or saved, only how the already-
+        // applied discount is displayed on the printed invoice.
+        const { grossSubtotal, discountAmt: printDiscount } = derivePrintDiscount(savedItems)
         setPrintData({
           voucherNo: saved.invoice_no, type: 'SALE',
           date: saved.date_ad || saved.date_bs || data.date,
@@ -472,9 +466,7 @@ export default function SalesPage() {
             discount_pct: Number(it.discount_pct) || 0, cc_pct: Number(it.cc_pct) || 0,
             cc_amount: Number(it.cc_amount) || 0, amount: Number(it.amount),
           })),
-          subtotal: saved.subtotal, ccAmount: saved.cc_amount,
-          discountAmt: calcDiscountAmt(savedItems),
-          discountScope,
+          subtotal: grossSubtotal, discountAmt: printDiscount, ccAmount: saved.cc_amount,
           roundOff: Number(saved.round_off) || 0,
           netTotal: saved.net_total, paidAmount: saved.paid_amount, dueAmount: saved.due_amount,
         })
@@ -535,13 +527,10 @@ export default function SalesPage() {
           cc_amount: Number(r.cc_amount) || 0, amount: Number(r.amount),
         })),
         // Client-computed — the same figures already on screen (see
-        // subtotal/roundOff/grandTotal above), since there's no server
-        // response to read them from yet. Provisional until synced; the
-        // server recomputes and owns the real numbers the moment it does.
-        subtotal, ccAmount: ccTotal,
-        discountAmt: calcDiscountAmt(validRows.map(r => ({ qty: r.qty, rate: r.rate, discount_pct: pctById[r._id] || 0 }))),
-        discountScope,
-        roundOff, netTotal: grandTotal,
+        // subtotal/discountAmt/roundOff/grandTotal above), since there's no
+        // server response to read them from yet. Provisional until synced;
+        // the server recomputes and owns the real numbers the moment it does.
+        subtotal, discountAmt, ccAmount: ccTotal, roundOff, netTotal: grandTotal,
         paidAmount: grandTotal, dueAmount: 0,
         offlinePending: true,
       })
@@ -1296,17 +1285,21 @@ export default function SalesPage() {
                                   try {
                                     const res = await salesAPI.get(s.id)
                                     const d = res.data.data
+                                    const printItems = (d.items||[]).map((it: any) => ({
+                                      product_name: it.product_name, batch_no: it.batch_no, expiry: it.expiry,
+                                      qty: Number(it.qty), bonus: Number(it.bonus)||0, rate: Number(it.rate),
+                                      discount_pct: Number(it.discount_pct)||0, cc_pct: Number(it.cc_pct)||0,
+                                      cc_amount: Number(it.cc_amount)||0, amount: Number(it.amount),
+                                    }))
+                                    // d.subtotal is already net-of-discount (see routes/sales.js) and
+                                    // the API has no discount total — recover both for display from
+                                    // the actual saved item amounts, same as the post-sale print path.
+                                    const { grossSubtotal, discountAmt } = derivePrintDiscount(printItems)
                                     setPrintData({
                                       voucherNo: d.invoice_no, type: 'SALE', date: d.date_ad,
                                       paymentMode: d.payment_mode, partyName: d.party_name,
-                                      items: (d.items||[]).map((it: any) => ({
-                                        product_name: it.product_name, batch_no: it.batch_no, expiry: it.expiry,
-                                        qty: Number(it.qty), bonus: Number(it.bonus)||0, rate: Number(it.rate),
-                                        discount_pct: Number(it.discount_pct)||0, cc_pct: Number(it.cc_pct)||0,
-                                        cc_amount: Number(it.cc_amount)||0, amount: Number(it.amount),
-                                      })),
-                                      subtotal: Number(d.subtotal||0), ccAmount: Number(d.cc_amount||0),
-                                      discountAmt: calcDiscountAmt(d.items || []),
+                                      items: printItems,
+                                      subtotal: grossSubtotal, discountAmt, ccAmount: Number(d.cc_amount||0),
                                       roundOff: Number(d.round_off) || 0,
                                       netTotal: Number(d.net_total), paidAmount: Number(d.paid_amount), dueAmount: Number(d.due_amount),
                                     })
@@ -1375,17 +1368,21 @@ export default function SalesPage() {
                         try {
                           const res = await salesAPI.get(s.id)
                           const d = res.data.data
+                          const printItems = (d.items||[]).map((it: any) => ({
+                            product_name: it.product_name, batch_no: it.batch_no, expiry: it.expiry,
+                            qty: Number(it.qty), bonus: Number(it.bonus)||0, rate: Number(it.rate),
+                            discount_pct: Number(it.discount_pct)||0, cc_pct: Number(it.cc_pct)||0,
+                            cc_amount: Number(it.cc_amount)||0, amount: Number(it.amount),
+                          }))
+                          // d.subtotal is already net-of-discount (see routes/sales.js) and
+                          // the API has no discount total — recover both for display from
+                          // the actual saved item amounts, same as the post-sale print path.
+                          const { grossSubtotal, discountAmt } = derivePrintDiscount(printItems)
                           setPrintData({
                             voucherNo: d.invoice_no, type: 'SALE', date: d.date_ad,
                             paymentMode: d.payment_mode, partyName: d.party_name,
-                            items: (d.items||[]).map((it: any) => ({
-                              product_name: it.product_name, batch_no: it.batch_no, expiry: it.expiry,
-                              qty: Number(it.qty), bonus: Number(it.bonus)||0, rate: Number(it.rate),
-                              discount_pct: Number(it.discount_pct)||0, cc_pct: Number(it.cc_pct)||0,
-                              cc_amount: Number(it.cc_amount)||0, amount: Number(it.amount),
-                            })),
-                            subtotal: Number(d.subtotal||0), ccAmount: Number(d.cc_amount||0),
-                            discountAmt: calcDiscountAmt(d.items || []),
+                            items: printItems,
+                            subtotal: grossSubtotal, discountAmt, ccAmount: Number(d.cc_amount||0),
                             roundOff: Number(d.round_off) || 0,
                             netTotal: Number(d.net_total), paidAmount: Number(d.paid_amount), dueAmount: Number(d.due_amount),
                           })
@@ -1412,16 +1409,21 @@ export default function SalesPage() {
           <Button variant="primary" size="sm" icon={<Printer size={13}/>}
             onClick={() => {
               const d = detail; setDetailId(null)
+              const printItems = (d.items||[]).map((it: any) => ({
+                product_name: it.product_name, batch_no: it.batch_no, expiry: it.expiry,
+                qty: Number(it.qty), bonus: Number(it.bonus)||0, rate: Number(it.rate),
+                discount_pct: Number(it.discount_pct)||0, cc_pct: Number(it.cc_pct)||0,
+                cc_amount: Number(it.cc_amount)||0, amount: Number(it.amount),
+              }))
+              // Same recovery as the list/mobile print paths above, so the
+              // detail-modal print shows the same Subtotal/Discount/CC Charge
+              // breakdown instead of silently omitting them.
+              const { grossSubtotal, discountAmt } = derivePrintDiscount(printItems)
               setTimeout(() => setPrintData({
                 voucherNo: d.invoice_no, type: 'SALE', date: d.date_ad,
                 paymentMode: d.payment_mode, partyName: d.party_name,
-                items: (d.items||[]).map((it: any) => ({
-                  product_name: it.product_name, batch_no: it.batch_no, expiry: it.expiry,
-                  qty: Number(it.qty), bonus: Number(it.bonus)||0, rate: Number(it.rate),
-                  discount_pct: Number(it.discount_pct)||0, cc_pct: Number(it.cc_pct)||0,
-                  cc_amount: Number(it.cc_amount)||0, amount: Number(it.amount),
-                })),
-                discountAmt: calcDiscountAmt(d.items || []),
+                items: printItems,
+                subtotal: grossSubtotal, discountAmt, ccAmount: Number(d.cc_amount||0),
                 netTotal: Number(d.net_total), paidAmount: Number(d.paid_amount), dueAmount: Number(d.due_amount),
                 roundOff: Number(d.round_off) || 0,
               }), 50)

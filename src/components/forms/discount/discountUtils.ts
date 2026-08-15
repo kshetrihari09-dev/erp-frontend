@@ -162,3 +162,50 @@ export function computeTotals(rows: InvoiceRow[], totalDiscount: number): Discou
   const grandTotal = Math.round(netTotal)
   return { subtotal, netTotal, roundOff, grandTotal }
 }
+
+// ─── Print-time discount recovery ───────────────────────────────────────────
+// The backend's `sales.subtotal` column is the sum of already-discounted
+// item amounts (see erp-unified-backend/src/routes/sales.js — `amount` is
+// computed from `qty*rate*(1-discount_pct/100)+cc_amount` and `subtotal`
+// is just the sum of those). It is NOT a pre-discount gross figure, so it
+// can't be used to show a "Subtotal" / "Discount" breakdown on the printed
+// invoice, and the API never returns a separate discount-amount field.
+//
+// This does not add a second discount calculation system: it recovers the
+// discount that was ALREADY applied to each line, from fields the backend
+// already returns/persists (qty, rate, amount, cc_amount) — the same
+// `discountAmount = gross - amountAfterDiscount` idea called out in the
+// print-fix requirements, just applied per line so it's correct no matter
+// which scope (invoice / manufacturer / product) produced that line's
+// discount_pct. Never used to recompute totals that get saved — display only.
+export interface PrintDiscountItem {
+  qty:        number
+  rate:       number
+  amount:     number
+  cc_amount?: number
+}
+
+export interface PrintDiscountResult {
+  /** Sum of qty*rate across items — the pre-discount gross subtotal. */
+  grossSubtotal: number
+  /** Sum of (qty*rate) - (amount - cc_amount) across items — the actual
+   *  discount already reflected in each item's saved `amount`. */
+  discountAmt:   number
+}
+
+export function derivePrintDiscount(items: PrintDiscountItem[]): PrintDiscountResult {
+  let gross = 0
+  let discount = 0
+  for (const it of items) {
+    const g   = (Number(it.qty) || 0) * (Number(it.rate) || 0)
+    const net = (Number(it.amount) || 0) - (Number(it.cc_amount) || 0)
+    gross    += g
+    discount += g - net
+  }
+  return {
+    grossSubtotal: Math.round(gross * 100) / 100,
+    // Floating-point noise only — clamp the odd -0.00/negative-epsilon case
+    // that can come from per-item rounding, never a real negative discount.
+    discountAmt: Math.max(0, Math.round(discount * 100) / 100),
+  }
+}

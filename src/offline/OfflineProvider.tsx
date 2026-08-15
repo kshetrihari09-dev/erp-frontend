@@ -24,7 +24,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import useAuthStore from '@/store/authStore'
 import { useOnlineStatus } from '@/hooks/useOnlineStatus'
 import { syncCatalog } from './catalogSync'
-import { runSync, pendingSyncCount, conflictSyncCount } from './syncEngine'
+import { runSync, pendingSyncCount } from './syncEngine'
 import { enqueueSale } from './syncQueue'
 import type { QueuedTransaction } from './db'
 
@@ -35,11 +35,6 @@ interface OfflineContextValue {
   checkingOnline:  boolean
   syncPhase:       SyncPhase
   pendingCount:    number
-  /** Queued sales parked because the server's atomic stock check rejected
-   *  them (requirement #8's cross-device stock conflict) — never
-   *  auto-retried, need a person to resolve them in Settings → Devices &
-   *  Sync → View Conflicts. Drives the indicator's amber/conflict state. */
-  conflictCount:   number
   /** Set briefly after a sync run completes with 1+ synced item, cleared
    *  automatically — drives the "🔄 All transactions synced" toast state
    *  (requirement #4) without the indicator needing its own timer logic. */
@@ -62,16 +57,14 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
 
   const [syncPhase, setSyncPhase]           = useState<SyncPhase>('idle')
   const [pendingCount, setPendingCount]     = useState(0)
-  const [conflictCount, setConflictCount]   = useState(0)
   const [justSyncedCount, setJustSyncedCount] = useState(0)
 
   const wasOnlineRef   = useRef(isOnline)
   const justSyncedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const refreshPendingCount = useCallback(async () => {
-    if (!company?.id) { setPendingCount(0); setConflictCount(0); return }
+    if (!company?.id) { setPendingCount(0); return }
     setPendingCount(await pendingSyncCount(company.id))
-    setConflictCount(await conflictSyncCount(company.id))
   }, [company?.id])
 
   const runFullSync = useCallback(async () => {
@@ -134,7 +127,7 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
   }, [company?.id, user?.id, refreshPendingCount])
 
   const value: OfflineContextValue = {
-    isOnline, checkingOnline, syncPhase, pendingCount, conflictCount, justSyncedCount,
+    isOnline, checkingOnline, syncPhase, pendingCount, justSyncedCount,
     enqueueOfflineSale, syncNow: runFullSync,
   }
 
