@@ -474,6 +474,7 @@ export default function SalesPage() {
           })),
           subtotal: saved.subtotal, ccAmount: saved.cc_amount,
           discountAmt: calcDiscountAmt(savedItems),
+          discountScope,
           roundOff: Number(saved.round_off) || 0,
           netTotal: saved.net_total, paidAmount: saved.paid_amount, dueAmount: saved.due_amount,
         })
@@ -539,6 +540,7 @@ export default function SalesPage() {
         // server recomputes and owns the real numbers the moment it does.
         subtotal, ccAmount: ccTotal,
         discountAmt: calcDiscountAmt(validRows.map(r => ({ qty: r.qty, rate: r.rate, discount_pct: pctById[r._id] || 0 }))),
+        discountScope,
         roundOff, netTotal: grandTotal,
         paidAmount: grandTotal, dueAmount: 0,
         offlinePending: true,

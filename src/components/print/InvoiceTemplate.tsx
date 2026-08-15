@@ -31,6 +31,14 @@ export interface PrintData {
   items?:       PrintItem[]
   subtotal?:    number
   discountAmt?: number
+  /** Which Discount Review scope produced discountAmt — drives the row's
+   *  label below Subtotal ("Discount (Invoice 5%)" / "(Manufacturer-wise)"
+   *  / "(Product-wise)"). Only known at the moment a sale is created (see
+   *  SalesPage.tsx's in-memory discountScope) — never persisted to the
+   *  sales table, so reprints from the Sales List/Detail modal (fetched
+   *  fresh from the server) won't have this and fall back to a plain
+   *  "Discount" label. That's expected, not a bug. */
+  discountScope?: 'invoice' | 'company' | 'product'
   ccAmount?:    number
   /** Amount added/subtracted to reach a whole-number Grand Total. Positive
    *  rounds up, negative rounds down. Omitted or 0 → no row is rendered. */
@@ -101,6 +109,24 @@ const InvoiceTemplate = forwardRef<HTMLDivElement, {
   const docTitle = tpl.docTitle?.trim()
     ? tpl.docTitle
     : TYPE_LABELS[data.type] || data.type
+
+  // Discount row label — reflects which Discount Review scope produced
+  // discountAmt. 'invoice' scope applies one uniform % to every line, so
+  // that % is read straight off the first item (all items share it — see
+  // discountUtils.ts computeItemDiscounts). 'company'/'product' scope
+  // discounts vary per line/group, so no single % is meaningful there —
+  // just the scope name. No discountScope on the data (e.g. a reprint
+  // fetched fresh from the server, which never persists scope) falls back
+  // to the original plain "Discount" label — same behavior as before.
+  const discountLabel = (() => {
+    if (data.discountScope === 'invoice') {
+      const pct = data.items?.[0]?.discount_pct
+      return pct ? `Discount (Invoice ${+pct.toFixed(2)}%)` : 'Discount (Invoice)'
+    }
+    if (data.discountScope === 'company') return 'Discount (Manufacturer-wise)'
+    if (data.discountScope === 'product') return 'Discount (Product-wise)'
+    return 'Discount'
+  })()
 
   const s = {
     wrap: {
@@ -377,7 +403,7 @@ const InvoiceTemplate = forwardRef<HTMLDivElement, {
             )}
             {(data.discountAmt ?? 0) > 0 && (
               <tr>
-                <td style={{ ...s.totalLabel, color: '#c00' }}>Discount</td>
+                <td style={{ ...s.totalLabel, color: '#c00' }}>{discountLabel}</td>
                 <td style={{ ...s.totalVal, color: '#c00' }}>−{fmt(data.discountAmt)}</td>
               </tr>
             )}
