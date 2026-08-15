@@ -180,8 +180,7 @@ export interface Product {
   purchase_rate: number
   tax_rate?:     number   // actual DB column name
   vat_percent?:  number   // aliased in /search route; use tax_rate ?? vat_percent ?? 13
-  cc_percent?:   number   // actual DB column name
-  cc_pct?:       number   // aliased in /search route
+  cc_pct?:       number   // C.C% — actual DB column name on products
   min_stock:     number
   current_stock: number
   is_active:     boolean
@@ -209,7 +208,7 @@ export interface Manufacturer {
   notes?:         string
   /** Default C.C% (bonus-quantity charge, see calcRowAmount) for products
    *  from this manufacturer. Only ever used to pre-fill a *new* product's
-   *  own cc_percent when this manufacturer is selected — it's a starting
+   *  own cc_pct when this manufacturer is selected — it's a starting
    *  point, not a live link; changing it later never touches products
    *  already created under it. */
   cc_pct?:        number

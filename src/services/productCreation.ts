@@ -67,7 +67,7 @@ export const productSchema = z.object({
   // the matching field on Sale rows. This is the product's *default*;
   // Sale rows read it via product.cc_pct when a line is added, but can
   // always be overridden per line without touching this stored default.
-  cc_percent:     numericField(0,  { min: 0, max: 100 }),
+  cc_pct:         numericField(0,  { min: 0, max: 100 }),
 
   // Required — but unlike the fields above, an empty value is NOT allowed
   // to silently default to 0. Matches Quick Add's existing check exactly
@@ -141,7 +141,7 @@ export async function createProductWithOpeningStock(raw: ProductFormInput): Prom
     purchase_rate: input.purchase_rate,
     mrp:           input.mrp,
     vat_percent:   input.vat_percent,
-    cc_percent:    input.cc_percent,
+    cc_pct:        input.cc_pct,
     min_stock:     input.min_stock,
   } as any)
 
@@ -170,6 +170,6 @@ export async function createProductWithOpeningStock(raw: ProductFormInput): Prom
     ...newProduct,
     vat_percent: input.vat_percent,
     sales_rate:  input.sales_rate,
-    cc_percent:  input.cc_percent,
+    cc_pct:      input.cc_pct,
   }
 }

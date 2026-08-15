@@ -23,7 +23,7 @@ function toScannedProduct(p: OfflineProduct, batches: OfflineBatch[]): ScannedPr
     id: p.id, item_code: p.item_code, name: p.name, generic_name: p.generic_name,
     company_name: p.company_name, unit: p.unit, sales_rate: p.sales_rate,
     purchase_rate: p.purchase_rate, mrp: p.mrp, vat_percent: p.vat_percent ?? p.tax_rate,
-    cc_pct: p.cc_pct ?? p.cc_percent, current_stock: p.current_stock,
+    cc_pct: p.cc_pct, current_stock: p.current_stock,
     batches: batches
       .filter(b => b.qty_available > 0)
       .sort((a, b) => (a.expiry_date || '').localeCompare(b.expiry_date || ''))
@@ -111,7 +111,7 @@ export function toProduct(p: OfflineProduct): Product {
     id: p.id, item_code: p.item_code, barcode: p.barcode, name: p.name,
     generic_name: p.generic_name, company_name: p.company_name, category: p.category,
     unit: p.unit, mrp: p.mrp, sales_rate: p.sales_rate, purchase_rate: p.purchase_rate,
-    tax_rate: p.tax_rate, vat_percent: p.vat_percent, cc_percent: p.cc_percent, cc_pct: p.cc_pct,
+    tax_rate: p.tax_rate, vat_percent: p.vat_percent, cc_pct: p.cc_pct,
     min_stock: p.min_stock, current_stock: p.current_stock, is_active: p.is_active,
   }
 }

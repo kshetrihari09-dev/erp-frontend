@@ -210,14 +210,13 @@ function ProductForm({ initial, onClose }: { initial?: Product | null; onClose: 
       // `tax_rate` column name; only GET /products/search aliases it to
       // vat_percent. Fall back through both so Edit shows the real saved value.
       vat_percent: (initial as any).tax_rate ?? initial.vat_percent ?? 13,
-      // Same story for C.C% — the real column is `cc_percent`; only
-      // GET /products/search aliases it to `cc_pct`.
-      cc_percent: (initial as any).cc_percent ?? (initial as any).cc_pct ?? 0,
+      // C.C% — `cc_pct` is the real column name on products.
+      cc_pct: initial.cc_pct ?? 0,
       min_stock: initial.min_stock,
     } : {
       // Same defaults Quick Add has always used, so a product created
       // without touching these fields is identical either way.
-      unit: 'Strip', vat_percent: 13, cc_percent: 0, min_stock: 50, mrp: 0, sales_rate: '' as any, purchase_rate: 0,
+      unit: 'Strip', vat_percent: 13, cc_pct: 0, min_stock: 50, mrp: 0, sales_rate: '' as any, purchase_rate: 0,
       barcode: '', opening_stock: '' as any, opening_batch: '', opening_expiry: '',
     },
   })
@@ -288,8 +287,8 @@ function ProductForm({ initial, onClose }: { initial?: Product | null; onClose: 
               // typed their own value into that field. Never touches an
               // existing product being edited, and never overwrites a
               // value the user set themselves.
-              if (!initial && !dirtyFields.cc_percent && manufacturer?.cc_pct != null) {
-                setValue('cc_percent', manufacturer.cc_pct, { shouldDirty: false })
+              if (!initial && !dirtyFields.cc_pct && manufacturer?.cc_pct != null) {
+                setValue('cc_pct', manufacturer.cc_pct, { shouldDirty: false })
               }
               // Return focus to the Product form — the next field in tab
               // order — once a manufacturer is picked/created, same as
@@ -340,9 +339,9 @@ function ProductForm({ initial, onClose }: { initial?: Product | null; onClose: 
           <input
             type="number" min={0} max={100} step="0.01" placeholder="0"
             className="erp-input"
-            {...register('cc_percent')}
+            {...register('cc_pct')}
           />
-          {errors.cc_percent && <p className="text-xs text-red-500 mt-1">{(errors as any).cc_percent?.message}</p>}
+          {errors.cc_pct && <p className="text-xs text-red-500 mt-1">{(errors as any).cc_pct?.message}</p>}
         </div>
         <Field label="Min Stock" name="min_stock" type="number" register={register} errors={errors} />
       </div>

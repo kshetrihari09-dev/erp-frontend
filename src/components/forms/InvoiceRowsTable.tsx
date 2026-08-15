@@ -114,12 +114,6 @@ const InvoiceRowsTable = forwardRef<InvoiceRowsTableHandle, Props>(function Invo
         if (p) {
           updated.product_name = p.name
           updated.rate         = p.sales_rate
-          // Real DB column is cc_percent; /search aliases it to cc_pct
-          // (see types/index.ts Product). Prefill from whichever is
-          // present, defaulting to 0 when the product has no C.C% set.
-          // The row's own cc_pct stays independently editable from here —
-          // this only sets the initial value.
-          updated.cc_pct       = p.cc_pct ?? (p as any).cc_percent ?? 0
         }
       }
       const { amount, cc_amount } = calcRowAmount({
@@ -157,12 +151,6 @@ const InvoiceRowsTable = forwardRef<InvoiceRowsTableHandle, Props>(function Invo
         product_id:   p.id,
         product_name: p.name,
         rate:         p.sales_rate,
-        // Real DB column is cc_percent; /search aliases it to cc_pct
-        // (see types/index.ts Product). Prefill from whichever is
-        // present, defaulting to 0 when the product has no C.C% set.
-        // Stays a plain row field from here, so the user can still edit
-        // it for just this sale without touching the product's saved value.
-        cc_pct:       p.cc_pct ?? (p as any).cc_percent ?? 0,
         // A previously-picked batch belongs to the OLD product — carrying
         // it over would silently submit the wrong batch. The new
         // BatchSelect fetches this product's own batches fresh and the

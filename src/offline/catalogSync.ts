@@ -46,7 +46,7 @@ function toOfflineProduct(p: Product): OfflineProduct {
     id: p.id, item_code: p.item_code, barcode: p.barcode, name: p.name,
     generic_name: p.generic_name, company_name: p.company_name, category: p.category,
     unit: p.unit, mrp: p.mrp, sales_rate: p.sales_rate, purchase_rate: p.purchase_rate,
-    tax_rate: p.tax_rate, vat_percent: p.vat_percent, cc_percent: p.cc_percent, cc_pct: p.cc_pct,
+    tax_rate: p.tax_rate, vat_percent: p.vat_percent, cc_pct: p.cc_pct,
     min_stock: p.min_stock, current_stock: p.current_stock, is_active: p.is_active,
     updated_at: p.created_at, _searchTokens: Array.from(tokens),
   }

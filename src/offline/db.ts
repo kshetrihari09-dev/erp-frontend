@@ -42,7 +42,6 @@ export interface OfflineProduct {
   purchase_rate: number
   tax_rate?:     number
   vat_percent?:  number
-  cc_percent?:   number
   cc_pct?:       number
   min_stock:     number
   current_stock: number
