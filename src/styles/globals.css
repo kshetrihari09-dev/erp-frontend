@@ -6270,3 +6270,190 @@ canvas{
 .pos-scan-btn-active { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px currentColor; }
 .pos-scan-btn:active { transform: scale(0.98); }
 
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   SALES/POS — MOBILE + TABLET TWO-STEP BILLING FLOW
+   ────────────────────────────────────────────────────────────────────────────
+   Everything below is scoped under `.pos-theme.sales-two-step`. Only
+   SalesPage.tsx's root div carries the `sales-two-step` class — PurchasePage
+   also uses `.pos-theme` but never gets this class, so nothing here can ever
+   affect it. Every selector duplicates an existing `.pos-theme`-scoped rule
+   (confirmed used only by Sales' mobile layout) at a wider breakpoint, or
+   adds new step-visibility gating driven by the `data-pos-step` attribute
+   set in SalesPage.tsx. Nothing here changes what's calculated, only which
+   already-existing block of markup is visible at a given width/step.
+
+   Breakpoints: ≤1024px = mobile + tablet (two-step flow). ≥1025px = desktop
+   (single page, both "steps" always rendered — identical to before this
+   change; this file adds nothing that applies at ≥1025px).
+══════════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1. Extend the existing "mobile" breakpoint (768px) to 1024px for
+   Sales-only responsive classes, so tablets get the same mobile-style
+   building blocks (product cards, accordions, sticky bars, single-column
+   grid, dual scan buttons) that phones already had. Each rule below
+   mirrors an existing ≤768px rule; none of these class names are used by
+   any other page (verified against PurchasePage.tsx, the only other
+   `.pos-theme` consumer). ── */
+@media (max-width: 1024px) {
+  .pos-theme.sales-two-step .pos-table-wrap.pos-desktop-only { display: none !important; }
+  .pos-theme.sales-two-step .pos-mobile-items { display: flex !important; flex-direction: column; gap: 10px; }
+
+  .pos-theme.sales-two-step .pos-fab {
+    display: flex !important;
+    position: fixed;
+    right: 16px;
+    bottom: 92px;
+    z-index: var(--z-fab);
+    width: 52px; height: 52px;
+    border-radius: 16px;
+    background: var(--pdt-accent);
+    color: #fff;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 8px 24px rgba(59,130,246,.5), 0 2px 8px rgba(0,0,0,.3);
+    border: none;
+  }
+
+  .pos-theme.sales-two-step .pos-mobile-actionbar {
+    display: flex !important;
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    z-index: var(--z-mobile-bar);
+    gap: 10px;
+    padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
+    background: var(--pdt-glass);
+    backdrop-filter: blur(16px) saturate(160%);
+    border-top: 1px solid var(--pdt-border);
+  }
+  .pos-theme.sales-two-step .pos-mobile-actionbar .pma-draft {
+    flex: 0 0 auto;
+    width: 52px; height: 52px;
+    border-radius: 14px;
+    background: var(--pdt-overlay-06);
+    border: 1.5px solid var(--pdt-border-2);
+    color: var(--pdt-text-2);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .pos-theme.sales-two-step .pos-mobile-actionbar .pma-post {
+    flex: 1;
+    min-height: 52px;
+    border-radius: 14px;
+    background: var(--pdt-accent);
+    border: none;
+    color: #fff;
+    font-size: 15px;
+    font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    gap: 8px;
+    padding: 6px 10px;
+    box-shadow: 0 6px 20px rgba(59,130,246,.45);
+  }
+  .pos-theme.sales-two-step .pos-mobile-actionbar .pma-post:active { transform: scale(.98); }
+  .pos-theme.sales-two-step .pos-mobile-actionbar .pma-post:disabled { opacity: .6; }
+
+  .pos-theme.sales-two-step .pos-desktop-actions { display: none !important; }
+  .pos-theme.sales-two-step .pos-grid-main { grid-template-columns: 1fr !important; gap: 12px; }
+  .pos-theme.sales-two-step .pos-total-card-desktop { display: none !important; }
+  .pos-theme.sales-two-step .pos-kbd-hints { display: none !important; }
+
+  /* Un-hide the specific .pos-mobile-only elements that still need to show
+     on tablet (compact customer summary, dual scan buttons). The other
+     .pos-mobile-only elements in the file live inside the now `.pos-mt-hide`
+     Billing Summary card, so they stay irrelevant/hidden via their
+     ancestor regardless of this rule. */
+  .pos-theme.sales-two-step .pos-customer-summary.pos-mobile-only { display: flex !important; }
+  .pos-theme.sales-two-step .pos-scan-row.pos-mobile-only { display: flex !important; }
+  .pos-theme.sales-two-step .pos-mobile-only-chevron { display: block !important; }
+
+  .pos-theme.sales-two-step .pos-accordion-header { cursor: pointer !important; padding: 2px 0; }
+  .pos-theme.sales-two-step .pos-accordion-body--closed {
+    max-height: 0 !important; opacity: 0 !important; margin: 0 !important; pointer-events: none !important;
+  }
+  .pos-theme.sales-two-step .pos-accordion-body--open {
+    max-height: 1200px !important; opacity: 1 !important; margin-top: 14px !important;
+  }
+
+  .pos-theme.sales-two-step .pos-mode-pill {
+    flex: 1 1 calc(50% - 4px) !important; justify-content: center !important;
+    min-height: 44px !important; font-size: 13px !important;
+  }
+
+  .pos-theme.sales-two-step .pos-card {
+    padding: 14px !important; border-radius: 0 !important;
+    border-left: none !important; border-right: none !important;
+  }
+  .pos-theme.sales-two-step .pos-card .pos-card {
+    border-radius: 12px !important; border: 1px solid var(--pdt-border) !important;
+  }
+
+  .pos-theme.sales-two-step .space-y-4:last-child { padding-bottom: 90px !important; }
+
+  .pos-theme.sales-two-step .pos-invoice-header { flex-wrap: wrap !important; row-gap: 10px; }
+  .pos-theme.sales-two-step .pos-invoice-actions { flex: 1 1 100% !important; width: 100% !important; flex-wrap: wrap; }
+
+  .pos-theme.sales-two-step .bsi-root { flex: 1 1 100% !important; min-width: 0; width: 100%; }
+  .pos-theme.sales-two-step .bsi-input { height: 46px !important; border-radius: 12px !important; font-size: 14px !important; }
+
+  .pos-theme.sales-two-step .pos-scan-single-desktop { display: none !important; }
+}
+
+/* ── 2. Step 1 / Step 2 visibility, driven by data-pos-step. Only takes
+   effect ≤1024px — at ≥1025px (desktop) this block doesn't apply at all,
+   so `data-pos-step` is inert there and both steps' markup always renders,
+   exactly like the page did before this change. ── */
+@media (max-width: 1024px) {
+  /* Content that moved into the Step 2 panel (in-card Payment Mode, the
+     old single Billing Summary card) — superseded, not shown, on mobile/
+     tablet. Unaffected at ≥1025px. */
+  .pos-theme.sales-two-step .pos-mt-hide { display: none !important; }
+
+  .pos-theme.sales-two-step[data-pos-step="2"] .pos-step1-only { display: none !important; }
+  .pos-theme.sales-two-step[data-pos-step="1"] .pos-step2-only { display: none !important; }
+}
+
+/* ── 3. New elements introduced by the Step 2 panel ── */
+.pos-theme .pos-discount-tap-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--pdt-overlay-04, var(--surface-2));
+  border: 1.5px solid var(--pdt-border-2, var(--border));
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--pdt-text-2, var(--text-2));
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.pos-theme .pos-discount-tap-row:active { background: var(--pdt-overlay-06, var(--surface-3)); }
+.pos-theme .pos-discount-tap-value {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--pdt-warning, #d97706);
+}
+
+/* Two-line label on the sticky Next/Post Invoice buttons ("Next →" /
+   "2 items • Rs. X" stacked instead of side-by-side, since both no
+   longer fit legibly on one line once the count+amount was added). */
+.pos-theme .pma-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  line-height: 1.15;
+}
+.pos-theme .pma-stack-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 700;
+}
+.pos-theme .pma-stack-sub {
+  font-size: 11px;
+  font-weight: 600;
+  opacity: .85;
+}

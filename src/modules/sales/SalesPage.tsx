@@ -23,7 +23,7 @@ import {
   CalendarDays, CreditCard, User, MapPin, Hash,
   Phone as PhoneIcon, ChevronDown, AlertCircle,
   CheckCircle2, RotateCcw, Save, Plus, UserPlus,
-  ScanLine, Pill, QrCode,
+  ScanLine, Pill, QrCode, ArrowLeft,
 } from 'lucide-react'
 import { salesAPI, partiesAPI, productsAPI } from '@/services/api'
 import { useOffline } from '@/offline/OfflineProvider'
@@ -45,7 +45,7 @@ import DateSystemInput from '@/components/shared/DateSystemInput'
 import DiscountReviewModal from '@/components/forms/discount/DiscountReviewModal'
 import {
   computeItemDiscounts, computeTotals, emptyDiscount, validRows as validDiscountRows,
-  derivePrintDiscount,
+  derivePrintDiscount, grossItemAmount,
   type DiscountScope, type DiscountEntry,
 } from '@/components/forms/discount/discountUtils'
 import { PrintPreviewModal } from '@/components/print'
@@ -129,6 +129,16 @@ export default function SalesPage() {
   const [customerOpen, setCustomerOpen] = useState(true)
   const [billingOpen,  setBillingOpen]  = useState(true)
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set())
+
+  // ── Mobile/tablet two-step billing flow (UI-only — see globals.css
+  // ".pos-step1-only"/".pos-step2-only"/".pos-mt-hide" rules scoped under
+  // .sales-two-step). Desktop ignores this entirely: both steps' markup
+  // renders unconditionally there via CSS, exactly like before this
+  // change. `mobileStep` never gates any calculation, validation, or the
+  // posting call itself — it only decides which already-existing block
+  // of JSX is visible at phone/tablet widths (≤1024px). Not persisted:
+  // navigating away and back (or a hard refresh) always starts at Step 1.
+  const [mobileStep, setMobileStep] = useState<1 | 2>(1)
 
   const [confirmCancel, setConfirmCancel] = useState<string | null>(null)
   // "Are you sure you want to create this sale?" — same confirm-before-post
@@ -370,6 +380,10 @@ export default function SalesPage() {
   const currentPayMode   = watch('payment_mode')
   const selectedCustomer = customers.find(c => c.id === customerId)
   const subtotal         = rows.reduce((s, r) => s + r.amount, 0)
+  // Display-only count for the Step 1/Step 2 mobile footers ("2 items •
+  // Rs. X") — just counts rows that already have a product on them,
+  // nothing new computed.
+  const itemCount        = rows.filter(r => r.product_id).length
 
   // Discount — resolved per the active scope (Invoice / Company / Product)
   // into a per-line discount_pct, exactly what gets posted to the backend.
@@ -432,6 +446,7 @@ export default function SalesPage() {
       setDiscountModalOpen(false)
       setDiscountScope('invoice'); setInvoiceDiscount(emptyDiscount())
       setCompanyDiscounts({}); setProductDiscounts({})
+      setMobileStep(1) // back to Step 1 for the next bill (mobile/tablet only — no-op on desktop)
       requestAnimationFrame(() => barcodeInputRef.current?.focus())
     }
 
@@ -464,7 +479,7 @@ export default function SalesPage() {
             product_name: it.product_name, batch_no: it.batch_no, expiry: it.expiry,
             qty: Number(it.qty), bonus: Number(it.bonus) || 0, rate: Number(it.rate),
             discount_pct: Number(it.discount_pct) || 0, cc_pct: Number(it.cc_pct) || 0,
-            cc_amount: Number(it.cc_amount) || 0, amount: Number(it.amount),
+            cc_amount: Number(it.cc_amount) || 0, amount: grossItemAmount(it.qty, it.rate),
           })),
           subtotal: grossSubtotal, discountAmt: printDiscount, ccAmount: saved.cc_amount,
           roundOff: Number(saved.round_off) || 0,
@@ -563,6 +578,7 @@ export default function SalesPage() {
     setDiscountModalOpen(false)
     setDiscountScope('invoice'); setInvoiceDiscount(emptyDiscount())
     setCompanyDiscounts({}); setProductDiscounts({})
+    setMobileStep(1) // no-op on desktop
     requestAnimationFrame(() => barcodeInputRef.current?.focus())
   }
 
@@ -582,6 +598,22 @@ export default function SalesPage() {
     if (!currentPayMode) { setFlash({ type: 'danger', msg: 'Please select a payment mode.' }); return }
     setFlash(null)
     setDiscountModalOpen(true)
+  }
+
+  // Mobile/tablet "Next" (Step 1 → Step 2) — same two checks handleNextClick
+  // already runs (at least one product, a customer picked), reusing the
+  // exact same validDiscountRows() check and error copy. Payment mode is
+  // deliberately NOT checked here: on this flow it's chosen ON Step 2 (see
+  // the Payment Mode card below), and onSubmit already re-validates it
+  // (along with everything else) before anything is actually posted — this
+  // only decides whether to advance the step, it doesn't skip validation,
+  // just relocates where the payment-mode check naturally happens.
+  function goToStep2() {
+    const v = validDiscountRows(rows)
+    if (!v.length) { setFlash({ type: 'danger', msg: 'Add at least one product' }); return }
+    if (!customerId) { setFlash({ type: 'danger', msg: 'Select a customer before posting the sale' }); setCustomerOpen(true); return }
+    setFlash(null)
+    setMobileStep(2)
   }
 
   // "Post Invoice" (from the Discount Review popup) no longer posts
@@ -629,7 +661,21 @@ export default function SalesPage() {
     { combo: 'f5',         description: 'New product',       handler: () => tableRef.current?.openCreateProduct() },
     { combo: 'f6',         description: 'New customer',      handler: () => setShowNewCustomer(true) },
     { combo: 'f7',         description: 'Apply discount',    handler: handleNextClick },
-    { combo: 'f8',         description: 'Payment',           handler: () => document.getElementById('pos-tender-input')?.focus() },
+    {
+      combo: 'f8', description: 'Payment',
+      // Desktop always has #pos-tender-input visible — unchanged. On
+      // mobile/tablet Step 2 (a physical keyboard on a tablet, say) the
+      // desktop input is present but hidden via CSS, so prefer whichever
+      // of the two tender inputs is actually visible (offsetParent is
+      // null for anything display:none) instead of always focusing the
+      // hidden one.
+      handler: () => {
+        const desktop = document.getElementById('pos-tender-input') as HTMLElement | null
+        const mobile  = document.getElementById('pos-tender-input-mobile') as HTMLElement | null
+        const target  = (mobile && mobile.offsetParent !== null) ? mobile : desktop
+        target?.focus()
+      },
+    },
     { combo: 'f9',         description: 'Next',              handler: handleNextClick },
     { combo: 'ctrl+s',     description: 'Next',              handler: handleNextClick },
     { combo: 'f12',        description: 'Next',              handler: handleNextClick },
@@ -660,8 +706,17 @@ export default function SalesPage() {
     : ''
 
   return (
-    // pos-theme activates ALL scoped CSS variables and responsive rules in globals.css
-    <div className={`pos-theme ${theme === 'dark' ? 'dark' : ''}`}>
+    // pos-theme activates ALL scoped CSS variables and responsive rules in
+    // globals.css. `sales-two-step` scopes the mobile/tablet two-step
+    // billing flow rules to THIS page only (PurchasePage.tsx also uses
+    // pos-theme but never gets this class, so it's completely unaffected —
+    // see the "SALES TWO-STEP" CSS section). `data-pos-step` is read only
+    // by those same scoped rules, and only below 1025px; desktop ignores
+    // it entirely and always renders both steps' content, unchanged.
+    <div
+      className={`pos-theme sales-two-step ${theme === 'dark' ? 'dark' : ''}`}
+      data-pos-step={mobileStep}
+    >
 
       {/* ── Page header — IDENTICAL to original ─────────────────────── */}
       <div className="page-header">
@@ -693,7 +748,9 @@ export default function SalesPage() {
           <div className="pos-grid-main">
 
             {/* ── Customer info card ──────────────────────────────────── */}
-            <div className="pos-card">
+            {/* pos-step1-only: only takes effect ≤1024px (see globals.css)
+                — desktop always renders this, unchanged. */}
+            <div className="pos-card pos-step1-only">
 
               {/* Card title — on mobile also acts as accordion toggle */}
               <div
@@ -790,8 +847,12 @@ export default function SalesPage() {
                     />
                   </div>
 
-                  {/* Payment mode — IDENTICAL to original */}
-                  <div className="pos-span2">
+                  {/* Payment mode — IDENTICAL to original on desktop.
+                      pos-mt-hide: hidden ≤1024px only — it re-appears as
+                      its own card in the Step 2 panel below, using this
+                      exact same PAYMENT_MODES.map/setValue('payment_mode')
+                      pair, not a second implementation of it. */}
+                  <div className="pos-span2 pos-mt-hide">
                     <FieldLabel icon={<CreditCard size={11}/>}>Payment Mode</FieldLabel>
                     <div className="flex gap-2 flex-wrap">
                       {PAYMENT_MODES.map(m => (
@@ -832,7 +893,7 @@ export default function SalesPage() {
               DESKTOP: InvoiceRowsTable — IDENTICAL to original
               MOBILE:  pos-table-wrap.pos-desktop-only hidden; pos-mobile-items shown
           ════════════════════════════════════════════════════════════ */}
-          <div className="pos-card">
+          <div className="pos-card pos-step1-only">
             <div className="flex items-center justify-between mb-4 pos-invoice-header">
               <div className="pos-card-title">
                 <ShoppingCart size={14} className="text-brand" />
@@ -1081,10 +1142,25 @@ export default function SalesPage() {
           </div>
 
           {/* ════════════════════════════════════════════════════════════
-              BILLING SUMMARY — IDENTICAL to original on desktop
-              Mobile: collapsible accordion
+              STEP 1 — Subtotal (mobile/tablet only)
+              Just the running subtotal of items entered so far — the
+              Discount/Round Off/Total Payable breakdown only makes sense
+              once payment + discount are chosen on Step 2, so this stays
+              a single read-only row here, using the same `subtotal`
+              already computed above.
           ════════════════════════════════════════════════════════════ */}
-          <div className="pos-card">
+          <div className="pos-card pos-step1-only pos-step1-subtotal">
+            <SummaryRow label="Subtotal" value={fmt(subtotal)} highlight large />
+          </div>
+
+          {/* ════════════════════════════════════════════════════════════
+              BILLING SUMMARY — IDENTICAL to original on desktop
+              pos-mt-hide: hidden ≤1024px only. Its Discount/Tender/Payment
+              content moved into the new Step 2 panel below for mobile and
+              tablet — see that panel's comment for why this had to be a
+              second render location rather than a CSS-only reorder.
+          ════════════════════════════════════════════════════════════ */}
+          <div className="pos-card pos-mt-hide">
             {/* Title — on mobile also acts as accordion toggle */}
             <div
               className="pos-card-title pos-accordion-header mb-4"
@@ -1220,21 +1296,161 @@ export default function SalesPage() {
             </div>
           </div>
 
-          {/* ── MOBILE ONLY: FAB ──────────────────────────────────────── */}
-          <button type="button" className="pos-fab" onClick={() => setRows(prev => [...prev, newRow()])} aria-label="Add product">
+          {/* ── MOBILE/TABLET STEP 1 ONLY: FAB ──────────────────────────── */}
+          <button type="button" className="pos-fab pos-step1-only" onClick={() => setRows(prev => [...prev, newRow()])} aria-label="Add product">
             <Plus size={22}/>
           </button>
 
-          {/* ── MOBILE ONLY: sticky bottom action bar ─────────────────── */}
-          <div className="pos-mobile-actionbar">
+          {/* ── MOBILE/TABLET STEP 1 ONLY: sticky bottom action bar ──────
+              Save Draft (unchanged handler) + Next. Next now advances to
+              Step 2 (goToStep2) instead of opening the Discount Review
+              modal — see goToStep2's comment above for why: Payment Mode
+              lives on Step 2 now, so the modal (which still requires a
+              payment mode) can't usefully open until that's picked there.
+              On desktop this bar is never visible (unaffected either way). */}
+          <div className="pos-mobile-actionbar pos-step1-only">
             <button type="button" className="pma-draft" onClick={saveDraft} title="Save Draft">
               <Save size={20}/>
             </button>
-            <button type="button" className="pma-post" onClick={handleNextClick} disabled={saving}>
-              {saving
-                ? <><span className="pos-spinner"/> Posting…</>
-                : <><FileText size={16}/> Next — {fmt(grandTotal)}</>
-              }
+            <button type="button" className="pma-post" onClick={goToStep2} disabled={saving}>
+              <span className="pma-stack">
+                <span className="pma-stack-label"><FileText size={14}/> Next →</span>
+                <span className="pma-stack-sub">{itemCount} item{itemCount === 1 ? '' : 's'} • {fmt(subtotal)}</span>
+              </span>
+            </button>
+          </div>
+
+          {/* ════════════════════════════════════════════════════════════
+              STEP 2 (MOBILE/TABLET ONLY) — Tender → Payment Mode →
+              Discount → Billing Summary → Back / Post Invoice.
+
+              This is new markup, but every field in it is wired to the
+              exact same state and handlers as the desktop-only blocks
+              above (tender/setTender, currentPayMode/setValue,
+              discountScope/handleDiscountScopeChange, discountAmt,
+              subtotal/roundOff/grandTotal, handleNextClick, handlePostClick).
+              Nothing here computes a new value, re-implements the discount
+              scopes, or posts a second way — it's a second *render
+              location* for controls that already exist, made necessary
+              because CSS alone can't relocate Payment Mode out of the
+              Customer card or reorder Tender/Discount/Billing Summary
+              across the desktop DOM without touching the desktop layout
+              itself (which must stay pixel-identical — see file header).
+          ════════════════════════════════════════════════════════════ */}
+          <div className="pos-step2-only space-y-3">
+
+            {/* Tender */}
+            <div className="pos-card">
+              <div className="pos-card-title mb-3">
+                <span aria-hidden="true" style={{ fontSize: 14 }}>💵</span> Tender Amount
+                <Kbd>F8</Kbd>
+              </div>
+              <FieldLabel icon={<CreditCard size={11}/>}>Tender Amount</FieldLabel>
+              <input
+                id="pos-tender-input-mobile"
+                type="number" className="erp-input pmic-billing-input text-right"
+                step="0.01" min="0" placeholder="0.00"
+                value={tender}
+                onChange={e => setTender(e.target.value === '' ? '' : Number(e.target.value))}
+              />
+              <div className="flex items-center justify-between mt-3">
+                <span className="text-xs font-semibold uppercase tracking-wide text-[var(--text-4)]">Change</span>
+                <span className={`text-lg font-bold ${change > 0 ? 'text-green-600' : 'text-[var(--text-4)]'}`}>
+                  {fmt(change)}
+                </span>
+              </div>
+              {!tender && (
+                <div className="flex items-center gap-2 mt-3 text-xs text-[var(--text-4)]">
+                  <AlertCircle size={12}/>
+                  Enter tender amount to calculate change.
+                </div>
+              )}
+            </div>
+
+            {/* Payment Mode — same PAYMENT_MODES/setValue pair as the
+                Customer card's (now pos-mt-hide) copy above. */}
+            <div className="pos-card">
+              <FieldLabel icon={<CreditCard size={11}/>}>Payment Mode</FieldLabel>
+              <div className="flex gap-2 flex-wrap">
+                {PAYMENT_MODES.map(m => (
+                  <button
+                    key={m.value}
+                    type="button"
+                    onClick={() => setValue('payment_mode', m.value)}
+                    className={`pos-mode-pill ${currentPayMode === m.value ? 'pos-mode-pill--active' : ''}`}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Discount — same scope selector as the (now pos-mt-hide)
+                Billing Summary card above. Entering the actual discount
+                value per scope still happens in the existing Discount
+                Review popup (Invoice/Company/Product panels) — tapping
+                the amount row below opens it via the exact same
+                handleNextClick used for desktop's Next/F7/F12, which
+                already validates rows+customer+payment mode first. */}
+            <div className="pos-card">
+              <div className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-4)] mb-1" title="Shortcut: F7">
+                Discount Scope <Kbd>F7</Kbd>
+              </div>
+              <div className="flex gap-1.5 flex-wrap mb-3">
+                {([
+                  { id: 'invoice', label: 'Invoice' },
+                  { id: 'company', label: 'Company / Manufacturer' },
+                  { id: 'product', label: 'Product' },
+                ] as const).map(opt => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => handleDiscountScopeChange(opt.id)}
+                    className={`pos-mode-pill ${discountScope === opt.id ? 'pos-mode-pill--active' : ''}`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              <button type="button" className="pos-discount-tap-row" onClick={handleNextClick}>
+                <span>Discount Amount</span>
+                <span className="pos-discount-tap-value">{fmt(discountAmt)}</span>
+              </button>
+            </div>
+
+            {/* Billing Summary — same subtotal/discountAmt/roundOff/
+                grandTotal already computed above; identical SummaryRow
+                component the desktop sidebar total card uses. */}
+            <div className="pos-card">
+              <div className="pos-card-title mb-3">
+                <span aria-hidden="true" style={{ fontSize: 14 }}>🧾</span> Billing Summary
+              </div>
+              <SummaryRow label="Subtotal"     value={fmt(subtotal)} />
+              <SummaryRow label="Discount"     value={`-${fmt(discountAmt)}`} muted={discountAmt === 0} />
+              <SummaryRow label="Round Off"    value={`${roundOff >= 0 ? '+' : '-'}${fmt(Math.abs(roundOff))}`} muted={roundOff === 0} />
+              <SummaryRow label="Total Payable" value={fmt(grandTotal)} highlight large />
+            </div>
+          </div>
+
+          {/* ── STEP 2 ONLY: sticky Back / Post Invoice bar ─────────────
+              Back preserves every field (rows, tender, discount, customer)
+              — it only flips mobileStep back to 1, nothing is reset. Post
+              Invoice calls the EXISTING handlePostClick (same confirm
+              dialog → onSubmit → same API call as desktop's Post Invoice
+              button inside the Discount Review modal). */}
+          <div className="pos-mobile-actionbar pos-step2-only">
+            <button type="button" className="pma-draft" onClick={() => setMobileStep(1)} title="Back" aria-label="Back">
+              <ArrowLeft size={20}/>
+            </button>
+            <button type="button" className="pma-post" onClick={handlePostClick} disabled={saving}>
+              {saving ? (
+                <><span className="pos-spinner"/> Posting…</>
+              ) : (
+                <span className="pma-stack">
+                  <span className="pma-stack-label"><FileText size={14}/> Post Invoice →</span>
+                  <span className="pma-stack-sub">{itemCount} item{itemCount === 1 ? '' : 's'} • {fmt(grandTotal)}</span>
+                </span>
+              )}
             </button>
           </div>
 
@@ -1285,16 +1501,18 @@ export default function SalesPage() {
                                   try {
                                     const res = await salesAPI.get(s.id)
                                     const d = res.data.data
+                                    // d.subtotal is already net-of-discount (see routes/sales.js) and
+                                    // the API has no discount total — recover both for display from
+                                    // the actual saved item amounts, same as the post-sale print path.
+                                    // (Run this against the real saved `amount` BEFORE the map below
+                                    // overwrites it with the gross qty*rate display value.)
+                                    const { grossSubtotal, discountAmt } = derivePrintDiscount(d.items || [])
                                     const printItems = (d.items||[]).map((it: any) => ({
                                       product_name: it.product_name, batch_no: it.batch_no, expiry: it.expiry,
                                       qty: Number(it.qty), bonus: Number(it.bonus)||0, rate: Number(it.rate),
                                       discount_pct: Number(it.discount_pct)||0, cc_pct: Number(it.cc_pct)||0,
-                                      cc_amount: Number(it.cc_amount)||0, amount: Number(it.amount),
+                                      cc_amount: Number(it.cc_amount)||0, amount: grossItemAmount(it.qty, it.rate),
                                     }))
-                                    // d.subtotal is already net-of-discount (see routes/sales.js) and
-                                    // the API has no discount total — recover both for display from
-                                    // the actual saved item amounts, same as the post-sale print path.
-                                    const { grossSubtotal, discountAmt } = derivePrintDiscount(printItems)
                                     setPrintData({
                                       voucherNo: d.invoice_no, type: 'SALE', date: d.date_ad,
                                       paymentMode: d.payment_mode, partyName: d.party_name,
@@ -1368,16 +1586,18 @@ export default function SalesPage() {
                         try {
                           const res = await salesAPI.get(s.id)
                           const d = res.data.data
+                          // d.subtotal is already net-of-discount (see routes/sales.js) and
+                          // the API has no discount total — recover both for display from
+                          // the actual saved item amounts, same as the post-sale print path.
+                          // (Run this against the real saved `amount` BEFORE the map below
+                          // overwrites it with the gross qty*rate display value.)
+                          const { grossSubtotal, discountAmt } = derivePrintDiscount(d.items || [])
                           const printItems = (d.items||[]).map((it: any) => ({
                             product_name: it.product_name, batch_no: it.batch_no, expiry: it.expiry,
                             qty: Number(it.qty), bonus: Number(it.bonus)||0, rate: Number(it.rate),
                             discount_pct: Number(it.discount_pct)||0, cc_pct: Number(it.cc_pct)||0,
-                            cc_amount: Number(it.cc_amount)||0, amount: Number(it.amount),
+                            cc_amount: Number(it.cc_amount)||0, amount: grossItemAmount(it.qty, it.rate),
                           }))
-                          // d.subtotal is already net-of-discount (see routes/sales.js) and
-                          // the API has no discount total — recover both for display from
-                          // the actual saved item amounts, same as the post-sale print path.
-                          const { grossSubtotal, discountAmt } = derivePrintDiscount(printItems)
                           setPrintData({
                             voucherNo: d.invoice_no, type: 'SALE', date: d.date_ad,
                             paymentMode: d.payment_mode, partyName: d.party_name,
@@ -1409,16 +1629,18 @@ export default function SalesPage() {
           <Button variant="primary" size="sm" icon={<Printer size={13}/>}
             onClick={() => {
               const d = detail; setDetailId(null)
+              // Same recovery as the list/mobile print paths above, so the
+              // detail-modal print shows the same Subtotal/Discount/CC Charge
+              // breakdown instead of silently omitting them. Run against the
+              // real saved `amount` BEFORE the map below overwrites it with
+              // the gross qty*rate display value.
+              const { grossSubtotal, discountAmt } = derivePrintDiscount(d.items || [])
               const printItems = (d.items||[]).map((it: any) => ({
                 product_name: it.product_name, batch_no: it.batch_no, expiry: it.expiry,
                 qty: Number(it.qty), bonus: Number(it.bonus)||0, rate: Number(it.rate),
                 discount_pct: Number(it.discount_pct)||0, cc_pct: Number(it.cc_pct)||0,
-                cc_amount: Number(it.cc_amount)||0, amount: Number(it.amount),
+                cc_amount: Number(it.cc_amount)||0, amount: grossItemAmount(it.qty, it.rate),
               }))
-              // Same recovery as the list/mobile print paths above, so the
-              // detail-modal print shows the same Subtotal/Discount/CC Charge
-              // breakdown instead of silently omitting them.
-              const { grossSubtotal, discountAmt } = derivePrintDiscount(printItems)
               setTimeout(() => setPrintData({
                 voucherNo: d.invoice_no, type: 'SALE', date: d.date_ad,
                 paymentMode: d.payment_mode, partyName: d.party_name,
@@ -1529,6 +1751,7 @@ export default function SalesPage() {
           reset({ customer_id: '', date: new Date().toISOString().split('T')[0], payment_mode: '', notes: '' })
           setDiscountScope('invoice'); setInvoiceDiscount(emptyDiscount())
           setCompanyDiscounts({}); setProductDiscounts({})
+          setMobileStep(1) // no-op on desktop
           requestAnimationFrame(() => barcodeInputRef.current?.focus())
         }}
       />

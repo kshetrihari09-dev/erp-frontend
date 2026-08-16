@@ -193,6 +193,13 @@ export interface PrintDiscountResult {
   discountAmt:   number
 }
 
+// Per-line print "Amount" is shown as the pre-discount gross (qty*rate),
+// matching the Subtotal row above it — the discount is only ever shown once,
+// in the Discount summary row, not silently baked into each line as well.
+export function grossItemAmount(qty: number, rate: number): number {
+  return Math.round((Number(qty) || 0) * (Number(rate) || 0) * 100) / 100
+}
+
 export function derivePrintDiscount(items: PrintDiscountItem[]): PrintDiscountResult {
   let gross = 0
   let discount = 0
