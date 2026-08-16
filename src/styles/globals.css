@@ -3083,6 +3083,8 @@ bsp-row--disabled { cursor: not-allowed; opacity: .55; }
   align-items: center;
   gap: 10px;
   padding: 2px 0;
+  flex: 1;
+  min-width: 0;
 }
 .pos-theme .pos-customer-summary-avatar {
   width: 32px; height: 32px; border-radius: 10px; flex-shrink: 0;
@@ -3091,8 +3093,37 @@ bsp-row--disabled { cursor: not-allowed; opacity: .55; }
   display: flex; align-items: center; justify-content: center;
   font-weight: 700; font-size: 13px;
 }
-.pos-theme .pos-customer-summary-name { font-size: 13px; font-weight: 600; color: var(--pdt-text); line-height: 1.2; }
+.pos-theme .pos-customer-summary-name { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--pdt-text); line-height: 1.2; }
 .pos-theme .pos-customer-summary-meta { font-size: 11px; color: var(--pdt-text-4); }
+
+/* Active/Inactive status pill next to the customer name (mobile summary) */
+.pos-theme .pos-status-pill {
+  display:        inline-flex;
+  align-items:    center;
+  padding:        1px 7px;
+  border-radius:  999px;
+  font-size:      10px;
+  font-weight:    700;
+  line-height:    1.5;
+}
+.pos-theme .pos-status-pill--active   { background: #dcfce7; color: #16a34a; }
+.pos-theme .pos-status-pill--inactive { background: #fee2e2; color: #dc2626; }
+
+/* Pencil "edit customer" button next to the mobile summary */
+.pos-theme .pos-customer-edit-btn {
+  flex-shrink:     0;
+  width:           30px;
+  height:          30px;
+  min-height:      30px;
+  border-radius:   9px;
+  border:          1.5px solid var(--pdt-border, var(--border));
+  background:      var(--pdt-overlay-04, var(--surface-2));
+  color:           var(--pdt-text-3, var(--text-3));
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+}
+.pos-theme .pos-customer-edit-btn:active { background: var(--pdt-overlay-06, var(--surface-3)); }
 
 /* Mobile product cards (replace table) */
 .pos-theme .pos-mobile-items { display: none; }
@@ -3584,39 +3615,49 @@ bsp-row--disabled { cursor: not-allowed; opacity: .55; }
   position:      relative;     /* anchor for psc-dropdown */
 }
 
-/* Header row: "Product" label + remove ×  */
-.pos-theme .pmic-header {
+/* Numbered badge (1, 2, 3…) replacing the old "Product" text label +
+   generic thumbnail icon — matches the reference mockup's blue numbered
+   circle at the start of each product row. Purely decorative (uses the
+   row's own array index), no new state. */
+.pos-theme .pmic-row-with-thumb {
+  display:     flex;
+  align-items: center;
+  gap:         8px;
+}
+.pos-theme .pmic-num-badge {
+  flex-shrink:     0;
+  width:           26px;
+  height:          26px;
+  border-radius:   50%;
   display:         flex;
   align-items:     center;
-  justify-content: space-between;
-  gap:             8px;
+  justify-content: center;
+  background:      var(--pdt-accent-dim, rgba(37,99,235,.12));
+  color:           var(--pdt-accent, var(--brand));
+  font-size:       12px;
+  font-weight:     800;
 }
-.pos-theme .pmic-product-label {
-  font-size:      10px;
-  font-weight:    700;
-  letter-spacing: .07em;
-  text-transform: uppercase;
-  color:          var(--pdt-text-4, var(--text-4));
-}
+
+/* Remove/delete button — red trash icon in a soft rounded square,
+   matching the mockup (previously a neutral × button). */
 .pos-theme .pmic-remove {
   display:         flex;
   align-items:     center;
   justify-content: center;
-  width:           32px;
-  height:          32px;
-  min-height:      32px;     /* override touch-target floor for this small btn */
+  width:           30px;
+  height:          30px;
+  min-height:      30px;     /* override touch-target floor for this small btn */
   border-radius:   9px;
-  border:          1.5px solid var(--pdt-border, var(--border));
-  background:      var(--pdt-overlay-04, var(--surface-2));
-  color:           var(--pdt-text-3, var(--text-3));
+  border:          1.5px solid rgba(239,68,68,.25);
+  background:      rgba(239,68,68,.1);
+  color:           #ef4444;
   cursor:          pointer;
-  transition:      background .12s, color .12s, border-color .12s;
+  transition:      background .12s, border-color .12s;
   flex-shrink:     0;
 }
 .pos-theme .pmic-remove:active {
-  background:    rgba(239,68,68,.15);
-  border-color:  rgba(239,68,68,.4);
-  color:         #ef4444;
+  background:    rgba(239,68,68,.22);
+  border-color:  rgba(239,68,68,.5);
 }
 
 /* PSC wrapper — ensures dropdown has something to anchor to */
@@ -3624,27 +3665,6 @@ bsp-row--disabled { cursor: not-allowed; opacity: .55; }
   position: relative;
   flex:     1;
   min-width: 0;
-}
-
-/* Decorative product "thumbnail" chip (Sales page mobile cards) — no
-   image data anywhere, just a generic icon so the row has the same
-   visual anchor point the mockup's product photo does. */
-.pos-theme .pmic-row-with-thumb {
-  display:     flex;
-  align-items: center;
-  gap:         10px;
-}
-.pos-theme .pmic-thumb {
-  flex-shrink:     0;
-  width:           40px;
-  height:          40px;
-  border-radius:   10px;
-  display:         flex;
-  align-items:     center;
-  justify-content: center;
-  background:      var(--pdt-overlay-06, var(--surface-3));
-  border:          1px solid var(--pdt-border, var(--border));
-  color:           var(--pdt-text-3, var(--text-3));
 }
 
 /* 3-column field grid: Qty / Rate / Bonus  and  Batch / Expiry / CC% */
@@ -3667,6 +3687,34 @@ bsp-row--disabled { cursor: not-allowed; opacity: .55; }
   gap:                   8px;
 }
 
+/* Batch/Expiry row — lighter weight than the Qty/Bonus/Rate/Amount row
+   below it (smaller height, no mono font, muted text) so it reads more
+   like the compact "Batch: 032 · Exp: 2030-06-30" summary line in the
+   reference mockup, while staying fully editable. */
+.pos-theme .pmic-batchrow .pmic-field label { margin-bottom: 3px; }
+.pos-theme .pmic-batchrow .pmic-field input,
+.pos-theme .pmic-batchrow .pmic-field .bsp-trigger {
+  height:      34px;
+  min-height:  34px;
+  font-family: var(--font-sans, inherit);
+  font-weight: 600;
+  font-size:   13px;
+  text-align:  left;
+  justify-content: flex-start;
+  color:       var(--pdt-text-3, var(--text-3));
+  background:  transparent;
+  border:      none;
+  border-bottom: 1.5px solid var(--pdt-border, var(--border));
+  border-radius: 0;
+  padding-left: 0;
+}
+.pos-theme .pmic-batchrow .pmic-field input:focus,
+.pos-theme .pmic-batchrow .pmic-field .bsp-trigger:focus {
+  border-bottom-color: var(--pdt-accent, var(--brand));
+  box-shadow: none;
+  background: transparent;
+}
+
 /* 4-column field grid: Qty | Bonus | Rate | Amount — deliberately kept
    as ONE row even down to 320px (per spec), just with tighter gaps/
    padding at the narrowest widths rather than wrapping to 2 rows. */
@@ -3685,44 +3733,37 @@ bsp-row--disabled { cursor: not-allowed; opacity: .55; }
 }
 
 /* Inline C.C.% field — sits on the same line as the product name/search,
-   per spec ("Product name + C.C.% on the same line"). Compact, fixed-
-   width so it doesn't crowd the product search field next to it. */
+   per spec ("Product name + C.C.% on the same line"). Styled as a
+   compact gray pill (e.g. "CC 5%") matching the reference mockup, rather
+   than a bordered input box — still a real, editable <input>. */
 .pos-theme .pmic-cc-inline {
   flex-shrink: 0;
-  width:       58px;
-  display:     flex;
-  flex-direction: column;
-  align-items: center;
-}
-.pos-theme .pmic-cc-inline label {
-  font-size:      9px;
-  font-weight:    700;
-  letter-spacing: .05em;
-  text-transform: uppercase;
-  color:          var(--pdt-text-4, var(--text-4));
-  margin-bottom:  3px;
+  width:       54px;
 }
 .pos-theme .pmic-cc-inline input {
   width:            100%;
-  height:           32px;
-  min-height:       32px;
-  border-radius:    8px;
-  border:           1.5px solid var(--pdt-border-2, var(--border));
-  background:       var(--pdt-overlay-04, var(--surface));
-  color:            var(--pdt-text, var(--text));
-  font-size:        13px;
-  font-family:      var(--font-mono, monospace);
-  font-weight:      600;
+  height:           26px;
+  min-height:       26px;
+  border-radius:    999px;
+  border:           1px solid var(--pdt-border, var(--border));
+  background:       var(--pdt-overlay-05, var(--surface-2));
+  color:            var(--pdt-text-3, var(--text-3));
+  font-size:        11px;
+  font-family:      var(--font-sans, inherit);
+  font-weight:      700;
   text-align:       center;
-  padding:          0 2px;
+  padding:          0 4px;
   box-sizing:       border-box;
   outline:          none;
   -webkit-appearance: none;
   appearance:       none;
 }
+.pos-theme .pmic-cc-inline input::placeholder { color: var(--pdt-text-3, var(--text-3)); opacity: 1; }
 .pos-theme .pmic-cc-inline input:focus {
   border-color: var(--pdt-accent, var(--brand));
   box-shadow:   0 0 0 3px var(--pdt-accent-dim, rgba(59,130,246,.15));
+  background:   var(--pdt-overlay-06, var(--surface));
+  color:        var(--pdt-text, var(--text));
 }
 .pos-theme .pmic-cc-inline input[type="number"]::-webkit-inner-spin-button,
 .pos-theme .pmic-cc-inline input[type="number"]::-webkit-outer-spin-button {
@@ -6537,6 +6578,83 @@ canvas{
   .pos-theme.sales-two-step .page-title { font-size: 18px !important; }
   .pos-theme.sales-two-step .page-breadcrumb { font-size: 11px !important; }
 }
+/* Icon square in front of Step 2 card titles (Tender/Payment Mode/
+   Discount/Billing Summary) — small colored chip matching the reference
+   mockup. Color/background are passed inline per-card (see IconSquare in
+   SalesPage.tsx); this only sets the shared shape/sizing. */
+.pos-theme .pos-icon-square {
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  width:           30px;
+  height:          30px;
+  border-radius:   9px;
+  flex-shrink:     0;
+}
+
+/* Tender Amount input with a "Rs." prefix chip, matching the mockup's
+   split "Rs. | 950.00" field. Same input/onChange as before — purely a
+   wrapper + a decorative prefix label. */
+.pos-theme .pos-tender-prefix-wrap {
+  display:     flex;
+  align-items: stretch;
+  gap:         0;
+}
+.pos-theme .pos-tender-prefix {
+  flex-shrink:     0;
+  display:         flex;
+  align-items:     center;
+  padding:         0 12px;
+  border:          1.5px solid var(--pdt-border-2, var(--border));
+  border-right:    none;
+  border-radius:   10px 0 0 10px;
+  background:      var(--pdt-overlay-04, var(--surface-2));
+  color:           var(--pdt-text-3, var(--text-3));
+  font-size:       14px;
+  font-weight:     700;
+}
+.pos-theme .pos-tender-prefix-wrap .pmic-billing-input {
+  border-radius: 0 10px 10px 0;
+}
+
+/* Payment Mode — 2-column grid with a checkmark badge on the active
+   mode, per the reference mockup (previously a flex-wrap pill row). */
+.pos-theme .pos-paymode-grid {
+  display:               grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap:                   8px;
+}
+.pos-theme .pos-paymode-btn {
+  position:        relative;
+  height:          44px;
+  min-height:      44px;
+  border-radius:   10px;
+  border:          1.5px solid var(--pdt-border-2, var(--border));
+  background:      var(--pdt-overlay-04, var(--surface));
+  color:           var(--pdt-text-2, var(--text-2));
+  font-size:       13px;
+  font-weight:     600;
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  gap:             6px;
+  -webkit-tap-highlight-color: transparent;
+}
+.pos-theme .pos-paymode-btn--active {
+  border-color: var(--pdt-accent, var(--brand));
+  background:   var(--pdt-accent, var(--brand));
+  color:        #fff;
+}
+.pos-theme .pos-paymode-check { flex-shrink: 0; }
+
+/* "In Words" line under Total Payable in Step 2's Billing Summary card */
+.pos-theme .pos-inwords {
+  margin-top:  8px;
+  font-size:   11px;
+  font-weight: 600;
+  color:       #16a34a;
+}
+
 .pos-theme .pos-discount-tap-row {
   display: flex;
   align-items: center;

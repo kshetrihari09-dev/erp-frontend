@@ -24,6 +24,7 @@ import {
   Phone as PhoneIcon, ChevronDown, AlertCircle,
   CheckCircle2, RotateCcw, Save, Plus, UserPlus,
   ScanLine, Pill, QrCode, ArrowLeft, HelpCircle,
+  Wallet, Percent, Receipt, Pencil,
 } from 'lucide-react'
 import { salesAPI, partiesAPI, productsAPI } from '@/services/api'
 import { useOffline } from '@/offline/OfflineProvider'
@@ -77,18 +78,70 @@ function FieldLabel({ icon, children }: { icon: React.ReactNode; children: React
   )
 }
 
+/* ── IconSquare — small colored icon chip used in front of Step 2's
+   card titles (Tender/Payment Mode/Discount/Billing Summary), matching
+   the reference mockup. Purely presentational — no state, no logic. */
+function IconSquare({ icon, bg, color }: { icon: React.ReactNode; bg: string; color: string }) {
+  return (
+    <span
+      className="pos-icon-square"
+      style={{ background: bg, color }}
+      aria-hidden="true"
+    >
+      {icon}
+    </span>
+  )
+}
+
+/* ── amountInWords — display-only helper for Step 2's Billing Summary
+   ("In Words: Nine Hundred Fifty Only" in the reference mockup). Purely
+   formats the already-computed grandTotal; does not affect it, does not
+   round it for posting, and is not sent to the backend anywhere. Indian/
+   Nepali numbering (Lakh/Crore), matching how amounts are normally
+   spelled out on Nepali invoices. */
+const ONES = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
+  'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen']
+const TENS = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety']
+function twoDigitsToWords(n: number): string {
+  if (n < 20) return ONES[n]
+  const t = Math.floor(n / 10), o = n % 10
+  return TENS[t] + (o ? ' ' + ONES[o] : '')
+}
+function threeDigitsToWords(n: number): string {
+  const h = Math.floor(n / 100), r = n % 100
+  return (h ? ONES[h] + ' Hundred' + (r ? ' ' : '') : '') + (r ? twoDigitsToWords(r) : '')
+}
+function amountInWords(value: number): string {
+  let n = Math.round(Math.abs(value))
+  if (n === 0) return 'Zero Only'
+  const crore = Math.floor(n / 1e7); n %= 1e7
+  const lakh  = Math.floor(n / 1e5); n %= 1e5
+  const thou  = Math.floor(n / 1e3); n %= 1e3
+  const rest  = n
+  const parts: string[] = []
+  if (crore) parts.push(threeDigitsToWords(crore) + ' Crore')
+  if (lakh)  parts.push(threeDigitsToWords(lakh) + ' Lakh')
+  if (thou)  parts.push(threeDigitsToWords(thou) + ' Thousand')
+  if (rest)  parts.push(threeDigitsToWords(rest))
+  return parts.join(' ') + ' Only'
+}
+
 /* ── SummaryRow — IDENTICAL to original ─────────────────────────────────── */
 function SummaryRow({
-  label, value, highlight = false, muted = false, large = false,
+  label, value, highlight = false, muted = false, large = false, danger = false,
 }: {
-  label: string; value: string; highlight?: boolean; muted?: boolean; large?: boolean
+  label: string; value: string; highlight?: boolean; muted?: boolean; large?: boolean; danger?: boolean
 }) {
   return (
     <div className={`flex items-center justify-between py-2 ${highlight ? 'border-t-2 border-[var(--border)] mt-1 pt-3' : ''}`}>
       <span className={`text-xs font-semibold uppercase tracking-wide ${muted ? 'text-[var(--text-4)]' : 'text-[var(--text-3)]'}`}>
         {label}
       </span>
-      <span className={`font-bold tabular-nums ${large ? 'text-xl text-brand' : highlight ? 'text-base text-brand' : 'text-sm text-[var(--text)]'}`}>
+      <span className={`font-bold tabular-nums ${
+        danger ? 'text-sm text-red-600' :
+        large ? 'text-xl text-brand' :
+        highlight ? 'text-base text-brand' : 'text-sm text-[var(--text)]'
+      }`}>
         {value}
       </span>
     </div>
@@ -766,18 +819,41 @@ export default function SalesPage() {
                 <User size={14} className="text-brand" />
                 Customer Information
 
-                {/* MOBILE ONLY: compact summary when collapsed */}
+                {/* MOBILE ONLY: compact summary, always visible once a
+                    customer is picked — Active/Inactive pill uses the
+                    same selectedCustomer.is_active the desktop grid
+                    already reads, purely a display addition. */}
                 <div className="pos-customer-summary pos-mobile-only">
                   <div className="pos-customer-summary-avatar">{customerInitials}</div>
                   <div>
                     <div className="pos-customer-summary-name">
                       {selectedCustomer?.name || ''}
+                      {selectedCustomer && (
+                        <span className={`pos-status-pill ${selectedCustomer.is_active ? 'pos-status-pill--active' : 'pos-status-pill--inactive'}`}>
+                          {selectedCustomer.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                      )}
                     </div>
                     {selectedCustomer?.phone && (
                       <div className="pos-customer-summary-meta">{selectedCustomer.phone}</div>
                     )}
                   </div>
                 </div>
+
+                {/* MOBILE ONLY: pencil — same accordion toggle as tapping
+                    the header itself, just a clearer edit affordance once
+                    a customer is already selected. */}
+                {selectedCustomer && (
+                  <button
+                    type="button"
+                    className="pos-customer-edit-btn pos-mobile-only"
+                    onClick={e => { e.stopPropagation(); setCustomerOpen(v => !v) }}
+                    aria-label="Edit customer"
+                    title="Edit customer"
+                  >
+                    <Pencil size={14}/>
+                  </button>
+                )}
 
                 {/* MOBILE ONLY: chevron */}
                 <ChevronDown
@@ -997,24 +1073,9 @@ export default function SalesPage() {
                 return (
                   <div key={idx} className="pmic">
 
-                    {/* ── Row 1: Product search + remove button ── */}
-                    <div className="pmic-header">
-                      <div className="pmic-product-label">Product</div>
-                      <button
-                        type="button"
-                        className="pmic-remove"
-                        onClick={() => setRows(prev => prev.filter((_, i) => i !== idx))}
-                        aria-label="Remove item"
-                      >
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                          <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-                        </svg>
-                      </button>
-                    </div>
-
-                    {/* ── Row 2: Product name + C.C.% on the SAME line ── */}
+                    {/* ── Row 1: numbered badge + product name/search + CC% + remove ── */}
                     <div className="pmic-row-with-thumb">
-                      <div className="pmic-thumb" aria-hidden="true"><Pill size={16} /></div>
+                      <div className="pmic-num-badge" aria-hidden="true">{idx + 1}</div>
                       <div className="pmic-psc-wrap">
                         <ProductSearchCell
                           value={row.product_id}
@@ -1030,23 +1091,34 @@ export default function SalesPage() {
                       </div>
                       {/* C.C.% — same line as the product name, per spec.
                           Same field/handler InvoiceRowsTable's desktop CC
-                          column already uses — just relocated inline here. */}
+                          column already uses — just relocated inline here,
+                          styled as a compact pill rather than a full input. */}
                       <div className="pmic-cc-inline" title="Credit Card %">
-                        <label>C.C%</label>
                         <input
                           type="number" inputMode="decimal" min={0} step="0.01"
                           value={row.cc_pct === 0 ? '' : row.cc_pct}
-                          placeholder="0"
+                          placeholder="CC 0%"
                           onChange={e => {
                             const cc_pct = e.target.value === '' ? 0 : Number(e.target.value)
                             updateRow({ cc_pct, ...reCalc({ cc_pct }) })
                           }}
                         />
                       </div>
+                      <button
+                        type="button"
+                        className="pmic-remove"
+                        onClick={() => setRows(prev => prev.filter((_, i) => i !== idx))}
+                        aria-label="Remove item"
+                        title="Remove item"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                          <path d="M3 4.5h10M6.5 4.5V3a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v1.5M4.5 4.5l.6 8.4a1 1 0 0 0 1 .93h3.8a1 1 0 0 0 1-.93l.6-8.4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </button>
                     </div>
 
-                    {/* ── Row 3: Batch + Expiry, below the product line ── */}
-                    <div className="pmic-fields-2">
+                    {/* ── Row 2: Batch + Expiry, directly below the product line ── */}
+                    <div className="pmic-fields-2 pmic-batchrow">
                       <div className="pmic-field">
                         <label>Batch</label>
                         <BatchSelect
@@ -1125,15 +1197,22 @@ export default function SalesPage() {
           </div>
 
           {/* ════════════════════════════════════════════════════════════
-              STEP 1 — Subtotal (mobile/tablet only)
-              Just the running subtotal of items entered so far — the
-              Discount/Round Off/Total Payable breakdown only makes sense
-              once payment + discount are chosen on Step 2, so this stays
-              a single read-only row here, using the same `subtotal`
-              already computed above.
+              STEP 1 — Running summary (mobile/tablet only)
+              Subtotal / Discount / CC Charge / Total / Paid / Balance Due —
+              all figures already computed above (subtotal, discountAmt,
+              ccTotal, grandTotal); "Paid" is always 0 here because Tender
+              is only entered on Step 2 (see pos-tender-input-mobile), so
+              Balance Due always mirrors the running Total until then —
+              same numbers Step 2's Billing Summary card recomputes live
+              once tender is entered.
           ════════════════════════════════════════════════════════════ */}
           <div className="pos-card pos-step1-only pos-step1-subtotal">
-            <SummaryRow label="Subtotal" value={fmt(subtotal)} highlight large />
+            <SummaryRow label="Subtotal"    value={fmt(subtotal - ccTotal)} muted />
+            <SummaryRow label="Discount"    value={`-${fmt(discountAmt)}`} muted={discountAmt === 0} danger={discountAmt > 0} />
+            <SummaryRow label="CC Charge"   value={fmt(ccTotal)} muted={ccTotal === 0} />
+            <SummaryRow label="Total"       value={fmt(grandTotal)} highlight large />
+            <SummaryRow label="Paid"        value={fmt(0)} muted />
+            <SummaryRow label="Balance Due" value={fmt(grandTotal)} danger />
           </div>
 
           {/* ════════════════════════════════════════════════════════════
@@ -1342,17 +1421,21 @@ export default function SalesPage() {
             {/* Tender */}
             <div className="pos-card">
               <div className="pos-card-title mb-3">
-                <span aria-hidden="true" style={{ fontSize: 14 }}>💵</span> Tender Amount
+                <IconSquare icon={<Wallet size={16}/>} bg="#dcfce7" color="#16a34a" />
+                Tender Amount
                 <Kbd>F8</Kbd>
               </div>
               <FieldLabel icon={<CreditCard size={11}/>}>Tender Amount</FieldLabel>
-              <input
-                id="pos-tender-input-mobile"
-                type="number" className="erp-input pmic-billing-input text-right"
-                step="0.01" min="0" placeholder="0.00"
-                value={tender}
-                onChange={e => setTender(e.target.value === '' ? '' : Number(e.target.value))}
-              />
+              <div className="pos-tender-prefix-wrap">
+                <span className="pos-tender-prefix">Rs.</span>
+                <input
+                  id="pos-tender-input-mobile"
+                  type="number" className="erp-input pmic-billing-input text-right"
+                  step="0.01" min="0" placeholder="0.00"
+                  value={tender}
+                  onChange={e => setTender(e.target.value === '' ? '' : Number(e.target.value))}
+                />
+              </div>
               <div className="flex items-center justify-between mt-3">
                 <span className="text-xs font-semibold uppercase tracking-wide text-[var(--text-4)]">Change</span>
                 <span className={`text-lg font-bold ${change > 0 ? 'text-green-600' : 'text-[var(--text-4)]'}`}>
@@ -1368,20 +1451,29 @@ export default function SalesPage() {
             </div>
 
             {/* Payment Mode — same PAYMENT_MODES/setValue pair as the
-                Customer card's (now pos-mt-hide) copy above. */}
+                Customer card's (now pos-mt-hide) copy above. Rendered as
+                a 2-column grid with a checkmark on the active mode, per
+                the reference mockup — same click handler either way. */}
             <div className="pos-card">
-              <FieldLabel icon={<CreditCard size={11}/>}>Payment Mode</FieldLabel>
-              <div className="flex gap-2 flex-wrap">
-                {PAYMENT_MODES.map(m => (
-                  <button
-                    key={m.value}
-                    type="button"
-                    onClick={() => setValue('payment_mode', m.value)}
-                    className={`pos-mode-pill ${currentPayMode === m.value ? 'pos-mode-pill--active' : ''}`}
-                  >
-                    {m.label}
-                  </button>
-                ))}
+              <div className="pos-card-title mb-3">
+                <IconSquare icon={<CreditCard size={16}/>} bg="#dbeafe" color="#2563eb" />
+                Payment Mode
+              </div>
+              <div className="pos-paymode-grid">
+                {PAYMENT_MODES.map(m => {
+                  const active = currentPayMode === m.value
+                  return (
+                    <button
+                      key={m.value}
+                      type="button"
+                      onClick={() => setValue('payment_mode', m.value)}
+                      className={`pos-paymode-btn ${active ? 'pos-paymode-btn--active' : ''}`}
+                    >
+                      {m.label}
+                      {active && <CheckCircle2 size={14} className="pos-paymode-check" />}
+                    </button>
+                  )
+                })}
               </div>
             </div>
 
@@ -1393,8 +1485,10 @@ export default function SalesPage() {
                 handleNextClick used for desktop's Next/F7/F12, which
                 already validates rows+customer+payment mode first. */}
             <div className="pos-card">
-              <div className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-4)] mb-1" title="Shortcut: F7">
-                Discount Scope <Kbd>F7</Kbd>
+              <div className="pos-card-title mb-3">
+                <IconSquare icon={<Percent size={16}/>} bg="#ffedd5" color="#ea580c" />
+                Discount
+                <Kbd>F7</Kbd>
               </div>
               <div className="flex gap-1.5 flex-wrap mb-3">
                 {([
@@ -1424,16 +1518,20 @@ export default function SalesPage() {
                 is split out of the existing `subtotal` (which already
                 includes it — see calcRowAmount's `amount = base +
                 cc_amount`) purely for display; Total Payable is still
-                exactly `grandTotal`, unchanged. */}
+                exactly `grandTotal`, unchanged. "In Words" is a pure
+                display formatting of grandTotal (see amountInWords
+                above) — not sent anywhere, doesn't affect posting. */}
             <div className="pos-card">
               <div className="pos-card-title mb-3">
-                <span aria-hidden="true" style={{ fontSize: 14 }}>🧾</span> Billing Summary
+                <IconSquare icon={<Receipt size={16}/>} bg="#ede9fe" color="#7c3aed" />
+                Billing Summary
               </div>
               <SummaryRow label="Subtotal"      value={fmt(subtotal - ccTotal)} />
-              <SummaryRow label="Discount"      value={`-${fmt(discountAmt)}`} muted={discountAmt === 0} />
+              <SummaryRow label="Discount"      value={`-${fmt(discountAmt)}`} muted={discountAmt === 0} danger={discountAmt > 0} />
               <SummaryRow label="CC Charge"     value={fmt(ccTotal)} muted={ccTotal === 0} />
               <SummaryRow label="Round Off"     value={`${roundOff >= 0 ? '+' : '-'}${fmt(Math.abs(roundOff))}`} muted={roundOff === 0} />
               <SummaryRow label="Total Payable" value={fmt(grandTotal)} highlight large />
+              <div className="pos-inwords">In Words: {amountInWords(grandTotal)}</div>
             </div>
           </div>
 
