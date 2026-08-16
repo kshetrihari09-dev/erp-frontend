@@ -3659,6 +3659,77 @@ bsp-row--disabled { cursor: not-allowed; opacity: .55; }
   }
 }
 
+/* 2-column field grid: Batch / Expiry (always visible, directly under
+   the product name row — see Sales page product card spec). */
+.pos-theme .pmic-fields-2 {
+  display:               grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap:                   8px;
+}
+
+/* 4-column field grid: Qty | Bonus | Rate | Amount — deliberately kept
+   as ONE row even down to 320px (per spec), just with tighter gaps/
+   padding at the narrowest widths rather than wrapping to 2 rows. */
+.pos-theme .pmic-fields-4 {
+  display:               grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap:                   6px;
+}
+@media (max-width: 400px) {
+  .pos-theme .pmic-fields-4 { gap: 4px; }
+  .pos-theme .pmic-fields-4 .pmic-field label { font-size: 9px; margin-bottom: 3px; }
+  .pos-theme .pmic-fields-4 .pmic-field input { padding: 0 2px; font-size: 13px; }
+  .pos-theme .pmic-fields-4 .pmic-field .pmic-amount-readout { padding: 0 4px; font-size: 12px; justify-content: center; }
+  .pos-theme .pmic-fields-4 .qty-stepper-btn { width: 22px; min-width: 22px; }
+  .pos-theme .pmic-fields-4 .qty-stepper { gap: 2px; }
+}
+
+/* Inline C.C.% field — sits on the same line as the product name/search,
+   per spec ("Product name + C.C.% on the same line"). Compact, fixed-
+   width so it doesn't crowd the product search field next to it. */
+.pos-theme .pmic-cc-inline {
+  flex-shrink: 0;
+  width:       58px;
+  display:     flex;
+  flex-direction: column;
+  align-items: center;
+}
+.pos-theme .pmic-cc-inline label {
+  font-size:      9px;
+  font-weight:    700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color:          var(--pdt-text-4, var(--text-4));
+  margin-bottom:  3px;
+}
+.pos-theme .pmic-cc-inline input {
+  width:            100%;
+  height:           32px;
+  min-height:       32px;
+  border-radius:    8px;
+  border:           1.5px solid var(--pdt-border-2, var(--border));
+  background:       var(--pdt-overlay-04, var(--surface));
+  color:            var(--pdt-text, var(--text));
+  font-size:        13px;
+  font-family:      var(--font-mono, monospace);
+  font-weight:      600;
+  text-align:       center;
+  padding:          0 2px;
+  box-sizing:       border-box;
+  outline:          none;
+  -webkit-appearance: none;
+  appearance:       none;
+}
+.pos-theme .pmic-cc-inline input:focus {
+  border-color: var(--pdt-accent, var(--brand));
+  box-shadow:   0 0 0 3px var(--pdt-accent-dim, rgba(59,130,246,.15));
+}
+.pos-theme .pmic-cc-inline input[type="number"]::-webkit-inner-spin-button,
+.pos-theme .pmic-cc-inline input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none; margin: 0;
+}
+.pos-theme .pmic-cc-inline input[type="number"] { -moz-appearance: textfield; }
+
 /* Individual field */
 .pos-theme .pmic-field label {
   display:        block;

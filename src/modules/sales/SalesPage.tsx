@@ -128,7 +128,6 @@ export default function SalesPage() {
   // Mobile accordion states (ignored on desktop — CSS keeps bodies visible)
   const [customerOpen, setCustomerOpen] = useState(true)
   const [billingOpen,  setBillingOpen]  = useState(true)
-  const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set())
 
   // ── Mobile/tablet two-step billing flow (UI-only — see globals.css
   // ".pos-step1-only"/".pos-step2-only"/".pos-mt-hide" rules scoped under
@@ -981,12 +980,6 @@ export default function SalesPage() {
             {/* Mobile product cards — hidden on desktop */}
             <div className="pos-mobile-items">
               {rows.map((row, idx) => {
-                const expanded = expandedRows.has(idx)
-                const toggleExpand = () => setExpandedRows(prev => {
-                  const next = new Set(prev)
-                  next.has(idx) ? next.delete(idx) : next.add(idx)
-                  return next
-                })
                 const updateRow = (patch: Partial<InvoiceRow>) =>
                   setRows(prev => prev.map((r, i) => i === idx ? { ...r, ...patch } : r))
 
@@ -1018,6 +1011,8 @@ export default function SalesPage() {
                         </svg>
                       </button>
                     </div>
+
+                    {/* ── Row 2: Product name + C.C.% on the SAME line ── */}
                     <div className="pmic-row-with-thumb">
                       <div className="pmic-thumb" aria-hidden="true"><Pill size={16} /></div>
                       <div className="pmic-psc-wrap">
@@ -1033,27 +1028,68 @@ export default function SalesPage() {
                           onCreated={p => setProducts(prev => prev.some(x => x.id === p.id) ? prev : [...prev, p])}
                         />
                       </div>
-                    </div>
-                    {/* Read-only summary of the batch/expiry the expandable
-                        panel below already holds — nothing here is a new
-                        value or a second source of truth, it's just always
-                        showing what row.batch_no/row.expiry already are. */}
-                    {(row.batch_no || row.expiry) && (
-                      <div className="pmic-batch-summary">
-                        {row.batch_no && <span>Batch: {row.batch_no}</span>}
-                        {row.batch_no && row.expiry && <span className="pmic-batch-dot">·</span>}
-                        {row.expiry && <span className="pmic-batch-expiry">Exp: {row.expiry}</span>}
+                      {/* C.C.% — same line as the product name, per spec.
+                          Same field/handler InvoiceRowsTable's desktop CC
+                          column already uses — just relocated inline here. */}
+                      <div className="pmic-cc-inline" title="Credit Card %">
+                        <label>C.C%</label>
+                        <input
+                          type="number" inputMode="decimal" min={0} step="0.01"
+                          value={row.cc_pct === 0 ? '' : row.cc_pct}
+                          placeholder="0"
+                          onChange={e => {
+                            const cc_pct = e.target.value === '' ? 0 : Number(e.target.value)
+                            updateRow({ cc_pct, ...reCalc({ cc_pct }) })
+                          }}
+                        />
                       </div>
-                    )}
+                    </div>
 
-                    {/* ── Row 2: Qty · Rate · Amount ── */}
-                    <div className="pmic-fields-3">
+                    {/* ── Row 3: Batch + Expiry, below the product line ── */}
+                    <div className="pmic-fields-2">
+                      <div className="pmic-field">
+                        <label>Batch</label>
+                        <BatchSelect
+                          productId={row.product_id}
+                          productName={row.product_name}
+                          value={row.batch_no}
+                          onSelect={batch => updateRow({
+                            batch_no: batch.batch_no || '',
+                            expiry:   batch.expiry_date || batch.expiry || '',
+                          })}
+                        />
+                      </div>
+                      <div className="pmic-field">
+                        <label>Expiry</label>
+                        <input
+                          type="text"
+                          value={row.expiry}
+                          placeholder="MM/YY"
+                          onChange={e => updateRow({ expiry: e.target.value })}
+                        />
+                      </div>
+                    </div>
+
+                    {/* ── Row 4: Qty | Bonus | Rate | Amount — ONE row ── */}
+                    <div className="pmic-fields-4">
                       <div className="pmic-field">
                         <label>Qty</label>
                         <QtyStepper
                           productId={row.product_id}
                           value={row.qty}
                           onChange={qty => updateRow({ qty, ...reCalc({ qty }) })}
+                        />
+                      </div>
+                      <div className="pmic-field">
+                        <label>Bonus</label>
+                        <input
+                          type="number" inputMode="numeric" min={0} step="1"
+                          value={row.bonus === 0 ? '' : row.bonus}
+                          placeholder="0"
+                          onChange={e => {
+                            const bonus = e.target.value === '' ? 0 : Number(e.target.value)
+                            updateRow({ bonus, ...reCalc({ bonus }) })
+                          }}
                         />
                       </div>
                       <div className="pmic-field">
@@ -1073,66 +1109,6 @@ export default function SalesPage() {
                         <div className="pmic-amount-readout">{fmt(row.amount)}</div>
                       </div>
                     </div>
-
-                    {/* ── Expand toggle ── */}
-                    <button type="button" className="pmic-toggle" onClick={toggleExpand}>
-                      <ChevronDown
-                        size={13}
-                        style={{ transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform .2s' }}
-                      />
-                      {expanded ? 'Hide' : 'Show'} Batch · Expiry · C.C % · Bonus
-                    </button>
-
-                    {/* ── Expanded: Batch · Expiry · C.C% · Bonus ── */}
-                    {expanded && (
-                      <div className="pmic-fields-3 pmic-extra" style={{ gridTemplateColumns: '1fr 1fr' }}>
-                        <div className="pmic-field">
-                          <label>Batch</label>
-                          <BatchSelect
-                            productId={row.product_id}
-                            productName={row.product_name}
-                            value={row.batch_no}
-                            onSelect={batch => updateRow({
-                              batch_no: batch.batch_no || '',
-                              expiry:   batch.expiry_date || batch.expiry || '',
-                            })}
-                          />
-                        </div>
-                        <div className="pmic-field">
-                          <label>Expiry</label>
-                          <input
-                            type="text"
-                            value={row.expiry}
-                            placeholder="MM/YY"
-                            onChange={e => updateRow({ expiry: e.target.value })}
-                          />
-                        </div>
-                        <div className="pmic-field">
-                          <label>C.C %</label>
-                          <input
-                            type="number" inputMode="decimal" min={0} step="0.01"
-                            value={row.cc_pct === 0 ? '' : row.cc_pct}
-                            placeholder="0"
-                            onChange={e => {
-                              const cc_pct = e.target.value === '' ? 0 : Number(e.target.value)
-                              updateRow({ cc_pct, ...reCalc({ cc_pct }) })
-                            }}
-                          />
-                        </div>
-                        <div className="pmic-field">
-                          <label>Bonus</label>
-                          <input
-                            type="number" inputMode="numeric" min={0} step="1"
-                            value={row.bonus === 0 ? '' : row.bonus}
-                            placeholder="0"
-                            onChange={e => {
-                              const bonus = e.target.value === '' ? 0 : Number(e.target.value)
-                              updateRow({ bonus, ...reCalc({ bonus }) })
-                            }}
-                          />
-                        </div>
-                      </div>
-                    )}
                   </div>
                 )
               })}
