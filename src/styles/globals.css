@@ -6412,7 +6412,60 @@ canvas{
   .pos-theme.sales-two-step[data-pos-step="1"] .pos-step2-only { display: none !important; }
 }
 
-/* ── 3. New elements introduced by the Step 2 panel ── */
+/* `.pos-step1-only` is reused on pre-existing desktop elements (the
+   Customer Info and Invoice Items cards), so it must stay visible at
+   ≥1025px — handled correctly above (the hide rule only fires ≤1024px).
+
+   `.pos-step2-only` and `.pos-step1-subtotal`, however, are BRAND NEW
+   markup with no desktop equivalent (desktop already shows its totals via
+   the existing `.pos-total-card-desktop` sidebar) — they must never
+   appear on desktop at all, in either "step", not just be step-gated.
+   Without this, they rendered as extra duplicate content (a second
+   Payment Mode picker, a second Billing Summary, an extra Subtotal card)
+   underneath the original desktop layout. */
+@media (min-width: 1025px) {
+  .pos-theme.sales-two-step .pos-step2-only,
+  .pos-theme.sales-two-step .pos-step1-subtotal { display: none !important; }
+}
+
+/* ── 4. Step 2 top bar (Back / title / help) ── */
+.pos-theme .pos-step2-topbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 2px 14px;
+}
+.pos-theme .pos-step2-topbar-back {
+  flex: 0 0 auto;
+  width: 36px; height: 36px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 10px;
+  border: 1px solid var(--pdt-border-2, var(--border));
+  background: var(--surface);
+  color: var(--pdt-text-2, var(--text-2));
+}
+.pos-theme .pos-step2-topbar-back:active { background: var(--pdt-overlay-06, var(--surface-3)); }
+.pos-theme .pos-step2-topbar-title {
+  flex: 1;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+}
+.pos-theme .pos-step2-topbar-help {
+  flex: 0 0 auto;
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  color: var(--pdt-text-4, var(--text-4));
+}
+
+/* ── 5. Smaller "Sales / POS" heading on mobile/tablet — scoped to this
+   page only (Purchase's `.page-title` at the same breakpoint is untouched
+   since it lacks `.sales-two-step`). ── */
+@media (max-width: 1024px) {
+  .pos-theme.sales-two-step .page-title { font-size: 18px !important; }
+  .pos-theme.sales-two-step .page-breadcrumb { font-size: 11px !important; }
+}
 .pos-theme .pos-discount-tap-row {
   display: flex;
   align-items: center;

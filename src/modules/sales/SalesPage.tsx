@@ -23,7 +23,7 @@ import {
   CalendarDays, CreditCard, User, MapPin, Hash,
   Phone as PhoneIcon, ChevronDown, AlertCircle,
   CheckCircle2, RotateCcw, Save, Plus, UserPlus,
-  ScanLine, Pill, QrCode, ArrowLeft,
+  ScanLine, Pill, QrCode, ArrowLeft, HelpCircle,
 } from 'lucide-react'
 import { salesAPI, partiesAPI, productsAPI } from '@/services/api'
 import { useOffline } from '@/offline/OfflineProvider'
@@ -380,6 +380,13 @@ export default function SalesPage() {
   const currentPayMode   = watch('payment_mode')
   const selectedCustomer = customers.find(c => c.id === customerId)
   const subtotal         = rows.reduce((s, r) => s + r.amount, 0)
+  // CC (credit-card surcharge) total — each row already carries its own
+  // computed cc_amount (see calcRowAmount above, used identically when
+  // rows are built/edited); this just sums what's already there for the
+  // new mobile Billing Summary's "CC Charge" row. Same figure the offline-
+  // post path already computes as `ccTotal` inside handleSubmit, just
+  // hoisted here so it's also available for on-screen display.
+  const ccTotal           = rows.reduce((s, r) => s + (Number(r.cc_amount) || 0), 0)
   // Display-only count for the Step 1/Step 2 mobile footers ("2 items •
   // Rs. X") — just counts rows that already have a product on them,
   // nothing new computed.
@@ -1337,6 +1344,23 @@ export default function SalesPage() {
               across the desktop DOM without touching the desktop layout
               itself (which must stay pixel-identical — see file header).
           ════════════════════════════════════════════════════════════ */}
+          {/* Step 2 top bar — Back (same setMobileStep(1) as the bottom
+              sticky Back button; both preserve all entered data) + a
+              static title + a purely-informational hint icon (no new
+              state, just a native title tooltip — nothing to wire up). */}
+          <div className="pos-step2-only pos-step2-topbar">
+            <button type="button" onClick={() => setMobileStep(1)} aria-label="Back" className="pos-step2-topbar-back">
+              <ArrowLeft size={20}/>
+            </button>
+            <div className="pos-step2-topbar-title">Payment &amp; Billing</div>
+            <span
+              className="pos-step2-topbar-help"
+              title="Enter the tender amount, pick a payment mode, review or adjust the discount, then confirm the totals before posting."
+              aria-hidden="true"
+            >
+              <HelpCircle size={18}/>
+            </span>
+          </div>
           <div className="pos-step2-only space-y-3">
 
             {/* Tender */}
@@ -1420,14 +1444,19 @@ export default function SalesPage() {
 
             {/* Billing Summary — same subtotal/discountAmt/roundOff/
                 grandTotal already computed above; identical SummaryRow
-                component the desktop sidebar total card uses. */}
+                component the desktop sidebar total card uses. CC Charge
+                is split out of the existing `subtotal` (which already
+                includes it — see calcRowAmount's `amount = base +
+                cc_amount`) purely for display; Total Payable is still
+                exactly `grandTotal`, unchanged. */}
             <div className="pos-card">
               <div className="pos-card-title mb-3">
                 <span aria-hidden="true" style={{ fontSize: 14 }}>🧾</span> Billing Summary
               </div>
-              <SummaryRow label="Subtotal"     value={fmt(subtotal)} />
-              <SummaryRow label="Discount"     value={`-${fmt(discountAmt)}`} muted={discountAmt === 0} />
-              <SummaryRow label="Round Off"    value={`${roundOff >= 0 ? '+' : '-'}${fmt(Math.abs(roundOff))}`} muted={roundOff === 0} />
+              <SummaryRow label="Subtotal"      value={fmt(subtotal - ccTotal)} />
+              <SummaryRow label="Discount"      value={`-${fmt(discountAmt)}`} muted={discountAmt === 0} />
+              <SummaryRow label="CC Charge"     value={fmt(ccTotal)} muted={ccTotal === 0} />
+              <SummaryRow label="Round Off"     value={`${roundOff >= 0 ? '+' : '-'}${fmt(Math.abs(roundOff))}`} muted={roundOff === 0} />
               <SummaryRow label="Total Payable" value={fmt(grandTotal)} highlight large />
             </div>
           </div>
