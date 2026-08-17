@@ -1,4 +1,4 @@
-import http from '@/services/http'
+import http, { REFRESH_TOKEN_KEY } from '@/services/http'
 import type { ApiResponse, Company, User, Sale, SaleItem, Purchase, PurchaseItem,
   Product, Party, Account, AccountDefault, Voucher, VoucherLine,
   VoucherPosting, PostingStatus, DashboardStats, PnLReport,
@@ -47,15 +47,26 @@ export const authAPI = {
     http.post<ApiResponse<{ token: string; access_token?: string; refresh_token?: string; user: User; company: Company }>>('/auth/login', data),
   register: (data: Params) =>
     http.post<ApiResponse<{ token: string; refresh_token: string; user: User; company: Company }>>('/auth/register', data),
-  logout:         () => http.post('/auth/logout'),
+  // Sends the current refresh token so the server can revoke that specific
+  // session (see routes/auth.js POST /auth/logout) — without this, a copy
+  // of the token (already leaked, or retried after this call) would keep
+  // working until it naturally expired.
+  logout: () => http.post('/auth/logout', { refresh_token: localStorage.getItem(REFRESH_TOKEN_KEY) || undefined }),
+  /** "Log out everywhere" — revokes every refresh-token session for this user. */
+  revokeAllSessions: () => http.post('/auth/revoke-sessions'),
   me:             () => http.get<ApiResponse<{ user: User; company: Company }>>('/auth/me'),
   changePassword: (data: { current_password: string; new_password: string }) =>
     http.put('/auth/change-password', data),
-  refresh: (data: { refresh_token: string }) => http.post('/auth/refresh', data),
+  refresh: (data: { refresh_token: string }) =>
+    http.post<ApiResponse<{ token: string; refresh_token: string }>>('/auth/refresh', data),
   /** Step-up confirmation: checks the current session's user's PIN or password.
    *  On success returns a short-lived stepUpToken to attach as
-   *  X-Step-Up-Token on subsequent sensitive requests (see stepUpToken.ts). */
-  verifyPassword: (credential: { password?: string; pin?: string }) =>
+   *  X-Step-Up-Token on subsequent sensitive requests (see stepUpToken.ts).
+   *  `action`, when provided, scopes the returned token to that one
+   *  mandatory (non-toggleable) action only — e.g. 'voucherEdit' — instead
+   *  of the general-purpose token used for optional/toggleable sensitive
+   *  actions. Omit it for the general case. */
+  verifyPassword: (credential: { password?: string; pin?: string; action?: string }) =>
     http.post<ApiResponse<{ stepUpToken: string; expiresIn: number }>>('/auth/verify-password', credential),
   /** Sets/changes the 6-digit Security PIN. Always requires the current
    *  account password, even for a first-time PIN. */

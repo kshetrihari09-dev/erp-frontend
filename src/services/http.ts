@@ -114,10 +114,14 @@ http.interceptors.response.use(
 
       try {
         const res      = await axios.post(`${config.apiBaseUrl}/auth/refresh`, { refresh_token: refreshToken })
-        const newToken = res.data?.data?.token
-        if (!newToken) throw new Error('No token in refresh response')
+        const newToken        = res.data?.data?.token
+        const newRefreshToken = res.data?.data?.refresh_token
+        if (!newToken || !newRefreshToken) throw new Error('No token in refresh response')
         localStorage.setItem(RAW_TOKEN_KEY, newToken)
-        localStorage.setItem(AUTH_REFRESH_KEY, refreshToken!)
+        // Refresh tokens now rotate server-side on every use — the old one
+        // is revoked the instant this response comes back, so the client
+        // MUST store the new one or the next refresh attempt will fail.
+        localStorage.setItem(AUTH_REFRESH_KEY, newRefreshToken)
         onRefreshDone(newToken)
         originalRequest.headers.Authorization = `Bearer ${newToken}`
         return http(originalRequest)

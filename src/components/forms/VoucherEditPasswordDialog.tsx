@@ -44,7 +44,7 @@ export default function VoucherEditPasswordDialog({ open, voucherLabel, onCancel
     if (!reason.trim()) { setErrMsg('A reason for this edit is required'); return }
     setSubmitting(true)
     try {
-      const res = await authAPI.verifyPassword({ password })
+      const res = await authAPI.verifyPassword({ password, action: 'voucherEdit' })
       const stepUp = res.data.data
       if (stepUp) setStepUpToken(stepUp.stepUpToken, stepUp.expiresIn)
       const confirmedReason = reason.trim()
