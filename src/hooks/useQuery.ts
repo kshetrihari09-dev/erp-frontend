@@ -3,7 +3,7 @@ import type { UseQueryOptions } from '@tanstack/react-query'
 import { QK, DEFAULT_PAGE_SIZE } from '@/constants'
 import {
   productsAPI, salesAPI, purchasesAPI, partiesAPI, accountingAPI,
-  reportsAPI, stockAPI, settingsAPI, returnsAPI, dateAPI, companiesAPI,
+  reportsAPI, stockAPI, settingsAPI, returnsAPI, dateAPI,
 } from '@/services/api'
 import * as manufacturersService from '@/services/manufacturers'
 import type { ManufacturerInput } from '@/services/manufacturers'
@@ -422,51 +422,6 @@ export function useCompanySettings() {
   return useQuery({
     queryKey: [QK.COMPANY],
     queryFn:  () => settingsAPI.company().then(unwrap),
-  })
-}
-
-// ─── Multi-Company ──────────────────────────────────────────────────────────
-export function useUserCompanies() {
-  return useQuery({
-    queryKey: [QK.COMPANIES],
-    queryFn:  () => companiesAPI.list().then(unwrap),
-    staleTime: 1000 * 30, // company list changes rarely; short stale time is enough
-  })
-}
-
-export function useDeleteCompany() {
-  const qc = useQueryClient()
-  const { success, error } = useUIStore()
-  return useMutation({
-    // confirmPassword is threaded through by useSensitiveConfirm()'s
-    // runWithConfirm(); companiesAPI.remove always requires it server-side.
-    mutationFn: ({ id, confirmPassword }: { id: string; confirmPassword?: string }) =>
-      companiesAPI.remove(id, confirmPassword),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: [QK.COMPANIES] })
-      success('Company deleted')
-    },
-    onError: (e: any) => {
-      // Let the requiresPasswordConfirm flow bubble up silently (no toast) —
-      // useSensitiveConfirm's runWithConfirm() catches it and opens the
-      // password modal. Only show a toast for genuine failures.
-      if (!e?.response?.data?.requiresPasswordConfirm) {
-        error('Could not delete company', e?.response?.data?.message || e?.message || '')
-      }
-    },
-  })
-}
-
-export function useRestoreCompany() {
-  const qc = useQueryClient()
-  const { success, error } = useUIStore()
-  return useMutation({
-    mutationFn: (id: string) => companiesAPI.restore(id),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: [QK.COMPANIES] })
-      success('Company restored')
-    },
-    onError: (e: any) => error('Could not restore company', e?.response?.data?.message || e?.message || ''),
   })
 }
 

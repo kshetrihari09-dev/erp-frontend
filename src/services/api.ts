@@ -3,7 +3,7 @@ import type { ApiResponse, Company, User, Sale, SaleItem, Purchase, PurchaseItem
   Product, Party, Account, AccountDefault, Voucher, VoucherLine,
   VoucherPosting, PostingStatus, DashboardStats, PnLReport,
   TrialBalanceRow, LedgerEntry, StockBatch, OpeningInventoryBatch, InvoiceTemplate, FiscalYear, AuditLog,
-  CompanyPreferences, Backup, AccountLedgerResponse, UserCompany } from '@/types'
+  CompanyPreferences, Backup, AccountLedgerResponse } from '@/types'
 import type { ScannedProduct } from '@/types/scanner'
 
 type Params = Record<string, unknown>
@@ -84,33 +84,20 @@ export const authAPI = {
     http.post('/auth/add-phone', data),
 }
 
-// ─── Multi-Company ──────────────────────────────────────────────────────────
-export interface SwitchCompanyResponse {
-  token:         string
-  refresh_token: string
-  user:          User
-  company:       Company
-}
-
+// ─── Company (single-company model — see middleware/index.js) ──────────────
 export const companiesAPI = {
-  /** Companies the current user can access (with is_default / is_current flags). */
-  list: () => http.get<ApiResponse<UserCompany[]>>('/companies'),
-  create: (data: Partial<Company> & { make_default?: boolean }) =>
-    http.post<ApiResponse<Company>>('/companies', data),
+  /** The caller's own company — there is exactly one. */
+  getCurrent: () => http.get<ApiResponse<Company>>('/companies/current'),
   update: (id: string, data: Partial<Company>) =>
     http.put<ApiResponse<Company>>(`/companies/${id}`, data),
-  /** Deactivates ("deletes") a company. Always requires confirmPassword —
-   *  call via useSensitiveConfirm()'s runWithConfirm() so the password
-   *  modal is handled automatically. Reversible via restore(). */
+  /** Deactivates ("deletes") the caller's own company. Always requires
+   *  confirmPassword — call via useSensitiveConfirm()'s runWithConfirm()
+   *  so the password modal is handled automatically. Reversible via
+   *  restore(). */
   remove: (id: string, confirmPassword?: string) =>
     http.delete<ApiResponse<{ id: string }>>(`/companies/${id}`, { data: { confirmPassword } }),
   restore: (id: string) =>
     http.post<ApiResponse<Company>>(`/companies/${id}/restore`),
-  /** Re-issues a token scoped to the given company. Caller must swap the token in. */
-  switchTo: (id: string) =>
-    http.post<ApiResponse<SwitchCompanyResponse>>(`/companies/${id}/switch`),
-  setDefault: (id: string) =>
-    http.put<ApiResponse<{ id: string }>>(`/companies/${id}/default`),
 }
 
 // ─── Products ─────────────────────────────────────────────────────────────────

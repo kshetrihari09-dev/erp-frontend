@@ -15,7 +15,6 @@ import { initials, cn } from '@/utils'
 import { todayBS as computeTodayBS } from '@/utils/nepaliDate'
 import { authAPI, reportsAPI } from '@/services/api'
 import ToastContainer from '@/components/shared/ToastContainer'
-import CompanySwitcher from '@/modules/company/CompanySwitcher'
 
 const SIDEBAR_W       = 260
 const SIDEBAR_W_COLL  = 72
@@ -408,9 +407,6 @@ export default function AppLayout() {
             )}
            
           </div>
-
-          {/* Company selector */}
-          {!isMobile && <div style={{ marginLeft: 10 }}><CompanySwitcher /></div>}
 
           {/* AD / BS date toggler */}
           {(todayAD || todayBS) && (

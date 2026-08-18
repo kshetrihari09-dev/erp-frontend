@@ -1,5 +1,5 @@
 import {
-  SlidersHorizontal, Building2, Building, ShoppingCart, Calculator, Users,
+  SlidersHorizontal, Building2, ShoppingCart, Calculator, Users,
   CalendarRange, Printer, CloudCog, Bell, Shield,
 } from 'lucide-react'
 
@@ -12,7 +12,6 @@ export interface SettingsSection {
 export const SETTINGS_SECTIONS: SettingsSection[] = [
   { id: 'general',       label: 'General',              icon: <SlidersHorizontal size={15}/> },
   { id: 'company',       label: 'Company',               icon: <Building2 size={15}/> },
-  { id: 'companies',     label: 'Companies',             icon: <Building size={15}/> },
   { id: 'sales-purchase',label: 'Sales & Purchase',      icon: <ShoppingCart size={15}/> },
   { id: 'accounting',    label: 'Accounting & Vouchers', icon: <Calculator size={15}/> },
   { id: 'users',         label: 'Users & Permissions',   icon: <Users size={15}/> },

@@ -56,14 +56,6 @@ export interface Company {
   vat_percent:     number
 }
 
-// ─── Multi-Company ──────────────────────────────────────────────────────────
-// A row from GET /companies — a Company the current user can access, plus
-// membership metadata (which one is their default, which one is active now).
-export interface UserCompany extends Company {
-  is_default: boolean
-  is_current: boolean
-  is_active?: boolean
-}
 
 // ─── Settings Center (companies.settings jsonb) ────────────────────────────────
 export interface CompanyPreferences {
