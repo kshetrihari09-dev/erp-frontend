@@ -1,6 +1,6 @@
 import {
   SlidersHorizontal, Building2, Building, ShoppingCart, Calculator, Users,
-  CalendarRange, Printer, CloudCog, Bell, Shield,
+  CalendarRange, Printer, CloudCog, Bell, Shield, Smartphone,
 } from 'lucide-react'
 
 export interface SettingsSection {
@@ -17,6 +17,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   { id: 'accounting',    label: 'Accounting & Vouchers', icon: <Calculator size={15}/> },
   { id: 'users',         label: 'Users & Permissions',   icon: <Users size={15}/> },
   { id: 'fiscal-years',  label: 'Fiscal Years',          icon: <CalendarRange size={15}/> },
+  { id: 'devices-sync',  label: 'Devices & Sync',        icon: <Smartphone size={15}/> },
   { id: 'printing',      label: 'Printing',              icon: <Printer size={15}/> },
   { id: 'backup',        label: 'Backup & Cloud',        icon: <CloudCog size={15}/> },
   { id: 'notifications', label: 'Notifications',         icon: <Bell size={15}/> },

@@ -19,6 +19,7 @@ import SalesPurchaseSection   from './sections/SalesPurchaseSection'
 import AccountingSection      from './sections/AccountingSection'
 import UsersPermissionsSection from './sections/UsersPermissionsSection'
 import FiscalYearsSection     from './sections/FiscalYearsSection'
+import DevicesSyncSection     from './sections/DevicesSyncSection'
 import PrintingSection        from './sections/PrintingSection'
 import BackupCloudSection     from './sections/BackupCloudSection'
 import NotificationsSection   from './sections/NotificationsSection'
@@ -32,6 +33,7 @@ const SECTION_COMPONENTS: Record<string, React.ComponentType> = {
   'accounting':     AccountingSection,
   'users':          UsersPermissionsSection,
   'fiscal-years':   FiscalYearsSection,
+  'devices-sync':   DevicesSyncSection,
   'printing':       PrintingSection,
   'backup':         BackupCloudSection,
   'notifications':  NotificationsSection,
