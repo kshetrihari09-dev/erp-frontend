@@ -3,7 +3,7 @@ import type { ApiResponse, Company, User, Sale, SaleItem, Purchase, PurchaseItem
   Product, Party, Account, AccountDefault, Voucher, VoucherLine,
   VoucherPosting, PostingStatus, DashboardStats, PnLReport,
   TrialBalanceRow, LedgerEntry, StockBatch, OpeningInventoryBatch, InvoiceTemplate, FiscalYear, AuditLog,
-  CompanyPreferences, Backup, AccountLedgerResponse } from '@/types'
+  CompanyPreferences, Backup, AccountLedgerResponse, UserCompany } from '@/types'
 import type { ScannedProduct } from '@/types/scanner'
 
 type Params = Record<string, unknown>
@@ -84,20 +84,33 @@ export const authAPI = {
     http.post('/auth/add-phone', data),
 }
 
-// ─── Company (single-company model — see middleware/index.js) ──────────────
+// ─── Multi-Company ──────────────────────────────────────────────────────────
+export interface SwitchCompanyResponse {
+  token:         string
+  refresh_token: string
+  user:          User
+  company:       Company
+}
+
 export const companiesAPI = {
-  /** The caller's own company — there is exactly one. */
-  getCurrent: () => http.get<ApiResponse<Company>>('/companies/current'),
+  /** Companies the current user can access (with is_default / is_current flags). */
+  list: () => http.get<ApiResponse<UserCompany[]>>('/companies'),
+  create: (data: Partial<Company> & { make_default?: boolean }) =>
+    http.post<ApiResponse<Company>>('/companies', data),
   update: (id: string, data: Partial<Company>) =>
     http.put<ApiResponse<Company>>(`/companies/${id}`, data),
-  /** Deactivates ("deletes") the caller's own company. Always requires
-   *  confirmPassword — call via useSensitiveConfirm()'s runWithConfirm()
-   *  so the password modal is handled automatically. Reversible via
-   *  restore(). */
+  /** Deactivates ("deletes") a company. Always requires confirmPassword —
+   *  call via useSensitiveConfirm()'s runWithConfirm() so the password
+   *  modal is handled automatically. Reversible via restore(). */
   remove: (id: string, confirmPassword?: string) =>
     http.delete<ApiResponse<{ id: string }>>(`/companies/${id}`, { data: { confirmPassword } }),
   restore: (id: string) =>
     http.post<ApiResponse<Company>>(`/companies/${id}/restore`),
+  /** Re-issues a token scoped to the given company. Caller must swap the token in. */
+  switchTo: (id: string) =>
+    http.post<ApiResponse<SwitchCompanyResponse>>(`/companies/${id}/switch`),
+  setDefault: (id: string) =>
+    http.put<ApiResponse<{ id: string }>>(`/companies/${id}/default`),
 }
 
 // ─── Products ─────────────────────────────────────────────────────────────────
@@ -420,4 +433,73 @@ export const cloudStorageAPI = {
   updateSettings: (provider: string, data: { folderName?: string; autoUploadEnabled?: boolean }) =>
     http.put<ApiResponse<CloudStorageConnection>>(`/cloud-storage/connections/${provider}/settings`, data),
   setDefault:   (provider: string) => http.post<ApiResponse<CloudStorageConnection[]>>('/cloud-storage/default', { provider }),
+}
+
+// ─── Devices & Sync ────────────────────────────────────────────────────────────
+// Backs Settings → Devices & Sync (DevicesSyncSection.tsx) and the pre-login
+// LAN connect flow (modules/connect/ServerConnectScreen.tsx). Both talk to
+// the same backend routes — see erp-unified-backend/src/routes/devices.js —
+// deliberately: there is exactly one device-registration/pairing mechanism,
+// used both from inside the authenticated app and from the pre-login screen.
+export interface DeviceInfo {
+  id:                string
+  device_name:       string
+  platform:           string | null
+  app_version:        string | null
+  status:             'active' | 'revoked'
+  user_id:            string | null
+  user_name?:         string | null
+  branch_id:          string | null
+  registered_at:      string
+  last_seen_at:       string | null
+  last_synced_at?:    string | null
+  pending_conflicts:  number
+}
+
+export interface SyncConflict {
+  id:             string
+  conflict_type:  string
+  reason:         string
+  device_id?:     string | null
+  device_name?:   string | null
+  created_at:     string
+  resolved_at?:   string | null
+}
+
+export const devicesAPI = {
+  list: () => http.get<ApiResponse<DeviceInfo[]>>('/devices'),
+
+  /** Creates/updates THIS device's own registration. `device_secret`, when
+   *  returned, must be persisted (see config/serverConnection.ts) and sent
+   *  back as X-Device-Secret on later register/heartbeat calls — see the
+   *  security audit note in erp-unified-backend/src/routes/devices.js. */
+  register: (data: { device_id: string; device_name: string; platform?: string; app_version?: string; branch_id?: string }) =>
+    http.post<ApiResponse<DeviceInfo & { device_secret?: string }>>('/devices/register', data),
+
+  heartbeat: (deviceId: string) =>
+    http.post<ApiResponse<{ status: string; last_seen_at: string }>>('/devices/heartbeat', { device_id: deviceId }, { headers: { 'X-Device-Id': deviceId } }),
+
+  rename: (id: string, device_name: string) =>
+    http.patch<ApiResponse<DeviceInfo>>(`/devices/${id}`, { device_name }),
+
+  revoke: (id: string) =>
+    http.post<ApiResponse<{ success: boolean }>>(`/devices/${id}/revoke`),
+
+  conflicts: (status: 'open' | 'resolved' = 'open') =>
+    http.get<ApiResponse<SyncConflict[]>>('/devices/conflicts', { params: { status } }),
+
+  resolveConflict: (id: string, note?: string) =>
+    http.post<ApiResponse<SyncConflict>>(`/devices/conflicts/${id}/resolve`, { note }),
+
+  /** Authenticated owner/admin generates a short-lived pairing token
+   *  (shown as a QR + a plain-text code) for another device to claim. */
+  pairStart: (data?: { branch_id?: string }) =>
+    http.post<ApiResponse<{ token: string; expires_at: string; ttl_seconds: number }>>('/devices/pair/start', data),
+
+  /** PUBLIC — no auth token needed/sent, because the device calling this
+   *  hasn't logged in yet (that's the whole point of pre-login pairing).
+   *  http.ts still attaches an Authorization header if a stale one exists
+   *  in storage, which is harmless here since this route ignores it. */
+  pairClaim: (data: { token: string; device_id: string; device_name: string; platform?: string; app_version?: string }) =>
+    http.post<ApiResponse<{ device: DeviceInfo & { device_secret?: string }; company_id: string; branch_id: string | null }>>('/devices/pair/claim', data),
 }

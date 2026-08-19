@@ -11,6 +11,7 @@ import axios, {
   type AxiosResponse,
 } from 'axios'
 import { config }      from '@/config/env'
+import { getEffectiveApiBaseUrl } from '@/config/serverConnection'
 import { RAW_TOKEN_KEY, REFRESH_TOKEN_KEY as AUTH_REFRESH_KEY } from '@/store/authStore'
 import { getValidStepUpToken, clearStepUpToken } from './stepUpToken'
 
@@ -47,6 +48,14 @@ function clearAuthAndRedirect() {
 // ─── Request interceptor — attach JWT ─────────────────────────────────────────
 http.interceptors.request.use(
   (config_: InternalAxiosRequestConfig) => {
+    // LAN-mode builds resolve their backend at runtime (see
+    // config/serverConnection.ts + modules/connect/) — everywhere else
+    // this is just config.apiBaseUrl, exactly as before. Per-request
+    // rather than baked into the axios instance so pairing a new server
+    // mid-session (Settings → Change Server) takes effect immediately
+    // without needing to reload the app.
+    config_.baseURL = getEffectiveApiBaseUrl(config.apiBaseUrl)
+
     const token = localStorage.getItem(RAW_TOKEN_KEY)
 
     if (token && token !== 'null' && token !== 'undefined' && token.includes('.')) {

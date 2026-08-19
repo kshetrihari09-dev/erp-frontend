@@ -14,6 +14,7 @@ import SettingsNav, { SETTINGS_SECTIONS } from './SettingsNav'
 
 import GeneralSection         from './sections/GeneralSection'
 import CompanySection         from './sections/CompanySection'
+import CompaniesSection       from './sections/CompaniesSection'
 import SalesPurchaseSection   from './sections/SalesPurchaseSection'
 import AccountingSection      from './sections/AccountingSection'
 import UsersPermissionsSection from './sections/UsersPermissionsSection'
@@ -26,6 +27,7 @@ import AuditLogSection        from './sections/AuditLogSection'
 const SECTION_COMPONENTS: Record<string, React.ComponentType> = {
   'general':        GeneralSection,
   'company':        CompanySection,
+  'companies':      CompaniesSection,
   'sales-purchase': SalesPurchaseSection,
   'accounting':     AccountingSection,
   'users':          UsersPermissionsSection,

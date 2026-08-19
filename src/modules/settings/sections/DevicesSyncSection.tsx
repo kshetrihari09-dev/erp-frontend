@@ -13,15 +13,20 @@
  * "sync now" call into the existing offline provider.
  *
  * ── Pairing, honestly scoped ─────────────────────────────────────────────
- * "Add Device" shows a QR (token + this device's current API URL).
+ * "Add Device" shows a QR (token + this device's current API URL), and
+ * now also the raw token as copyable text — needed for the pre-login LAN
+ * connect flow (modules/connect/ServerConnectScreen.tsx), where a device
+ * that found this server via LAN discovery or manual IP entry (i.e. no
+ * QR was scanned) still needs a code to type in.
  * "Connect via QR" scans another device's QR and calls pairClaim with
  * *this* device's own persisted id — i.e. it authorizes/registers THIS
  * device using a code from an already-registered one. Both devices still
  * log in the completely normal way; pairing never issues a session.
- * This does NOT solve pre-login LAN discovery (finding the server before
- * you've ever been able to reach it to log in at all) — this app's API
- * base URL is baked in at build time (see config/env.ts), and making that
- * runtime-overridable is a separate, larger change this pass doesn't make.
+ * Pre-login LAN discovery itself (finding the server before you've ever
+ * been able to reach it to log in at all) is handled by ServerGate +
+ * ServerConnectScreen, gated behind VITE_LAN_MODE — see config/env.ts and
+ * config/serverConnection.ts for why a normal cloud-hosted build (fixed
+ * backend baked in at build time) is completely unaffected by any of it.
  */
 import { useCallback, useEffect, useState } from 'react'
 import { Capacitor } from '@capacitor/core'
@@ -65,6 +70,7 @@ export default function DevicesSyncSection() {
 
   const [pairOpen, setPairOpen]     = useState(false)
   const [pairQr, setPairQr]         = useState<string | null>(null)
+  const [pairToken, setPairToken]   = useState<string | null>(null)
   const [pairExpires, setPairExpires] = useState<string | null>(null)
   const [pairError, setPairError]   = useState<string | null>(null)
 
@@ -114,6 +120,7 @@ export default function DevicesSyncSection() {
     setPairOpen(true)
     setPairError(null)
     setPairQr(null)
+    setPairToken(null)
     try {
       const res = await devicesAPI.pairStart()
       const { token, expires_at } = res.data.data
@@ -122,6 +129,7 @@ export default function DevicesSyncSection() {
       const payload = JSON.stringify({ token, apiBaseUrl: config.apiBaseUrl })
       const dataUrl = await QRCode.toDataURL(payload, { errorCorrectionLevel: 'M', margin: 2, width: 240 })
       setPairQr(dataUrl)
+      setPairToken(token)
       setPairExpires(expires_at)
     } catch (e: any) {
       setPairError(e?.message || 'Could not create a pairing code')
@@ -301,6 +309,27 @@ export default function DevicesSyncSection() {
               Generating code…
             </div>
           ) : null}
+          {pairToken && (
+            <div className="w-full">
+              <p className="text-[11px] text-[var(--text-4)] text-center mb-1">
+                No camera on the new device? It can find this server automatically
+                (Connect to Server → Find LAN Server / Enter Server Address), then enter this
+                code when asked to pair:
+              </p>
+              <div className="flex items-center gap-1.5">
+                <code className="flex-1 text-xs bg-[var(--surface-3)] border border-[var(--border)] rounded-md px-2 py-1.5 break-all select-all">
+                  {pairToken}
+                </code>
+                <Button
+                  variant="secondary" size="sm"
+                  onClick={() => navigator.clipboard?.writeText(pairToken)}
+                  title="Copy code"
+                >
+                  Copy
+                </Button>
+              </div>
+            </div>
+          )}
           {pairExpires && (
             <p className="text-[11px] text-[var(--text-4)]">Expires {new Date(pairExpires).toLocaleTimeString()}</p>
           )}

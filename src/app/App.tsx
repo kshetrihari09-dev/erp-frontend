@@ -2,14 +2,17 @@ import { Providers } from './providers'
 import Router from './Router'
 import DevBadge from '@/components/DevBadge'
 import OfflineStatusIndicator from '@/components/offline/OfflineStatusIndicator'
+import ServerGate from '@/modules/connect/ServerGate'
 import '../styles/globals.css'
 
 export default function App() {
   return (
-    <Providers>
-      <Router />
-      <OfflineStatusIndicator />
-      <DevBadge />
-    </Providers>
+    <ServerGate>
+      <Providers>
+        <Router />
+        <OfflineStatusIndicator />
+        <DevBadge />
+      </Providers>
+    </ServerGate>
   )
 }
