@@ -172,6 +172,14 @@ export const salesAPI = {
    */
   updatePaymentMode: (id: string, payment_mode: string) =>
     http.put<ApiResponse<Sale>>(`/sales/${id}/payment-mode`, { payment_mode }),
+  /**
+   * Sales List inline edit — updates ONLY date_ad (+ derived date_bs) on
+   * an existing sale. Does not touch items, totals, stock, or vouchers.
+   * confirmPassword is the legacy step-up fallback (see useSensitiveConfirm) —
+   * omitted on the normal path, where a cached step-up token header covers it.
+   */
+  updateDate: (id: string, date_ad: string, confirmPassword?: string) =>
+    http.put<ApiResponse<Sale>>(`/sales/${id}/date`, { date_ad, confirmPassword }),
 }
 
 // ─── Purchases ────────────────────────────────────────────────────────────────
