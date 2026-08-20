@@ -254,7 +254,7 @@ export default function DevicesSyncSection() {
                     <td className="py-2 pr-3 text-[var(--text-4)]">
                       <span className="inline-flex items-center gap-1"><Clock size={11} /> {timeAgo(d.last_seen_at)}</span>
                     </td>
-                    <td className="py-2 pr-3 text-[var(--text-4)]">{timeAgo(d.last_synced_at ?? null)}</td>
+                    <td className="py-2 pr-3 text-[var(--text-4)]">{timeAgo(d.last_synced_at)}</td>
                     <td className="py-2 pr-3 text-[var(--text-4)]">{d.app_version || '—'}</td>
                     <td className="py-2 pr-3">
                       <div className="flex justify-end gap-1">
