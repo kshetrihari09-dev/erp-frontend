@@ -144,6 +144,17 @@ const InvoiceRowsTable = forwardRef<InvoiceRowsTableHandle, Props>(function Invo
 
   /* ── Product selected from combobox ──────────────────────────────────── */
   function handleProductSelect(idx: number, p: Product) {
+    // Keep the master `products` list in sync with whatever the live
+    // search/barcode lookup just resolved — same merge handleProductCreated
+    // below already does for quick-created products. Without it, a product
+    // outside the initial capped snapshot (e.g. anything alphabetically
+    // past it — most visibly names starting U–Z on a catalog over ~500
+    // items, since GET /products orders by name ascending) selects
+    // correctly but company-scope/product-scope discount grouping
+    // (discountUtils.ts's rowCompanyName, which looks products up in this
+    // same array) silently falls back to "Unassigned" for it.
+    onProductsChange?.(products.some(x => x.id === p.id) ? products : [...products, p])
+
     const next = rows.map((r, i) => {
       if (i !== idx) return r
       const updated = {
