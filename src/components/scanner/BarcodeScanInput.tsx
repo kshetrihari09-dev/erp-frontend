@@ -36,6 +36,10 @@ import { useState, useRef, forwardRef, useImperativeHandle, type KeyboardEvent }
 import { ScanLine, Loader2 } from 'lucide-react'
 import { scannerAPI } from '@/services/api'
 import type { Product } from '@/types'
+import { useOffline } from '@/offline/OfflineProvider'
+import { isNetworkError } from '@/offline/syncEngine'
+import { lookupByCodeOffline } from '@/offline/productLookup'
+import useAuthStore from '@/store/authStore'
 
 export interface BarcodeScanInputHandle {
   focus: () => void
@@ -86,6 +90,8 @@ const barcodeCache = new Map<string, Product>()
 const BarcodeScanInput = forwardRef<BarcodeScanInputHandle, Props>(function BarcodeScanInput({
   onResolved, onNotFound, onAccountMismatch, autoFocus,
 }, ref) {
+  const { isOnline } = useOffline()
+  const companyId = useAuthStore(s => s.company?.id)
   const [code, setCode] = useState('')
   const [busy, setBusy] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -106,6 +112,29 @@ const BarcodeScanInput = forwardRef<BarcodeScanInputHandle, Props>(function Barc
     }
 
     setBusy(true)
+
+    // Offline: skip the network call entirely and resolve straight from
+    // the IndexedDB catalog cache (same lookupByCodeOffline the camera
+    // scanner already uses — see useLocalScanner.ts) — the same exact
+    // barcode match, just against the local cache instead of the server.
+    if (!isOnline) {
+      try {
+        const offline = companyId ? await lookupByCodeOffline(companyId, trimmed) : null
+        if (offline) {
+          const product = scannedToProduct(offline)
+          barcodeCache.set(trimmed, product)
+          setCode('')
+          onResolved(product)
+        } else {
+          setCode('')
+          onNotFound(trimmed)
+        }
+      } finally {
+        setBusy(false)
+      }
+      return
+    }
+
     try {
       const res = await scannerAPI.lookupBarcode(trimmed)
       const data = res.data?.data
@@ -119,6 +148,21 @@ const BarcodeScanInput = forwardRef<BarcodeScanInputHandle, Props>(function Barc
         onNotFound(trimmed)
       }
     } catch (err: any) {
+      // Real network failure (connection dropped mid-scan) — same
+      // offline fallback as the isOnline-false branch above, rather than
+      // reporting a false "not found" for a product actually in the
+      // offline catalog.
+      if (isNetworkError(err) && companyId) {
+        const offline = await lookupByCodeOffline(companyId, trimmed)
+        if (offline) {
+          const product = scannedToProduct(offline)
+          barcodeCache.set(trimmed, product)
+          setCode('')
+          onResolved(product)
+          setBusy(false)
+          return
+        }
+      }
       setCode('')
       if (err?.response?.status === 403 && err?.response?.data?.code === 'QR_ACCOUNT_MISMATCH') {
         if (onAccountMismatch) onAccountMismatch(QR_ACCOUNT_MISMATCH_MSG)

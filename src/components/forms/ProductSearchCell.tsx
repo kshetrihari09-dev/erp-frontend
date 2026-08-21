@@ -50,6 +50,10 @@ import { Search, Plus, PackageSearch, Loader2 } from 'lucide-react'
 import { productsAPI, scannerAPI } from '@/services/api'
 import type { Product } from '@/types'
 import QuickAddModal from './QuickAddModal'
+import { useOffline } from '@/offline/OfflineProvider'
+import { isNetworkError } from '@/offline/syncEngine'
+import { lookupByCodeOffline, searchProductsOffline, toProduct } from '@/offline/productLookup'
+import useAuthStore from '@/store/authStore'
 
 /** Maps the (slightly different) ScannedProduct shape returned by the
  *  barcode-lookup endpoint onto the full Product shape this cell's
@@ -82,13 +86,25 @@ function scannedToProduct(s: {
 
 /** One exact barcode/item_code lookup. Returns null (never throws) on a
  *  404 "not found" or any network error — callers treat that as "not a
- *  barcode, proceed with normal fallback" rather than an error state. */
-async function tryBarcodeMatch(code: string): Promise<Product | null> {
+ *  barcode, proceed with normal fallback" rather than an error state.
+ *  Offline (or on a real network failure): falls back to the same
+ *  IndexedDB catalog cache the camera/hardware scanners already use
+ *  (offline/productLookup.ts) instead of failing outright. */
+async function tryBarcodeMatch(code: string, isOnline: boolean, companyId?: string): Promise<Product | null> {
+  if (!isOnline) {
+    if (!companyId) return null
+    const offline = await lookupByCodeOffline(companyId, code)
+    return offline ? scannedToProduct(offline) : null
+  }
   try {
     const res = await scannerAPI.lookupBarcode(code)
     const data = res.data?.data
     return data ? scannedToProduct(data) : null
-  } catch {
+  } catch (err: any) {
+    if (isNetworkError(err) && companyId) {
+      const offline = await lookupByCodeOffline(companyId, code)
+      return offline ? scannedToProduct(offline) : null
+    }
     return null
   }
 }
@@ -113,6 +129,8 @@ export interface ProductSearchCellHandle {
 const ProductSearchCell = forwardRef<ProductSearchCellHandle, Props>(function ProductSearchCell({
   value, products, onChange, onCreated, autoFocus, tabIndex,
 }, ref) {
+  const { isOnline } = useOffline()
+  const companyId = useAuthStore(s => s.company?.id)
   const [query,       setQuery]      = useState('')
   const [results,     setResults]    = useState<Product[]>([])
   const [open,        setOpen]       = useState(false)
@@ -196,18 +214,48 @@ const ProductSearchCell = forwardRef<ProductSearchCellHandle, Props>(function Pr
     // 200 ms debounce — fast enough to feel instant, avoids per-keystroke calls
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(async () => {
+      // Offline: skip the network call entirely and search the IndexedDB
+      // catalog cache (offline/productLookup.ts's searchProductsOffline —
+      // same cache catalogSync.ts keeps populated while online) instead.
+      // Token-prefix search across name/brand/generic name/SKU, same
+      // fields this cell's online search already covers.
+      if (!isOnline) {
+        if (!companyId) { setResults([]); setLoading(false); return }
+        try {
+          const offline = await searchProductsOffline(companyId, trimmed, 20)
+          setResults(offline.map(toProduct))
+        } catch {
+          setResults([])
+        } finally {
+          setLoading(false)
+        }
+        return
+      }
       try {
         const res = await productsAPI.search(trimmed, 20)
         setResults(res.data.data || [])
       } catch (err: any) {
         if (err?.name !== 'CanceledError' && err?.code !== 'ERR_CANCELED') {
-          setResults([])
+          // Real network failure mid-search (connection dropped just as
+          // the user typed) — same offline fallback as the isOnline-false
+          // branch above, rather than showing "no product found" for
+          // something that's actually in the offline catalog.
+          if (isNetworkError(err) && companyId) {
+            try {
+              const offline = await searchProductsOffline(companyId, trimmed, 20)
+              setResults(offline.map(toProduct))
+            } catch {
+              setResults([])
+            }
+          } else {
+            setResults([])
+          }
         }
       } finally {
         setLoading(false)
       }
     }, 200)
-  }, [])
+  }, [isOnline, companyId])
 
   /* ── Cleanup on unmount ───────────────────────────────────────────────── */
   useEffect(() => {
@@ -292,7 +340,7 @@ const ProductSearchCell = forwardRef<ProductSearchCellHandle, Props>(function Pr
       return
     }
     setLoading(true)
-    tryBarcodeMatch(typed).then(scanned => {
+    tryBarcodeMatch(typed, isOnline, companyId).then(scanned => {
       setLoading(false)
       if (scanned) {
         selectProduct(scanned)

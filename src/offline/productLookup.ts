@@ -16,7 +16,7 @@
  */
 import { getOfflineDb, type OfflineProduct, type OfflineBatch } from './db'
 import type { ScannedProduct } from '@/types/scanner'
-import type { Product } from '@/types'
+import type { Product, StockBatch } from '@/types'
 
 function toScannedProduct(p: OfflineProduct, batches: OfflineBatch[]): ScannedProduct {
   return {
@@ -114,4 +114,41 @@ export function toProduct(p: OfflineProduct): Product {
     tax_rate: p.tax_rate, vat_percent: p.vat_percent, cc_pct: p.cc_pct,
     min_stock: p.min_stock, current_stock: p.current_stock, is_active: p.is_active,
   }
+}
+
+/** Full cached catalog (active products only), for screens that need a
+ *  "load everything" list rather than a typed search — e.g. SalesPage
+ *  populating its product picker the moment it opens offline, mirroring
+ *  what `productsAPI.list({ limit: 500 })` gives it online. Read-only
+ *  against the same `products` store catalogSync.ts already populates;
+ *  no new IndexedDB store, no network call. */
+export async function getAllProductsOffline(companyId: string): Promise<OfflineProduct[]> {
+  const db = await getOfflineDb(companyId)
+  const all = await db.getAll('products')
+  return all.filter(p => p.is_active)
+}
+
+/** Cached batches for one product, mapped to the app-wide StockBatch
+ *  shape — the offline equivalent of GET /stock/batches?product_id=...
+ *  (see useProductBatches.ts), so BatchSelect's batch/expiry/qty picker
+ *  keeps working offline exactly as it does online. Same contract as the
+ *  backend endpoint: only batches with qty_available > 0, oldest expiry
+ *  first (FEFO). product_name/item_code (fields StockBatch requires that
+ *  OfflineBatch doesn't carry) are filled from the matching cached
+ *  product row rather than needing the caller to supply them. */
+export async function getBatchesOffline(companyId: string, productId: string): Promise<StockBatch[]> {
+  const db = await getOfflineDb(companyId)
+  const [product, batches] = await Promise.all([
+    db.get('products', productId),
+    batchesFor(companyId, productId),
+  ])
+  return batches
+    .filter(b => b.qty_available > 0)
+    .sort((a, b) => (a.expiry_date || '').localeCompare(b.expiry_date || ''))
+    .map(b => ({
+      id: b.id, product_id: b.product_id,
+      product_name: product?.name ?? '', item_code: product?.item_code ?? '',
+      batch_no: b.batch_no, expiry: b.expiry_date, expiry_date: b.expiry_date,
+      qty_available: b.qty_available, purchase_rate: b.purchase_rate, sales_rate: b.sales_rate,
+    }))
 }
