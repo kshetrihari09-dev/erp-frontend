@@ -24,7 +24,6 @@ import {
   Phone as PhoneIcon, ChevronDown, AlertCircle,
   CheckCircle2, RotateCcw, Save, Plus, UserPlus,
   ScanLine, Pill, QrCode, ArrowLeft, HelpCircle,
-  Pencil, Check, X as XIcon,
 } from 'lucide-react'
 import { salesAPI, partiesAPI, productsAPI } from '@/services/api'
 import { useOffline } from '@/offline/OfflineProvider'
@@ -58,7 +57,6 @@ import { PAYMENT_MODES } from '@/constants'
 import type { Product, Party, Sale } from '@/types'
 import PostingStatusBadge from '@/components/PostingStatusBadge'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
-import { useSensitiveConfirm } from '@/modules/settings/hooks/useSensitiveConfirm'
 
 const LIMIT = 20
 
@@ -147,16 +145,6 @@ export default function SalesPage() {
 
   const [confirmCancel, setConfirmCancel] = useState<string | null>(null)
 
-  // ── Sales List inline "edit invoice date" ────────────────────────────────
-  // editingDateId: which sale's date row/card is currently showing the
-  // editor (null = none). editDateValue: the AD ISO date currently in that
-  // editor, kept separate from `sales` so typing doesn't touch the list
-  // until Save succeeds. savingDate guards the Save button against a
-  // double-click firing two PUTs for the same row.
-  const [editingDateId, setEditingDateId] = useState<string | null>(null)
-  const [editDateValue, setEditDateValue] = useState('')
-  const [savingDate,    setSavingDate]    = useState(false)
-  const { runWithConfirm: runDateConfirm, dialog: dateConfirmDialog } = useSensitiveConfirm()
   // "Are you sure you want to create this sale?" — same confirm-before-post
   // pattern PurchasePage uses (see its confirmCreate state / ConfirmDialog).
   const [confirmPost, setConfirmPost] = useState(false)
@@ -630,31 +618,6 @@ export default function SalesPage() {
   async function cancelSale(id: string) {
     try { await salesAPI.cancel(id); success('Sale cancelled'); loadList() }
     catch (e: any) { error('Cannot cancel', e.message) }
-  }
-
-  function openDateEdit(s: Sale) {
-    setEditingDateId(s.id)
-    setEditDateValue(String(s.date_ad).slice(0, 10))
-  }
-
-  function closeDateEdit() {
-    setEditingDateId(null)
-    setEditDateValue('')
-  }
-
-  async function saveDateEdit(id: string) {
-    if (!editDateValue) return
-    setSavingDate(true)
-    try {
-      await runDateConfirm(confirmPassword => salesAPI.updateDate(id, editDateValue, confirmPassword))
-      success('Invoice date updated')
-      closeDateEdit()
-      loadList()
-    } catch (e: any) {
-      if (!e?.cancelled) error('Cannot update date', e?.response?.data?.message || e?.message)
-    } finally {
-      setSavingDate(false)
-    }
   }
 
   // "Next (F12)" — validates the invoice itself (same checks onSubmit used
@@ -1577,36 +1540,7 @@ export default function SalesPage() {
                       ? sales.map(s => (
                           <tr key={s.id} className="clickable" onClick={() => setDetailId(s.id)}>
                             <td className="td-mono text-brand">{s.invoice_no}</td>
-                            <td className="td-mono">
-                              {editingDateId === s.id ? (
-                                <div className="sil-date-edit" onClick={e => e.stopPropagation()}>
-                                  <DateSystemInput
-                                    valueAD={editDateValue}
-                                    onChangeAD={setEditDateValue}
-                                    className="erp-input erp-input-sm"
-                                    aria-label="Invoice date"
-                                  />
-                                  <Button variant="ghost" size="sm" title="Save" disabled={savingDate} onClick={() => saveDateEdit(s.id)}>
-                                    <Check size={13} className="text-green-700"/>
-                                  </Button>
-                                  <Button variant="ghost" size="sm" title="Cancel" disabled={savingDate} onClick={closeDateEdit}>
-                                    <XIcon size={13}/>
-                                  </Button>
-                                </div>
-                              ) : (
-                                <span className="sil-date-display">
-                                  {formatDisplayDate(s.date_ad, dateMode)}
-                                  {s.status === 'active' && (
-                                    <button
-                                      type="button" className="sil-date-edit-btn" title="Edit invoice date"
-                                      onClick={e => { e.stopPropagation(); openDateEdit(s) }}
-                                    >
-                                      <Pencil size={12}/>
-                                    </button>
-                                  )}
-                                </span>
-                              )}
-                            </td>
+                            <td className="td-mono">{formatDisplayDate(s.date_ad, dateMode)}</td>
                             <td>{s.party_name}</td>
                             <td className="td-right">{fmt(s.net_total)}</td>
                             <td className="td-right text-green-700">{fmt(s.paid_amount)}</td>
@@ -1680,10 +1614,7 @@ export default function SalesPage() {
                     <span className="sil-card-total">{fmt(s.net_total)}</span>
                   </div>
 
-                  {/* Customer + date row — read-only here; date editing is
-                      desktop-only (see .sil-desktop-table below), matching
-                      the mobile card list's existing no-inline-edit pattern
-                      for every other field. */}
+                  {/* Customer + date row (read-only, same as desktop). */}
                   <div className="sil-card-sub">
                     <span className="sil-card-customer">{s.party_name || ''}</span>
                     <span className="sil-card-date">{formatDisplayDate(s.date_ad, dateMode)}</span>
@@ -1867,10 +1798,6 @@ export default function SalesPage() {
         onConfirm={() => confirmCancel && cancelSale(confirmCancel)}
         title="Cancel Sale" message="Are you sure you want to cancel this sale? This action cannot be undone." danger
       />
-      {/* Step-up (PIN/password) dialog for editing an invoice's date — only
-          ever shown when Settings → sensitiveActions.saleDateEdit is on for
-          this company and there's no valid cached step-up token yet. */}
-      {dateConfirmDialog}
       <PrintPreviewModal
         data={printData} open={!!printData}
         onClose={() => setPrintData(null)}
