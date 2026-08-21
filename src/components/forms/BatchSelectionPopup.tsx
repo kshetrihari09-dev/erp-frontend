@@ -80,17 +80,31 @@ export default function BatchSelectionPopup({
   }, [batches, query])
 
   /* Reset + focus the search box every time the popup opens — and
-   * pre-highlight the FEFO-recommended batch (or the only batch, when
-   * there's just one) so Enter alone confirms it without any arrowing. */
+   * pre-highlight the FEFO-recommended batch (or, failing that, the
+   * first genuinely selectable one) so Enter alone confirms it without
+   * any arrowing.
+   *
+   * This one effect now owns every hl reset (open, and the query
+   * clearing that happens as part of opening) — previously a second,
+   * separate `useEffect(() => setHL(0), [query])` existed to reset the
+   * highlight whenever the user typed, but since `setQuery('')` here
+   * also changes `query`, that second effect fired right after this one
+   * on every reopen where a prior search was left non-empty, silently
+   * stomping the FEFO highlight back to row 0 — which, if row 0 happened
+   * to be expired/out-of-stock, made Enter (and Tab) look like they did
+   * nothing, since choose() is a no-op on an unselectable row. Typing-
+   * driven reset now happens directly in the search input's onChange
+   * below instead, so it can never race with this one. */
   useEffect(() => {
     if (!open) return
     setQuery('')
-    const idx = recommended ? batches.findIndex(b => b.id === recommended.id) : 0
+    const recommendedIdx = recommended ? batches.findIndex(b => b.id === recommended.id) : -1
+    const idx = recommendedIdx >= 0
+      ? recommendedIdx
+      : batches.findIndex(b => !isExpired(b) && Number(b.qty_available) > 0)
     setHL(idx >= 0 ? idx : 0)
     requestAnimationFrame(() => inputRef.current?.focus())
   }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => { setHL(0) }, [query])
 
   useEffect(() => {
     const el = listRef.current?.children[hl] as HTMLElement | undefined
@@ -124,12 +138,14 @@ export default function BatchSelectionPopup({
         break
       case 'Enter':
         e.preventDefault()
+        e.stopPropagation() // defensive — nothing above this popup should ever see this Enter
         choose(filtered[hl])
         break
       case 'Tab':
         // Same as Enter — select the highlighted batch, then
         // BatchSelect.tsx moves focus on to Quantity.
         e.preventDefault()
+        e.stopPropagation()
         choose(filtered[hl])
         break
       case 'Escape':
@@ -162,7 +178,7 @@ export default function BatchSelectionPopup({
             className="bsp-search-input"
             placeholder="Type to filter batches…"
             value={query}
-            onChange={e => setQuery(e.target.value)}
+            onChange={e => { setQuery(e.target.value); setHL(0) }}
             onKeyDown={handleKey}
             autoComplete="off"
             spellCheck={false}
