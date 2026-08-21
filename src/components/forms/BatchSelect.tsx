@@ -50,7 +50,6 @@ import { Search } from 'lucide-react'
 import useProductBatches from '@/hooks/useProductBatches'
 import type { StockBatch } from '@/types'
 import BatchSelectionPopup from './BatchSelectionPopup'
-import { formatExpiry } from '@/utils/batch'
 
 interface Props {
   productId?:   string
@@ -235,7 +234,11 @@ export default function BatchSelect({
           : noStock
             ? 'No batches available'
             : selected
-              ? `${selected.batch_no} · Exp ${formatExpiry(selected.expiry_date || selected.expiry)}`
+              // Just the batch number — the invoice row already has its own
+              // dedicated Expiry column right next to this one showing the
+              // same date, so embedding it here too was pure duplication
+              // and made this (narrow) column cramped/truncated.
+              ? selected.batch_no || '—'
               : 'Select batch…'}
       </button>
 
