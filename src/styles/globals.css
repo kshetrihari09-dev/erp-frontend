@@ -6292,14 +6292,15 @@ canvas{
    change; this file adds nothing that applies at ≥1025px).
 ══════════════════════════════════════════════════════════════════════════════ */
 
-/* ── 1. Extend the existing "mobile" breakpoint (768px) to 1024px for
-   Sales-only responsive classes, so tablets get the same mobile-style
-   building blocks (product cards, accordions, sticky bars, single-column
-   grid, dual scan buttons) that phones already had. Each rule below
-   mirrors an existing ≤768px rule; none of these class names are used by
-   any other page (verified against PurchasePage.tsx, the only other
-   `.pos-theme` consumer). ── */
-@media (max-width: 1024px) {
+/* ── 1. Extend the existing "mobile" breakpoint (768px) to phone widths
+   only (≤767px) for Sales-only responsive classes — phones get the
+   product cards, accordions, sticky bars, single-column grid, and dual
+   scan buttons. Genuine tablets (768–1199px) get their own two-column
+   layout instead — see the "GENUINE TABLET LAYOUT" block near the end of
+   this file. Each rule below mirrors an existing ≤768px rule; none of
+   these class names are used by any other page (verified against
+   PurchasePage.tsx, the only other `.pos-theme` consumer). ── */
+@media (max-width: 767px) {
   .pos-theme.sales-two-step .pos-table-wrap.pos-desktop-only { display: none !important; }
   .pos-theme.sales-two-step .pos-mobile-items { display: flex !important; flex-direction: column; gap: 10px; }
 
@@ -6402,11 +6403,11 @@ canvas{
   .pos-theme.sales-two-step .pos-scan-single-desktop { display: none !important; }
 }
 
-/* ── 2. Step 1 / Step 2 visibility, driven by data-pos-step. Only takes
-   effect ≤1024px — at ≥1025px (desktop) this block doesn't apply at all,
-   so `data-pos-step` is inert there and both steps' markup always renders,
-   exactly like the page did before this change. ── */
-@media (max-width: 1024px) {
+/* ── 2. Step 1 / Step 2 visibility, driven by data-pos-step. Phone-only
+   (≤767px) — at ≥768px (tablet AND desktop) this block doesn't apply at
+   all, so `data-pos-step` is inert there and both steps' markup renders
+   according to the tablet/desktop rules elsewhere instead. ── */
+@media (max-width: 767px) {
   /* Content that moved into the Step 2 panel (in-card Payment Mode, the
      old single Billing Summary card) — superseded, not shown, on mobile/
      tablet. Unaffected at ≥1025px. */
@@ -6418,16 +6419,17 @@ canvas{
 
 /* `.pos-step1-only` is reused on pre-existing desktop elements (the
    Customer Info and Invoice Items cards), so it must stay visible at
-   ≥1025px — handled correctly above (the hide rule only fires ≤1024px).
+   ≥768px — handled correctly above (the hide rule only fires ≤767px).
 
    `.pos-step2-only` and `.pos-step1-subtotal`, however, are BRAND NEW
-   markup with no desktop equivalent (desktop already shows its totals via
-   the existing `.pos-total-card-desktop` sidebar) — they must never
-   appear on desktop at all, in either "step", not just be step-gated.
-   Without this, they rendered as extra duplicate content (a second
+   markup with no desktop/tablet equivalent (desktop already shows its
+   totals via `.pos-total-card-desktop`; tablet reuses that same sidebar
+   — see the "GENUINE TABLET LAYOUT" block below) — they must never
+   appear at ≥768px at all, in either "step", not just be step-gated.
+   Without this, they'd render as extra duplicate content (a second
    Payment Mode picker, a second Billing Summary, an extra Subtotal card)
-   underneath the original desktop layout. */
-@media (min-width: 1025px) {
+   underneath the tablet/desktop layout. */
+@media (min-width: 768px) {
   .pos-theme.sales-two-step .pos-step2-only,
   .pos-theme.sales-two-step .pos-step1-subtotal { display: none !important; }
 }
@@ -6463,10 +6465,11 @@ canvas{
   color: var(--pdt-text-4, var(--text-4));
 }
 
-/* ── 5. Smaller "Sales / POS" heading on mobile/tablet — scoped to this
+/* ── 5. Smaller "Sales / POS" heading on phone only — scoped to this
    page only (Purchase's `.page-title` at the same breakpoint is untouched
-   since it lacks `.sales-two-step`). ── */
-@media (max-width: 1024px) {
+   since it lacks `.sales-two-step`). Tablet keeps the normal-size heading
+   — it has the width to spare. ── */
+@media (max-width: 767px) {
   .pos-theme.sales-two-step .page-title { font-size: 18px !important; }
   .pos-theme.sales-two-step .page-breadcrumb { font-size: 11px !important; }
 }
@@ -6513,4 +6516,109 @@ canvas{
   font-size: 11px;
   font-weight: 600;
   opacity: .85;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   SALES PAGE — GENUINE TABLET LAYOUT (768px–1199px)
+   ────────────────────────────────────────────────────────────────────────────
+   Everything above this section is the phone flow (now scoped to ≤767px, see
+   the ".sales-two-step" media queries higher in this file) or the untouched
+   desktop layout (≥1200px falls through to normal `.pos-theme` rules).
+
+   Real tablets (iPad-class devices, 768–1199px) get their own two-column
+   layout here instead of inheriting the phone's single-column step wizard:
+   LEFT column = Customer, scan/search, Invoice Items, Billing Summary,
+   stacked and scrolling normally; RIGHT column = Total Payable, pinned
+   (sticky) beside it the whole time.
+
+   Nothing here duplicates a calculation, adds new state, or introduces new
+   markup — it repositions/re-shows the exact same cards Desktop already
+   renders (`.pos-mt-hide` Billing Summary, `.pos-desktop-actions`, the
+   desktop `InvoiceRowsTable`), which the ≤767px phone rules above are what
+   hide/replace them with the compact mobile equivalents; tablet simply
+   never applies those phone rules in the first place.
+══════════════════════════════════════════════════════════════════════════════ */
+@media (min-width: 768px) and (max-width: 1199px) {
+  /* Two columns. Right column is sized off Total Payable's natural width
+     (same ~280px the desktop sidebar already uses), left column takes the
+     rest — close to the ~60/40 split at the narrow end of this range and
+     progressively roomier on the left as the viewport widens toward
+     1199px, which reads better than a fixed percentage split would at
+     both ends of a 768–1199px range. */
+  .pos-theme.sales-two-step > .space-y-4 {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(260px, 300px);
+    gap: 16px;
+    align-items: start;
+  }
+
+  /* `.pos-grid-main` (Customer card + Total card's own small 2-column
+     grid — shared markup with phone/desktop) is made transparent here so
+     its two children become direct items of the grid above, without any
+     JSX change — just reassigning where the existing cards render. */
+  .pos-theme.sales-two-step > .space-y-4 > .pos-grid-main {
+    display: contents !important;
+  }
+
+  /* Total Payable — pinned to the right column and spanning several row
+     tracks (not just row 1, which is all its original nested grid gave
+     it) so it stays visible beside Customer, Invoice Items, AND Billing
+     Summary as the left column grows — then sticky so it stays in view
+     while that left column scrolls underneath it, per the "right billing
+     panel should remain sticky" requirement. `span 6` rather than `-1`:
+     with no `grid-template-rows` declared, this grid's rows are implicit/
+     auto-generated, and `-1` only resolves against an *explicit* grid's
+     last line — it would not reach the real last row here. `span N`
+     works correctly either way, and 6 comfortably covers this column's
+     handful of stacked cards with headroom to spare. */
+  .pos-theme.sales-two-step > .space-y-4 > .pos-grid-main > .pos-total-card-desktop {
+    display: block !important;
+    grid-column: 2;
+    grid-row: 1 / span 6;
+    position: sticky;
+    top: 16px;
+    align-self: start;
+    max-height: calc(100vh - 32px);
+    overflow: auto;
+  }
+
+  /* Everything else — Customer card, Invoice Items, Billing Summary,
+     desktop action buttons, and the flash success/error banner if one
+     happens to be showing — gets no explicit column assignment. Grid
+     auto-placement fills column 1 top-to-bottom in DOM order
+     automatically, since column 2 is already claimed by Total Payable's
+     row-span above. Deliberately class-agnostic (rather than naming every
+     element and its `grid-area`) so this keeps working regardless of
+     which of those elements happens to be present at a given moment —
+     the flash banner in particular only renders conditionally. */
+
+  /* Un-hide the desktop-style cards the ≤767px phone rules would
+     otherwise have hidden — tablet shows the always-visible single page
+     (Billing Summary + action buttons together), not the phone's
+     Step 1 → Step 2 wizard. */
+  .pos-theme.sales-two-step > .space-y-4 > .pos-card.pos-mt-hide { display: block !important; }
+  .pos-theme.sales-two-step > .space-y-4 > .pos-desktop-actions { display: flex !important; }
+  /* Belt-and-suspenders alongside the `min-width: 768px` rule further up
+     this file that already keeps `.pos-step1-subtotal`/`.pos-step2-only`
+     hidden at this width — redundant on its own but harmless, and keeps
+     this block a complete, self-contained description of the tablet
+     layout on its own. */
+  .pos-theme.sales-two-step > .space-y-4 > .pos-card.pos-step1-subtotal { display: none !important; }
+
+  /* Desktop table (Product | Batch | Expiry | Qty | Rate | Amount |
+     Remove) over the compact phone cards — a tablet has the horizontal
+     room for it, matching what Purchase's tablet view already shows
+     (Purchase never had a phone-style card override to begin with, so it
+     already renders this same table at every width ≥769px; this just
+     brings Sales in line with it at tablet widths too). */
+  .pos-theme.sales-two-step .pos-table-wrap.pos-desktop-only { display: block !important; }
+  .pos-theme.sales-two-step .pos-mobile-items { display: none !important; }
+
+  /* Minimum touch target — 44px specifically at tablet, matching the
+     spec's explicit "minimum 44px touch targets" callout. Phones already
+     get a 40px floor via the existing ≤768px rule earlier in this file;
+     tablet has the extra room to spare for the fuller size. */
+  .pos-theme.sales-two-step button,
+  .pos-theme.sales-two-step .erp-input,
+  .pos-theme.sales-two-step select { min-height: 44px; }
 }
