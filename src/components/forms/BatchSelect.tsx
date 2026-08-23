@@ -104,6 +104,29 @@ function focusRowQty(el: HTMLElement | null) {
   })
 }
 
+/** Sales pages render the desktop InvoiceRowsTable row AND the mobile
+ *  .pmic card for the SAME row at the same time — only one is ever
+ *  actually visible, the other is just `display: none` behind a CSS
+ *  breakpoint (see globals.css's `.pos-desktop-only` / `.pos-mobile-items`
+ *  rules, including the extra tablet/"two-step" breakpoints layered on
+ *  top). That means, without this check, BOTH rows' BatchSelect instances
+ *  independently auto-open their own BatchSelectionPopup the moment a
+ *  product resolves batches — two stacked popups. Confirming a batch with
+ *  Enter/Tab only reaches whichever popup's search input currently has
+ *  focus, so the OTHER (hidden-trigger) instance's popup silently stays
+ *  open, invisible-looking-but-not until it's dismissed with a mouse
+ *  click, which doesn't require focus.
+ *
+ *  Rather than re-deriving every current/future CSS breakpoint in JS,
+ *  this asks the DOM directly: `offsetParent` is null when the element
+ *  (or any ancestor) is `display: none`, which is exactly how both the
+ *  desktop-only and mobile-only wrappers are hidden here. Only the
+ *  instance that's actually on screen is allowed to auto-act. */
+function isRootVisible(el: HTMLElement | null): boolean {
+  if (!el) return false
+  return el.offsetParent !== null
+}
+
 export default function BatchSelect({
   productId, productName, value, onSelect, onTextChange, className, tabIndex, mode = 'sale',
   autoSelectSingle, onAutoResolved, hideTrigger,
@@ -149,6 +172,17 @@ export default function BatchSelect({
     if (!productId) { processedRef.current = undefined; return }
     if (loading) return
     if (processedRef.current === productId) return
+
+    // This row exists twice in the DOM at once — this instance (desktop
+    // table row or mobile card, whichever CSS is currently hiding) isn't
+    // the one on screen right now, so it must not auto-open its own
+    // popup or auto-select on top of the visible instance's. See
+    // isRootVisible's doc comment above for why. Deliberately doesn't
+    // touch processedRef: if this row later becomes the visible one for
+    // the same productId (e.g. the visible instance still hasn't
+    // resolved it), it should still get a chance to run this logic then.
+    if (!isRootVisible(rootRef.current)) return
+
     processedRef.current = productId
 
     // Scanned rows with exactly one batch: select it immediately, no
