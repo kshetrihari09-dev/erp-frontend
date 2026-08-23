@@ -23,7 +23,7 @@ import {
   CalendarDays, CreditCard, User, MapPin, Hash,
   Phone as PhoneIcon, ChevronDown, AlertCircle,
   CheckCircle2, RotateCcw, Save, Plus, UserPlus,
-  ScanLine, Pill, QrCode, ArrowLeft, HelpCircle, Info,
+  ScanLine, Pill, QrCode, ArrowLeft, HelpCircle, Info, Gift,
 } from 'lucide-react'
 import { salesAPI, partiesAPI, productsAPI } from '@/services/api'
 import { useOffline } from '@/offline/OfflineProvider'
@@ -77,6 +77,21 @@ function FieldLabel({ icon, children }: { icon: React.ReactNode; children: React
       {children}
     </label>
   )
+}
+
+/* ── Auto-scroll a focused field into view on mobile ─────────────────────
+   The Android on-screen keyboard resizes the viewport AFTER layout, so a
+   scrollIntoView called synchronously on focus often runs before the
+   keyboard has finished animating in and undershoots. A short delay lets
+   it settle first. Attached once per product card via onFocusCapture
+   (capture phase — React's focus events don't bubble in the DOM sense,
+   but do fire during capture), so it applies to every input inside
+   (product search, C.C %, Bonus, Rate, Qty) without wiring it onto each
+   one individually. Desktop/tablet never trigger this in practice (no
+   on-screen keyboard to cover anything), so it's harmless there too. */
+function scrollFocusedIntoView(e: React.FocusEvent<HTMLElement>) {
+  const el = e.target
+  setTimeout(() => { el.scrollIntoView({ behavior: 'smooth', block: 'center' }) }, 300)
 }
 
 /* ── SummaryRow — IDENTICAL to original ─────────────────────────────────── */
@@ -1043,7 +1058,7 @@ export default function SalesPage() {
                 }
 
                 return (
-                  <div key={idx} className="pmic">
+                  <div key={idx} className="pmic" onFocusCapture={scrollFocusedIntoView}>
 
                     {/* ── Top row: "Product" / "C.C %" labels ── */}
                     <div className="pmic-top-row">
@@ -1134,9 +1149,10 @@ export default function SalesPage() {
                         />
                       </div>
                       <div className="pmic-field">
-                        <label>Bonus</label>
+                        <label>Bonus <Gift size={14} className="pmic-field-info" aria-hidden="true" /></label>
                         <input
                           type="number" inputMode="numeric" min={0} step="1"
+                          className="pmic-bonus-input"
                           value={row.bonus === 0 ? '' : row.bonus}
                           placeholder="0"
                           onChange={e => {
@@ -1332,11 +1348,6 @@ export default function SalesPage() {
               </button>
             </div>
           </div>
-
-          {/* ── MOBILE/TABLET STEP 1 ONLY: FAB ──────────────────────────── */}
-          <button type="button" className="pos-fab pos-step1-only" onClick={() => setRows(prev => [...prev, newRow()])} aria-label="Add product">
-            <Plus size={22}/>
-          </button>
 
           {/* ── MOBILE/TABLET STEP 1 ONLY: sticky bottom action bar ──────
               Save Draft (unchanged handler) + Next. Next now advances to

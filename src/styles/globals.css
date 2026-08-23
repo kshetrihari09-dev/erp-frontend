@@ -3964,6 +3964,72 @@ bsp-row--disabled { cursor: not-allowed; opacity: .55; }
   }
 }
 
+/* Qty · Bonus · Rate · Amount — one row, four columns. Qty gets extra
+   share (vs. equal quarters) so its number field isn't squeezed between
+   the −/+ buttons — the other three don't need as much room. */
+.pos-theme.sales-two-step .pmic-fields-4 {
+  display:               grid;
+  grid-template-columns: 1.3fr 0.9fr 0.9fr 1fr;
+  gap:                   6px;
+}
+@media (max-width: 380px) {
+  .pos-theme.sales-two-step .pmic-fields-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Bonus — a subtler, less attention-grabbing focus ring than the shared
+   `.pmic-field input:focus` default (which stays as-is for every other
+   field on this card, and for Purchase's own mobile card elsewhere).
+   Bonus is a secondary/occasional field, not something that should draw
+   the eye as strongly as Qty/Rate/Amount when focused. */
+.pos-theme.sales-two-step .pmic-bonus-input:focus {
+  border-color: var(--pdt-border-2, var(--border));
+  box-shadow:   0 0 0 2px rgba(99,102,241,.10);
+  background:   var(--pdt-overlay-04, var(--surface));
+}
+
+/* Compact C.C % input — sits right next to the product field, small
+   enough that it clearly reads as "belongs to this product" rather than
+   a peer field of Qty/Rate/Amount below. */
+.pos-theme.sales-two-step .pmic-cc-input {
+  width: 48px;
+}
+
+/* Wider Qty number field (see .pmic-fields-4 above) — the qty-stepper's
+   own input already flexes to fill whatever room its column gives it;
+   this just guarantees it never collapses below a legible width even in
+   the narrowest 2-column fallback at ≤380px. QtyStepper (and therefore
+   this class) is Sales-only — verified against PurchasePage.tsx, which
+   uses a different quantity control entirely — so no need to scope this
+   one under `.sales-two-step`, but doing so anyway for consistency with
+   everything else in this block costs nothing. */
+.pos-theme.sales-two-step .qty-stepper .qty-stepper-input {
+  min-width: 34px;
+}
+
+/* Add Product button — a little leaner than Purchase's identical-looking
+   button elsewhere in this file (still shared/unscoped — untouched). */
+.pos-theme.sales-two-step .pmic-add-btn {
+  min-height: 60px;
+  padding:    10px 13px;
+}
+
+/* Tighter spacing between Invoice Items' own header (title + scan
+   controls) and everything below it, and between product cards / the
+   Add Product button — still comfortable for touch, just not as airy.
+   `.pos-invoice-header`/`.pos-invoice-actions` are the SAME shared header
+   element used by desktop (title + keyboard hints) too, not something
+   only rendered inside `.pos-mobile-items` — so these two specifically
+   need the explicit ≤767px guard the others above don't, or they'd also
+   tighten the desktop header's spacing. */
+@media (max-width: 767px) {
+  .pos-theme.sales-two-step .pos-invoice-header { margin-bottom: 10px !important; }
+  .pos-theme.sales-two-step .pos-invoice-actions { gap: 8px !important; }
+}
+.pos-theme.sales-two-step .pos-mobile-items { gap: 8px !important; }
+.pos-theme.sales-two-step .pmic { gap: 8px !important; }
+
 /* Expand / collapse toggle */
 .pos-theme .pmic-toggle {
   display:     flex;
