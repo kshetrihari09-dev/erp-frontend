@@ -1149,7 +1149,7 @@ export default function SalesPage() {
                         />
                       </div>
                       <div className="pmic-field">
-                        <label>Bonus <Gift size={14} className="pmic-field-info" aria-hidden="true" /></label>
+                        <label>Bonus</label>
                         <input
                           type="number" inputMode="numeric" min={0} step="1"
                           className="pmic-bonus-input"
