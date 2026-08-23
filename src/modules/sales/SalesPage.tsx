@@ -12,18 +12,16 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import ScanButton from '@/components/scanner/ScanButton'
-import BarcodeScanInput, { type BarcodeScanInputHandle } from '@/components/scanner/BarcodeScanInput'
+import UnifiedProductInput, { type UnifiedProductInputHandle } from '@/components/forms/UnifiedProductInput'
 import ProductNotFoundDialog from '@/components/scanner/ProductNotFoundDialog'
 import { playSuccessBeep, playErrorBeep } from '@/utils/beep'
-import type { ScanResult } from '@/types/scanner'
 import { useForm } from 'react-hook-form'
 import {
   Printer, FilePlus, List, FileText, ShoppingCart,
   CalendarDays, CreditCard, User, MapPin, Hash,
   Phone as PhoneIcon, ChevronDown, AlertCircle,
   CheckCircle2, RotateCcw, Save, Plus, UserPlus,
-  ScanLine, Pill, QrCode, ArrowLeft, HelpCircle, Info, Gift,
+  Pill, ArrowLeft, HelpCircle, Info, Gift,
 } from 'lucide-react'
 import { salesAPI, partiesAPI, productsAPI } from '@/services/api'
 import { useOffline } from '@/offline/OfflineProvider'
@@ -195,76 +193,22 @@ export default function SalesPage() {
   const [productDiscounts,  setProductDiscounts]  = useState<Record<number, DiscountEntry>>({})
   const [discountModalOpen, setDiscountModalOpen] = useState(false)
 
-  // ── Scanner ─────────────────────────────────────────────────────────────
-  // Batch is intentionally left blank here: BatchSelect (rendered for this
-  // row once it mounts) picks up the fresh product_id and runs the same
-  // auto-select/auto-open logic used for search and keyboard selection —
-  // a scanned product goes through the exact same batch popup, so a
-  // scan never silently locks in a batch the user didn't confirm.
+  // ── Unified product entry (UnifiedProductInput) ─────────────────────────
+  // Single resolution point for every way a product can enter this
+  // invoice — hardware scanner, manual barcode/code entry, name/code/SKU
+  // search pick, camera barcode scan, camera QR scan. All five used to
+  // funnel through two nearly-identical copies of this same dedupe/add
+  // logic (handleBarcodeProduct for the hardware-scanner field,
+  // handleScanResult for the camera flow); UnifiedProductInput now
+  // resolves a Product by whichever method the user used and hands it
+  // here just once, so there's exactly one place this logic lives.
   //
-  // Mirrors handleBarcodeProduct (the hardware-scanner path) below: same
-  // dedupe-by-incrementing-qty, same `_scanned` flag, same calcRowAmount()
-  // call for Amount. This camera-scan path was previously missing all
-  // three, which is why Amount stayed 0 and Batch never auto-resolved on
-  // a fresh scan — QtyGate itself was working correctly the whole time,
-  // it disables Qty only when the product genuinely has zero available
-  // stock batches (see QtyGate.tsx/BatchSelect.tsx), which is unrelated
-  // to this fix.
-  const handleScanResult = useCallback((result: ScanResult) => {
-    const p = result.product
-
-    // Already on the invoice? Bump qty instead of adding a duplicate
-    // row — same "qty > 0" dedupe handleBarcodeProduct uses, so scanning
-    // the same medicine twice in one continuous session just increases
-    // quantity instead of creating a second line.
-    const existingIdx = rows.findIndex(r => r.product_id === p.id && Number(r.qty) > 0)
-
-    if (existingIdx !== -1) {
-      const next = rows.map((r, i) => {
-        if (i !== existingIdx) return r
-        const qty = Number(r.qty || 0) + 1
-        const { amount, cc_amount } = calcRowAmount({
-          qty, rate: Number(r.rate), bonus: Number(r.bonus) || 0,
-          discount_pct: Number(r.discount_pct) || 0, cc_pct: Number(r.cc_pct) || 0,
-        })
-        return { ...r, qty, amount, cc_amount }
-      })
-      setRows(next)
-      setProducts(prev => prev.some(x => x.id === p.id) ? prev : [...prev, p as any])
-      flashRow(next[existingIdx]._id)
-      return
-    }
-
-    // New product — flagged `_scanned` so BatchSelect auto-picks a single
-    // batch (or opens the popup for 2+) instead of sitting unresolved,
-    // exactly like a hardware-scanner row. Amount/cc_amount are computed
-    // right away instead of staying at newRow()'s default of 0.
-    const row: InvoiceRow = { ...newRow(), _scanned: true }
-    row.product_id   = p.id
-    row.product_name = p.name
-    row.rate         = p.sales_rate
-    row.cc_pct       = p.cc_pct ?? 0
-    const { amount, cc_amount } = calcRowAmount({
-      qty: row.qty, rate: Number(row.rate), bonus: 0,
-      discount_pct: 0, cc_pct: Number(row.cc_pct) || 0,
-    })
-    row.amount    = amount
-    row.cc_amount = cc_amount
-
-    const last = rows[rows.length - 1]
-    const next = (last && !last.product_id) ? [...rows.slice(0, -1), row] : [...rows, row]
-    setRows(next)
-    setProducts(prev => prev.some(x => x.id === p.id) ? prev : [...prev, p as any])
-    flashRow(row._id)
-  }, [rows])
-
-  // ── Dedicated barcode-scanner input (BarcodeScanInput) ──────────────────
-  // Separate, always-focused fast path for a USB/Bluetooth hardware
-  // scanner — see BarcodeScanInput.tsx and the "Hardware barcode scanner
-  // support" note in ProductSearchCell.tsx for how this differs from
-  // that per-row combobox. This is intentionally additive: ScanButton's
-  // camera flow (handleScanResult above) is untouched.
-  const barcodeInputRef = useRef<BarcodeScanInputHandle>(null)
+  // Batch is intentionally left blank here: BatchSelect (rendered once
+  // this row mounts) picks up the fresh product_id and runs its own
+  // auto-select/auto-open logic — a resolved product goes through the
+  // exact same batch popup no matter how it was found, so nothing ever
+  // silently locks in a batch the user didn't confirm.
+  const unifiedInputRef = useRef<UnifiedProductInputHandle>(null)
   const [notFoundCode, setNotFoundCode] = useState<string | null>(null)
   const [accountMismatchMsg, setAccountMismatchMsg] = useState<string | null>(null)
   const [flashRowId,   setFlashRowId]   = useState<number | undefined>(undefined)
@@ -276,14 +220,14 @@ export default function SalesPage() {
     flashTimerRef.current = setTimeout(() => setFlashRowId(undefined), 600)
   }
 
-  // Auto-focus the barcode field the moment the Sale page mounts — the
+  // Auto-focus the unified field the moment the Sale page mounts — the
   // cashier should never have to click it before the very first scan.
   useEffect(() => {
-    barcodeInputRef.current?.focus()
+    unifiedInputRef.current?.focus()
     return () => { if (flashTimerRef.current) clearTimeout(flashTimerRef.current) }
   }, [])
 
-  const handleBarcodeProduct = useCallback((p: Product) => {
+  const handleProductSelected = useCallback((p: Product) => {
     playSuccessBeep()
 
     // Already on the invoice? Increase quantity instead of adding a
@@ -309,15 +253,17 @@ export default function SalesPage() {
       setProducts(prev => prev.some(x => x.id === p.id) ? prev : [...prev, p])
       flashRow(next[existingIdx]._id)
       // Existing row already has its batch resolved — nothing further to
-      // wait on, so return focus to the barcode input right away.
-      requestAnimationFrame(() => barcodeInputRef.current?.focus())
+      // wait on, so return focus to the entry field right away.
+      requestAnimationFrame(() => unifiedInputRef.current?.focus())
       return
     }
 
     // New product — add a row flagged `_scanned` so BatchSelect knows to
     // auto-pick a single batch (or show the popup for 2+) and to hand
-    // focus back to the barcode field once resolved, instead of to Qty
-    // (see BatchSelect.tsx / InvoiceRowsTable.tsx).
+    // focus back to the entry field once resolved, instead of to Qty
+    // (see BatchSelect.tsx / InvoiceRowsTable.tsx). Applies equally
+    // whether this product came from a scan or a typed search pick —
+    // either way it just resolved for the first time on this invoice.
     const row: InvoiceRow = { ...newRow(), _scanned: true }
     row.product_id   = p.id
     row.product_name = p.name
@@ -341,15 +287,15 @@ export default function SalesPage() {
     // 2+-batch cases, BatchSelect's own popup (which auto-focuses itself)
     // or its onAutoResolved callback takes over a moment later — see
     // BatchSelect.tsx.
-    requestAnimationFrame(() => barcodeInputRef.current?.focus())
+    requestAnimationFrame(() => unifiedInputRef.current?.focus())
   }, [rows])
 
-  const handleBarcodeNotFound = useCallback((code: string) => {
+  const handleProductNotFound = useCallback((code: string) => {
     playErrorBeep()
     setNotFoundCode(code)
   }, [])
 
-  // Distinct from handleBarcodeNotFound: this is a deliberate block (QR
+  // Distinct from handleProductNotFound: this is a deliberate block (QR
   // printed under a different account), not a missing product, so it
   // gets its own dialog with a plain message instead of "no product
   // matches this code: <raw JSON>".
@@ -360,13 +306,13 @@ export default function SalesPage() {
 
   function closeAccountMismatchDialog() {
     setAccountMismatchMsg(null)
-    requestAnimationFrame(() => barcodeInputRef.current?.focus())
+    requestAnimationFrame(() => unifiedInputRef.current?.focus())
   }
 
   function closeNotFoundDialog() {
     setNotFoundCode(null)
-    // "Product Not Found dialog closes" -> focus barcode field automatically.
-    requestAnimationFrame(() => barcodeInputRef.current?.focus())
+    // "Product Not Found dialog closes" -> focus the entry field automatically.
+    requestAnimationFrame(() => unifiedInputRef.current?.focus())
   }
 
   const { register, handleSubmit, reset, watch, setValue } = useForm({
@@ -515,7 +461,7 @@ export default function SalesPage() {
       setDiscountScope('invoice'); setInvoiceDiscount(emptyDiscount())
       setCompanyDiscounts({}); setProductDiscounts({})
       setMobileStep(1) // back to Step 1 for the next bill (mobile/tablet only — no-op on desktop)
-      requestAnimationFrame(() => barcodeInputRef.current?.focus())
+      requestAnimationFrame(() => unifiedInputRef.current?.focus())
     }
 
     // ── Online path ──────────────────────────────────────────────────────
@@ -647,7 +593,7 @@ export default function SalesPage() {
     setDiscountScope('invoice'); setInvoiceDiscount(emptyDiscount())
     setCompanyDiscounts({}); setProductDiscounts({})
     setMobileStep(1) // no-op on desktop
-    requestAnimationFrame(() => barcodeInputRef.current?.focus())
+    requestAnimationFrame(() => unifiedInputRef.current?.focus())
   }
 
   async function cancelSale(id: string) {
@@ -968,44 +914,19 @@ export default function SalesPage() {
                 Invoice Items
               </div>
               <div className="flex items-center gap-3 pos-invoice-actions">
-                <BarcodeScanInput
-                  ref={barcodeInputRef}
+                {/* One field, one mount, every device — barcode scanning
+                    (hardware + camera + QR) and name/code/SKU search
+                    combined, instead of a desktop-only camera button and
+                    a separate mobile-only pair (see UnifiedProductInput.tsx). */}
+                <UnifiedProductInput
+                  ref={unifiedInputRef}
+                  context="sales"
                   autoFocus
-                  onResolved={handleBarcodeProduct}
-                  onNotFound={handleBarcodeNotFound}
+                  onProductResolved={handleProductSelected}
+                  onNotFound={handleProductNotFound}
                   onAccountMismatch={handleAccountMismatch}
-                  placeholder={isPhoneWidth ? 'Scan barcode or search product…' : undefined}
+                  placeholder={isPhoneWidth ? 'Scan or search product…' : undefined}
                 />
-                {/* Desktop: single camera-scan button. */}
-                <div className="pos-scan-single-desktop">
-                  <ScanButton context="sales" onResult={handleScanResult} />
-                </div>
-                {/* Mobile-only: same button, reusing the exact same
-                    ScanButton/scanning pipeline as desktop — just two
-                    entry points into it, each pre-selecting which mode
-                    the scanner should open in (see ScanButton's
-                    initialMode prop). Neither duplicates the scanner:
-                    both render the same LocalScannerView/useLocalScanner/
-                    useBarcodeEngine chain, just parameterized. The
-                    in-scanner Barcode|QR toggle is untouched either way. */}
-                <div className="pos-scan-row pos-mobile-only">
-                  <ScanButton
-                    context="sales"
-                    onResult={handleScanResult}
-                    label="Scan Barcode"
-                    icon={<ScanLine size={15} />}
-                    className="pos-scan-btn pos-scan-btn-barcode"
-                    initialMode="barcode"
-                  />
-                  <ScanButton
-                    context="sales"
-                    onResult={handleScanResult}
-                    label="Scan QR"
-                    icon={<QrCode size={15} />}
-                    className="pos-scan-btn pos-scan-btn-qr"
-                    initialMode="qr"
-                  />
-                </div>
                 {/* pos-kbd-hints: hidden on mobile via CSS addendum */}
                 <div className="pos-kbd-hints flex items-center gap-3 text-xs text-[var(--text-4)]" title="F2 Product · F3 Customer · F4 Batch · F5 New Product · F6 New Customer · F7 Discount · F8 Payment · F9 Save · F10 Print · Esc Close">
                   <span className="flex items-center gap-1">
@@ -1035,7 +956,7 @@ export default function SalesPage() {
                 showBonus
                 showCC
                 showDiscount={false}
-                onBarcodeRowResolved={() => barcodeInputRef.current?.focus()}
+                onBarcodeRowResolved={() => unifiedInputRef.current?.focus()}
                 flashRowId={flashRowId}
               />
             </div>
@@ -1140,11 +1061,11 @@ export default function SalesPage() {
                         // this was missing here, so a scanned product with
                         // exactly one batch still opened the popup on
                         // mobile instead of auto-selecting it. `_scanned`
-                        // is set by handleBarcodeProduct/handleScanResult
+                        // is set by handleProductSelected
                         // above when the row was added via a scan rather
                         // than manual product search.
                         autoSelectSingle={!!row._scanned}
-                        onAutoResolved={row._scanned ? () => barcodeInputRef.current?.focus() : undefined}
+                        onAutoResolved={row._scanned ? () => unifiedInputRef.current?.focus() : undefined}
                       />
                     </div>
 
@@ -1854,7 +1775,7 @@ export default function SalesPage() {
           setDiscountScope('invoice'); setInvoiceDiscount(emptyDiscount())
           setCompanyDiscounts({}); setProductDiscounts({})
           setMobileStep(1) // no-op on desktop
-          requestAnimationFrame(() => barcodeInputRef.current?.focus())
+          requestAnimationFrame(() => unifiedInputRef.current?.focus())
         }}
       />
       {/* Fires automatically the moment a sale posts (printData is set in
