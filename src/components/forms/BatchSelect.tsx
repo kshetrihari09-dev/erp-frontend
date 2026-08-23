@@ -77,6 +77,16 @@ interface Props {
    *  via the popup) — SalesPage uses this to return focus to the
    *  barcode input instead, so scanning can continue uninterrupted. */
   onAutoResolved?: () => void
+  /** When true, the trigger button itself is not shown (kept mounted but
+   *  visually hidden) — used by SalesPage's compact mobile product card,
+   *  which has no visible Batch/Expiry field at all and relies entirely
+   *  on this component's existing auto-open-the-popup-on-product-select
+   *  behavior above instead of the user tapping a trigger. The popup
+   *  itself is a sibling of the trigger, not a child of it, so it's
+   *  completely unaffected — still opens/positions exactly as it always
+   *  has. Default false: every existing caller (desktop/tablet Sales,
+   *  Purchase in both modes) is completely unchanged. */
+  hideTrigger?: boolean
 }
 
 /** Find the Quantity input in this same invoice row — desktop rows are
@@ -96,7 +106,7 @@ function focusRowQty(el: HTMLElement | null) {
 
 export default function BatchSelect({
   productId, productName, value, onSelect, onTextChange, className, tabIndex, mode = 'sale',
-  autoSelectSingle, onAutoResolved,
+  autoSelectSingle, onAutoResolved, hideTrigger,
 }: Props) {
   const { batches, loading } = useProductBatches(productId)
 
@@ -203,7 +213,10 @@ export default function BatchSelect({
   if (!productId) {
     return (
       <div ref={rootRef} className="bsp-trigger-wrap">
-        <button type="button" className={`bsp-trigger bsp-trigger--empty ${className || ''}`} disabled tabIndex={tabIndex}>—</button>
+        <button
+          type="button" className={`bsp-trigger bsp-trigger--empty ${className || ''}`} disabled tabIndex={tabIndex}
+          style={hideTrigger ? { display: 'none' } : undefined}
+        >—</button>
       </div>
     )
   }
@@ -228,6 +241,7 @@ export default function BatchSelect({
             setPopupOpen(true)
           }
         }}
+        style={hideTrigger ? { display: 'none' } : undefined}
       >
         {loading
           ? 'Loading…'

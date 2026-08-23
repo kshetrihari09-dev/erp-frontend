@@ -3230,14 +3230,25 @@ bsp-row--disabled { cursor: not-allowed; opacity: .55; }
 @media (max-width: 768px) {
   .pos-theme .pos-mobile-actionbar {
     display: flex;
+    flex-direction: column;
     position: fixed;
     left: 0; right: 0; bottom: 0;
     z-index: var(--z-mobile-bar);
-    gap: 10px;
+    gap: 8px;
     padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
     background: var(--pdt-glass);
     backdrop-filter: blur(16px) saturate(160%);
     border-top: 1px solid var(--pdt-border);
+  }
+  /* Save/Draft + Next/Post Invoice — was the bar's own direct flex row;
+     now its own child so the offline pill (see .pma-offline-pill below)
+     can stack underneath it inside the same fixed bar without ever
+     overlapping either button. */
+  .pos-theme .pos-mobile-actionbar .pma-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
   }
   .pos-theme .pos-mobile-actionbar .pma-draft {
     flex: 0 0 auto;
@@ -3263,6 +3274,31 @@ bsp-row--disabled { cursor: not-allowed; opacity: .55; }
   }
   .pos-theme .pos-mobile-actionbar .pma-post:active { transform: scale(.98); }
   .pos-theme .pos-mobile-actionbar .pma-post:disabled { opacity: .6; }
+
+  /* Offline status pill — sits below the button row, inside this same
+     fixed bar, so it can never cover Save/Next and always sits above the
+     safe-area inset the bar already reserves. Only rendered at all when
+     `!isOnline` (see SalesPage.tsx) — this is purely a status readout,
+     it doesn't gate or change any billing/sync behavior itself. */
+  .pos-theme .pos-mobile-actionbar .pma-offline-pill {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: rgba(217,119,6,.12);
+    color: #b45309;
+    font-size: 11px;
+    font-weight: 600;
+    text-align: center;
+  }
+  .pos-theme .pos-mobile-actionbar .pma-offline-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #d97706;
+    flex-shrink: 0;
+  }
 }
 
 /* Hide desktop-only action row & desktop grid on mobile */
@@ -3798,6 +3834,135 @@ bsp-row--disabled { cursor: not-allowed; opacity: .55; }
 }
 .pos-theme .pmic-batch-expiry { color: #16a34a; }
 .pos-theme .pmic-batch-dot { color: var(--pdt-text-4, var(--text-4)); }
+
+/* ══════════════════════════════════════════════════════════════════════
+   SALES PAGE — MOBILE PRODUCT CARD REDESIGN (compact, no expand toggle)
+   ────────────────────────────────────────────────────────────────────
+   Scoped to `.pos-theme.sales-two-step` (Sales page only), even though
+   every class name below is new and wouldn't collide with Purchase's
+   card anyway — kept consistent with how every other Sales-only override
+   in this file is scoped. Purchase's own `.pmic-header`/`.pmic-remove`/
+   `.pmic-toggle`/`.pmic-extra`/`.pmic-fields-3`/`.pmic-batch-summary`
+   rules just below this block are untouched and still used exactly as
+   before — Sales no longer renders any of those elements at all, so this
+   redesign doesn't need to hide or override them, only add new markup.
+══════════════════════════════════════════════════════════════════════ */
+.pos-theme.sales-two-step .pmic-top-row {
+  display:         flex;
+  align-items:     center;
+  justify-content: space-between;
+  gap:             8px;
+}
+.pos-theme.sales-two-step .pmic-cc-label {
+  display:         flex;
+  align-items:     center;
+  gap:             3px;
+  font-size:       10px;
+  font-weight:     700;
+  letter-spacing:  .06em;
+  text-transform:  uppercase;
+  color:           var(--pdt-text-4, var(--text-4));
+  flex-shrink:     0;
+}
+.pos-theme.sales-two-step .pmic-field-info { color: var(--pdt-text-4, var(--text-4)); flex-shrink: 0; }
+
+/* Remove (×) button now lives inside the product row itself, next to the
+   C.C % input, instead of a separate header row — same visual treatment
+   as the old `.pmic-remove` it replaces on this page. */
+.pos-theme.sales-two-step .pmic-remove-inline {
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  width:           32px;
+  height:          32px;
+  min-height:      32px;
+  border-radius:   9px;
+  border:          1.5px solid var(--pdt-border, var(--border));
+  background:      var(--pdt-overlay-04, var(--surface-2));
+  color:           var(--pdt-text-3, var(--text-3));
+  flex-shrink:     0;
+  -webkit-tap-highlight-color: transparent;
+}
+.pos-theme.sales-two-step .pmic-remove-inline:active {
+  background:   rgba(239,68,68,.15);
+  border-color: rgba(239,68,68,.4);
+  color:        #ef4444;
+}
+
+/* Compact C.C % input — sits at the right end of the product row, sized
+   for 1-3 digits rather than a full-width field like Qty/Rate/Amount. */
+.pos-theme.sales-two-step .pmic-cc-input {
+  flex-shrink:      0;
+  width:            56px;
+  height:           40px;
+  min-height:       40px;
+  border-radius:    9px;
+  border:           1.5px solid var(--pdt-border-2, var(--border));
+  background:       var(--pdt-overlay-04, var(--surface));
+  color:            var(--pdt-text, var(--text));
+  font-size:        14px;
+  font-family:      var(--font-mono, monospace);
+  font-weight:      700;
+  text-align:       center;
+  padding:          0 4px;
+  outline:          none;
+  -webkit-appearance: none;
+  appearance:       none;
+  transition:       border-color .15s, box-shadow .15s, background .15s;
+}
+.pos-theme.sales-two-step .pmic-cc-input:focus {
+  border-color: var(--pdt-accent, var(--brand));
+  box-shadow:   0 0 0 3px var(--pdt-accent-dim, rgba(59,130,246,.15));
+  background:   var(--pdt-overlay-06, var(--surface-2));
+}
+.pos-theme.sales-two-step .pmic-cc-input::-webkit-inner-spin-button,
+.pos-theme.sales-two-step .pmic-cc-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.pos-theme.sales-two-step .pmic-cc-input { -moz-appearance: textfield; }
+
+/* BatchSelect (hideTrigger) stays mounted purely to drive its own
+   existing auto-open-the-popup-on-product-select effect — see
+   BatchSelect.tsx — but contributes no visible box or layout space on
+   this compact card. Taken out of the card's normal flex flow entirely
+   (rather than just `display:none`, which would still cost this flex
+   column one `gap` interval) so it can't add any stray blank space. */
+.pos-theme.sales-two-step .pmic-batch-hidden {
+  position: absolute;
+  width: 0; height: 0;
+  overflow: hidden;
+}
+
+/* Qty · Bonus · Rate · Amount — one row, four equal columns. A separate
+   class from Purchase's `.pmic-fields-3` (unchanged, still 3 columns —
+   see above) since Sales' compact card always shows 4 fields together
+   instead of 3 + an expandable panel. */
+.pos-theme.sales-two-step .pmic-fields-4 {
+  display:               grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap:                   6px;
+}
+@media (max-width: 380px) {
+  .pos-theme.sales-two-step .pmic-fields-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Subtotal row (Step 1, mobile only) — flatter/leaner than the standard
+   `.pos-card` treatment (no shadow/gradient/full border box), just a thin
+   top divider separating it from Invoice Items above, so it reads as a
+   running total row rather than another stacked card. The floating "+"
+   button (`.pos-fab`, unchanged) overlaps its top-right corner, same as
+   before this change — nothing about the FAB itself moved. */
+@media (max-width: 767px) {
+  .pos-theme.sales-two-step .pos-step1-subtotal {
+    background:       transparent;
+    border:           none;
+    border-top:       1px solid var(--pdt-border);
+    box-shadow:       none;
+    backdrop-filter:  none;
+    border-radius:    0;
+    padding:          14px 16px 20px;
+  }
+}
 
 /* Expand / collapse toggle */
 .pos-theme .pmic-toggle {
@@ -6322,14 +6487,21 @@ canvas{
 
   .pos-theme.sales-two-step .pos-mobile-actionbar {
     display: flex !important;
+    flex-direction: column;
     position: fixed;
     left: 0; right: 0; bottom: 0;
     z-index: var(--z-mobile-bar);
-    gap: 10px;
+    gap: 8px;
     padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
     background: var(--pdt-glass);
     backdrop-filter: blur(16px) saturate(160%);
     border-top: 1px solid var(--pdt-border);
+  }
+  .pos-theme.sales-two-step .pos-mobile-actionbar .pma-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
   }
   .pos-theme.sales-two-step .pos-mobile-actionbar .pma-draft {
     flex: 0 0 auto;
@@ -6356,6 +6528,25 @@ canvas{
   }
   .pos-theme.sales-two-step .pos-mobile-actionbar .pma-post:active { transform: scale(.98); }
   .pos-theme.sales-two-step .pos-mobile-actionbar .pma-post:disabled { opacity: .6; }
+  .pos-theme.sales-two-step .pos-mobile-actionbar .pma-offline-pill {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: rgba(217,119,6,.12);
+    color: #b45309;
+    font-size: 11px;
+    font-weight: 600;
+    text-align: center;
+  }
+  .pos-theme.sales-two-step .pos-mobile-actionbar .pma-offline-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #d97706;
+    flex-shrink: 0;
+  }
 
   .pos-theme.sales-two-step .pos-desktop-actions { display: none !important; }
   .pos-theme.sales-two-step .pos-grid-main { grid-template-columns: 1fr !important; gap: 12px; }
@@ -6392,7 +6583,7 @@ canvas{
     border-radius: 12px !important; border: 1px solid var(--pdt-border) !important;
   }
 
-  .pos-theme.sales-two-step .space-y-4:last-child { padding-bottom: 90px !important; }
+  .pos-theme.sales-two-step .space-y-4:last-child { padding-bottom: 128px !important; }
 
   .pos-theme.sales-two-step .pos-invoice-header { flex-wrap: wrap !important; row-gap: 10px; }
   .pos-theme.sales-two-step .pos-invoice-actions { flex: 1 1 100% !important; width: 100% !important; flex-wrap: wrap; }

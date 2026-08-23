@@ -23,8 +23,7 @@ import {
   CalendarDays, CreditCard, User, MapPin, Hash,
   Phone as PhoneIcon, ChevronDown, AlertCircle,
   CheckCircle2, RotateCcw, Save, Plus, UserPlus,
-  ScanLine, Pill, QrCode, ArrowLeft, HelpCircle,
-  Pencil, Check, X as XIcon,
+  ScanLine, Pill, QrCode, ArrowLeft, HelpCircle, Info,
 } from 'lucide-react'
 import { salesAPI, partiesAPI, productsAPI } from '@/services/api'
 import { useOffline } from '@/offline/OfflineProvider'
@@ -58,7 +57,6 @@ import { PAYMENT_MODES } from '@/constants'
 import type { Product, Party, Sale } from '@/types'
 import PostingStatusBadge from '@/components/PostingStatusBadge'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
-import { useSensitiveConfirm } from '@/modules/settings/hooks/useSensitiveConfirm'
 
 const LIMIT = 20
 
@@ -130,10 +128,30 @@ export default function SalesPage() {
   const companyId = useAuthStore(s => s.company?.id)
   const [tender,      setTender]      = useState<number | ''>('')
 
+  // Phone-width detection (same window-width + resize-listener pattern
+  // used by BatchSelectionPopup.tsx / usePrintResponsive.ts elsewhere in
+  // this project, same 767px cutoff the CSS in globals.css now uses for
+  // "genuine phone" vs. tablet/desktop) — the ONLY thing this drives is
+  // which placeholder string gets passed to the barcode input below
+  // (BarcodeScanInput itself renders identically either way, and is a
+  // single shared element for every breakpoint, so a CSS-only swap of its
+  // placeholder text isn't possible). Nothing else about the page's
+  // rendering, layout, or logic depends on this.
+  const [barcodeInputWidth, setBarcodeInputWidth] = useState(() => (typeof window !== 'undefined' ? window.innerWidth : 1280))
+  useEffect(() => {
+    const onResize = () => setBarcodeInputWidth(window.innerWidth)
+    window.addEventListener('resize', onResize)
+    window.addEventListener('orientationchange', onResize)
+    return () => {
+      window.removeEventListener('resize', onResize)
+      window.removeEventListener('orientationchange', onResize)
+    }
+  }, [])
+  const isPhoneWidth = barcodeInputWidth <= 767
+
   // Mobile accordion states (ignored on desktop — CSS keeps bodies visible)
   const [customerOpen, setCustomerOpen] = useState(true)
   const [billingOpen,  setBillingOpen]  = useState(true)
-  const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set())
 
   // ── Mobile/tablet two-step billing flow (UI-only — see globals.css
   // ".pos-step1-only"/".pos-step2-only"/".pos-mt-hide" rules scoped under
@@ -147,16 +165,6 @@ export default function SalesPage() {
 
   const [confirmCancel, setConfirmCancel] = useState<string | null>(null)
 
-  // ── Sales List inline "edit invoice date" ────────────────────────────────
-  // editingDateId: which sale's date row/card is currently showing the
-  // editor (null = none). editDateValue: the AD ISO date currently in that
-  // editor, kept separate from `sales` so typing doesn't touch the list
-  // until Save succeeds. savingDate guards the Save button against a
-  // double-click firing two PUTs for the same row.
-  const [editingDateId, setEditingDateId] = useState<string | null>(null)
-  const [editDateValue, setEditDateValue] = useState('')
-  const [savingDate,    setSavingDate]    = useState(false)
-  const { runWithConfirm: runDateConfirm, dialog: dateConfirmDialog } = useSensitiveConfirm()
   // "Are you sure you want to create this sale?" — same confirm-before-post
   // pattern PurchasePage uses (see its confirmCreate state / ConfirmDialog).
   const [confirmPost, setConfirmPost] = useState(false)
@@ -632,31 +640,6 @@ export default function SalesPage() {
     catch (e: any) { error('Cannot cancel', e.message) }
   }
 
-  function openDateEdit(s: Sale) {
-    setEditingDateId(s.id)
-    setEditDateValue(String(s.date_ad).slice(0, 10))
-  }
-
-  function closeDateEdit() {
-    setEditingDateId(null)
-    setEditDateValue('')
-  }
-
-  async function saveDateEdit(id: string) {
-    if (!editDateValue) return
-    setSavingDate(true)
-    try {
-      await runDateConfirm(confirmPassword => salesAPI.updateDate(id, editDateValue, confirmPassword))
-      success('Invoice date updated')
-      closeDateEdit()
-      loadList()
-    } catch (e: any) {
-      if (!e?.cancelled) error('Cannot update date', e?.response?.data?.message || e?.message)
-    } finally {
-      setSavingDate(false)
-    }
-  }
-
   // "Next (F12)" — validates the invoice itself (same checks onSubmit used
   // to run before posting), then opens the Discount Review popup. The
   // Sale page no longer posts directly; the popup's own Post Invoice
@@ -976,6 +959,7 @@ export default function SalesPage() {
                   onResolved={handleBarcodeProduct}
                   onNotFound={handleBarcodeNotFound}
                   onAccountMismatch={handleAccountMismatch}
+                  placeholder={isPhoneWidth ? 'Scan barcode or search product…' : undefined}
                 />
                 {/* Desktop: single camera-scan button. */}
                 <div className="pos-scan-single-desktop">
@@ -1041,15 +1025,9 @@ export default function SalesPage() {
               />
             </div>
 
-            {/* Mobile product cards — hidden on desktop */}
+            {/* Mobile product cards — hidden on desktop/tablet */}
             <div className="pos-mobile-items">
               {rows.map((row, idx) => {
-                const expanded = expandedRows.has(idx)
-                const toggleExpand = () => setExpandedRows(prev => {
-                  const next = new Set(prev)
-                  next.has(idx) ? next.delete(idx) : next.add(idx)
-                  return next
-                })
                 const updateRow = (patch: Partial<InvoiceRow>) =>
                   setRows(prev => prev.map((r, i) => i === idx ? { ...r, ...patch } : r))
 
@@ -1067,20 +1045,15 @@ export default function SalesPage() {
                 return (
                   <div key={idx} className="pmic">
 
-                    {/* ── Row 1: Product search + remove button ── */}
-                    <div className="pmic-header">
+                    {/* ── Top row: "Product" / "C.C %" labels ── */}
+                    <div className="pmic-top-row">
                       <div className="pmic-product-label">Product</div>
-                      <button
-                        type="button"
-                        className="pmic-remove"
-                        onClick={() => setRows(prev => prev.filter((_, i) => i !== idx))}
-                        aria-label="Remove item"
-                      >
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                          <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-                        </svg>
-                      </button>
+                      <div className="pmic-cc-label">
+                        C.C % <Info size={10} className="pmic-field-info" aria-hidden="true" />
+                      </div>
                     </div>
+
+                    {/* ── Product search + remove + C.C % — one row ── */}
                     <div className="pmic-row-with-thumb">
                       <div className="pmic-thumb" aria-hidden="true"><Pill size={16} /></div>
                       <div className="pmic-psc-wrap">
@@ -1092,31 +1065,84 @@ export default function SalesPage() {
                             // batch_no/expiry cleared: they belonged to whatever
                             // product was previously in this row, if any.
                             updateRow({ product_id: p.id, product_name: p.name, rate: p.sales_rate, amount, cc_amount, batch_no: '', expiry: '' })
+                            // Keep `products` in sync with whatever the live search
+                            // just resolved — same merge every other product-
+                            // resolution path in this file already does (camera
+                            // scanner, barcode input, quick-create below). Without
+                            // it, a product outside the initial 500-item snapshot
+                            // (e.g. anything alphabetically past it, most visibly
+                            // "Z..." names) selects correctly but company-scope/
+                            // product-scope discount grouping (discountUtils.ts's
+                            // rowCompanyName, which looks products up in this same
+                            // array) silently falls back to "Unassigned" for it.
+                            setProducts(prev => prev.some(x => x.id === p.id) ? prev : [...prev, p])
                           }}
                           onCreated={p => setProducts(prev => prev.some(x => x.id === p.id) ? prev : [...prev, p])}
                         />
                       </div>
+                      <button
+                        type="button"
+                        className="pmic-remove-inline"
+                        onClick={() => setRows(prev => prev.filter((_, i) => i !== idx))}
+                        aria-label="Remove item"
+                      >
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                          <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                        </svg>
+                      </button>
+                      <input
+                        type="number" inputMode="decimal" min={0} step="0.01"
+                        className="pmic-cc-input"
+                        aria-label="C.C %"
+                        value={row.cc_pct === 0 ? '' : row.cc_pct}
+                        placeholder="0"
+                        onChange={e => {
+                          const cc_pct = e.target.value === '' ? 0 : Number(e.target.value)
+                          updateRow({ cc_pct, ...reCalc({ cc_pct }) })
+                        }}
+                      />
                     </div>
-                    {/* Read-only summary of the batch/expiry the expandable
-                        panel below already holds — nothing here is a new
-                        value or a second source of truth, it's just always
-                        showing what row.batch_no/row.expiry already are. */}
-                    {(row.batch_no || row.expiry) && (
-                      <div className="pmic-batch-summary">
-                        {row.batch_no && <span>Batch: {row.batch_no}</span>}
-                        {row.batch_no && row.expiry && <span className="pmic-batch-dot">·</span>}
-                        {row.expiry && <span className="pmic-batch-expiry">Exp: {row.expiry}</span>}
-                      </div>
-                    )}
 
-                    {/* ── Row 2: Qty · Rate · Amount ── */}
-                    <div className="pmic-fields-3">
+                    {/* Batch/Expiry have no visible field on this compact
+                        card — BatchSelect stays mounted (hideTrigger) purely
+                        to drive its own existing auto-open-the-popup-on-
+                        product-select behavior (see BatchSelect.tsx), so
+                        selection still happens through that exact same
+                        popup, just without a tappable field to trigger it
+                        manually here. */}
+                    <div className="pmic-batch-hidden">
+                      <BatchSelect
+                        productId={row.product_id}
+                        productName={row.product_name}
+                        value={row.batch_no}
+                        onSelect={batch => updateRow({
+                          batch_no: batch.batch_no || '',
+                          expiry:   batch.expiry_date || batch.expiry || '',
+                        })}
+                        hideTrigger
+                      />
+                    </div>
+
+                    {/* ── Qty · Bonus · Rate · Amount — one row ── */}
+                    <div className="pmic-fields-4">
                       <div className="pmic-field">
                         <label>Qty</label>
                         <QtyStepper
                           productId={row.product_id}
                           value={row.qty}
                           onChange={qty => updateRow({ qty, ...reCalc({ qty }) })}
+                        />
+                      </div>
+                      <div className="pmic-field">
+                        <label>Bonus <Info size={9} className="pmic-field-info" aria-hidden="true" /></label>
+                        <input
+                          type="number" inputMode="numeric" min={0} step="1"
+                          value={row.bonus === 0 ? '' : row.bonus}
+                          placeholder="0"
+                          onChange={e => {
+                            const bonus = e.target.value === '' ? 0 : Number(e.target.value)
+                            updateRow({ bonus, ...reCalc({ bonus }) })
+                          }}
                         />
                       </div>
                       <div className="pmic-field">
@@ -1136,66 +1162,6 @@ export default function SalesPage() {
                         <div className="pmic-amount-readout">{fmt(row.amount)}</div>
                       </div>
                     </div>
-
-                    {/* ── Expand toggle ── */}
-                    <button type="button" className="pmic-toggle" onClick={toggleExpand}>
-                      <ChevronDown
-                        size={13}
-                        style={{ transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform .2s' }}
-                      />
-                      {expanded ? 'Hide' : 'Show'} Batch · Expiry · C.C % · Bonus
-                    </button>
-
-                    {/* ── Expanded: Batch · Expiry · C.C% · Bonus ── */}
-                    {expanded && (
-                      <div className="pmic-fields-3 pmic-extra" style={{ gridTemplateColumns: '1fr 1fr' }}>
-                        <div className="pmic-field">
-                          <label>Batch</label>
-                          <BatchSelect
-                            productId={row.product_id}
-                            productName={row.product_name}
-                            value={row.batch_no}
-                            onSelect={batch => updateRow({
-                              batch_no: batch.batch_no || '',
-                              expiry:   batch.expiry_date || batch.expiry || '',
-                            })}
-                          />
-                        </div>
-                        <div className="pmic-field">
-                          <label>Expiry</label>
-                          <input
-                            type="text"
-                            value={row.expiry}
-                            placeholder="MM/YY"
-                            onChange={e => updateRow({ expiry: e.target.value })}
-                          />
-                        </div>
-                        <div className="pmic-field">
-                          <label>C.C %</label>
-                          <input
-                            type="number" inputMode="decimal" min={0} step="0.01"
-                            value={row.cc_pct === 0 ? '' : row.cc_pct}
-                            placeholder="0"
-                            onChange={e => {
-                              const cc_pct = e.target.value === '' ? 0 : Number(e.target.value)
-                              updateRow({ cc_pct, ...reCalc({ cc_pct }) })
-                            }}
-                          />
-                        </div>
-                        <div className="pmic-field">
-                          <label>Bonus</label>
-                          <input
-                            type="number" inputMode="numeric" min={0} step="1"
-                            value={row.bonus === 0 ? '' : row.bonus}
-                            placeholder="0"
-                            onChange={e => {
-                              const bonus = e.target.value === '' ? 0 : Number(e.target.value)
-                              updateRow({ bonus, ...reCalc({ bonus }) })
-                            }}
-                          />
-                        </div>
-                      </div>
-                    )}
                   </div>
                 )
               })}
@@ -1210,6 +1176,7 @@ export default function SalesPage() {
               </button>
             </div>
           </div>
+
 
           {/* ════════════════════════════════════════════════════════════
               STEP 1 — Subtotal (mobile/tablet only)
@@ -1379,15 +1346,29 @@ export default function SalesPage() {
               payment mode) can't usefully open until that's picked there.
               On desktop this bar is never visible (unaffected either way). */}
           <div className="pos-mobile-actionbar pos-step1-only">
-            <button type="button" className="pma-draft" onClick={saveDraft} title="Save Draft">
-              <Save size={20}/>
-            </button>
-            <button type="button" className="pma-post" onClick={goToStep2} disabled={saving}>
-              <span className="pma-stack">
-                <span className="pma-stack-label"><FileText size={14}/> Next →</span>
-                <span className="pma-stack-sub">{itemCount} item{itemCount === 1 ? '' : 's'} • {fmt(subtotal)}</span>
-              </span>
-            </button>
+            <div className="pma-row">
+              <button type="button" className="pma-draft" onClick={saveDraft} title="Save Draft">
+                <Save size={20}/>
+              </button>
+              <button type="button" className="pma-post" onClick={goToStep2} disabled={saving}>
+                <span className="pma-stack">
+                  <span className="pma-stack-label"><FileText size={14}/> Next →</span>
+                  <span className="pma-stack-sub">{itemCount} item{itemCount === 1 ? '' : 's'} • {fmt(subtotal)}</span>
+                </span>
+              </button>
+            </div>
+            {/* Same `isOnline` the whole offline-first billing flow already
+                uses (see enqueueOfflineSale in onSubmit) — purely a status
+                readout, doesn't gate anything here itself. Sits below the
+                button row inside this same fixed bar (rather than as its
+                own separate fixed element) so it can never overlap Save/
+                Next, and inherits the bar's existing safe-area padding. */}
+            {!isOnline && (
+              <div className="pma-offline-pill">
+                <span className="pma-offline-dot" aria-hidden="true" />
+                Offline – Transactions will sync automatically
+              </div>
+            )}
           </div>
 
           {/* ════════════════════════════════════════════════════════════
@@ -1531,19 +1512,27 @@ export default function SalesPage() {
               dialog → onSubmit → same API call as desktop's Post Invoice
               button inside the Discount Review modal). */}
           <div className="pos-mobile-actionbar pos-step2-only">
-            <button type="button" className="pma-draft" onClick={() => setMobileStep(1)} title="Back" aria-label="Back">
-              <ArrowLeft size={20}/>
-            </button>
-            <button type="button" className="pma-post" onClick={handlePostClick} disabled={saving}>
-              {saving ? (
-                <><span className="pos-spinner"/> Posting…</>
-              ) : (
-                <span className="pma-stack">
-                  <span className="pma-stack-label"><FileText size={14}/> Post Invoice →</span>
-                  <span className="pma-stack-sub">{itemCount} item{itemCount === 1 ? '' : 's'} • {fmt(grandTotal)}</span>
-                </span>
-              )}
-            </button>
+            <div className="pma-row">
+              <button type="button" className="pma-draft" onClick={() => setMobileStep(1)} title="Back" aria-label="Back">
+                <ArrowLeft size={20}/>
+              </button>
+              <button type="button" className="pma-post" onClick={handlePostClick} disabled={saving}>
+                {saving ? (
+                  <><span className="pos-spinner"/> Posting…</>
+                ) : (
+                  <span className="pma-stack">
+                    <span className="pma-stack-label"><FileText size={14}/> Post Invoice →</span>
+                    <span className="pma-stack-sub">{itemCount} item{itemCount === 1 ? '' : 's'} • {fmt(grandTotal)}</span>
+                  </span>
+                )}
+              </button>
+            </div>
+            {!isOnline && (
+              <div className="pma-offline-pill">
+                <span className="pma-offline-dot" aria-hidden="true" />
+                Offline – Transactions will sync automatically
+              </div>
+            )}
           </div>
 
         </div>
@@ -1577,36 +1566,7 @@ export default function SalesPage() {
                       ? sales.map(s => (
                           <tr key={s.id} className="clickable" onClick={() => setDetailId(s.id)}>
                             <td className="td-mono text-brand">{s.invoice_no}</td>
-                            <td className="td-mono">
-                              {editingDateId === s.id ? (
-                                <div className="sil-date-edit" onClick={e => e.stopPropagation()}>
-                                  <DateSystemInput
-                                    valueAD={editDateValue}
-                                    onChangeAD={setEditDateValue}
-                                    className="erp-input erp-input-sm"
-                                    aria-label="Invoice date"
-                                  />
-                                  <Button variant="ghost" size="sm" title="Save" disabled={savingDate} onClick={() => saveDateEdit(s.id)}>
-                                    <Check size={13} className="text-green-700"/>
-                                  </Button>
-                                  <Button variant="ghost" size="sm" title="Cancel" disabled={savingDate} onClick={closeDateEdit}>
-                                    <XIcon size={13}/>
-                                  </Button>
-                                </div>
-                              ) : (
-                                <span className="sil-date-display">
-                                  {formatDisplayDate(s.date_ad, dateMode)}
-                                  {s.status === 'active' && (
-                                    <button
-                                      type="button" className="sil-date-edit-btn" title="Edit invoice date"
-                                      onClick={e => { e.stopPropagation(); openDateEdit(s) }}
-                                    >
-                                      <Pencil size={12}/>
-                                    </button>
-                                  )}
-                                </span>
-                              )}
-                            </td>
+                            <td className="td-mono">{formatDisplayDate(s.date_ad, dateMode)}</td>
                             <td>{s.party_name}</td>
                             <td className="td-right">{fmt(s.net_total)}</td>
                             <td className="td-right text-green-700">{fmt(s.paid_amount)}</td>
@@ -1680,10 +1640,7 @@ export default function SalesPage() {
                     <span className="sil-card-total">{fmt(s.net_total)}</span>
                   </div>
 
-                  {/* Customer + date row — read-only here; date editing is
-                      desktop-only (see .sil-desktop-table below), matching
-                      the mobile card list's existing no-inline-edit pattern
-                      for every other field. */}
+                  {/* Customer + date row (read-only, same as desktop). */}
                   <div className="sil-card-sub">
                     <span className="sil-card-customer">{s.party_name || ''}</span>
                     <span className="sil-card-date">{formatDisplayDate(s.date_ad, dateMode)}</span>
@@ -1867,10 +1824,6 @@ export default function SalesPage() {
         onConfirm={() => confirmCancel && cancelSale(confirmCancel)}
         title="Cancel Sale" message="Are you sure you want to cancel this sale? This action cannot be undone." danger
       />
-      {/* Step-up (PIN/password) dialog for editing an invoice's date — only
-          ever shown when Settings → sensitiveActions.saleDateEdit is on for
-          this company and there's no valid cached step-up token yet. */}
-      {dateConfirmDialog}
       <PrintPreviewModal
         data={printData} open={!!printData}
         onClose={() => setPrintData(null)}

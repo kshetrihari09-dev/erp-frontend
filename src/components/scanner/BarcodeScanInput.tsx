@@ -57,6 +57,12 @@ interface Props {
    *  degradation — the mismatch is still blocked either way). */
   onAccountMismatch?: (message: string) => void
   autoFocus?:  boolean
+  /** Optional override for the input's placeholder text — defaults to
+   *  "Scan barcode…" below, unchanged for every existing caller. Added so
+   *  SalesPage can show a mobile-specific "Scan barcode or search
+   *  product…" without touching desktop/tablet, which keep passing
+   *  nothing and get the original text. */
+  placeholder?: string
 }
 
 // Exact copy of the message the backend returns for QR_ACCOUNT_MISMATCH
@@ -88,7 +94,7 @@ function scannedToProduct(s: {
 const barcodeCache = new Map<string, Product>()
 
 const BarcodeScanInput = forwardRef<BarcodeScanInputHandle, Props>(function BarcodeScanInput({
-  onResolved, onNotFound, onAccountMismatch, autoFocus,
+  onResolved, onNotFound, onAccountMismatch, autoFocus, placeholder,
 }, ref) {
   const { isOnline } = useOffline()
   const companyId = useAuthStore(s => s.company?.id)
@@ -191,7 +197,7 @@ const BarcodeScanInput = forwardRef<BarcodeScanInputHandle, Props>(function Barc
         value={code}
         onChange={e => setCode(e.target.value)}
         onKeyDown={handleKey}
-        placeholder="Scan barcode…"
+        placeholder={placeholder ?? 'Scan barcode…'}
         autoFocus={autoFocus}
         autoComplete="off"
         spellCheck={false}
