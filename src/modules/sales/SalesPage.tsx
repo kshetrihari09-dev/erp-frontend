@@ -1135,6 +1135,16 @@ export default function SalesPage() {
                           expiry:   batch.expiry_date || batch.expiry || '',
                         })}
                         hideTrigger
+                        // Same barcode/QR-scanned-row behavior the desktop
+                        // table already has (see InvoiceRowsTable.tsx) —
+                        // this was missing here, so a scanned product with
+                        // exactly one batch still opened the popup on
+                        // mobile instead of auto-selecting it. `_scanned`
+                        // is set by handleBarcodeProduct/handleScanResult
+                        // above when the row was added via a scan rather
+                        // than manual product search.
+                        autoSelectSingle={!!row._scanned}
+                        onAutoResolved={row._scanned ? () => barcodeInputRef.current?.focus() : undefined}
                       />
                     </div>
 
@@ -1149,7 +1159,7 @@ export default function SalesPage() {
                         />
                       </div>
                       <div className="pmic-field">
-                        <label>Bonus</label>
+                        <label>Bonus <Gift size={14} className="pmic-field-info" aria-hidden="true" /></label>
                         <input
                           type="number" inputMode="numeric" min={0} step="1"
                           className="pmic-bonus-input"

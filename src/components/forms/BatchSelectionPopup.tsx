@@ -16,9 +16,20 @@
  *              (BatchSelect.tsx does the actual focus move after onSelect)
  *   Escape     close without selecting
  *
- * Mouse:
+ * Mouse (desktop, > 768px):
  *   Single click   just moves the highlight (same as hover/arrow keys)
  *   Double click   selects the batch, same as pressing Enter on it
+ *
+ * Touch (mobile, <= 768px — same breakpoint InvoiceRowsTable/SalesPage
+ * already use for their own mobile-vs-desktop split, see .pos-desktop-only
+ * in globals.css): a single tap selects immediately. Double-tap-to-confirm
+ * doesn't map to touch the way it does to a mouse — a phone has no hover
+ * state to "preview" a highlight with, so requiring a second tap just
+ * looks like the first tap did nothing. Desktop's click-then-double-click
+ * behaviour is unchanged. The search box also isn't auto-focused on
+ * mobile (desktop still is) — with the keyboard already up, a tap's
+ * first job on most mobile browsers is just to dismiss it, so the row's
+ * "click" wouldn't register until a second tap either.
  *
  * The row opens already highlighting the FEFO-recommended batch (the
  * earliest-expiring one that isn't expired and has stock), so for the
@@ -56,6 +67,22 @@ export default function BatchSelectionPopup({
 }: Props) {
   const [query, setQuery] = useState('')
   const [hl,    setHL]    = useState(0)
+
+  // Same window-width + resize-listener pattern already used by
+  // usePrintResponsive.ts / useAccResponsive.ts elsewhere in this project,
+  // and the same 768px cutoff InvoiceRowsTable/SalesPage already use for
+  // their own mobile-card vs desktop-table split — see file header.
+  const [width, setWidth] = useState(() => (typeof window !== 'undefined' ? window.innerWidth : 1280))
+  useEffect(() => {
+    const onResize = () => setWidth(window.innerWidth)
+    window.addEventListener('resize', onResize)
+    window.addEventListener('orientationchange', onResize)
+    return () => {
+      window.removeEventListener('resize', onResize)
+      window.removeEventListener('orientationchange', onResize)
+    }
+  }, [])
+  const isMobile = width <= 768
 
   // This popup already has its own local (non-global) Enter/Esc/arrow-key
   // handling below — nothing about that changes. This just registers its
@@ -103,8 +130,16 @@ export default function BatchSelectionPopup({
       ? recommendedIdx
       : batches.findIndex(b => !isExpired(b) && Number(b.qty_available) > 0)
     setHL(idx >= 0 ? idx : 0)
-    requestAnimationFrame(() => inputRef.current?.focus())
-  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
+    // Skip auto-focusing (and therefore auto-opening the on-screen
+    // keyboard) on mobile. With the keyboard up, a tap on a batch row's
+    // FIRST job on most mobile browsers is just to dismiss the keyboard —
+    // the tap doesn't reach the row as a real "select" until the second
+    // one, which is exactly the "need to tap twice" this was causing.
+    // Desktop still autofocuses so typing-to-filter works immediately,
+    // matching every other search-first UI in this app; mobile can still
+    // tap the search box to bring the keyboard up and filter manually.
+    if (!isMobile) requestAnimationFrame(() => inputRef.current?.focus())
+  }, [open, isMobile]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const el = listRef.current?.children[hl] as HTMLElement | undefined
@@ -223,10 +258,12 @@ export default function BatchSelectionPopup({
                         !selectable ? 'bsp-row--disabled' : '',
                       ].filter(Boolean).join(' ')}
                       onMouseEnter={() => setHL(i)}
-                      // Single click only moves the highlight (same as
-                      // hover/arrow keys) — double-click confirms, same
-                      // as pressing Enter on the highlighted row.
-                      onClick={() => setHL(i)}
+                      // Desktop: click only moves the highlight (mouse has
+                      // hover to preview with) — double-click confirms.
+                      // Mobile (<= 768px): a tap has no hover equivalent,
+                      // so a single tap both highlights AND confirms —
+                      // see file header.
+                      onClick={() => { setHL(i); if (isMobile) choose(b) }}
                       onDoubleClick={() => choose(b)}
                     >
                       <span className="bsp-col bsp-col-batch">
@@ -247,12 +284,16 @@ export default function BatchSelectionPopup({
           )}
         </div>
 
-        {/* Keyboard hints */}
+        {/* Keyboard hints — the tap/double-click hint below swaps per
+            device since the two have different single-interaction
+            behaviour (see file header); the rest (↑↓/Enter/Tab/Esc) only
+            apply when a physical keyboard is in play, which is harmless
+            to leave visible either way. */}
         <div className="bsp-footer">
           <span><kbd className="bsp-kbd">↑↓</kbd> Navigate</span>
           <span><kbd className="bsp-kbd">Enter</kbd> Select</span>
           <span><kbd className="bsp-kbd">Tab</kbd> Select + Next</span>
-          <span>Double-click Select</span>
+          <span>{isMobile ? 'Tap to select' : 'Double-click Select'}</span>
           <span><kbd className="bsp-kbd">Esc</kbd> Close</span>
         </div>
       </div>
