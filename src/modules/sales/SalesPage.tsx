@@ -1134,7 +1134,7 @@ export default function SalesPage() {
                         />
                       </div>
                       <div className="pmic-field">
-                        <label>Bonus <Info size={9} className="pmic-field-info" aria-hidden="true" /></label>
+                        <label>Bonus</label>
                         <input
                           type="number" inputMode="numeric" min={0} step="1"
                           value={row.bonus === 0 ? '' : row.bonus}
