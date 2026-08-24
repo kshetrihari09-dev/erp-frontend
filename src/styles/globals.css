@@ -7037,6 +7037,17 @@ canvas{
 .pos-cf-lead-icon-static,
 .pos-cf-trailing-icon { display: none; }
 
+/* Address/PAN/Telephone/Date now share one wrapper (.pos-cf-quad) so they
+   can become a single equal-width row on mobile/tablet. This default rule
+   (active at EVERY width, including desktop) reproduces the exact grid
+   these four items sat in directly before the wrapper existed — 2 columns,
+   16px gap — so desktop's rendered output is unchanged. */
+.pos-cf-quad {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
 @media (max-width: 1199px) {
   .pos-theme.sales-two-step .pos-customer-grid {
     gap: 14px;
@@ -7079,18 +7090,32 @@ canvas{
     filter: brightness(1.08);
   }
 
-  /* ── Address / PAN / Telephone / Date field boxes ── */
+  /* ── Address / PAN / Telephone / Date: one equal-width row, compact sizing ── */
+  .pos-theme.sales-two-step .pos-cf-quad {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
   .pos-theme.sales-two-step .pos-cf-field .pos-cf-readonly,
   .pos-theme.sales-two-step .pos-cf-field .pos-cf-date-wrap .erp-input {
-    height: 48px;
-    border-radius: 12px !important;
-    font-size: 13.5px;
+    height: 42px;
+    border-radius: 10px !important;
+    font-size: 11.5px;
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+  }
+  .pos-theme.sales-two-step .pos-cf-field label {
+    font-size: 9px;
+    gap: 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 4px;
   }
   .pos-theme.sales-two-step .pos-cf-readonly {
     position: relative;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 4px;
   }
   .pos-theme.sales-two-step .pos-cf-readonly-text {
     flex: 1;
@@ -7104,32 +7129,28 @@ canvas{
     color: var(--pdt-accent);
     opacity: .85;
   }
+  .pos-theme.sales-two-step .pos-cf-lead-icon-static svg { width: 11px; height: 11px; }
   .pos-theme.sales-two-step .pos-cf-trailing-icon {
     display: flex;
     flex-shrink: 0;
     color: var(--pdt-text-4);
   }
+  .pos-theme.sales-two-step .pos-cf-trailing-icon svg { width: 11px; height: 11px; }
 
   /* Date field: give the input right-side breathing room for the
      decorative calendar icon, laid on top of it (native AD picker icon,
      when present, sits further right — this one just mirrors it visually
      for the BS text-mode case where the browser draws nothing). */
   .pos-theme.sales-two-step .pos-cf-date-wrap { position: relative; }
-  .pos-theme.sales-two-step .pos-cf-date-input { padding-right: 34px !important; }
+  .pos-theme.sales-two-step .pos-cf-date-input { padding-right: 24px !important; }
   .pos-theme.sales-two-step .pos-cf-date-icon {
     position: absolute;
-    right: 14px;
+    right: 8px;
     top: 50%;
     transform: translateY(-50%);
     pointer-events: none;
   }
-
-  /* Visual reflow only — DOM order in SalesPage.tsx is untouched.
-     Address, PAN | Telephone, Date. */
-  .pos-theme.sales-two-step .pos-cf-address { order: 1; }
-  .pos-theme.sales-two-step .pos-cf-pan     { order: 2; }
-  .pos-theme.sales-two-step .pos-cf-phone   { order: 3; }
-  .pos-theme.sales-two-step .pos-cf-date    { order: 4; }
+  .pos-theme.sales-two-step .pos-cf-date-icon svg { width: 11px; height: 11px; }
 
   /* Card + header polish to match the reference design a little closer. */
   .pos-theme.sales-two-step .pos-card.pos-step1-only { border-radius: 18px; }

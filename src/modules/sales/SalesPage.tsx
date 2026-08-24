@@ -831,55 +831,60 @@ export default function SalesPage() {
                     </div>
                   </div>
 
-                  {/* Address — IDENTICAL to original, decorative icon added for mobile/tablet only */}
-                  <div className="pos-cf-field pos-cf-address">
-                    <FieldLabel icon={<MapPin size={11}/>}>Address</FieldLabel>
-                    <div className="erp-input pos-readonly pos-cf-readonly">
-                      <Home size={14} className="pos-cf-lead-icon-static" aria-hidden="true" />
-                      <span className="pos-cf-readonly-text">
-                        {selectedCustomer?.address || <span className="text-[var(--text-4)]">—</span>}
-                      </span>
+                  {/* Address, PAN, Telephone, Date — grouped in a wrapper so
+                      they can become one equal-width row on mobile/tablet
+                      (see .pos-cf-quad in globals.css). The wrapper's default
+                      (non-media-query) styling reproduces the exact 2-col/16px
+                      grid these four items sat in before, so desktop's output
+                      is unchanged — only the ≤1199px override reflows them. */}
+                  <div className="pos-span2 pos-cf-quad">
+                    {/* Address — IDENTICAL to original, decorative icon added for mobile/tablet only */}
+                    <div className="pos-cf-field pos-cf-address">
+                      <FieldLabel icon={<MapPin size={11}/>}>Address</FieldLabel>
+                      <div className="erp-input pos-readonly pos-cf-readonly">
+                        <Home size={14} className="pos-cf-lead-icon-static" aria-hidden="true" />
+                        <span className="pos-cf-readonly-text">
+                          {selectedCustomer?.address || <span className="text-[var(--text-4)]">—</span>}
+                        </span>
+                      </div>
                     </div>
-                  </div>
 
-                  {/* PAN — IDENTICAL to original */}
-                  <div className="pos-cf-field pos-cf-pan">
-                    <FieldLabel icon={<Hash size={11}/>}>PAN</FieldLabel>
-                    <div className="erp-input pos-readonly pos-cf-readonly">
-                      <span className="pos-cf-readonly-text">
-                        {selectedCustomer?.pan_no || <span className="text-[var(--text-4)]">—</span>}
-                      </span>
+                    {/* PAN — IDENTICAL to original */}
+                    <div className="pos-cf-field pos-cf-pan">
+                      <FieldLabel icon={<Hash size={11}/>}>PAN</FieldLabel>
+                      <div className="erp-input pos-readonly pos-cf-readonly">
+                        <span className="pos-cf-readonly-text">
+                          {selectedCustomer?.pan_no || <span className="text-[var(--text-4)]">—</span>}
+                        </span>
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Telephone — IDENTICAL to original, decorative icon added for mobile/tablet only */}
-                  <div className="pos-cf-field pos-cf-phone">
-                    <FieldLabel icon={<PhoneIcon size={11}/>}>Telephone</FieldLabel>
-                    <div className="erp-input pos-readonly pos-cf-readonly">
-                      <span className="pos-cf-readonly-text">
-                        {selectedCustomer?.phone || <span className="text-[var(--text-4)]">—</span>}
-                      </span>
-                      <PhoneIcon size={14} className="pos-cf-trailing-icon" aria-hidden="true" />
+                    {/* Telephone — IDENTICAL to original, decorative icon added for mobile/tablet only */}
+                    <div className="pos-cf-field pos-cf-phone">
+                      <FieldLabel icon={<PhoneIcon size={11}/>}>Telephone</FieldLabel>
+                      <div className="erp-input pos-readonly pos-cf-readonly">
+                        <span className="pos-cf-readonly-text">
+                          {selectedCustomer?.phone || <span className="text-[var(--text-4)]">—</span>}
+                        </span>
+                        <PhoneIcon size={14} className="pos-cf-trailing-icon" aria-hidden="true" />
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Date — same field, now AD/BS aware via DateSystemInput.
-                      Kept in its ORIGINAL DOM position (after Telephone) so
-                      desktop's grid auto-placement — which relies purely on
-                      source order — is completely untouched. On mobile/tablet
-                      it's moved next to Address purely visually via CSS
-                      `order` (see .pos-cf-date in globals.css), not by
-                      reshuffling markup. */}
-                  <div className="pos-cf-field pos-cf-date">
-                    <FieldLabel icon={<CalendarDays size={11}/>}>Date</FieldLabel>
-                    <div className="pos-cf-date-wrap">
-                      <DateSystemInput
-                        className="erp-input pos-cf-date-input"
-                        min={lastInvDate || undefined}
-                        valueAD={watch('date')}
-                        onChangeAD={(ad) => setValue('date', ad)}
-                      />
-                      <CalendarDays size={14} className="pos-cf-trailing-icon pos-cf-date-icon" aria-hidden="true" />
+                    {/* Date — same field, now AD/BS aware via DateSystemInput.
+                        Kept in its ORIGINAL DOM position (after Telephone) so
+                        desktop's grid auto-placement — which relies purely on
+                        source order — is completely untouched. */}
+                    <div className="pos-cf-field pos-cf-date">
+                      <FieldLabel icon={<CalendarDays size={11}/>}>Date</FieldLabel>
+                      <div className="pos-cf-date-wrap">
+                        <DateSystemInput
+                          className="erp-input pos-cf-date-input"
+                          min={lastInvDate || undefined}
+                          valueAD={watch('date')}
+                          onChangeAD={(ad) => setValue('date', ad)}
+                        />
+                        <CalendarDays size={14} className="pos-cf-trailing-icon pos-cf-date-icon" aria-hidden="true" />
+                      </div>
                     </div>
                   </div>
 
