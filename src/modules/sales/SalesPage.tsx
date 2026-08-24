@@ -18,7 +18,7 @@ import { playSuccessBeep, playErrorBeep } from '@/utils/beep'
 import { useForm } from 'react-hook-form'
 import {
   Printer, FilePlus, List, FileText, ShoppingCart,
-  CalendarDays, CreditCard, User, MapPin, Hash,
+  CalendarDays, CreditCard, User, MapPin, Hash, Home,
   Phone as PhoneIcon, ChevronDown, AlertCircle,
   CheckCircle2, RotateCcw, Save, Plus, UserPlus,
   ArrowLeft, HelpCircle, Trash2,
@@ -800,11 +800,16 @@ export default function SalesPage() {
                 <div className="pos-customer-grid">
 
                   {/* Party selector — now required (see onSubmit validation below) */}
+                  {/* pos-cf-*: purely decorative mobile/tablet skin (icons,
+                      spacing, order) added below in globals.css, scoped to
+                      ≤1199px. Desktop gets none of these rules, so this
+                      block renders byte-identical to before at ≥1200px. */}
                   <div className="pos-span2">
                     <FieldLabel icon={<User size={11}/>}>Party <span style={{ color: 'var(--danger,#dc2626)' }}>*</span></FieldLabel>
-                    <div className="flex gap-2 items-stretch">
-                      <div className="relative flex-1">
-                        <select id="pos-customer-select" className="erp-input pos-select" required {...register('customer_id')}>
+                    <div className="flex gap-2 items-stretch pos-cf-party-row">
+                      <div className="relative flex-1 pos-cf-select-wrap">
+                        <User size={16} className="pos-cf-lead-icon" aria-hidden="true" />
+                        <select id="pos-customer-select" className="erp-input pos-select pos-cf-select" required {...register('customer_id')}>
                           <option value="">Select a customer…</option>
                           {customers.map(c => (
                             <option key={c.id} value={c.id}>
@@ -812,11 +817,11 @@ export default function SalesPage() {
                             </option>
                           ))}
                         </select>
-                        <ChevronDown size={13} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-4)]" />
+                        <ChevronDown size={13} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-4)] pos-cf-chevron" />
                       </div>
                       <button
                         type="button"
-                        className="pos-party-add-btn"
+                        className="pos-party-add-btn pos-cf-add-btn"
                         onClick={() => setShowNewCustomer(true)}
                         title="New Customer (F6)"
                         aria-label="New Customer"
@@ -826,39 +831,56 @@ export default function SalesPage() {
                     </div>
                   </div>
 
-                  {/* Address — IDENTICAL to original */}
-                  <div>
+                  {/* Address — IDENTICAL to original, decorative icon added for mobile/tablet only */}
+                  <div className="pos-cf-field pos-cf-address">
                     <FieldLabel icon={<MapPin size={11}/>}>Address</FieldLabel>
-                    <div className="erp-input pos-readonly">
-                      {selectedCustomer?.address || <span className="text-[var(--text-4)]">—</span>}
+                    <div className="erp-input pos-readonly pos-cf-readonly">
+                      <Home size={14} className="pos-cf-lead-icon-static" aria-hidden="true" />
+                      <span className="pos-cf-readonly-text">
+                        {selectedCustomer?.address || <span className="text-[var(--text-4)]">—</span>}
+                      </span>
                     </div>
                   </div>
 
                   {/* PAN — IDENTICAL to original */}
-                  <div>
+                  <div className="pos-cf-field pos-cf-pan">
                     <FieldLabel icon={<Hash size={11}/>}>PAN</FieldLabel>
-                    <div className="erp-input pos-readonly">
-                      {selectedCustomer?.pan_no || <span className="text-[var(--text-4)]">—</span>}
+                    <div className="erp-input pos-readonly pos-cf-readonly">
+                      <span className="pos-cf-readonly-text">
+                        {selectedCustomer?.pan_no || <span className="text-[var(--text-4)]">—</span>}
+                      </span>
                     </div>
                   </div>
 
-                  {/* Telephone — IDENTICAL to original */}
-                  <div>
+                  {/* Telephone — IDENTICAL to original, decorative icon added for mobile/tablet only */}
+                  <div className="pos-cf-field pos-cf-phone">
                     <FieldLabel icon={<PhoneIcon size={11}/>}>Telephone</FieldLabel>
-                    <div className="erp-input pos-readonly">
-                      {selectedCustomer?.phone || <span className="text-[var(--text-4)]">—</span>}
+                    <div className="erp-input pos-readonly pos-cf-readonly">
+                      <span className="pos-cf-readonly-text">
+                        {selectedCustomer?.phone || <span className="text-[var(--text-4)]">—</span>}
+                      </span>
+                      <PhoneIcon size={14} className="pos-cf-trailing-icon" aria-hidden="true" />
                     </div>
                   </div>
 
-                  {/* Date — same field, now AD/BS aware via DateSystemInput */}
-                  <div>
+                  {/* Date — same field, now AD/BS aware via DateSystemInput.
+                      Kept in its ORIGINAL DOM position (after Telephone) so
+                      desktop's grid auto-placement — which relies purely on
+                      source order — is completely untouched. On mobile/tablet
+                      it's moved next to Address purely visually via CSS
+                      `order` (see .pos-cf-date in globals.css), not by
+                      reshuffling markup. */}
+                  <div className="pos-cf-field pos-cf-date">
                     <FieldLabel icon={<CalendarDays size={11}/>}>Date</FieldLabel>
-                    <DateSystemInput
-                      className="erp-input"
-                      min={lastInvDate || undefined}
-                      valueAD={watch('date')}
-                      onChangeAD={(ad) => setValue('date', ad)}
-                    />
+                    <div className="pos-cf-date-wrap">
+                      <DateSystemInput
+                        className="erp-input pos-cf-date-input"
+                        min={lastInvDate || undefined}
+                        valueAD={watch('date')}
+                        onChangeAD={(ad) => setValue('date', ad)}
+                      />
+                      <CalendarDays size={14} className="pos-cf-trailing-icon pos-cf-date-icon" aria-hidden="true" />
+                    </div>
                   </div>
 
                   {/* Payment mode — IDENTICAL to original on desktop.

@@ -7009,3 +7009,129 @@ canvas{
   .pos-theme.sales-two-step .erp-input,
   .pos-theme.sales-two-step select { min-height: 44px; }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   CUSTOMER INFORMATION CARD — MOBILE/TABLET VISUAL UPGRADE
+   ────────────────────────────────────────────────────────────────────────────
+   Purely decorative: bigger touch-friendly fields, inline leading/trailing
+   icons, a filled square "add customer" button, and a visual reflow of
+   Address/Date/PAN/Telephone into the Address→Date, PAN→Telephone order
+   shown in the design. Everything here is presentation only:
+     - No selectors, state, handlers, API calls, or validation are touched.
+     - The `order` reflow below is CSS Grid `order` on the existing DOM
+       nodes — the markup itself keeps its original source order (see
+       SalesPage.tsx), so nothing about focus/tab order or form submission
+       changes at the JS level.
+     - Scoped to `.pos-theme.sales-two-step` (Sales page only) and
+       ≤1199px, matching this file's own existing phone (≤767px) / tablet
+       (768–1199px) breakpoints. Desktop (≥1200px) is completely
+       unaffected — the decorative icon elements added to the JSX stay
+       `display: none` there (default, set immediately below) and the
+       grid keeps its original auto order.
+══════════════════════════════════════════════════════════════════════════════ */
+
+/* Icons are added to the JSX for every breakpoint but hidden by default;
+   only the ≤1199px block further down switches them on. This keeps the
+   desktop DOM/CSS output byte-for-byte equivalent to before. */
+.pos-cf-lead-icon,
+.pos-cf-lead-icon-static,
+.pos-cf-trailing-icon { display: none; }
+
+@media (max-width: 1199px) {
+  .pos-theme.sales-two-step .pos-customer-grid {
+    gap: 14px;
+  }
+
+  /* ── Party select: leading icon + pill field + filled square add-button ── */
+  .pos-theme.sales-two-step .pos-cf-select-wrap { position: relative; }
+  .pos-theme.sales-two-step .pos-cf-lead-icon {
+    display: flex;
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--pdt-accent);
+    pointer-events: none;
+    z-index: 1;
+  }
+  .pos-theme.sales-two-step .pos-cf-select {
+    height: 52px;
+    padding-left: 42px !important;
+    padding-right: 36px !important;
+    border-radius: 14px !important;
+    font-size: 14px;
+    border-width: 1.5px !important;
+  }
+  .pos-theme.sales-two-step .pos-cf-chevron { right: 14px; }
+  .pos-theme.sales-two-step .pos-cf-party-row { gap: 10px; }
+  .pos-theme.sales-two-step .pos-cf-add-btn {
+    width: 52px;
+    height: 52px;
+    border-radius: 14px !important;
+    background: var(--pdt-accent) !important;
+    color: #fff !important;
+    border: none !important;
+    box-shadow: 0 2px 8px rgba(37,99,235,.28);
+  }
+  .pos-theme.sales-two-step .pos-cf-add-btn:hover,
+  .pos-theme.sales-two-step .pos-cf-add-btn:active {
+    background: var(--pdt-accent) !important;
+    filter: brightness(1.08);
+  }
+
+  /* ── Address / PAN / Telephone / Date field boxes ── */
+  .pos-theme.sales-two-step .pos-cf-field .pos-cf-readonly,
+  .pos-theme.sales-two-step .pos-cf-field .pos-cf-date-wrap .erp-input {
+    height: 48px;
+    border-radius: 12px !important;
+    font-size: 13.5px;
+  }
+  .pos-theme.sales-two-step .pos-cf-readonly {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .pos-theme.sales-two-step .pos-cf-readonly-text {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .pos-theme.sales-two-step .pos-cf-lead-icon-static {
+    display: flex;
+    flex-shrink: 0;
+    color: var(--pdt-accent);
+    opacity: .85;
+  }
+  .pos-theme.sales-two-step .pos-cf-trailing-icon {
+    display: flex;
+    flex-shrink: 0;
+    color: var(--pdt-text-4);
+  }
+
+  /* Date field: give the input right-side breathing room for the
+     decorative calendar icon, laid on top of it (native AD picker icon,
+     when present, sits further right — this one just mirrors it visually
+     for the BS text-mode case where the browser draws nothing). */
+  .pos-theme.sales-two-step .pos-cf-date-wrap { position: relative; }
+  .pos-theme.sales-two-step .pos-cf-date-input { padding-right: 34px !important; }
+  .pos-theme.sales-two-step .pos-cf-date-icon {
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+  }
+
+  /* Visual reflow only — DOM order in SalesPage.tsx is untouched.
+     Address, Date | PAN, Telephone, matching the design. */
+  .pos-theme.sales-two-step .pos-cf-address { order: 1; }
+  .pos-theme.sales-two-step .pos-cf-date    { order: 2; }
+  .pos-theme.sales-two-step .pos-cf-pan     { order: 3; }
+  .pos-theme.sales-two-step .pos-cf-phone   { order: 4; }
+
+  /* Card + header polish to match the reference design a little closer. */
+  .pos-theme.sales-two-step .pos-card.pos-step1-only { border-radius: 18px; }
+  .pos-theme.sales-two-step .pos-card.pos-step1-only .pos-card-title { font-size: 14px; }
+}
