@@ -7125,11 +7125,11 @@ canvas{
   }
 
   /* Visual reflow only — DOM order in SalesPage.tsx is untouched.
-     Address, Date | PAN, Telephone, matching the design. */
+     Address, PAN | Telephone, Date. */
   .pos-theme.sales-two-step .pos-cf-address { order: 1; }
-  .pos-theme.sales-two-step .pos-cf-date    { order: 2; }
-  .pos-theme.sales-two-step .pos-cf-pan     { order: 3; }
-  .pos-theme.sales-two-step .pos-cf-phone   { order: 4; }
+  .pos-theme.sales-two-step .pos-cf-pan     { order: 2; }
+  .pos-theme.sales-two-step .pos-cf-phone   { order: 3; }
+  .pos-theme.sales-two-step .pos-cf-date    { order: 4; }
 
   /* Card + header polish to match the reference design a little closer. */
   .pos-theme.sales-two-step .pos-card.pos-step1-only { border-radius: 18px; }
