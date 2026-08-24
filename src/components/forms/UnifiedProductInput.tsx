@@ -321,22 +321,26 @@ const UnifiedProductInput = forwardRef<UnifiedProductInputHandle, Props>(functio
         )}
       </div>
 
-      <div className="flex items-stretch gap-2 flex-shrink-0">
+      <div className="upi-scan-buttons flex items-stretch gap-2 flex-shrink-0">
         <ScanButton
           context={context}
           onResult={handleCameraResult}
           initialMode={'barcode' as ScanMode}
           label="Scan Barcode"
-          icon={<ScanLine size={14} />}
-          className="inline-flex items-center gap-1.5 px-3 h-9 rounded-lg border text-xs font-semibold transition-all bg-white text-slate-600 border-slate-200 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 whitespace-nowrap"
+          description="Scan product barcode"
+          icon={<ScanLine size={15} />}
+          iconChipClassName="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex-shrink-0"
+          className="upi-scan-btn upi-scan-btn-barcode inline-flex items-center gap-2.5 px-3 h-9 rounded-lg border transition-all bg-white border-slate-200 hover:border-blue-400 hover:bg-blue-50 whitespace-nowrap"
         />
         <ScanButton
           context={context}
           onResult={handleCameraResult}
           initialMode={'qr' as ScanMode}
           label="Scan QR"
-          icon={<QrCode size={14} />}
-          className="inline-flex items-center gap-1.5 px-3 h-9 rounded-lg border text-xs font-semibold transition-all bg-white text-slate-600 border-slate-200 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 whitespace-nowrap"
+          description="Scan QR code"
+          icon={<QrCode size={15} />}
+          iconChipClassName="flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex-shrink-0"
+          className="upi-scan-btn upi-scan-btn-qr inline-flex items-center gap-2.5 px-3 h-9 rounded-lg border transition-all bg-white border-slate-200 hover:border-emerald-400 hover:bg-emerald-50 whitespace-nowrap"
         />
       </div>
     </div>

@@ -35,6 +35,14 @@ interface Props {
   label?: string
   icon?: ReactNode
   className?: string
+  // Optional second line under the label (e.g. "Scan product barcode").
+  // Purely presentational — switches the button to a two-line, icon-chip
+  // layout when set; every existing caller that doesn't pass this (just
+  // PurchasePage's bare `<ScanButton .../>`) renders exactly as before.
+  description?: string
+  // Background/text color classes for the icon chip in the two-line
+  // layout above — ignored unless `description` is set.
+  iconChipClassName?: string
   // Which symbology the scanner should open directly into (see
   // useBarcodeEngine's ScanMode) — e.g. a "Scan QR" button passes 'qr'
   // here so tapping it jumps straight into QR mode instead of the
@@ -54,7 +62,7 @@ function hasCameraSupport(): boolean {
   return typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia
 }
 
-export default function ScanButton({ context, onResult, disabled, label, icon, className, initialMode }: Props) {
+export default function ScanButton({ context, onResult, disabled, label, icon, className, description, iconChipClassName, initialMode }: Props) {
   const [localOpen, setLocalOpen] = useState(false)
   const cameraSupported = hasCameraSupport()
 
@@ -65,17 +73,54 @@ export default function ScanButton({ context, onResult, disabled, label, icon, c
 
   const isActive = localOpen
   const isDisabled = disabled || !cameraSupported
+  const title = !cameraSupported
+    ? 'No camera available on this device'
+    : isActive ? 'Click to cancel scan' : (label ?? 'Scan medicine with camera')
+
+  if (description) {
+    // Two-line layout: icon chip + bold label + grey description
+    // underneath — same click handler/scanner below, just a richer
+    // button face for contexts with room for it (see UnifiedProductInput's
+    // mobile/tablet scan-button row).
+    return (
+      <>
+        <button
+          onClick={handleClick}
+          disabled={isDisabled}
+          title={title}
+          className={[
+            className ?? 'inline-flex items-center gap-2.5 px-3 py-2 rounded-xl border transition-all bg-white border-slate-200',
+            isDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer',
+          ].filter(Boolean).join(' ')}
+        >
+          <span className={iconChipClassName ?? 'flex items-center justify-center w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex-shrink-0'}>
+            {icon ?? <ScanLine size={15} />}
+          </span>
+          <span className="flex flex-col items-start text-left min-w-0">
+            <span className="text-[13px] font-bold leading-tight truncate w-full">{label ?? 'Scan Medicine'}</span>
+            <span className="text-[11px] font-normal text-slate-400 leading-tight truncate w-full">{description}</span>
+          </span>
+        </button>
+
+        <Suspense fallback={null}>
+          <LocalScannerView
+            open={localOpen}
+            context={context}
+            onResult={onResult}
+            onClose={() => setLocalOpen(false)}
+            initialMode={initialMode}
+          />
+        </Suspense>
+      </>
+    )
+  }
 
   return (
     <>
       <button
         onClick={handleClick}
         disabled={isDisabled}
-        title={
-          !cameraSupported
-            ? 'No camera available on this device'
-            : isActive ? 'Click to cancel scan' : (label ?? 'Scan medicine with camera')
-        }
+        title={title}
         className={[
           className ??
             'inline-flex items-center gap-1.5 px-3 h-8 rounded-lg border text-xs font-semibold transition-all bg-white text-slate-600 border-slate-200 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50',

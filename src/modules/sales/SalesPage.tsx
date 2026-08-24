@@ -21,7 +21,7 @@ import {
   CalendarDays, CreditCard, User, MapPin, Hash,
   Phone as PhoneIcon, ChevronDown, AlertCircle,
   CheckCircle2, RotateCcw, Save, Plus, UserPlus,
-  Pill, ArrowLeft, HelpCircle, Info, Gift,
+  ArrowLeft, HelpCircle, Trash2,
 } from 'lucide-react'
 import { salesAPI, partiesAPI, productsAPI } from '@/services/api'
 import { useOffline } from '@/offline/OfflineProvider'
@@ -37,7 +37,7 @@ import TransactionSuccessAlert, { type TransactionSuccessInfo } from '@/componen
 import InvoiceRowsTable, { newRow, type InvoiceRow, type InvoiceRowsTableHandle } from '@/components/forms/InvoiceRowsTable'
 import ProductSearchCell from '@/components/forms/ProductSearchCell'
 import BatchSelect from '@/components/forms/BatchSelect'
-import QtyStepper from '@/components/forms/QtyStepper'
+import QtyGate from '@/components/forms/QtyGate'
 import QuickAddPartyModal from '@/components/forms/QuickAddPartyModal'
 import { fmt, calcRowAmount } from '@/utils'
 import { formatDisplayDate } from '@/utils/dateSystem'
@@ -961,8 +961,26 @@ export default function SalesPage() {
               />
             </div>
 
-            {/* Mobile product cards — hidden on desktop/tablet */}
-            <div className="pos-mobile-items">
+            {/* Mobile/tablet Invoice Items — compact table (header row +
+                one line per product): PRODUCT (with C.C% underneath) |
+                QTY | BONUS | RATE | AMOUNT | ACTION. C.C% lives under the
+                product name instead of its own column so Product gets
+                the rest of the row's width and nothing has to shrink
+                below a legible/tappable size to fit narrow phones.
+                Hidden on desktop/tablet ≥1200px (see pos-mobile-items'
+                display rules in globals.css). */}
+            <div className="pos-mobile-items pmic-table">
+              {rows.length > 0 && (
+                <div className="pmic-thead" aria-hidden="true">
+                  <div className="pmic-th pmic-th-product">Product</div>
+                  <div className="pmic-th">Qty</div>
+                  <div className="pmic-th">Bonus</div>
+                  <div className="pmic-th">Rate</div>
+                  <div className="pmic-th">Amount</div>
+                  <div className="pmic-th pmic-th-action">Action</div>
+                </div>
+              )}
+
               {rows.map((row, idx) => {
                 const updateRow = (patch: Partial<InvoiceRow>) =>
                   setRows(prev => prev.map((r, i) => i === idx ? { ...r, ...patch } : r))
@@ -979,136 +997,131 @@ export default function SalesPage() {
                 }
 
                 return (
-                  <div key={idx} className="pmic" onFocusCapture={scrollFocusedIntoView}>
-
-                    {/* ── Top row: "Product" / "C.C %" labels ── */}
-                    <div className="pmic-top-row">
-                      <div className="pmic-product-label">Product</div>
-                      <div className="pmic-cc-label">
-                        C.C % <Info size={10} className="pmic-field-info" aria-hidden="true" />
-                      </div>
-                    </div>
-
-                    {/* ── Product search + remove + C.C % — one row ── */}
-                    <div className="pmic-row-with-thumb">
-                      <div className="pmic-thumb" aria-hidden="true"><Pill size={16} /></div>
-                      <div className="pmic-psc-wrap">
-                        <ProductSearchCell
-                          value={row.product_id}
-                          products={products}
-                          onChange={p => {
-                            const { amount, cc_amount } = reCalc({ rate: Number(p.sales_rate) })
-                            // batch_no/expiry cleared: they belonged to whatever
-                            // product was previously in this row, if any.
-                            updateRow({ product_id: p.id, product_name: p.name, rate: p.sales_rate, amount, cc_amount, batch_no: '', expiry: '' })
-                            // Keep `products` in sync with whatever the live search
-                            // just resolved — same merge every other product-
-                            // resolution path in this file already does (camera
-                            // scanner, barcode input, quick-create below). Without
-                            // it, a product outside the initial 500-item snapshot
-                            // (e.g. anything alphabetically past it, most visibly
-                            // "Z..." names) selects correctly but company-scope/
-                            // product-scope discount grouping (discountUtils.ts's
-                            // rowCompanyName, which looks products up in this same
-                            // array) silently falls back to "Unassigned" for it.
-                            setProducts(prev => prev.some(x => x.id === p.id) ? prev : [...prev, p])
-                          }}
-                          onCreated={p => setProducts(prev => prev.some(x => x.id === p.id) ? prev : [...prev, p])}
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        className="pmic-remove-inline"
-                        onClick={() => setRows(prev => prev.filter((_, i) => i !== idx))}
-                        aria-label="Remove item"
-                      >
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                          <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-                        </svg>
-                      </button>
-                      <input
-                        type="number" inputMode="decimal" min={0} step="0.01"
-                        className="pmic-cc-input"
-                        aria-label="C.C %"
-                        value={row.cc_pct === 0 ? '' : row.cc_pct}
-                        placeholder="0"
-                        onChange={e => {
-                          const cc_pct = e.target.value === '' ? 0 : Number(e.target.value)
-                          updateRow({ cc_pct, ...reCalc({ cc_pct }) })
+                  <div key={idx} className="pmic-row2" onFocusCapture={scrollFocusedIntoView}>
+                    <div className="pmic-row2-product">
+                      <ProductSearchCell
+                        value={row.product_id}
+                        products={products}
+                        onChange={p => {
+                          const { amount, cc_amount } = reCalc({ rate: Number(p.sales_rate) })
+                          // batch_no/expiry cleared: they belonged to whatever
+                          // product was previously in this row, if any.
+                          updateRow({ product_id: p.id, product_name: p.name, rate: p.sales_rate, amount, cc_amount, batch_no: '', expiry: '' })
+                          // Keep `products` in sync with whatever the live search
+                          // just resolved — same merge every other product-
+                          // resolution path in this file already does (camera
+                          // scanner, barcode input, quick-create below). Without
+                          // it, a product outside the initial 500-item snapshot
+                          // (e.g. anything alphabetically past it, most visibly
+                          // "Z..." names) selects correctly but company-scope/
+                          // product-scope discount grouping (discountUtils.ts's
+                          // rowCompanyName, which looks products up in this same
+                          // array) silently falls back to "Unassigned" for it.
+                          setProducts(prev => prev.some(x => x.id === p.id) ? prev : [...prev, p])
                         }}
+                        onCreated={p => setProducts(prev => prev.some(x => x.id === p.id) ? prev : [...prev, p])}
                       />
-                    </div>
 
-                    {/* Batch/Expiry have no visible field on this compact
-                        card — BatchSelect stays mounted (hideTrigger) purely
-                        to drive its own existing auto-open-the-popup-on-
-                        product-select behavior (see BatchSelect.tsx), so
-                        selection still happens through that exact same
-                        popup, just without a tappable field to trigger it
-                        manually here. */}
-                    <div className="pmic-batch-hidden">
-                      <BatchSelect
-                        productId={row.product_id}
-                        productName={row.product_name}
-                        value={row.batch_no}
-                        onSelect={batch => updateRow({
-                          batch_no: batch.batch_no || '',
-                          expiry:   batch.expiry_date || batch.expiry || '',
-                        })}
-                        hideTrigger
-                        // Same barcode/QR-scanned-row behavior the desktop
-                        // table already has (see InvoiceRowsTable.tsx) —
-                        // this was missing here, so a scanned product with
-                        // exactly one batch still opened the popup on
-                        // mobile instead of auto-selecting it. `_scanned`
-                        // is set by handleProductSelected
-                        // above when the row was added via a scan rather
-                        // than manual product search.
-                        autoSelectSingle={!!row._scanned}
-                        onAutoResolved={row._scanned ? () => unifiedInputRef.current?.focus() : undefined}
-                      />
-                    </div>
-
-                    {/* ── Qty · Bonus · Rate · Amount — one row ── */}
-                    <div className="pmic-fields-4">
-                      <div className="pmic-field">
-                        <label>Qty</label>
-                        <QtyStepper
-                          productId={row.product_id}
-                          value={row.qty}
-                          onChange={qty => updateRow({ qty, ...reCalc({ qty }) })}
-                        />
-                      </div>
-                      <div className="pmic-field">
-                        <label>Bonus</label>
-                        <input
-                          type="number" inputMode="numeric" min={0} step="1"
-                          className="pmic-bonus-input"
-                          value={row.bonus === 0 ? '' : row.bonus}
-                          placeholder="0"
-                          onChange={e => {
-                            const bonus = e.target.value === '' ? 0 : Number(e.target.value)
-                            updateRow({ bonus, ...reCalc({ bonus }) })
-                          }}
-                        />
-                      </div>
-                      <div className="pmic-field">
-                        <label>Rate</label>
+                      {/* C.C% — small, under the product name rather than
+                          its own column (see block comment above). Still
+                          the exact same value/onChange/reCalc as before,
+                          just relocated. */}
+                      <div className="pmic-row2-cc-wrap">
+                        <span className="pmic-row2-cc-label">CC%</span>
                         <input
                           type="number" inputMode="decimal" min={0} step="0.01"
-                          value={row.rate === 0 ? '' : row.rate}
-                          placeholder="0.00"
+                          className="pmic-row2-cc-input"
+                          aria-label="C.C %"
+                          value={row.cc_pct === 0 ? '' : row.cc_pct}
+                          placeholder="0"
                           onChange={e => {
-                            const rate = e.target.value === '' ? 0 : Number(e.target.value)
-                            updateRow({ rate, ...reCalc({ rate }) })
+                            const cc_pct = e.target.value === '' ? 0 : Number(e.target.value)
+                            updateRow({ cc_pct, ...reCalc({ cc_pct }) })
                           }}
                         />
                       </div>
-                      <div className="pmic-field">
-                        <label>Amount</label>
-                        <div className="pmic-amount-readout">{fmt(row.amount)}</div>
+
+                      {/* Batch/Expiry have no visible field on this compact
+                          row — BatchSelect stays mounted (hideTrigger) purely
+                          to drive its own existing auto-open-the-popup-on-
+                          product-select behavior (see BatchSelect.tsx), so
+                          selection still happens through that exact same
+                          popup, just without a tappable field to trigger it
+                          manually here. */}
+                      <div className="pmic-batch-hidden">
+                        <BatchSelect
+                          productId={row.product_id}
+                          productName={row.product_name}
+                          value={row.batch_no}
+                          onSelect={batch => updateRow({
+                            batch_no: batch.batch_no || '',
+                            expiry:   batch.expiry_date || batch.expiry || '',
+                          })}
+                          hideTrigger
+                          // Same barcode/QR-scanned-row behavior the desktop
+                          // table already has (see InvoiceRowsTable.tsx) —
+                          // this was missing here, so a scanned product with
+                          // exactly one batch still opened the popup on
+                          // mobile instead of auto-selecting it. `_scanned`
+                          // is set by handleProductSelected above when the
+                          // row was added via a scan rather than manual
+                          // product search.
+                          autoSelectSingle={!!row._scanned}
+                          onAutoResolved={row._scanned ? () => unifiedInputRef.current?.focus() : undefined}
+                        />
                       </div>
                     </div>
+
+                    {/* Qty — QtyGate directly (skips QtyStepper's ±
+                        buttons) so this reads as the same plain boxed
+                        number field as Bonus/Rate below. Same
+                        validation/disable-when-no-batches logic as
+                        everywhere else Quantity appears — QtyGate itself
+                        is the shared piece, nothing duplicated here. */}
+                    <QtyGate
+                      productId={row.product_id}
+                      value={row.qty === 0 ? '' : row.qty}
+                      className="pmic-row2-input"
+                      onChange={v => {
+                        const qty = v === '' ? 0 : v
+                        updateRow({ qty, ...reCalc({ qty }) })
+                      }}
+                    />
+
+                    <input
+                      type="number" inputMode="numeric" min={0} step="1"
+                      className="pmic-row2-input"
+                      aria-label="Bonus"
+                      value={row.bonus === 0 ? '' : row.bonus}
+                      placeholder="0"
+                      onChange={e => {
+                        const bonus = e.target.value === '' ? 0 : Number(e.target.value)
+                        updateRow({ bonus, ...reCalc({ bonus }) })
+                      }}
+                    />
+
+                    <input
+                      type="number" inputMode="decimal" min={0} step="0.01"
+                      className="pmic-row2-input"
+                      aria-label="Rate"
+                      value={row.rate === 0 ? '' : row.rate}
+                      placeholder="0.00"
+                      onChange={e => {
+                        const rate = e.target.value === '' ? 0 : Number(e.target.value)
+                        updateRow({ rate, ...reCalc({ rate }) })
+                      }}
+                    />
+
+                    <div className="pmic-row2-amount">{fmt(row.amount)}</div>
+
+                    <button
+                      type="button"
+                      className="pmic-row2-remove"
+                      onClick={() => setRows(prev => prev.filter((_, i) => i !== idx))}
+                      aria-label="Remove item"
+                    >
+                      <Trash2 size={14} />
+                    </button>
                   </div>
                 )
               })}
