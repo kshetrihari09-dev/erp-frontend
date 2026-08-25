@@ -90,26 +90,30 @@ function scannedToProduct(s: ScannedProduct | (FuzzyResult & { current_stock?: n
 
 export interface UnifiedProductInputHandle {
   focus: () => void
-  /** Refocuses the field WITHOUT popping the on-screen keyboard, on
-   *  touch-only devices (`pointer: coarse` — a real keyboard, i.e.
-   *  desktop/laptop, behaves identically to focus() either way).
-   *
-   *  Used for the "hand focus back to this field so scanning can
-   *  continue" call sites (see SalesPage.tsx's BatchSelect
-   *  `onAutoResolved`) that fire automatically the instant a scan
-   *  finishes resolving — including finishing batch selection for a
-   *  scanned row — with no tap from the user at all. A plain focus()
-   *  there was silently triggering the mobile keyboard after every
-   *  single scan, covering the screen mid-workflow.
-   *
-   *  Implementation: briefly marks the input readOnly while focusing it
-   *  (a standard technique — most mobile browsers skip showing the
-   *  keyboard for a readOnly field) then removes readOnly ~150ms later,
-   *  well before a human can re-aim and trigger the next scan. The
-   *  field stays focused throughout, so a hardware/Bluetooth scanner —
-   *  which "types" into whatever's focused — keeps working exactly as
-   *  before; only the OS's own virtual keyboard is suppressed. */
+  /** Refocuses the field only on desktop-capable devices (see
+   *  `canUseDesktopAutoFocus` below) — a no-op everywhere else. Used for
+   *  the "hand focus back to this field so scanning can continue" call
+   *  sites (see SalesPage.tsx's BatchSelect `onAutoResolved`, and the
+   *  post-scan refocuses in handleProductSelected) that fire
+   *  automatically the instant a scan finishes resolving, with no tap
+   *  from the user at all. A plain focus() there was silently
+   *  triggering the mobile/tablet on-screen keyboard after every single
+   *  scan, covering the screen mid-workflow — see `finish()` below for
+   *  the same fix applied to this component's own internal refocus. */
   focusSilently: () => void
+}
+
+/** Desktop-capable = has a mouse (fine pointer) that can hover, which a
+ *  touch-only phone or tablet does not — this is what actually
+ *  determines whether programmatically focusing an input will pop the
+ *  OS's on-screen keyboard, not screen width (a docked/external-keyboard
+ *  tablet is rare enough, and detecting it wrong just means one extra
+ *  manual tap, vs. width-based detection getting a mid-size touch
+ *  tablet wrong and popping the keyboard anyway). */
+function canUseDesktopAutoFocus(): boolean {
+  return typeof window !== 'undefined'
+    && typeof window.matchMedia === 'function'
+    && window.matchMedia('(hover: hover) and (pointer: fine)').matches
 }
 
 interface Props {
@@ -124,6 +128,11 @@ interface Props {
   /** 403 QR_ACCOUNT_MISMATCH from a camera QR scan or manual code entry. */
   onAccountMismatch?: (message: string) => void
   placeholder?: string
+  /** Only actually focuses on desktop-capable devices (see
+   *  canUseDesktopAutoFocus) — on mobile/tablet this is a no-op, so the
+   *  page's initial "focus the scan field on load" doesn't pop the
+   *  keyboard the instant a phone/tablet opens the Sale page. Manually
+   *  tapping the field still opens the keyboard normally either way. */
   autoFocus?: boolean
   className?: string
 }
@@ -153,19 +162,13 @@ const UnifiedProductInput = forwardRef<UnifiedProductInputHandle, Props>(functio
   useImperativeHandle(ref, () => ({
     focus: () => inputRef.current?.focus(),
     focusSilently: () => {
-      const el = inputRef.current
-      if (!el) return
-      const isTouchOnly = typeof window !== 'undefined'
-        && typeof window.matchMedia === 'function'
-        && window.matchMedia('(pointer: coarse)').matches
-      if (!isTouchOnly) { el.focus(); return }
-      el.readOnly = true
-      el.focus()
-      window.setTimeout(() => { el.readOnly = false }, 150)
+      if (canUseDesktopAutoFocus()) inputRef.current?.focus()
     },
   }))
 
-  useEffect(() => { if (autoFocus) inputRef.current?.focus() }, [autoFocus])
+  useEffect(() => {
+    if (autoFocus && canUseDesktopAutoFocus()) inputRef.current?.focus()
+  }, [autoFocus])
 
   /* ── Close dropdown on outside click ──────────────────────────────────── */
   useEffect(() => {
@@ -225,7 +228,15 @@ const UnifiedProductInput = forwardRef<UnifiedProductInputHandle, Props>(functio
     setResults([])
     setOpen(false)
     setHL(0)
-    requestAnimationFrame(() => inputRef.current?.focus())
+    // Fires after EVERY resolution — including camera barcode/QR scans,
+    // which finish with zero tap from the user. Refocusing unconditionally
+    // here is exactly what was popping the on-screen keyboard right after
+    // a successful mobile/tablet scan; only re-arm the field automatically
+    // on desktop-capable devices. Mobile/tablet users can still tap the
+    // field themselves to search or scan again.
+    if (canUseDesktopAutoFocus()) {
+      requestAnimationFrame(() => { inputRef.current?.focus() })
+    }
   }
 
   /** One exact code lookup — used for both "user picked a search
