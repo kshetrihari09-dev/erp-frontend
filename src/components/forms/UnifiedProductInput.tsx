@@ -90,6 +90,26 @@ function scannedToProduct(s: ScannedProduct | (FuzzyResult & { current_stock?: n
 
 export interface UnifiedProductInputHandle {
   focus: () => void
+  /** Refocuses the field WITHOUT popping the on-screen keyboard, on
+   *  touch-only devices (`pointer: coarse` — a real keyboard, i.e.
+   *  desktop/laptop, behaves identically to focus() either way).
+   *
+   *  Used for the "hand focus back to this field so scanning can
+   *  continue" call sites (see SalesPage.tsx's BatchSelect
+   *  `onAutoResolved`) that fire automatically the instant a scan
+   *  finishes resolving — including finishing batch selection for a
+   *  scanned row — with no tap from the user at all. A plain focus()
+   *  there was silently triggering the mobile keyboard after every
+   *  single scan, covering the screen mid-workflow.
+   *
+   *  Implementation: briefly marks the input readOnly while focusing it
+   *  (a standard technique — most mobile browsers skip showing the
+   *  keyboard for a readOnly field) then removes readOnly ~150ms later,
+   *  well before a human can re-aim and trigger the next scan. The
+   *  field stays focused throughout, so a hardware/Bluetooth scanner —
+   *  which "types" into whatever's focused — keeps working exactly as
+   *  before; only the OS's own virtual keyboard is suppressed. */
+  focusSilently: () => void
 }
 
 interface Props {
@@ -130,7 +150,20 @@ const UnifiedProductInput = forwardRef<UnifiedProductInputHandle, Props>(functio
   // catalog (already a full Product — no extra lookup needed on pick).
   const resultsOnlineRef = useRef(true)
 
-  useImperativeHandle(ref, () => ({ focus: () => inputRef.current?.focus() }))
+  useImperativeHandle(ref, () => ({
+    focus: () => inputRef.current?.focus(),
+    focusSilently: () => {
+      const el = inputRef.current
+      if (!el) return
+      const isTouchOnly = typeof window !== 'undefined'
+        && typeof window.matchMedia === 'function'
+        && window.matchMedia('(pointer: coarse)').matches
+      if (!isTouchOnly) { el.focus(); return }
+      el.readOnly = true
+      el.focus()
+      window.setTimeout(() => { el.readOnly = false }, 150)
+    },
+  }))
 
   useEffect(() => { if (autoFocus) inputRef.current?.focus() }, [autoFocus])
 

@@ -253,8 +253,11 @@ export default function SalesPage() {
       setProducts(prev => prev.some(x => x.id === p.id) ? prev : [...prev, p])
       flashRow(next[existingIdx]._id)
       // Existing row already has its batch resolved — nothing further to
-      // wait on, so return focus to the entry field right away.
-      requestAnimationFrame(() => unifiedInputRef.current?.focus())
+      // wait on, so return focus to the entry field right away. Silent
+      // on touch devices — see UnifiedProductInputHandle.focusSilently's
+      // doc comment — since this fires automatically after every re-scan
+      // of an already-added product, with no tap from the user at all.
+      requestAnimationFrame(() => unifiedInputRef.current?.focusSilently())
       return
     }
 
@@ -286,8 +289,9 @@ export default function SalesPage() {
     // never opens a popup or calls onAutoResolved at all. For the 1- or
     // 2+-batch cases, BatchSelect's own popup (which auto-focuses itself)
     // or its onAutoResolved callback takes over a moment later — see
-    // BatchSelect.tsx.
-    requestAnimationFrame(() => unifiedInputRef.current?.focus())
+    // BatchSelect.tsx. Silent on touch devices for the same reason as
+    // the existing-row branch above — this also fires with no user tap.
+    requestAnimationFrame(() => unifiedInputRef.current?.focusSilently())
   }, [rows])
 
   const handleProductNotFound = useCallback((code: string) => {
@@ -1094,7 +1098,7 @@ export default function SalesPage() {
                           // row was added via a scan rather than manual
                           // product search.
                           autoSelectSingle={!!row._scanned}
-                          onAutoResolved={row._scanned ? () => unifiedInputRef.current?.focus() : undefined}
+                          onAutoResolved={row._scanned ? () => unifiedInputRef.current?.focusSilently() : undefined}
                         />
                       </div>
                     </div>
