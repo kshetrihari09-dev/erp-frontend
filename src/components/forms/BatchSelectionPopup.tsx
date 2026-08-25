@@ -49,10 +49,27 @@ interface Props {
   selectedBatchNo?: string
   onSelect:         (batch: StockBatch) => void
   onClose:          () => void
+  /** Barcode/QR-scanned rows only (see BatchSelect's `autoSelectSingle`,
+   *  itself driven by InvoiceRowsTable's `_scanned` flag). This popup can
+   *  auto-open the instant a scan resolves 2+ batches — with no tap from
+   *  the user at all — and unconditionally focusing the search input on
+   *  every open (see below) meant that auto-open also silently triggered
+   *  the on-screen keyboard on phones/tablets, covering half the popup
+   *  and derailing continuous scanning for something the user never
+   *  asked to type into. When true AND the device is actually touch-only
+   *  (`pointer: coarse` — a real keyboard, i.e. desktop/laptop, is
+   *  unaffected either way), the initial auto-focus is skipped; arrow
+   *  keys/Enter/Tab, tap-to-highlight, and double-tap-to-select all keep
+   *  working exactly as before, and tapping the search box still opens
+   *  the keyboard on demand like any normal input. Default false/
+   *  undefined: every existing manually-triggered popup (clicking the
+   *  Batch trigger, Purchase's "browse existing" button) keeps
+   *  auto-focusing the search box exactly as it always has. */
+  avoidAutoFocus?:  boolean
 }
 
 export default function BatchSelectionPopup({
-  open, productName, batches, selectedBatchNo, onSelect, onClose,
+  open, productName, batches, selectedBatchNo, onSelect, onClose, avoidAutoFocus,
 }: Props) {
   const [query, setQuery] = useState('')
   const [hl,    setHL]    = useState(0)
@@ -103,7 +120,17 @@ export default function BatchSelectionPopup({
       ? recommendedIdx
       : batches.findIndex(b => !isExpired(b) && Number(b.qty_available) > 0)
     setHL(idx >= 0 ? idx : 0)
-    requestAnimationFrame(() => inputRef.current?.focus())
+    requestAnimationFrame(() => {
+      // Skip only for the scanned+touch case described in the
+      // `avoidAutoFocus` prop doc above — everything else (mouse/keyboard
+      // desktops, and every manually-triggered open regardless of device)
+      // keeps focusing the search box exactly as before.
+      const isTouchOnly = typeof window !== 'undefined'
+        && typeof window.matchMedia === 'function'
+        && window.matchMedia('(pointer: coarse)').matches
+      if (avoidAutoFocus && isTouchOnly) return
+      inputRef.current?.focus()
+    })
   }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {

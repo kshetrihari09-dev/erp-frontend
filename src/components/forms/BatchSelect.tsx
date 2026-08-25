@@ -297,6 +297,12 @@ export default function BatchSelect({
         selectedBatchNo={value}
         onSelect={resolve}
         onClose={() => setPopupOpen(false)}
+        // See BatchSelectionPopup's `avoidAutoFocus` doc comment: only
+        // scanned rows (autoSelectSingle truthy) skip the search box's
+        // auto-focus, and only on touch devices — this is the popup that
+        // can auto-open mid-scan with zero user tap, so it's the only
+        // one that needs it.
+        avoidAutoFocus={!!autoSelectSingle}
       />
     </div>
   )
