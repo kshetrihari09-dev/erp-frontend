@@ -4,8 +4,8 @@ import { useForm } from 'react-hook-form'
 import type { UseFormRegister, FieldErrors } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Plus, Package, ScanLine, Boxes, Download, Upload, Printer, QrCode, Filter, Pencil, Trash2 } from 'lucide-react'
-import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct, useProductOpeningBatches, useAddOpeningInventory, useNextBarcode } from '@/hooks/useQuery'
-import { Button, Modal, Badge, Pagination, SkeletonRows, Empty, SearchInput, ConfirmDialog } from '@/components/ui'
+import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct, useProductOpeningBatches, useAddOpeningInventory, useNextBarcode, useSuppliers } from '@/hooks/useQuery'
+import { Button, Modal, Badge, Pagination, SkeletonRows, Empty, SearchInput, ConfirmDialog, Select, ToggleSwitch } from '@/components/ui'
 import ManufacturerSelect from '@/components/forms/ManufacturerSelect'
 import ExportProductsModal from './ExportProductsModal'
 import ImportProductsModal from './ImportProductsModal'
@@ -197,6 +197,93 @@ function Field({ label, name, type = 'text', register, errors, ...rest }: {
   )
 }
 
+// ── Inventory Planning (Smart Purchase Suggestions) ─────────────────────────
+// Deliberately kept OUTSIDE the shared react-hook-form `productSchema` (used
+// by both this form and Quick Add) so this optional section can't affect
+// Quick Add's simpler flow or its validation rules. State here is applied
+// via a plain PATCH after create/update — same "non-fatal follow-up" pattern
+// already used for opening stock in productCreation.ts.
+export interface PlanningState {
+  preferred_supplier_id: string
+  supplier_lead_time_days: string
+  safety_stock_qty: string
+  safety_stock_days: string
+  reorder_point_override: string
+  exclude_from_suggestions: boolean
+}
+
+function emptyPlanning(p?: Product | null): PlanningState {
+  return {
+    preferred_supplier_id:   p?.preferred_supplier_id || '',
+    supplier_lead_time_days: p?.supplier_lead_time_days != null ? String(p.supplier_lead_time_days) : '',
+    safety_stock_qty:        p?.safety_stock_qty != null ? String(p.safety_stock_qty) : '',
+    safety_stock_days:       p?.safety_stock_days != null ? String(p.safety_stock_days) : '',
+    reorder_point_override:  p?.reorder_point_override != null ? String(p.reorder_point_override) : '',
+    exclude_from_suggestions: !!p?.exclude_from_suggestions,
+  }
+}
+
+/** Converts the form's string state into the payload shape products.js expects (numbers or null to clear). */
+function planningToPayload(s: PlanningState) {
+  const num = (v: string) => (v === '' ? null : Number(v))
+  return {
+    preferred_supplier_id:   s.preferred_supplier_id || null,
+    supplier_lead_time_days: num(s.supplier_lead_time_days),
+    safety_stock_qty:        num(s.safety_stock_qty),
+    safety_stock_days:       num(s.safety_stock_days),
+    reorder_point_override:  num(s.reorder_point_override),
+    exclude_from_suggestions: s.exclude_from_suggestions,
+  }
+}
+
+function InventoryPlanningSection({ value, onChange }: { value: PlanningState; onChange: (v: PlanningState) => void }) {
+  const { data: suppliersData } = useSuppliers({ limit: 200 })
+  const suppliers = (suppliersData?.data as any[]) || []
+  const set = (k: keyof PlanningState, v: any) => onChange({ ...value, [k]: v })
+
+  return (
+    <div className="mt-5 pt-4 border-t border-[var(--border)]">
+      <div className="flex items-center gap-1.5 mb-3 text-xs font-bold uppercase tracking-wide text-[var(--text-3)]">
+        <Boxes size={13} className="text-brand" />
+        Inventory Planning <span className="normal-case font-medium text-[var(--text-4)]">(optional — used by Smart Purchase Suggestions)</span>
+      </div>
+      <div className="form-grid col3">
+        <Select
+          label="Preferred Supplier"
+          value={value.preferred_supplier_id}
+          onChange={(e) => set('preferred_supplier_id', e.target.value)}
+          placeholder="Select Supplier"
+          options={suppliers.map((s: any) => ({ value: s.id, label: s.name }))}
+        />
+        <div>
+          <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">Supplier Lead Time (days)</label>
+          <input type="number" min={0} className="erp-input" placeholder="Company default"
+            value={value.supplier_lead_time_days} onChange={(e) => set('supplier_lead_time_days', e.target.value)} />
+        </div>
+        <div>
+          <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">Reorder Point <span className="normal-case font-medium text-[var(--text-4)]">(blank = auto)</span></label>
+          <input type="number" min={0} className="erp-input" placeholder="Auto Calculate"
+            value={value.reorder_point_override} onChange={(e) => set('reorder_point_override', e.target.value)} />
+        </div>
+        <div>
+          <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">Safety Stock (units)</label>
+          <input type="number" min={0} className="erp-input" placeholder="Auto from days below"
+            value={value.safety_stock_qty} onChange={(e) => set('safety_stock_qty', e.target.value)} />
+        </div>
+        <div>
+          <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">OR Safety Stock (days)</label>
+          <input type="number" min={0} className="erp-input" placeholder="Company default"
+            value={value.safety_stock_days} onChange={(e) => set('safety_stock_days', e.target.value)}
+            disabled={value.safety_stock_qty !== ''} />
+        </div>
+        <div className="flex items-end pb-1.5">
+          <ToggleSwitch checked={value.exclude_from_suggestions} onChange={(v) => set('exclude_from_suggestions', v)} label="Exclude from Smart Purchase Suggestions" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function ProductForm({ initial, onClose }: { initial?: Product | null; onClose: () => void }) {
   const create = useCreateProduct()
   const update = useUpdateProduct()
@@ -223,6 +310,7 @@ function ProductForm({ initial, onClose }: { initial?: Product | null; onClose: 
 
   const [scanOpen, setScanOpen]   = useState(false)
   const [scanBanner, setScanBanner] = useState<string | null>(null)
+  const [planning, setPlanning] = useState<PlanningState>(() => emptyPlanning(initial))
 
   // Create Product only: pre-fetch the next auto-generated barcode (same
   // global product_auto_barcode_seq / nextAutoBarcode() the backend already
@@ -256,9 +344,17 @@ function ProductForm({ initial, onClose }: { initial?: Product | null; onClose: 
     if (initial) {
       // Editing never touches opening stock — that's a "new product" concept.
       const { opening_stock, opening_batch, opening_expiry, ...editable } = data as any
-      await update.mutateAsync({ id: initial.id, data: editable })
+      await update.mutateAsync({ id: initial.id, data: { ...editable, ...planningToPayload(planning) } })
     } else {
-      await create.mutateAsync(data)
+      const newProduct = await create.mutateAsync(data)
+      // Inventory Planning is optional and applied as a non-fatal follow-up
+      // PATCH, same pattern as opening-stock — the product is still
+      // created successfully even if this secondary call fails.
+      const payload = planningToPayload(planning)
+      const hasAnyPlanning = Object.values(payload).some(v => v !== null && v !== false)
+      if (hasAnyPlanning) {
+        try { await update.mutateAsync({ id: newProduct.id, data: payload as any }) } catch { /* non-fatal */ }
+      }
     }
     onClose()
   })
@@ -368,6 +464,8 @@ function ProductForm({ initial, onClose }: { initial?: Product | null; onClose: 
       ) : (
         <OpeningInventorySection productId={initial.id} />
       )}
+
+      <InventoryPlanningSection value={planning} onChange={setPlanning} />
 
       <div className="flex justify-end gap-2 mt-5 pt-4 border-t border-[var(--border)]">
         <Button variant="secondary" onClick={onClose}>Cancel</Button>

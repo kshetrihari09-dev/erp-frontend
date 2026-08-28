@@ -3,7 +3,9 @@ import type { ApiResponse, Company, User, Sale, SaleItem, Purchase, PurchaseItem
   Product, Party, Account, AccountDefault, Voucher, VoucherLine,
   VoucherPosting, PostingStatus, DashboardStats, PnLReport,
   TrialBalanceRow, LedgerEntry, StockBatch, OpeningInventoryBatch, InvoiceTemplate, FiscalYear, AuditLog,
-  CompanyPreferences, Backup, AccountLedgerResponse, UserCompany } from '@/types'
+  CompanyPreferences, Backup, AccountLedgerResponse, UserCompany,
+  PurchaseSuggestion, PurchaseSuggestionSummary, PurchaseSuggestionSettings,
+  PurchaseOrder, PurchaseOrderItem } from '@/types'
 import type { ScannedProduct } from '@/types/scanner'
 
 type Params = Record<string, unknown>
@@ -188,7 +190,7 @@ export const purchasesAPI = {
   get:    (id: string)      => http.get<ApiResponse<Purchase>>(`/purchases/${id}`),
   create: (data: {
     party_id?: string; date_ad: string; payment_mode: string;
-    supplier_bill_no?: string; items: PurchaseItem[]
+    supplier_bill_no?: string; items: PurchaseItem[]; purchase_order_id?: string
   }) => http.post<ApiResponse<Purchase>>('/purchases', data),
   cancel: (id: string) => http.put(`/purchases/${id}/cancel`),
 }
@@ -221,6 +223,27 @@ export const stockAPI = {
   list:    (params?: Params) => http.get('/stock', { params }),
   batches: (params?: Params) => http.get<ApiResponse<StockBatch[]>>('/stock/batches', { params }),
   summary: ()                => http.get('/stock/summary'),
+}
+
+// ─── Smart Purchase Suggestions ─────────────────────────────────────────────────
+export const purchaseSuggestionsAPI = {
+  list:    (params?: Params) => http.get<ApiResponse<PurchaseSuggestion[]>>('/purchase-suggestions', { params }),
+  summary: (params?: Params) => http.get<ApiResponse<PurchaseSuggestionSummary>>('/purchase-suggestions/summary', { params }),
+  getSettings: () => http.get<ApiResponse<PurchaseSuggestionSettings>>('/purchase-suggestions/settings'),
+  updateSettings: (data: Partial<PurchaseSuggestionSettings>) =>
+    http.put<ApiResponse<PurchaseSuggestionSettings>>('/purchase-suggestions/settings', data),
+  createPurchaseOrders: (data: { items: { product_id: string; qty: number; rate?: number; supplier_id?: string }[] }) =>
+    http.post<ApiResponse<PurchaseOrder[]>>('/purchase-suggestions/create-purchase-orders', data),
+}
+
+// ─── Purchase Orders ─────────────────────────────────────────────────────────────
+export const purchaseOrdersAPI = {
+  list:    (params?: Params) => http.get<ApiResponse<PurchaseOrder[]>>('/purchase-orders', { params }),
+  get:     (id: string)      => http.get<ApiResponse<PurchaseOrder>>(`/purchase-orders/${id}`),
+  create:  (data: { supplier_id?: string; expected_date?: string; notes?: string; items: Partial<PurchaseOrderItem>[] }) =>
+    http.post<ApiResponse<PurchaseOrder>>('/purchase-orders', data),
+  approve: (id: string) => http.put<ApiResponse<PurchaseOrder>>(`/purchase-orders/${id}/approve`),
+  cancel:  (id: string) => http.put<ApiResponse<PurchaseOrder>>(`/purchase-orders/${id}/cancel`),
 }
 
 // ─── Parties ──────────────────────────────────────────────────────────────────

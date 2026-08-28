@@ -6,7 +6,7 @@ import {
   Users, Truck, BookOpen, BookCopy,
   FileBarChart, Settings, LogOut, Building2, CalendarDays, Moon,
   Sun, Menu, X, AlertTriangle, Bell, Search, ChevronRight, Home,
-  PackageX, CalendarClock,
+  PackageX, CalendarClock, Sparkles,
 } from 'lucide-react'
 import useAuthStore from '@/store/authStore'
 import useUIStore from '@/store/uiStore'
@@ -41,6 +41,7 @@ const NAV = [
 
   { section: 'INVENTORY' },
   { to: PATHS.PRODUCTS,   label: 'Products',       icon: <Package         size={20} strokeWidth={1.8}/>, alertKey: 'lowStock' },
+  { to: PATHS.PURCHASE_SUGGESTIONS, label: 'Smart Purchase Suggestions', icon: <Sparkles size={20} strokeWidth={1.8}/> },
 
   { section: 'ACCOUNTING' },
   { to: PATHS.ACCOUNTING,    label: 'Accounting',     icon: <BookOpen           size={20} strokeWidth={1.8}/> },
@@ -177,6 +178,7 @@ export default function AppLayout() {
     [PATHS.BARCODE_PRINT]: 'Barcode Print',
     [PATHS.QR_CODE_PRINT]: 'QR Code Print',
     [PATHS.STOCK]:      'Stock Report',
+    [PATHS.PURCHASE_SUGGESTIONS]: 'Smart Purchase Suggestions',
     [PATHS.CUSTOMERS]:  'Customers',
     [PATHS.SUPPLIERS]:  'Suppliers',
     [PATHS.ACCOUNTING]:    'Accounting',

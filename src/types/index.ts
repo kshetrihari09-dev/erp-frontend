@@ -185,6 +185,96 @@ export interface Product {
   current_stock: number
   is_active:     boolean
   created_at?:   string
+  // ── Inventory Planning (Smart Purchase Suggestions) — all optional,
+  // null/undefined means "use the company default" (see PurchaseSuggestionSettings).
+  preferred_supplier_id?:    string | null
+  supplier_lead_time_days?:  number | null
+  safety_stock_days?:        number | null
+  safety_stock_qty?:         number | null
+  reorder_point_override?:   number | null
+  exclude_from_suggestions?: boolean
+}
+
+// ─── Smart Purchase Suggestions ────────────────────────────────────────────────
+export type SuggestionStatus = 'critical' | 'low_stock' | 'reorder_recommended' | 'healthy' | 'no_sales_data'
+
+export interface PurchaseSuggestion {
+  product_id:               string
+  item_code:                string
+  name:                     string
+  category?:                string
+  unit:                     string
+  current_stock:            number
+  available_stock:          number
+  reserved_stock:           number
+  avg_daily_sales:          number
+  total_sold:               number
+  returned_qty:             number
+  lead_time_days:           number
+  lead_time_demand:         number
+  safety_stock:             number
+  reorder_point:            number
+  incoming_stock:           number
+  suggested_qty:            number
+  days_remaining:           number | null
+  status:                   SuggestionStatus
+  status_label:             string
+  preferred_supplier_id?:   string | null
+  preferred_supplier_name?: string | null
+  latest_purchase_price?:   number | null
+  estimated_value?:         number | null
+}
+
+export interface PurchaseSuggestionSummary {
+  products_to_purchase:  number
+  critical_products:     number
+  total_suggested_qty:   number
+  total_estimated_value: number
+  dateFrom?: string
+  dateTo?:   string
+  days?:     number
+}
+
+export interface PurchaseSuggestionSettings {
+  defaultPeriodDays:          number
+  includeZeroSalesProducts:   boolean
+  salesAnalysisMethod:        string
+  defaultLeadTimeDays:        number
+  safetyStockDays:            number
+  criticalStockDays:          number
+  lowStockDays:               number
+  considerIncomingPurchaseOrders: boolean
+  considerReservedStock:      boolean
+  useProductSpecificSettings: boolean
+}
+
+export type PurchaseOrderStatus = 'pending' | 'approved' | 'partially_received' | 'received' | 'cancelled'
+
+export interface PurchaseOrderItem {
+  id?:            string
+  product_id:     string | null
+  product_name:   string
+  qty_ordered:    number
+  qty_received:   number
+  rate:           number
+  amount:         number
+}
+
+export interface PurchaseOrder {
+  id:               string
+  company_id:       string
+  supplier_id?:     string | null
+  supplier_name?:   string | null
+  order_no:         string
+  order_date:       string
+  expected_date?:   string | null
+  source:           'manual' | 'suggestion'
+  status:           PurchaseOrderStatus
+  estimated_total:  number
+  notes?:           string | null
+  created_at:       string
+  items?:           PurchaseOrderItem[]
+  bills?:           { id: string; bill_no: string; date_ad: string; net_total: number; status: string }[]
 }
 
 /**

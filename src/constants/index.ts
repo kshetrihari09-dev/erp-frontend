@@ -114,6 +114,11 @@ export const QK = {
   POSTING_STATUS:   'posting-status',
   PREFERENCES:      'preferences',
   BACKUPS:          'backups',
+  PURCHASE_SUGGESTIONS:          'purchase-suggestions',
+  PURCHASE_SUGGESTIONS_SUMMARY:  'purchase-suggestions-summary',
+  PURCHASE_SUGGESTION_SETTINGS:  'purchase-suggestion-settings',
+  PURCHASE_ORDERS:               'purchase-orders',
+  PURCHASE_ORDER:                'purchase-order',
 } as const
 
 // ─── Routes / paths ───────────────────────────────────────────────────────────
@@ -130,6 +135,7 @@ export const PATHS = {
   QR_CODE_PRINT: '/qrcode-print',
   MANUFACTURERS: '/manufacturers',
   STOCK:      '/stock',
+  PURCHASE_SUGGESTIONS: '/purchase-suggestions',
   CUSTOMERS:  '/customers',
   SUPPLIERS:  '/suppliers',
   ACCOUNTING:    '/accounting',

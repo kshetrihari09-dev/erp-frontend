@@ -4,6 +4,7 @@ import { QK, DEFAULT_PAGE_SIZE } from '@/constants'
 import {
   productsAPI, salesAPI, purchasesAPI, partiesAPI, accountingAPI,
   reportsAPI, stockAPI, settingsAPI, returnsAPI, dateAPI, companiesAPI,
+  purchaseSuggestionsAPI, purchaseOrdersAPI,
 } from '@/services/api'
 import * as manufacturersService from '@/services/manufacturers'
 import type { ManufacturerInput } from '@/services/manufacturers'
@@ -339,6 +340,91 @@ export function useBatches(params?: Record<string, unknown>) {
   return useQuery({
     queryKey: [QK.BATCHES, params],
     queryFn:  () => stockAPI.batches(params).then(unwrap),
+  })
+}
+
+// ─── Smart Purchase Suggestions ─────────────────────────────────────────────────
+export function usePurchaseSuggestions(params?: Record<string, unknown>) {
+  return useQuery({
+    queryKey: [QK.PURCHASE_SUGGESTIONS, params],
+    queryFn:  () => purchaseSuggestionsAPI.list(params).then((res) => ({
+      data: res.data.data, pagination: (res.data as any).pagination,
+      summary: (res.data as any).summary, meta: (res.data as any).meta,
+    })),
+    placeholderData: keepPreviousData,
+  })
+}
+
+export function usePurchaseSuggestionSettings() {
+  return useQuery({
+    queryKey: [QK.PURCHASE_SUGGESTION_SETTINGS],
+    queryFn:  () => purchaseSuggestionsAPI.getSettings().then(unwrap),
+  })
+}
+
+export function useUpdatePurchaseSuggestionSettings() {
+  const qc = useQueryClient()
+  const { success, error } = useUIStore()
+  return useMutation({
+    mutationFn: purchaseSuggestionsAPI.updateSettings,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [QK.PURCHASE_SUGGESTION_SETTINGS] })
+      qc.invalidateQueries({ queryKey: [QK.PURCHASE_SUGGESTIONS] })
+      success('Settings saved')
+    },
+    onError: (e: { message: string }) => error('Failed to save settings', e.message),
+  })
+}
+
+export function useCreatePurchaseOrdersFromSuggestions() {
+  const qc = useQueryClient()
+  const { success, error } = useUIStore()
+  return useMutation({
+    mutationFn: purchaseSuggestionsAPI.createPurchaseOrders,
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: [QK.PURCHASE_SUGGESTIONS] })
+      qc.invalidateQueries({ queryKey: [QK.PURCHASE_ORDERS] })
+      const count = Array.isArray(res.data.data) ? res.data.data.length : 1
+      success(`${count} purchase order${count > 1 ? 's' : ''} created`)
+    },
+    onError: (e: { message: string }) => error('Failed to create purchase order', e.message),
+  })
+}
+
+// ─── Purchase Orders ─────────────────────────────────────────────────────────────
+export function usePurchaseOrders(params?: Record<string, unknown>) {
+  return useQuery({
+    queryKey: [QK.PURCHASE_ORDERS, params],
+    queryFn:  () => purchaseOrdersAPI.list(params).then(unwrapPaginated),
+    placeholderData: keepPreviousData,
+  })
+}
+
+export function usePurchaseOrder(id: string) {
+  return useQuery({
+    queryKey: [QK.PURCHASE_ORDER, id],
+    queryFn:  () => purchaseOrdersAPI.get(id).then(unwrap),
+    enabled:  !!id,
+  })
+}
+
+export function useApprovePurchaseOrder() {
+  const qc = useQueryClient()
+  const { success, error } = useUIStore()
+  return useMutation({
+    mutationFn: purchaseOrdersAPI.approve,
+    onSuccess: () => { qc.invalidateQueries({ queryKey: [QK.PURCHASE_ORDERS] }); success('Purchase order approved') },
+    onError:   (e: { message: string }) => error('Failed', e.message),
+  })
+}
+
+export function useCancelPurchaseOrder() {
+  const qc = useQueryClient()
+  const { success, error } = useUIStore()
+  return useMutation({
+    mutationFn: purchaseOrdersAPI.cancel,
+    onSuccess: () => { qc.invalidateQueries({ queryKey: [QK.PURCHASE_ORDERS] }); success('Purchase order cancelled') },
+    onError:   (e: { message: string }) => error('Failed', e.message),
   })
 }
 

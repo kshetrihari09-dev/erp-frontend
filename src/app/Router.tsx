@@ -19,6 +19,7 @@ const BarcodePrintPage = lazy(() => import('@/modules/inventory/BarcodePrintPage
 const QRCodePrintPage = lazy(() => import('@/modules/inventory/QRCodePrintPage'))
 const ManufacturersPage = lazy(() => import('@/modules/inventory/ManufacturersPage'))
 const StockPage    = lazy(() => import('@/modules/inventory/StockPage'))
+const PurchaseSuggestionsPage = lazy(() => import('@/modules/inventory/PurchaseSuggestionsPage'))
 const CustomersPage= lazy(() => import('@/modules/users/CustomersPage'))
 const SuppliersPage= lazy(() => import('@/modules/users/SuppliersPage'))
 const AccountingPage=lazy(() => import('@/modules/accounting/AccountingPage'))
@@ -65,6 +66,7 @@ export default function Router() {
             <Route path="manufacturers" element={<ManufacturersPage />} />
             <Route path="stock"        element={<StockPage />} />
             <Route path="stock-report" element={<StockPage />} />
+            <Route path="purchase-suggestions" element={<PurchaseSuggestionsPage />} />
 
             {/* Parties */}
             <Route path="customers"    element={<CustomersPage />} />

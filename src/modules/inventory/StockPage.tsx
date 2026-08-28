@@ -1,11 +1,14 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useStock, useBatches } from '@/hooks/useQuery'
-import { Tabs, StatCard, Pagination, SkeletonRows, Empty, SearchInput } from '@/components/ui'
+import { Tabs, StatCard, Pagination, SkeletonRows, Empty, SearchInput, Button } from '@/components/ui'
 import { useDebounce } from '@/hooks/useDebounce'
 import { fmt, fmtDate } from '@/utils'
-import { Package, AlertTriangle, DollarSign } from 'lucide-react'
+import { PATHS } from '@/constants'
+import { Package, AlertTriangle, DollarSign, Sparkles } from 'lucide-react'
 
 export default function StockPage() {
+  const navigate = useNavigate()
   const [tab, setTab]      = useState('overview')
   const [page, setPage]    = useState(1)
   const [searchRaw, setSearch] = useState('')
@@ -28,6 +31,19 @@ export default function StockPage() {
       <div className="page-header">
         <div><div className="page-breadcrumb">Inventory</div><h1 className="page-title">Stock Report</h1></div>
       </div>
+
+      {/* Surface Smart Purchase Suggestions here when it's actually relevant
+          (requirement #1: "accessible from the Inventory dashboard when
+          relevant") — i.e. only when there's something to act on. */}
+      {Number(summary.low_stock_count || 0) > 0 && (
+        <div className="flex items-center justify-between gap-3 bg-[var(--brand)]/10 border border-[var(--brand)]/30 rounded-xl px-4 py-3 mb-4">
+          <div className="flex items-center gap-2 text-sm text-[var(--text)]">
+            <Sparkles size={16} className="text-brand flex-shrink-0" />
+            <span><b>{summary.low_stock_count}</b> product{summary.low_stock_count > 1 ? 's are' : ' is'} running low. See what to reorder and how much.</span>
+          </div>
+          <Button variant="primary" size="sm" onClick={() => navigate(PATHS.PURCHASE_SUGGESTIONS)}>View Suggestions</Button>
+        </div>
+      )}
 
       {/* Summary stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
