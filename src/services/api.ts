@@ -5,7 +5,9 @@ import type { ApiResponse, Company, User, Sale, SaleItem, Purchase, PurchaseItem
   TrialBalanceRow, LedgerEntry, StockBatch, OpeningInventoryBatch, InvoiceTemplate, FiscalYear, AuditLog,
   CompanyPreferences, Backup, AccountLedgerResponse, UserCompany,
   PurchaseSuggestion, PurchaseSuggestionSummary, PurchaseSuggestionSettings,
-  PurchaseOrder, PurchaseOrderItem } from '@/types'
+  PurchaseOrder, PurchaseOrderItem,
+  CustomerCreditProfile, CreditRiskDashboard, CreditRiskHistoryEntry, CreditRiskSettings,
+  CreditRiskCheckResult, Approval } from '@/types'
 import type { ScannedProduct } from '@/types/scanner'
 
 type Params = Record<string, unknown>
@@ -244,6 +246,36 @@ export const purchaseOrdersAPI = {
     http.post<ApiResponse<PurchaseOrder>>('/purchase-orders', data),
   approve: (id: string) => http.put<ApiResponse<PurchaseOrder>>(`/purchase-orders/${id}/approve`),
   cancel:  (id: string) => http.put<ApiResponse<PurchaseOrder>>(`/purchase-orders/${id}/cancel`),
+}
+
+// ─── Credit-Risk & Bad-Debt Scoring ────────────────────────────────────────────────
+export const creditRiskAPI = {
+  dashboard: () => http.get<ApiResponse<CreditRiskDashboard>>('/credit-risk/dashboard'),
+  listCustomers: (params?: Params) => http.get<ApiResponse<CustomerCreditProfile[]>>('/credit-risk/customers', { params }),
+  getCustomer: (customerId: string) => http.get<ApiResponse<{ customer: any; profile: CustomerCreditProfile }>>(`/credit-risk/customers/${customerId}`),
+  getHistory: (customerId: string, params?: Params) => http.get<ApiResponse<CreditRiskHistoryEntry[]>>(`/credit-risk/customers/${customerId}/history`, { params }),
+  recalculate: (customerId: string) => http.post<ApiResponse<CustomerCreditProfile>>(`/credit-risk/customers/${customerId}/recalculate`),
+  check: (customerId: string, invoiceAmount: number) =>
+    http.get<ApiResponse<CreditRiskCheckResult>>(`/credit-risk/customers/${customerId}/check`, { params: { invoice_amount: invoiceAmount } }),
+  writeOff: (customerId: string, data: { amount: number; reason: string; sale_id?: string }) =>
+    http.post(`/credit-risk/customers/${customerId}/write-off`, data),
+  getSettings: () => http.get<ApiResponse<CreditRiskSettings>>('/credit-risk/settings'),
+  updateSettings: (data: Partial<CreditRiskSettings>) => http.put<ApiResponse<CreditRiskSettings>>('/credit-risk/settings', data),
+}
+
+// ─── Approvals (generic) ────────────────────────────────────────────────────────────
+export const approvalsAPI = {
+  list: (params?: Params) => http.get<ApiResponse<Approval[]>>('/approvals', { params }),
+  get:  (id: string) => http.get<ApiResponse<Approval>>(`/approvals/${id}`),
+  decide: (id: string, decision: 'approve' | 'reject', reason?: string) =>
+    http.put<ApiResponse<Approval>>(`/approvals/${id}/decide`, { decision, reason }),
+}
+
+// ─── Notifications (generic) ────────────────────────────────────────────────────────
+export const notificationsAPI = {
+  list: (params?: Params) => http.get('/notifications', { params }),
+  markRead: (id: string) => http.put(`/notifications/${id}/read`),
+  markAllRead: () => http.put('/notifications/read-all'),
 }
 
 // ─── Parties ──────────────────────────────────────────────────────────────────

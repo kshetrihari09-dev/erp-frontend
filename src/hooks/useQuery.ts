@@ -4,7 +4,7 @@ import { QK, DEFAULT_PAGE_SIZE } from '@/constants'
 import {
   productsAPI, salesAPI, purchasesAPI, partiesAPI, accountingAPI,
   reportsAPI, stockAPI, settingsAPI, returnsAPI, dateAPI, companiesAPI,
-  purchaseSuggestionsAPI, purchaseOrdersAPI,
+  purchaseSuggestionsAPI, purchaseOrdersAPI, creditRiskAPI, approvalsAPI, notificationsAPI,
 } from '@/services/api'
 import * as manufacturersService from '@/services/manufacturers'
 import type { ManufacturerInput } from '@/services/manufacturers'
@@ -425,6 +425,149 @@ export function useCancelPurchaseOrder() {
     mutationFn: purchaseOrdersAPI.cancel,
     onSuccess: () => { qc.invalidateQueries({ queryKey: [QK.PURCHASE_ORDERS] }); success('Purchase order cancelled') },
     onError:   (e: { message: string }) => error('Failed', e.message),
+  })
+}
+
+// ─── Credit-Risk & Bad-Debt Scoring ─────────────────────────────────────────────────
+export function useCreditRiskDashboard() {
+  return useQuery({
+    queryKey: [QK.CREDIT_RISK_DASHBOARD],
+    queryFn:  () => creditRiskAPI.dashboard().then(unwrap),
+  })
+}
+
+export function useCreditRiskCustomers(params?: Record<string, unknown>) {
+  return useQuery({
+    queryKey: [QK.CREDIT_RISK_CUSTOMERS, params],
+    queryFn:  () => creditRiskAPI.listCustomers(params).then(unwrapPaginated),
+    placeholderData: keepPreviousData,
+  })
+}
+
+export function useCreditRiskCustomer(customerId: string) {
+  return useQuery({
+    queryKey: [QK.CREDIT_RISK_CUSTOMER, customerId],
+    queryFn:  () => creditRiskAPI.getCustomer(customerId).then(unwrap),
+    enabled:  !!customerId,
+  })
+}
+
+export function useCreditRiskHistory(customerId: string, params?: Record<string, unknown>) {
+  return useQuery({
+    queryKey: [QK.CREDIT_RISK_HISTORY, customerId, params],
+    queryFn:  () => creditRiskAPI.getHistory(customerId, params).then(unwrapPaginated),
+    enabled:  !!customerId,
+  })
+}
+
+export function useCreditRiskCheckQuery(customerId: string, invoiceAmount: number, enabled: boolean) {
+  return useQuery({
+    queryKey: [QK.CREDIT_RISK_CUSTOMER, 'check', customerId, invoiceAmount],
+    queryFn:  () => creditRiskAPI.check(customerId, invoiceAmount).then(unwrap),
+    enabled:  enabled && !!customerId && invoiceAmount > 0,
+    staleTime: 30_000,
+  })
+}
+
+/** Billing-time credit check — NOT auto-fetched; call check.mutateAsync when a
+ *  credit sale customer/amount is chosen, since it depends on live form state. */
+export function useCreditRiskCheck() {
+  return useMutation({
+    mutationFn: ({ customerId, invoiceAmount }: { customerId: string; invoiceAmount: number }) =>
+      creditRiskAPI.check(customerId, invoiceAmount).then(unwrap),
+  })
+}
+
+export function useRecalculateCreditRisk() {
+  const qc = useQueryClient()
+  const { success, error } = useUIStore()
+  return useMutation({
+    mutationFn: creditRiskAPI.recalculate,
+    onSuccess: (_res, customerId) => {
+      qc.invalidateQueries({ queryKey: [QK.CREDIT_RISK_CUSTOMER, customerId] })
+      qc.invalidateQueries({ queryKey: [QK.CREDIT_RISK_CUSTOMERS] })
+      qc.invalidateQueries({ queryKey: [QK.CREDIT_RISK_DASHBOARD] })
+      qc.invalidateQueries({ queryKey: [QK.CREDIT_RISK_HISTORY, customerId] })
+      success('Credit risk recalculated')
+    },
+    onError: (e: { message: string }) => error('Recalculation failed', e.message),
+  })
+}
+
+export function useWriteOffBadDebt() {
+  const qc = useQueryClient()
+  const { success, error } = useUIStore()
+  return useMutation({
+    mutationFn: ({ customerId, data }: { customerId: string; data: { amount: number; reason: string; sale_id?: string } }) =>
+      creditRiskAPI.writeOff(customerId, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [QK.CREDIT_RISK_CUSTOMERS] })
+      qc.invalidateQueries({ queryKey: [QK.CREDIT_RISK_DASHBOARD] })
+      success('Bad debt recorded')
+    },
+    onError: (e: { message: string }) => error('Failed to record bad debt', e.message),
+  })
+}
+
+export function useCreditRiskSettings() {
+  return useQuery({
+    queryKey: [QK.CREDIT_RISK_SETTINGS],
+    queryFn:  () => creditRiskAPI.getSettings().then(unwrap),
+  })
+}
+
+export function useUpdateCreditRiskSettings() {
+  const qc = useQueryClient()
+  const { success, error } = useUIStore()
+  return useMutation({
+    mutationFn: creditRiskAPI.updateSettings,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [QK.CREDIT_RISK_SETTINGS] })
+      qc.invalidateQueries({ queryKey: [QK.CREDIT_RISK_DASHBOARD] })
+      success('Settings saved')
+    },
+    onError: (e: { message: string }) => error('Failed to save settings', e.message),
+  })
+}
+
+// ─── Approvals (generic) ────────────────────────────────────────────────────────────
+export function useApprovals(params?: Record<string, unknown>) {
+  return useQuery({
+    queryKey: [QK.APPROVALS, params],
+    queryFn:  () => approvalsAPI.list(params).then(unwrapPaginated),
+    placeholderData: keepPreviousData,
+  })
+}
+
+export function useDecideApproval() {
+  const qc = useQueryClient()
+  const { success, error } = useUIStore()
+  return useMutation({
+    mutationFn: ({ id, decision, reason }: { id: string; decision: 'approve' | 'reject'; reason?: string }) =>
+      approvalsAPI.decide(id, decision, reason),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [QK.APPROVALS] })
+      qc.invalidateQueries({ queryKey: [QK.CREDIT_RISK_DASHBOARD] })
+      qc.invalidateQueries({ queryKey: [QK.CREDIT_RISK_CUSTOMERS] })
+      success('Decision recorded')
+    },
+    onError: (e: { message: string }) => error('Failed', e.message),
+  })
+}
+
+// ─── Notifications (generic) ────────────────────────────────────────────────────────
+export function useNotifications(params?: Record<string, unknown>) {
+  return useQuery({
+    queryKey: [QK.NOTIFICATIONS, params],
+    queryFn:  () => notificationsAPI.list(params).then((res: any) => ({ data: res.data.data, meta: res.data.meta })),
+  })
+}
+
+export function useMarkNotificationRead() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: notificationsAPI.markRead,
+    onSuccess: () => qc.invalidateQueries({ queryKey: [QK.NOTIFICATIONS] }),
   })
 }
 

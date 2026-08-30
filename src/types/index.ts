@@ -633,3 +633,149 @@ export interface AuditLog {
   ip_address?: string
   created_at:  string
 }
+
+// ─── Credit-Risk & Bad-Debt Scoring ─────────────────────────────────────────────
+export type RiskCategory = 'low' | 'medium' | 'high' | 'insufficient_data'
+export type PaymentTrend = 'improving' | 'stable' | 'worsening'
+
+export interface CreditRiskFactorBreakdown {
+  factor: string
+  weight_pct: number
+  score: number | null
+  note?: string
+}
+
+export interface CreditRiskFactors {
+  explanation: string[]
+  breakdown: CreditRiskFactorBreakdown[]
+  raw?: Record<string, number | null>
+}
+
+export interface CustomerCreditProfile {
+  id?: string
+  customer_id: string
+  customer_name?: string
+  customer_code?: string
+  current_risk_score: number | null
+  risk_category: RiskCategory
+  bad_debt_probability: number | null
+  expected_credit_loss: number | null
+  payment_trend: PaymentTrend
+  outstanding_amount: number
+  overdue_amount: number
+  credit_utilization: number | null
+  recommended_credit_limit: number | null
+  recommended_payment_terms_days: number | null
+  recommended_action: string
+  factors: CreditRiskFactors
+  last_calculated_at?: string
+}
+
+export interface CreditRiskDashboard {
+  summary: {
+    total_customers: number
+    low_risk_customers: number
+    medium_risk_customers: number
+    high_risk_customers: number
+    insufficient_data_customers: number
+    total_outstanding: number
+    at_risk_outstanding: number
+    estimated_credit_loss: number
+  }
+  risk_distribution: Record<RiskCategory, number>
+  payment_risk_trend: Record<PaymentTrend, number>
+  high_risk_customers: CreditRiskCustomerSummary[]
+  highest_potential_loss: CreditRiskCustomerSummary[]
+}
+
+export interface CreditRiskCustomerSummary {
+  customer_id: string
+  customer_name: string
+  customer_code: string
+  risk_score: number | null
+  risk_category: RiskCategory
+  outstanding_amount: number
+  overdue_amount: number
+  bad_debt_probability: number | null
+  expected_credit_loss: number | null
+  payment_trend: PaymentTrend
+  recommended_action: string
+}
+
+export interface CreditRiskHistoryEntry {
+  id: string
+  risk_score: number | null
+  risk_category: RiskCategory
+  bad_debt_probability: number | null
+  expected_credit_loss: number | null
+  payment_trend: PaymentTrend
+  trigger: string
+  calculated_at: string
+}
+
+export interface CreditRiskSettings {
+  scoringPeriodDays: number
+  weights: {
+    onTimePaymentRate: number
+    paymentDelay: number
+    overdueExposure: number
+    creditUtilization: number
+    latePaymentFrequency: number
+    defaultHistory: number
+  }
+  thresholds: { lowRiskMin: number; mediumRiskMin: number }
+  delayScorePenaltyPerDay: number
+  onTimeGraceDays: number
+  badDebt: { probabilityMultiplier: number; perIncidentBump: number }
+  trendRecentWindowDays: number
+  trendChangeThresholdDays: number
+  recommendations: {
+    mediumRiskLimitPct: number
+    highRiskLowLimit: number
+    mediumRiskTermsDays: number
+    highRiskTermsDays: number
+  }
+  automaticActions: 'recommendation_only' | 'require_approval' | 'block_high_risk'
+  alerts: {
+    highRiskEnabled: boolean
+    scoreDropThreshold: number
+    scoreDropWindowDays: number
+    badDebtProbabilityThreshold: number
+    criticalOverdueAmount: number
+  }
+}
+
+export interface CreditRiskCheckResult {
+  customer_id: string
+  customer_name: string
+  risk_score: number | null
+  risk_category: RiskCategory
+  credit_limit: number
+  outstanding: number
+  available_credit: number | null
+  invoice_amount: number
+  exceeds_available_credit: boolean
+  exceeds_recommended_exposure: boolean
+  recommended_action: string
+  blocked: boolean
+  requires_approval: boolean
+}
+
+export type ApprovalStatus = 'pending' | 'approved' | 'rejected'
+
+export interface Approval {
+  id: string
+  type: string
+  status: ApprovalStatus
+  customer_id?: string | null
+  customer_name?: string | null
+  related_sale_id?: string | null
+  reason?: string | null
+  payload: Record<string, any>
+  requested_by?: string | null
+  requested_by_name?: string | null
+  decided_by?: string | null
+  decision_reason?: string | null
+  decided_at?: string | null
+  created_at: string
+}

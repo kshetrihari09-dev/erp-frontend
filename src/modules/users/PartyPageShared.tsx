@@ -17,6 +17,7 @@ import { Button, Modal, Pagination, SkeletonRows, Empty, ConfirmDialog } from '@
 import { useDebounce } from '@/hooks/useDebounce'
 import { fmt, fmtDate } from '@/utils'
 import type { Party, AccountDefault } from '@/types'
+import { CreditRiskProfileCard } from '@/modules/creditRisk/CreditRiskProfileCard'
 // Validation schema now lives in schemas/party.ts (shared with the Quick
 // Create dialog opened from Sale/Purchase). partySchema is re-exported so
 // any existing import of it from this file still works; the inferred
@@ -470,6 +471,10 @@ export function SideDrawer({ party, label, defaultRole, accent, onClose, onEdit,
               </div>
             ))}
           </div>
+
+          {/* Credit Risk Profile (requirement #12) — customers only; suppliers
+              carry no receivable risk in this system. */}
+          {label === 'Customer' && <CreditRiskProfileCard customerId={party.id} />}
 
           {/* Recent activity */}
           <div>

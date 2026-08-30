@@ -119,6 +119,13 @@ export const QK = {
   PURCHASE_SUGGESTION_SETTINGS:  'purchase-suggestion-settings',
   PURCHASE_ORDERS:               'purchase-orders',
   PURCHASE_ORDER:                'purchase-order',
+  CREDIT_RISK_DASHBOARD:  'credit-risk-dashboard',
+  CREDIT_RISK_CUSTOMERS:  'credit-risk-customers',
+  CREDIT_RISK_CUSTOMER:   'credit-risk-customer',
+  CREDIT_RISK_HISTORY:    'credit-risk-history',
+  CREDIT_RISK_SETTINGS:   'credit-risk-settings',
+  APPROVALS:      'approvals',
+  NOTIFICATIONS:  'notifications',
 } as const
 
 // ─── Routes / paths ───────────────────────────────────────────────────────────
@@ -136,6 +143,7 @@ export const PATHS = {
   MANUFACTURERS: '/manufacturers',
   STOCK:      '/stock',
   PURCHASE_SUGGESTIONS: '/purchase-suggestions',
+  CREDIT_RISK: '/credit-risk',
   CUSTOMERS:  '/customers',
   SUPPLIERS:  '/suppliers',
   ACCOUNTING:    '/accounting',

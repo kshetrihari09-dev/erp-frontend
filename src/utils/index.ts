@@ -190,6 +190,16 @@ export const statusColor = (status: string) => {
     pending:   'badge-amber',
     locked:    'badge-red',
     open:      'badge-green',
+    // Credit-Risk categories/trends (requirement #5: use existing status styles, no hardcoded colors)
+    low:        'badge-green',
+    medium:     'badge-amber',
+    high:       'badge-red',
+    insufficient_data: 'badge-muted',
+    improving:  'badge-green',
+    stable:     'badge-muted',
+    worsening:  'badge-red',
+    approved:   'badge-green',
+    rejected:   'badge-red',
   }
   return map[status?.toLowerCase()] || 'badge-muted'
 }

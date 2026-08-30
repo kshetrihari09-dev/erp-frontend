@@ -28,6 +28,7 @@ import { useOffline } from '@/offline/OfflineProvider'
 import { isNetworkError } from '@/offline/syncEngine'
 import { getAllProductsOffline, toProduct as toOfflineProduct } from '@/offline/productLookup'
 import useAuthStore from '@/store/authStore'
+import { CreditRiskBillingCheck } from '@/modules/creditRisk/CreditRiskBillingCheck'
 import useUIStore from '@/store/uiStore'
 import {
   Button, Tabs, Modal, Badge, Pagination,
@@ -834,6 +835,13 @@ export default function SalesPage() {
                       </button>
                     </div>
                   </div>
+
+                  <CreditRiskBillingCheck
+                    customerId={customerId}
+                    invoiceAmount={grandTotal}
+                    isCredit={currentPayMode === 'credit'}
+                    onChangePaymentMethod={() => setValue('payment_mode', '')}
+                  />
 
                   {/* Address, PAN, Telephone, Date — grouped in a wrapper so
                       they can become one equal-width row on mobile/tablet
