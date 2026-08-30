@@ -436,6 +436,20 @@ export function useCreditRiskDashboard() {
   })
 }
 
+export function useRecalculateAllCreditRisk() {
+  const qc = useQueryClient()
+  const { success, error } = useUIStore()
+  return useMutation({
+    mutationFn: creditRiskAPI.recalculateAll,
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: [QK.CREDIT_RISK_DASHBOARD] })
+      qc.invalidateQueries({ queryKey: [QK.CREDIT_RISK_CUSTOMERS] })
+      success(`Recalculated ${(res.data as any)?.data?.count ?? 'all'} customers`)
+    },
+    onError: (e: { message: string }) => error('Recalculation failed', e.message),
+  })
+}
+
 export function useCreditRiskCustomers(params?: Record<string, unknown>) {
   return useQuery({
     queryKey: [QK.CREDIT_RISK_CUSTOMERS, params],

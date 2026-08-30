@@ -251,6 +251,7 @@ export const purchaseOrdersAPI = {
 // ─── Credit-Risk & Bad-Debt Scoring ────────────────────────────────────────────────
 export const creditRiskAPI = {
   dashboard: () => http.get<ApiResponse<CreditRiskDashboard>>('/credit-risk/dashboard'),
+  recalculateAll: () => http.post<ApiResponse<{ count: number }>>('/credit-risk/recalculate-all'),
   listCustomers: (params?: Params) => http.get<ApiResponse<CustomerCreditProfile[]>>('/credit-risk/customers', { params }),
   getCustomer: (customerId: string) => http.get<ApiResponse<{ customer: any; profile: CustomerCreditProfile }>>(`/credit-risk/customers/${customerId}`),
   getHistory: (customerId: string, params?: Params) => http.get<ApiResponse<CreditRiskHistoryEntry[]>>(`/credit-risk/customers/${customerId}/history`, { params }),

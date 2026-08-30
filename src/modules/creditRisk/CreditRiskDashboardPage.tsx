@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   useCreditRiskDashboard, useCreditRiskCustomers, useApprovals, useDecideApproval,
-  useCreditRiskSettings, useUpdateCreditRiskSettings,
+  useCreditRiskSettings, useUpdateCreditRiskSettings, useRecalculateAllCreditRisk,
 } from '@/hooks/useQuery'
 import { Button, Modal, Badge, SkeletonRows, Empty, SearchInput, Select, Input } from '@/components/ui'
 import { fmt } from '@/utils'
@@ -149,6 +149,7 @@ export default function CreditRiskDashboardPage() {
   const [categoryFilter, setCategoryFilter] = useState('')
   const { data: dashboard, isLoading, isFetching, refetch } = useCreditRiskDashboard()
   const { data: customersData } = useCreditRiskCustomers({ search: search || undefined, risk_category: categoryFilter || undefined, limit: 50 })
+  const recalcAll = useRecalculateAllCreditRisk()
 
   const customers: any[] = (customersData?.data as any) || []
 
@@ -158,6 +159,29 @@ export default function CreditRiskDashboardPage() {
 
   const { summary, payment_risk_trend, high_risk_customers, highest_potential_loss } = dashboard
 
+  // Fresh deployment / long gap since last recalculation: the dashboard
+  // reads a cache table that only fills in as customers get scored (event-
+  // based, or one at a time on first profile view) — so it's expected to
+  // start at zero. Surface the bulk recalculate action right here instead
+  // of leaving the person staring at empty summary cards.
+  if (summary.total_customers === 0) {
+    return (
+      <div>
+        <div className="page-header">
+          <div><div className="page-breadcrumb">Accounting</div><h1 className="page-title">Credit Risk Dashboard</h1></div>
+        </div>
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-8 text-center">
+          <Users size={28} className="mx-auto mb-3 text-[var(--text-4)]" />
+          <div className="text-sm font-semibold text-[var(--text)] mb-1">No customers scored yet</div>
+          <p className="text-xs text-[var(--text-4)] mb-4 max-w-md mx-auto">
+            Credit risk scores are calculated when a customer has a relevant event (a credit sale, payment, etc.) or when you open their profile — not automatically for everyone on every page load. Run this once to score all existing customers now.
+          </p>
+          <Button variant="primary" loading={recalcAll.isPending} onClick={() => recalcAll.mutate()}>Recalculate All Customers</Button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div>
       <div className="page-header">
@@ -166,6 +190,7 @@ export default function CreditRiskDashboardPage() {
           <h1 className="page-title">Credit Risk Dashboard</h1>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="secondary" loading={recalcAll.isPending} onClick={() => recalcAll.mutate()}>Recalculate All</Button>
           <Button variant="secondary" icon={<RefreshCw size={14} className={isFetching ? 'animate-spin' : ''} />} onClick={() => refetch()}>Refresh</Button>
           <Button variant="secondary" icon={<Settings size={14} />} onClick={() => setSettingsOpen(true)}>Settings</Button>
         </div>
