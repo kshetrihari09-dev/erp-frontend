@@ -51,7 +51,17 @@ const isLocal     = (env.API_BASE_URL || '').includes('localhost') ||
 export const config = {
   // API
   apiBaseUrl:   env.API_BASE_URL || 'http://localhost:5000/api/v1',
-  apiTimeout:   20_000,
+  // Was 20s — too tight for a large sale/purchase invoice (many line
+  // items each needing their own validated stock/accounting work on the
+  // server). A request that's still genuinely in progress past the old
+  // limit got aborted client-side with no HTTP response at all, which
+  // offline/syncEngine.ts's isNetworkError() can only read as "the
+  // connection dropped" — the transaction then silently re-queued as
+  // pending and retried, timing out identically every time even on a
+  // perfectly good connection. 60s gives real headroom; the batched
+  // stock-deduction rewrite in routes/sales.js means most invoices,
+  // including large ones, finish in a fraction of that anyway.
+  apiTimeout:   60_000,
   lanMode:      env.LAN_MODE,
 
   // App
