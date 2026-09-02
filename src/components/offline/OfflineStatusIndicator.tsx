@@ -3,17 +3,21 @@
  *
  * Deliberately small and easy to ignore — a corner pill, never a modal or
  * full-width banner (requirement #4: "Do not create a large blocking
- * offline popup"). Pure presentation; all the actual state comes from
- * OfflineProvider's context, so this component has no logic of its own
- * beyond picking which of the four states to render.
+ * offline popup"). Pure presentation for the ambient state; tapping it
+ * opens PendingTransactionsPanel, the actual place to see and act on
+ * individual pending/failed bills (previously there was no such screen —
+ * this pill was a count and nothing else).
  */
+import { useState } from 'react'
 import useAuthStore from '@/store/authStore'
 import { useOffline } from '@/offline/OfflineProvider'
 import { Z } from '@/styles/zIndex'
+import PendingTransactionsPanel from './PendingTransactionsPanel'
 
 export default function OfflineStatusIndicator() {
   const company = useAuthStore(s => s.company)
   const { isOnline, syncPhase, pendingCount, justSyncedCount } = useOffline()
+  const [panelOpen, setPanelOpen] = useState(false)
 
   // No company = not logged in yet — nothing to show a connection status
   // for (the login page itself doesn't need offline billing).
@@ -41,32 +45,36 @@ export default function OfflineStatusIndicator() {
   }
 
   return (
-    <div
-      role="status"
-      aria-live="polite"
-      style={{
-        position: 'fixed',
-        bottom: 10,
-        left: 10,
-        zIndex: Z.offlineIndicator,
-        maxWidth: 'calc(100vw - 20px)',
-        padding: '5px 10px',
-        borderRadius: 999,
-        fontSize: 11,
-        fontWeight: 600,
-        lineHeight: 1.3,
-        whiteSpace: 'nowrap',
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-        background: bg,
-        color,
-        border: `1px solid ${border}`,
-        backdropFilter: 'blur(6px)',
-        pointerEvents: 'none',   // never intercepts taps/clicks underneath it
-        userSelect: 'none',
-      }}
-    >
-      {label}
-    </div>
+    <>
+      <button
+        type="button"
+        onClick={() => setPanelOpen(true)}
+        aria-label={`${label} — tap to view pending sales bills`}
+        style={{
+          position: 'fixed',
+          bottom: 10,
+          left: 10,
+          zIndex: Z.offlineIndicator,
+          maxWidth: 'calc(100vw - 20px)',
+          padding: '5px 10px',
+          borderRadius: 999,
+          fontSize: 11,
+          fontWeight: 600,
+          lineHeight: 1.3,
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          background: bg,
+          color,
+          border: `1px solid ${border}`,
+          backdropFilter: 'blur(6px)',
+          cursor: 'pointer',
+          userSelect: 'none',
+        }}
+      >
+        {label}
+      </button>
+      {panelOpen && <PendingTransactionsPanel onClose={() => setPanelOpen(false)} />}
+    </>
   )
 }

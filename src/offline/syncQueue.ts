@@ -63,3 +63,18 @@ export async function discardQueueItem(companyId: string, clientTxnId: string): 
   const db = await getOfflineDb(companyId)
   await db.delete('syncQueue', clientTxnId)
 }
+
+/** Manual "retry now" for one item, from the Pending Transactions panel —
+ *  clears retry_count/next_retry_at/last_error so isDue() (syncEngine.ts)
+ *  picks it up on the very next sync pass regardless of how many times it
+ *  has already failed or how long its current backoff window still has
+ *  left. Does not touch payload/client_txn_id, so the server still sees
+ *  the exact same idempotent transaction it always would have. */
+export async function retryQueueItem(companyId: string, clientTxnId: string): Promise<void> {
+  await updateQueueItem(companyId, clientTxnId, {
+    status: 'pending',
+    retry_count: 0,
+    next_retry_at: undefined,
+    last_error: undefined,
+  })
+}

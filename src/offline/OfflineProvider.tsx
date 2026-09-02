@@ -25,7 +25,7 @@ import useAuthStore from '@/store/authStore'
 import { useOnlineStatus } from '@/hooks/useOnlineStatus'
 import { syncCatalog } from './catalogSync'
 import { runSync, pendingSyncCount } from './syncEngine'
-import { enqueueSale } from './syncQueue'
+import { enqueueSale, listQueue, retryQueueItem, discardQueueItem } from './syncQueue'
 import type { QueuedTransaction } from './db'
 
 type SyncPhase = 'idle' | 'syncing-queue' | 'syncing-catalog'
@@ -44,6 +44,21 @@ interface OfflineContextValue {
   enqueueOfflineSale: (payload: Record<string, unknown>) => Promise<QueuedTransaction>
   /** Manual "try now" — e.g. a retry button in a failed-transactions view. */
   syncNow: () => Promise<void>
+  /** Every queued transaction (any status), newest sync info included —
+   *  backs the Pending Transactions panel. Deliberately a pull, not a
+   *  subscription: that panel is the only consumer, so it fetches fresh
+   *  on open/action rather than every component in the tree re-rendering
+   *  on every queue change. */
+  listPendingTransactions: () => Promise<QueuedTransaction[]>
+  /** Resets one item to immediately-due and kicks off a sync pass. Used
+   *  by the panel's "Retry now" action, including on items that already
+   *  hit MAX_RETRIES / came back non-retryable. */
+  retryTransaction: (clientTxnId: string) => Promise<void>
+  /** Permanently removes one queued transaction — a deliberate action
+   *  from the panel, never automatic (see syncQueue.ts's discardQueueItem
+   *  docblock). Only meaningful for a 'failed' item the person has
+   *  decided not to pursue (e.g. re-entering it by hand instead). */
+  discardTransaction: (clientTxnId: string) => Promise<void>
 }
 
 const OfflineContext = createContext<OfflineContextValue | null>(null)
@@ -126,9 +141,30 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
     return txn
   }, [company?.id, user?.id, refreshPendingCount])
 
+  const listPendingTransactions = useCallback(async () => {
+    if (!company?.id) return []
+    return listQueue(company.id)
+  }, [company?.id])
+
+  const retryTransaction = useCallback(async (clientTxnId: string) => {
+    if (!company?.id) return
+    await retryQueueItem(company.id, clientTxnId)
+    await refreshPendingCount()
+    // Fires immediately rather than waiting for the next poll/reconnect —
+    // the whole point of a manual retry button is not waiting.
+    await runFullSync()
+  }, [company?.id, refreshPendingCount, runFullSync])
+
+  const discardTransaction = useCallback(async (clientTxnId: string) => {
+    if (!company?.id) return
+    await discardQueueItem(company.id, clientTxnId)
+    await refreshPendingCount()
+  }, [company?.id, refreshPendingCount])
+
   const value: OfflineContextValue = {
     isOnline, checkingOnline, syncPhase, pendingCount, justSyncedCount,
     enqueueOfflineSale, syncNow: runFullSync,
+    listPendingTransactions, retryTransaction, discardTransaction,
   }
 
   return <OfflineContext.Provider value={value}>{children}</OfflineContext.Provider>
