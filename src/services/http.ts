@@ -90,11 +90,18 @@ http.interceptors.response.use(
     }
     return response
   },
-  async (error: AxiosError<{ message?: string; code?: string; errors?: Record<string, string[]> }>) => {
+  async (error: AxiosError<{ message?: string; code?: string; errors?: Record<string, string[]>; retryable?: boolean }>) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean }
     const status          = error.response?.status
     const rawMessage      = error.response?.data?.message || error.message || 'Network error'
     const errors          = (error.response?.data as any)?.errors || null
+    // `code` / `retryable` are optional machine-readable fields some routes
+    // attach (see erp-unified-backend routes/sales.js) to distinguish a
+    // structural rejection that will fail identically on every retry (e.g.
+    // a locked accounting period) from an ordinary one — offline/syncEngine.ts
+    // uses `retryable` to stop backing off on those instead of looping forever.
+    const code            = (error.response?.data as any)?.code ?? null
+    const retryable       = (error.response?.data as any)?.retryable
 
     if (config.enableApiLogs || config.isDev) {
       console.error(`[API ✗] ${status || 'NET'}:`, rawMessage, error.config?.url)
@@ -142,7 +149,7 @@ http.interceptors.response.use(
       }
     }
 
-    return Promise.reject({ message: rawMessage, status, errors, original: error })
+    return Promise.reject({ message: rawMessage, status, errors, code, retryable, original: error })
   }
 )
 
