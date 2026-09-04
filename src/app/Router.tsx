@@ -27,6 +27,7 @@ const AccountingPage=lazy(() => import('@/modules/accounting/AccountingPage'))
 const LedgerPage   = lazy(() => import('@/modules/accounting/LedgerPage'))
 const ReportsPage  = lazy(() => import('@/modules/reports/ReportsPage'))
 const SettingsPage = lazy(() => import('@/modules/settings/SettingsPage'))
+const RemindersPage = lazy(() => import('@/modules/reminders/RemindersPage'))
 
 function PageLoader() {
   return (
@@ -69,6 +70,7 @@ export default function Router() {
             <Route path="stock-report" element={<StockPage />} />
             <Route path="purchase-suggestions" element={<PurchaseSuggestionsPage />} />
             <Route path="credit-risk" element={<CreditRiskDashboardPage />} />
+            <Route path="reminders" element={<RemindersPage />} />
 
             {/* Parties */}
             <Route path="customers"    element={<CustomersPage />} />

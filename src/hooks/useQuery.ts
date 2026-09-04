@@ -5,6 +5,7 @@ import {
   productsAPI, salesAPI, purchasesAPI, partiesAPI, accountingAPI,
   reportsAPI, stockAPI, settingsAPI, returnsAPI, dateAPI, companiesAPI,
   purchaseSuggestionsAPI, purchaseOrdersAPI, creditRiskAPI, approvalsAPI, notificationsAPI,
+  remindersAPI,
 } from '@/services/api'
 import * as manufacturersService from '@/services/manufacturers'
 import type { ManufacturerInput } from '@/services/manufacturers'
@@ -582,6 +583,119 @@ export function useMarkNotificationRead() {
   return useMutation({
     mutationFn: notificationsAPI.markRead,
     onSuccess: () => qc.invalidateQueries({ queryKey: [QK.NOTIFICATIONS] }),
+  })
+}
+
+// ─── Reminders ────────────────────────────────────────────────────────────────
+export function useReminders(params?: Record<string, unknown>) {
+  return useQuery({
+    queryKey: [QK.REMINDERS, params],
+    queryFn:  () => remindersAPI.list(params).then(unwrapPaginated),
+    placeholderData: keepPreviousData,
+  })
+}
+
+export function useReminder(id: string) {
+  return useQuery({
+    queryKey: [QK.REMINDERS, id],
+    queryFn:  () => remindersAPI.get(id).then(unwrap),
+    enabled:  !!id,
+  })
+}
+
+export function useReminderCounts() {
+  return useQuery({
+    queryKey: [QK.REMINDER_COUNTS],
+    queryFn:  () => remindersAPI.counts().then(unwrap),
+    // Counts drive the sidebar's overdue badge (AppLayout.tsx) as well as
+    // this page — a short refetch interval keeps "Overdue: 3" from going
+    // stale while the app just sits open, without needing a websocket.
+    refetchInterval: 60_000,
+  })
+}
+
+export function useReminderTypes() {
+  return useQuery({
+    queryKey: [QK.REMINDER_TYPES],
+    queryFn:  () => remindersAPI.types().then(unwrap),
+    staleTime: Infinity, // static enum list — never needs refetching
+  })
+}
+
+export function useReminderAssignableUsers() {
+  return useQuery({
+    queryKey: [QK.REMINDER_ASSIGNABLE_USERS],
+    queryFn:  () => remindersAPI.assignableUsers().then(unwrap),
+    staleTime: 5 * 60_000,
+  })
+}
+
+function useInvalidateReminders() {
+  const qc = useQueryClient()
+  return () => {
+    qc.invalidateQueries({ queryKey: [QK.REMINDERS] })
+    qc.invalidateQueries({ queryKey: [QK.REMINDER_COUNTS] })
+  }
+}
+
+export function useCreateReminder() {
+  const invalidate = useInvalidateReminders()
+  const { success, error } = useUIStore()
+  return useMutation({
+    mutationFn: (data: Record<string, unknown>) => remindersAPI.create(data).then(unwrap),
+    onSuccess: () => { invalidate(); success('Reminder created') },
+    onError: (e: { message: string }) => error('Could not create reminder', e.message),
+  })
+}
+
+export function useUpdateReminder() {
+  const invalidate = useInvalidateReminders()
+  const { success, error } = useUIStore()
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Record<string, unknown> }) => remindersAPI.update(id, data).then(unwrap),
+    onSuccess: () => { invalidate(); success('Reminder updated') },
+    onError: (e: { message: string }) => error('Could not update reminder', e.message),
+  })
+}
+
+export function useDeleteReminder() {
+  const invalidate = useInvalidateReminders()
+  const { success, error } = useUIStore()
+  return useMutation({
+    mutationFn: (id: string) => remindersAPI.delete(id),
+    onSuccess: () => { invalidate(); success('Reminder deleted') },
+    onError: (e: { message: string }) => error('Could not delete reminder', e.message),
+  })
+}
+
+export function useCompleteReminder() {
+  const invalidate = useInvalidateReminders()
+  const { success, error } = useUIStore()
+  return useMutation({
+    mutationFn: (id: string) => remindersAPI.complete(id).then(unwrap),
+    onSuccess: () => { invalidate(); success('Reminder completed') },
+    onError: (e: { message: string }) => error('Could not complete reminder', e.message),
+  })
+}
+
+export function useReopenReminder() {
+  const invalidate = useInvalidateReminders()
+  const { success, error } = useUIStore()
+  return useMutation({
+    mutationFn: (id: string) => remindersAPI.reopen(id).then(unwrap),
+    onSuccess: () => { invalidate(); success('Reminder reopened') },
+    onError: (e: { message: string }) => error('Could not reopen reminder', e.message),
+  })
+}
+
+export function useSnoozeReminder() {
+  const invalidate = useInvalidateReminders()
+  const { success, error } = useUIStore()
+  return useMutation({
+    mutationFn: ({ id, preset, snoozed_until }: { id: string; preset?: string; snoozed_until?: string }) =>
+      remindersAPI.snooze(id, { preset, snoozed_until, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone }).then(unwrap),
+    onSuccess: () => { invalidate(); success('Reminder snoozed') },
+    onError: (e: { message: string }) => error('Could not snooze reminder', e.message),
   })
 }
 
