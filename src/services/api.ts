@@ -279,6 +279,22 @@ export const notificationsAPI = {
   markAllRead: () => http.put('/notifications/read-all'),
 }
 
+// ─── Reminders ────────────────────────────────────────────────────────────────
+export const remindersAPI = {
+  list:    (params?: Params) => http.get<ApiResponse<any[]>>('/reminders', { params }),
+  get:     (id: string)      => http.get<ApiResponse<any>>(`/reminders/${id}`),
+  counts:  () => http.get<ApiResponse<{ today: number; overdue: number; upcoming: number; completed: number }>>('/reminders/counts'),
+  types:   () => http.get<ApiResponse<{ value: string; label: string }[]>>('/reminders/types'),
+  assignableUsers: () => http.get<ApiResponse<{ id: string; name: string }[]>>('/reminders/assignable-users'),
+  create:  (data: Record<string, unknown>) => http.post<ApiResponse<any>>('/reminders', data),
+  update:  (id: string, data: Record<string, unknown>) => http.patch<ApiResponse<any>>(`/reminders/${id}`, data),
+  delete:  (id: string) => http.delete(`/reminders/${id}`),
+  complete: (id: string) => http.post<ApiResponse<any>>(`/reminders/${id}/complete`),
+  reopen:   (id: string) => http.post<ApiResponse<any>>(`/reminders/${id}/reopen`),
+  snooze:  (id: string, body: { preset?: string; snoozed_until?: string; timezone?: string }) =>
+    http.post<ApiResponse<any>>(`/reminders/${id}/snooze`, body),
+}
+
 // ─── Parties ──────────────────────────────────────────────────────────────────
 export const partiesAPI = {
   customers:      (params?: Params) => http.get<ApiResponse<Party[]>>('/parties/customers', { params }),

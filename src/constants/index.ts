@@ -126,6 +126,10 @@ export const QK = {
   CREDIT_RISK_SETTINGS:   'credit-risk-settings',
   APPROVALS:      'approvals',
   NOTIFICATIONS:  'notifications',
+  REMINDERS:      'reminders',
+  REMINDER_COUNTS:'reminder-counts',
+  REMINDER_TYPES: 'reminder-types',
+  REMINDER_ASSIGNABLE_USERS: 'reminder-assignable-users',
 } as const
 
 // ─── Routes / paths ───────────────────────────────────────────────────────────
@@ -150,4 +154,5 @@ export const PATHS = {
   LEDGER:        '/ledger',
   REPORTS:    '/reports',
   SETTINGS:   '/settings',
+  REMINDERS:  '/reminders',
 } as const

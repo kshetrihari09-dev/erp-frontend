@@ -7,7 +7,7 @@ import {
   Plus, Search, RotateCcw, Download, ChevronDown,
   Eye, Edit2, BookOpen, FileText, Printer, Trash2,
   MoreVertical, X, Phone, MapPin, ArrowUpDown,
-  ArrowUp, ArrowDown, ChevronRight, Landmark, CheckCircle2,
+  ArrowUp, ArrowDown, ChevronRight, Landmark, CheckCircle2, Bell,
 } from 'lucide-react'
 import {
   useUpdateParty, useDeleteParty, usePartyLedger,
@@ -18,6 +18,7 @@ import { useDebounce } from '@/hooks/useDebounce'
 import { fmt, fmtDate } from '@/utils'
 import type { Party, AccountDefault } from '@/types'
 import { CreditRiskProfileCard } from '@/modules/creditRisk/CreditRiskProfileCard'
+import ReminderFormModal from '@/modules/reminders/ReminderFormModal'
 // Validation schema now lives in schemas/party.ts (shared with the Quick
 // Create dialog opened from Sale/Purchase). partySchema is re-exported so
 // any existing import of it from this file still works; the inferred
@@ -113,8 +114,8 @@ export function KpiCard({ label, value, sub, icon, iconBg, iconColor, loading }:
 }
 
 // ── ActionsMenu ───────────────────────────────────────────────────────────────
-export function ActionsMenu({ label, onView, onEdit, onLedger, onDelete }: {
-  label: string; onView: () => void; onEdit: () => void; onLedger: () => void; onDelete: () => void
+export function ActionsMenu({ label, onView, onEdit, onLedger, onDelete, onRemind }: {
+  label: string; onView: () => void; onEdit: () => void; onLedger: () => void; onDelete: () => void; onRemind?: () => void
 }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -132,6 +133,10 @@ export function ActionsMenu({ label, onView, onEdit, onLedger, onDelete }: {
     { icon: <BookOpen size={13} />, text: 'Open Ledger',        action: onLedger },
     { icon: <FileText size={13} />, text: 'View Transactions',  action: () => {} },
     { icon: <Printer size={13} />,  text: 'Print Statement',    action: () => {} },
+    // Only shown when a caller passes onRemind (Customers/Suppliers pages
+    // — see below) rather than every consumer of this shared menu having
+    // to opt out.
+    onRemind ? { icon: <Bell size={13} />, text: '🔔 Add Reminder', action: onRemind } : null,
     null,
     { icon: <Trash2 size={13} />,   text: `Delete ${label}`,   action: onDelete, danger: true },
   ]
@@ -380,9 +385,9 @@ export function LedgerTable({ partyId, accent }: { partyId: string; accent: Acce
 }
 
 // ── SideDrawer ────────────────────────────────────────────────────────────────
-export function SideDrawer({ party, label, defaultRole, accent, onClose, onEdit, onLedger }: {
+export function SideDrawer({ party, label, defaultRole, accent, onClose, onEdit, onLedger, onRemind }: {
   party: Party; label: string; defaultRole: string; accent: AccentConfig
-  onClose: () => void; onEdit: () => void; onLedger: () => void
+  onClose: () => void; onEdit: () => void; onLedger: () => void; onRemind?: () => void
 }) {
   const { data: ledgerData, isLoading } = usePartyLedger(party.id)
   const recentRows = ((ledgerData as any)?.rows ?? []).slice(0, 5)
@@ -508,6 +513,11 @@ export function SideDrawer({ party, label, defaultRole, accent, onClose, onEdit,
             style={{ flex: 1, background: accent.solid }}>
             <BookOpen size={13} /> Ledger
           </Button>
+          {onRemind && (
+            <Button variant="secondary" size="sm" onClick={onRemind}>
+              <Bell size={13} /> Reminder
+            </Button>
+          )}
         </div>
       </div>
     </div>
@@ -552,6 +562,7 @@ export function PartyPage({
   const [delId,        setDelId]     = useState<string | null>(null)
   const [ledger,       setLedger]    = useState<Party | null>(null)
   const [preview,      setPreview]   = useState<Party | null>(null)
+  const [remindFor,    setRemindFor] = useState<Party | null>(null)
   const [selected,     setSelected]  = useState<Set<string>>(new Set())
 
   const search = useDebounce(searchRaw, 400)
@@ -778,6 +789,7 @@ export function PartyPage({
                         onEdit={()   => { setEditing(p); setModal(true) }}
                         onLedger={()  => setLedger(p)}
                         onDelete={() => setDelId(p.id)}
+                        onRemind={() => setRemindFor(p)}
                       />
                     </td>
                   </tr>
@@ -859,6 +871,9 @@ export function PartyPage({
                   <button className="pp-mc-action-btn" onClick={() => setLedger(p)}>
                     <BookOpen size={13}/> Ledger
                   </button>
+                  <button className="pp-mc-action-btn" onClick={() => setRemindFor(p)}>
+                    <Bell size={13}/> Reminder
+                  </button>
                 </div>
               </div>
             ))
@@ -876,6 +891,7 @@ export function PartyPage({
           onClose={() => setPreview(null)}
           onEdit={() => { setEditing(preview); setPreview(null); setModal(true) }}
           onLedger={() => { setLedger(preview); setPreview(null) }}
+          onRemind={() => { setRemindFor(preview); setPreview(null) }}
         />
       )}
 
@@ -892,6 +908,19 @@ export function PartyPage({
         <Modal open onClose={() => setLedger(null)} title={`Ledger — ${ledger.name}`} size="xl">
           <LedgerTable partyId={ledger.id} accent={accent} />
         </Modal>
+      )}
+
+      {/* Quick-add Reminder — links the new reminder to this customer/supplier
+          automatically (spec section 6's "+ Reminder" quick action). */}
+      {remindFor && (
+        <ReminderFormModal
+          open onClose={() => setRemindFor(null)}
+          initial={{
+            title: `${defaultRole === 'supplier' ? 'Follow up with' : 'Call'} ${remindFor.name}${defaultRole === 'supplier' ? ' regarding payment' : ' about pending order'}`,
+            reminder_type: defaultRole === 'supplier' ? 'SUPPLIER_PAYMENT' : 'CUSTOMER_FOLLOW_UP',
+            customer_id: remindFor.id,
+          }}
+        />
       )}
 
       {/* Confirm Delete */}
