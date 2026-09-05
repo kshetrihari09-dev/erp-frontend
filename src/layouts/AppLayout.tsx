@@ -14,7 +14,6 @@ import { PATHS } from '@/constants'
 import { initials, cn } from '@/utils'
 import { todayBS as computeTodayBS } from '@/utils/nepaliDate'
 import { authAPI, reportsAPI } from '@/services/api'
-import { useReminderCounts } from '@/hooks/useQuery'
 import ToastContainer from '@/components/shared/ToastContainer'
 import CompanySwitcher from '@/modules/company/CompanySwitcher'
 
@@ -29,7 +28,6 @@ const MOBILE_BP  = 768
 const NAV = [
   { section: 'DASHBOARD' },
   { to: PATHS.DASHBOARD,  label: 'Dashboard',     icon: <LayoutDashboard size={20} strokeWidth={1.8}/> },
-  { to: PATHS.REMINDERS,  label: 'Reminders',     icon: <Bell            size={20} strokeWidth={1.8}/>, alertKey: 'remindersOverdue' },
 
   { section: 'SALES' },
   { to: PATHS.SALES,      label: 'Sales / POS',   icon: <ShoppingCart    size={20} strokeWidth={1.8}/>, alertKey: 'due' },
@@ -105,7 +103,6 @@ export default function AppLayout() {
   }, [searchQuery])
 
   const unreadCount = alerts.lowStock + alerts.expiry
-  const { data: reminderCounts } = useReminderCounts()
 
   // Close search/notification dropdowns on outside click
   useEffect(() => {
@@ -291,9 +288,7 @@ export default function AppLayout() {
                 <div key={`sec-${i}`} className="nav-section-label">{item.section}</div>
               )
             }
-            const badge = item.alertKey === 'lowStock' ? alerts.lowStock
-              : item.alertKey === 'remindersOverdue' ? (reminderCounts?.overdue || 0)
-              : 0
+            const badge = item.alertKey === 'lowStock' ? alerts.lowStock : 0
             return (
               <div
                 key={item.to}
