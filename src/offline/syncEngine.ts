@@ -105,8 +105,18 @@ export async function runSync(
       // separate error code). Schedule a backoff retry rather than
       // giving up after one rejection, since some causes (a stale
       // stock/permission snapshot) can resolve on their own.
-      const retry_count = item.retry_count + 1
-      const permanentlyFailed = retry_count >= MAX_RETRIES
+      //
+      // EXCEPTION: `err.retryable === false` (see http.ts / routes/sales.js)
+      // means the server has told us this is a structural rejection — a
+      // locked accounting period, an unbalanced voucher, etc. — that will
+      // fail identically no matter how many times this exact payload is
+      // replayed. Backing off and retrying it anyway just hides a
+      // transaction that actually needs a person's attention behind a
+      // "still syncing" state forever. Jump straight to permanently
+      // failed instead, so the failed-transactions view can surface it now.
+      const nonRetryable = err?.retryable === false
+      const retry_count = nonRetryable ? MAX_RETRIES : item.retry_count + 1
+      const permanentlyFailed = nonRetryable || retry_count >= MAX_RETRIES
       await updateQueueItem(companyId, item.client_txn_id, {
         status: 'failed',
         retry_count,
