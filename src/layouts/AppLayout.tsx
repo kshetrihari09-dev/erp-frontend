@@ -16,6 +16,7 @@ import { todayBS as computeTodayBS } from '@/utils/nepaliDate'
 import { authAPI, reportsAPI } from '@/services/api'
 import { useReminderCounts } from '@/hooks/useQuery'
 import ToastContainer from '@/components/shared/ToastContainer'
+import ReminderAlarmWatcher from '@/components/reminders/ReminderAlarmWatcher'
 import CompanySwitcher from '@/modules/company/CompanySwitcher'
 
 const SIDEBAR_W       = 260
@@ -630,6 +631,7 @@ export default function AppLayout() {
 
       {/* Toast system */}
       <ToastContainer />
+      <ReminderAlarmWatcher />
     </div>
   )
 }
