@@ -7317,3 +7317,142 @@ canvas{
 .ptp-badge--synced  { background: rgba(22,163,74,0.12); color: #15803d; }
 
 .ptp-spin { animation: qam-rotate 0.8s linear infinite; }
+
+/* ── Customer storefront shell (Customer Product Ordering module) ────────── */
+.customer-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.customer-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.customer-topbar-name { font-weight: 800; font-size: 15px; }
+.customer-topbar-user { font-size: 12px; color: var(--text-3); font-weight: 600; }
+
+.customer-main {
+  flex: 1;
+  padding-bottom: 76px; /* room for the fixed bottom nav */
+}
+
+.customer-bottomnav {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  z-index: 50;
+  display: flex;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+.customer-navitem {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 9px 4px 8px;
+  color: var(--text-4);
+  text-decoration: none;
+  min-height: 56px; /* touch target */
+}
+.customer-navitem--active { color: var(--brand); }
+.customer-navitem-icon { position: relative; }
+.customer-navitem-label { font-size: 10.5px; font-weight: 700; }
+.customer-cart-badge {
+  position: absolute;
+  top: -6px; right: -9px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 9.5px;
+  font-weight: 800;
+  min-width: 15px;
+  height: 15px;
+  border-radius: 999px;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0 3px;
+}
+
+/* Product grid — 2 columns mobile, more on wider screens (spec #26/#44) */
+.customer-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  padding: 12px;
+}
+@media (min-width: 640px)  { .customer-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 900px)  { .customer-grid { grid-template-columns: repeat(4, 1fr); } }
+@media (min-width: 1200px) { .customer-grid { grid-template-columns: repeat(5, 1fr); } }
+
+.customer-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.customer-card-img {
+  aspect-ratio: 1;
+  background: var(--surface-3);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-4);
+  font-size: 24px;
+  overflow: hidden;
+}
+.customer-card-img img { width: 100%; height: 100%; object-fit: cover; }
+.customer-card-body { padding: 9px 10px 10px; display: flex; flex-direction: column; gap: 3px; flex: 1; }
+.customer-card-name { font-size: 12.5px; font-weight: 700; line-height: 1.3; color: var(--text); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.customer-card-price { font-size: 13.5px; font-weight: 800; color: var(--brand); }
+.customer-card-unit { font-size: 10.5px; color: var(--text-4); font-weight: 600; }
+.customer-card-stock { font-size: 10.5px; font-weight: 700; }
+.customer-card-stock--ok   { color: #16a34a; }
+.customer-card-stock--low  { color: #d97706; }
+.customer-card-stock--out  { color: #dc2626; }
+
+.customer-category-scroll {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 10px 12px;
+  scrollbar-width: none;
+}
+.customer-category-scroll::-webkit-scrollbar { display: none; }
+.customer-category-chip {
+  flex-shrink: 0;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.customer-category-chip--active { background: var(--brand); color: #fff; border-color: var(--brand); }
+
+/* Desktop: bottom nav becomes a slim top nav instead of taking screen space */
+@media (min-width: 900px) {
+  .customer-main { padding-bottom: 24px; }
+  .customer-bottomnav {
+    position: sticky;
+    top: 49px; /* right under the topbar */
+    bottom: auto;
+    flex-direction: row;
+    justify-content: center;
+    gap: 32px;
+    border-top: none;
+    border-bottom: 1px solid var(--border);
+  }
+  .customer-navitem { flex: none; flex-direction: row; gap: 6px; min-height: 44px; padding: 10px 4px; }
+}

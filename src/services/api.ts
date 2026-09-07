@@ -279,6 +279,18 @@ export const notificationsAPI = {
   markAllRead: () => http.put('/notifications/read-all'),
 }
 
+// ─── Customer Orders (admin/staff side) ─────────────────────────────────────
+// Customer Product Ordering module — staff view of orders placed through
+// the customer storefront. Confirming an order server-side converts it
+// into a real Sale (routes/adminCustomerOrders.js); nothing about that
+// conversion happens on the frontend.
+export const adminCustomerOrdersAPI = {
+  list:   (params?: Params) => http.get<ApiResponse<any[]>>('/admin/customer-orders', { params }),
+  get:    (id: string) => http.get<ApiResponse<any>>(`/admin/customer-orders/${id}`),
+  setStatus: (id: string, status: string, cancel_reason?: string) =>
+    http.patch<ApiResponse<any>>(`/admin/customer-orders/${id}/status`, { status, cancel_reason }),
+}
+
 // ─── Reminders ────────────────────────────────────────────────────────────────
 export const remindersAPI = {
   list:    (params?: Params) => http.get<ApiResponse<any[]>>('/reminders', { params }),

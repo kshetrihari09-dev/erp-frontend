@@ -1,7 +1,9 @@
 import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { RequireAuth, RequireGuest } from '@/router/guards'
+import { RequireCustomerAuth, RequireCustomerGuest } from '@/router/customerGuards'
 import AppLayout from '@/layouts/AppLayout'
+import CustomerLayout from '@/layouts/CustomerLayout'
 import { PATHS } from '@/constants'
 import { Spinner } from '@/components/ui'
 
@@ -28,6 +30,18 @@ const LedgerPage   = lazy(() => import('@/modules/accounting/LedgerPage'))
 const ReportsPage  = lazy(() => import('@/modules/reports/ReportsPage'))
 const SettingsPage = lazy(() => import('@/modules/settings/SettingsPage'))
 const RemindersPage = lazy(() => import('@/modules/reminders/RemindersPage'))
+const AdminCustomerOrdersPage = lazy(() => import('@/modules/customerOrders/AdminCustomerOrdersPage'))
+
+// Customer storefront pages (Customer Product Ordering module)
+const CustomerLoginPage    = lazy(() => import('@/modules/customer/CustomerLoginPage'))
+const CustomerRegisterPage = lazy(() => import('@/modules/customer/CustomerRegisterPage'))
+const CustomerHomePage     = lazy(() => import('@/modules/customer/CustomerHomePage'))
+const CustomerProductDetailPage = lazy(() => import('@/modules/customer/CustomerProductDetailPage'))
+const CustomerCartPage     = lazy(() => import('@/modules/customer/CustomerCartPage'))
+const CustomerCheckoutPage = lazy(() => import('@/modules/customer/CustomerCheckoutPage'))
+const CustomerOrdersPage   = lazy(() => import('@/modules/customer/CustomerOrdersPage'))
+const CustomerOrderDetailPage = lazy(() => import('@/modules/customer/CustomerOrderDetailPage'))
+const CustomerProfilePage  = lazy(() => import('@/modules/customer/CustomerProfilePage'))
 
 function PageLoader() {
   return (
@@ -71,6 +85,7 @@ export default function Router() {
             <Route path="purchase-suggestions" element={<PurchaseSuggestionsPage />} />
             <Route path="credit-risk" element={<CreditRiskDashboardPage />} />
             <Route path="reminders" element={<RemindersPage />} />
+            <Route path="customer-orders" element={<AdminCustomerOrdersPage />} />
 
             {/* Parties */}
             <Route path="customers"    element={<CustomersPage />} />
@@ -87,6 +102,26 @@ export default function Router() {
 
             {/* System */}
             <Route path="settings"     element={<SettingsPage />} />
+          </Route>
+
+          {/* ── Customer storefront (Customer Product Ordering module) ──────
+               Entirely separate from the staff tree above: its own guards
+               (RequireCustomerAuth/Guest — router/customerGuards.tsx), its
+               own layout (CustomerLayout, no staff sidebar/nav), its own
+               auth store/token. A customer session and a staff session can
+               coexist in the same browser (different tabs) without
+               interfering with each other. */}
+          <Route path="/customer/login"    element={<RequireCustomerGuest><CustomerLoginPage /></RequireCustomerGuest>} />
+          <Route path="/customer/register" element={<RequireCustomerGuest><CustomerRegisterPage /></RequireCustomerGuest>} />
+
+          <Route path="/customer" element={<RequireCustomerAuth><CustomerLayout /></RequireCustomerAuth>}>
+            <Route index element={<CustomerHomePage />} />
+            <Route path="products/:id" element={<CustomerProductDetailPage />} />
+            <Route path="cart"         element={<CustomerCartPage />} />
+            <Route path="checkout"     element={<CustomerCheckoutPage />} />
+            <Route path="orders"       element={<CustomerOrdersPage />} />
+            <Route path="orders/:id"   element={<CustomerOrderDetailPage />} />
+            <Route path="profile"      element={<CustomerProfilePage />} />
           </Route>
 
           {/* 404 */}

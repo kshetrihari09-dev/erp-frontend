@@ -17,6 +17,14 @@ const env = {
   ENABLE_API_LOGS: import.meta.env.VITE_ENABLE_API_LOGS === 'true',
   FRONTEND_PORT:   import.meta.env.VITE_FRONTEND_PORT   as string  || '3000',
   BACKEND_PORT:    import.meta.env.VITE_BACKEND_PORT    as string  || '5000',
+  // Customer Product Ordering module (Phase 4): which company's catalog
+  // this storefront shows. This app is multi-tenant and there is, as of
+  // this phase, no subdomain/slug-based "which store am I on" resolution
+  // — that's flagged as a follow-up in the implementation report, not
+  // silently guessed at here. A `?company=<id>` URL query param
+  // overrides this at runtime (see modules/customer/useStorefrontCompany.ts)
+  // for testing multiple tenants against one build without a rebuild.
+  STOREFRONT_COMPANY_ID: import.meta.env.VITE_STOREFRONT_COMPANY_ID as string || '',
   // Opt-in only — existing cloud deployments (this frontend pointed at a
   // fixed hosted backend, e.g. Vercel → Render) never set this and behave
   // exactly as before: config.apiBaseUrl below is used as-is, no pre-login
@@ -63,6 +71,7 @@ export const config = {
   // including large ones, finish in a fraction of that anyway.
   apiTimeout:   60_000,
   lanMode:      env.LAN_MODE,
+  storefrontCompanyId: env.STOREFRONT_COMPANY_ID,
 
   // App
   appName:      env.APP_NAME,

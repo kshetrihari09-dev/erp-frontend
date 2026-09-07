@@ -5,7 +5,7 @@ import {
   productsAPI, salesAPI, purchasesAPI, partiesAPI, accountingAPI,
   reportsAPI, stockAPI, settingsAPI, returnsAPI, dateAPI, companiesAPI,
   purchaseSuggestionsAPI, purchaseOrdersAPI, creditRiskAPI, approvalsAPI, notificationsAPI,
-  remindersAPI,
+  remindersAPI, adminCustomerOrdersAPI,
 } from '@/services/api'
 import * as manufacturersService from '@/services/manufacturers'
 import type { ManufacturerInput } from '@/services/manufacturers'
@@ -583,6 +583,39 @@ export function useMarkNotificationRead() {
   return useMutation({
     mutationFn: notificationsAPI.markRead,
     onSuccess: () => qc.invalidateQueries({ queryKey: [QK.NOTIFICATIONS] }),
+  })
+}
+
+// ─── Customer Orders (admin/staff) ─────────────────────────────────────────
+export function useAdminCustomerOrders(params?: Record<string, unknown>) {
+  return useQuery({
+    queryKey: ['admin-customer-orders', params],
+    queryFn: () => adminCustomerOrdersAPI.list(params).then(unwrapPaginated),
+    placeholderData: keepPreviousData,
+    refetchInterval: 30_000, // new orders should show up without a manual refresh
+  })
+}
+
+export function useAdminCustomerOrder(id: string) {
+  return useQuery({
+    queryKey: ['admin-customer-order', id],
+    queryFn: () => adminCustomerOrdersAPI.get(id).then(unwrap),
+    enabled: !!id,
+  })
+}
+
+export function useSetCustomerOrderStatus() {
+  const qc = useQueryClient()
+  const { success, error } = useUIStore()
+  return useMutation({
+    mutationFn: ({ id, status, cancel_reason }: { id: string; status: string; cancel_reason?: string }) =>
+      adminCustomerOrdersAPI.setStatus(id, status, cancel_reason).then(unwrap),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ['admin-customer-orders'] })
+      qc.invalidateQueries({ queryKey: ['admin-customer-order', vars.id] })
+      success(vars.status === 'confirmed' ? 'Order confirmed — sale created' : 'Order updated')
+    },
+    onError: (e: { message: string }) => error('Could not update order', e.message),
   })
 }
 
