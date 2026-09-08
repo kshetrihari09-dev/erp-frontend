@@ -9,7 +9,7 @@ export default function CustomerLoginPage() {
   const navigate = useNavigate()
   const location = useLocation() as { state?: { from?: { pathname: string } } }
   const setAuth = useCustomerAuthStore(s => s.setAuth)
-  const { companyId, missing } = useStorefrontCompany()
+  const { companyId, missing, invalid } = useStorefrontCompany()
 
   const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
@@ -33,10 +33,14 @@ export default function CustomerLoginPage() {
     }
   }
 
-  if (missing) {
+  if (missing || invalid) {
     return (
       <div className="flex items-center justify-center h-screen p-6 text-center">
-        <p className="text-sm text-[var(--text-3)]">This storefront isn't configured yet. Please contact the store owner.</p>
+        <p className="text-sm text-[var(--text-3)]">
+          {missing
+            ? 'Store configuration is missing. Please contact the administrator.'
+            : 'Invalid store configuration.'}
+        </p>
       </div>
     )
   }
