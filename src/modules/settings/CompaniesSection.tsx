@@ -62,16 +62,24 @@ export default function CompaniesSection() {
     }
   }
 
-  // Customer-facing registration/login pages read `?company=<id>` and send
-  // it straight through to the backend as `company_id`, which the API
-  // requires to be the real company UUID (see routes/customerAuth.js) —
-  // not the company name. Building the link here, from `c.id`, means
-  // no one has to hand-type or guess that UUID again.
+  // Customer-facing registration/login pages read the storefront slug via
+  // `?store=<storefront_code>` (StorefrontContext.tsx resolves it through
+  // GET /storefront/config — see routes/storefront.js) — never the raw
+  // company UUID. A company without a storefront_code yet (shouldn't
+  // normally happen; migration 036 backfills one for every existing
+  // company) falls back to the UUID with a clear warning, since that's
+  // strictly better than silently copying a broken link.
   async function handleCopyStorefrontLink(c: UserCompany) {
-    const url = `${window.location.origin}/customer/register?company=${c.id}`
+    const url = c.storefront_code
+      ? `${window.location.origin}/customer/register?store=${c.storefront_code}`
+      : `${window.location.origin}/customer/register?company=${c.id}`
     try {
       await navigator.clipboard.writeText(url)
-      success('Storefront link copied', url)
+      if (c.storefront_code) {
+        success('Storefront link copied', url)
+      } else {
+        success('Storefront link copied (no storefront code set)', url + ' — set a storefront code under Settings → Company for a cleaner link.')
+      }
     } catch {
       error('Could not copy link', 'Your browser blocked clipboard access. Copy it manually: ' + url)
     }

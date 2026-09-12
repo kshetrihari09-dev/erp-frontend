@@ -19,6 +19,7 @@ export default function CompanySection() {
       name: '', address: '', phone: '', email: '',
       pan_no: '', registration_no: '', invoice_prefix: 'INV',
       currency: 'NPR', vat_percent: 13, date_system: 'AD' as 'AD' | 'BS',
+      storefront_code: '',
     },
   })
 
@@ -35,6 +36,7 @@ export default function CompanySection() {
         currency:         company.currency || 'NPR',
         vat_percent:      company.vat_percent || 13,
         date_system:      company.date_system || 'AD',
+        storefront_code:  company.storefront_code || '',
       })
     }
   }, [company])
@@ -94,6 +96,19 @@ export default function CompanySection() {
           <div className="stp-span2">
             <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">Address</label>
             <input className="erp-input" placeholder="Kathmandu, Nepal" {...register('address')} />
+          </div>
+          <div className="stp-span2">
+            <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">Storefront Code</label>
+            <input
+              className="erp-input"
+              placeholder="chandrauta"
+              {...register('storefront_code', {
+                pattern: { value: /^[a-z0-9]+(-[a-z0-9]*)*$/i, message: 'Letters, numbers, and hyphens only' },
+              })}
+            />
+            <p className="text-[11px] text-[var(--text-3)] mt-1">
+              Used in your customer storefront link instead of an internal ID, e.g. /customer/register?store={'{code}'}.
+            </p>
           </div>
         </div>
         <div className="flex justify-end mt-5">

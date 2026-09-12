@@ -1,7 +1,8 @@
 import { lazy, Suspense } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom'
 import { RequireAuth, RequireGuest } from '@/router/guards'
 import { RequireCustomerAuth, RequireCustomerGuest } from '@/router/customerGuards'
+import { StorefrontProvider } from '@/modules/customer/StorefrontContext'
 import AppLayout from '@/layouts/AppLayout'
 import CustomerLayout from '@/layouts/CustomerLayout'
 import { PATHS } from '@/constants'
@@ -110,18 +111,26 @@ export default function Router() {
                own layout (CustomerLayout, no staff sidebar/nav), its own
                auth store/token. A customer session and a staff session can
                coexist in the same browser (different tabs) without
-               interfering with each other. */}
-          <Route path="/customer/login"    element={<RequireCustomerGuest><CustomerLoginPage /></RequireCustomerGuest>} />
-          <Route path="/customer/register" element={<RequireCustomerGuest><CustomerRegisterPage /></RequireCustomerGuest>} />
+               interfering with each other.
 
-          <Route path="/customer" element={<RequireCustomerAuth><CustomerLayout /></RequireCustomerAuth>}>
-            <Route index element={<CustomerHomePage />} />
-            <Route path="products/:id" element={<CustomerProductDetailPage />} />
-            <Route path="cart"         element={<CustomerCartPage />} />
-            <Route path="checkout"     element={<CustomerCheckoutPage />} />
-            <Route path="orders"       element={<CustomerOrdersPage />} />
-            <Route path="orders/:id"   element={<CustomerOrderDetailPage />} />
-            <Route path="profile"      element={<CustomerProfilePage />} />
+               StorefrontProvider (modules/customer/StorefrontContext.tsx) is
+               mounted once here, above every /customer/* page — the single
+               source of truth for "which company" (spec §5), resolved from
+               ?store=<slug> / VITE_STOREFRONT_CODE (no UUID in the URL in
+               production), never re-resolved independently per page. */}
+          <Route path="/customer" element={<StorefrontProvider><Outlet /></StorefrontProvider>}>
+            <Route path="login"    element={<RequireCustomerGuest><CustomerLoginPage /></RequireCustomerGuest>} />
+            <Route path="register" element={<RequireCustomerGuest><CustomerRegisterPage /></RequireCustomerGuest>} />
+
+            <Route element={<RequireCustomerAuth><CustomerLayout /></RequireCustomerAuth>}>
+              <Route index element={<CustomerHomePage />} />
+              <Route path="products/:id" element={<CustomerProductDetailPage />} />
+              <Route path="cart"         element={<CustomerCartPage />} />
+              <Route path="checkout"     element={<CustomerCheckoutPage />} />
+              <Route path="orders"       element={<CustomerOrdersPage />} />
+              <Route path="orders/:id"   element={<CustomerOrderDetailPage />} />
+              <Route path="profile"      element={<CustomerProfilePage />} />
+            </Route>
           </Route>
 
           {/* 404 */}

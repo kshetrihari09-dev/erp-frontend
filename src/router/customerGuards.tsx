@@ -41,7 +41,10 @@ export function RequireCustomerAuth({ children }: { children: React.ReactNode })
     )
   }
   if (!valid || !isAuthenticated) {
-    return <Navigate to="/customer/login" state={{ from: location }} replace />
+    // Preserve ?store=/?company= across the redirect — see
+    // services/customerHttp.ts's 401 handler for why this matters for a
+    // multi-tenant deployment with no build-time storefront config.
+    return <Navigate to={`/customer/login${location.search}`} state={{ from: location }} replace />
   }
   return <>{children}</>
 }

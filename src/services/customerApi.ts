@@ -2,6 +2,13 @@ import customerHttp from './customerHttp'
 
 type Params = Record<string, unknown>
 
+// Public — no customer token required/sent (resolved before any customer
+// is logged in). Backend: routes/storefront.js.
+export const storefrontAPI = {
+  config: (params: { store?: string; company?: string }) =>
+    customerHttp.get('/storefront/config', { params }),
+}
+
 export const customerAuthAPI = {
   register: (data: { company_id: string; name: string; phone: string; password: string; email?: string; address?: string }) =>
     customerHttp.post('/customer-auth/register', data),

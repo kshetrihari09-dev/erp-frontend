@@ -40,7 +40,12 @@ customerHttp.interceptors.response.use(
       localStorage.removeItem(CUSTOMER_RAW_TOKEN_KEY)
       localStorage.removeItem('erp_customer_auth_state')
       if (!window.location.pathname.startsWith('/customer/login')) {
-        window.location.href = '/customer/login'
+        // Preserve ?store=/?company= (StorefrontContext.tsx's resolution
+        // params) across the redirect — a multi-tenant deployment with no
+        // VITE_STOREFRONT_CODE baked in relies entirely on the URL, and a
+        // session-expiry redirect must not silently drop the customer onto
+        // an unconfigured storefront.
+        window.location.href = `/customer/login${window.location.search}`
       }
     }
 

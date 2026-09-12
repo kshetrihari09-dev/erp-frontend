@@ -50,6 +50,7 @@ export interface Company {
   pan_no?:         string
   registration_no?: string
   logo_url?:       string
+  storefront_code?: string | null
   date_system:     'BS' | 'AD'
   invoice_prefix:  string
   currency:        string
