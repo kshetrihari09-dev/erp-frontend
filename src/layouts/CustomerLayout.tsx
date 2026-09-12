@@ -10,7 +10,7 @@
  */
 import { NavLink, Outlet } from 'react-router-dom'
 import { Home, ShoppingCart, ClipboardList, User } from 'lucide-react'
-import { useCustomerCart } from '@/hooks/useCustomerQuery'
+import { useActiveCart } from '@/hooks/useCustomerQuery'
 import useCustomerAuthStore from '@/store/customerAuthStore'
 import ToastContainer from '@/components/shared/ToastContainer'
 
@@ -22,7 +22,11 @@ const TABS = [
 ]
 
 export default function CustomerLayout() {
-  const { data: cart } = useCustomerCart()
+  // useActiveCart() — the persisted server cart when logged in, or the
+  // guest's browser-held cart (store/guestCartStore.ts) otherwise — so
+  // the badge count is correct either way (spec §14: browsing/cart work
+  // without an account).
+  const { data: cart } = useActiveCart()
   const customer = useCustomerAuthStore(s => s.customer)
   const cartCount = cart?.items?.length || 0
 
@@ -30,7 +34,9 @@ export default function CustomerLayout() {
     <div className="customer-shell">
       <header className="customer-topbar">
         <span className="customer-topbar-name">🛍️ Store</span>
-        {customer && <span className="customer-topbar-user">Hi, {customer.name.split(' ')[0]}</span>}
+        {customer
+          ? <span className="customer-topbar-user">Hi, {customer.name.split(' ')[0]}</span>
+          : <NavLink to="/customer/login" className="customer-topbar-user text-brand font-semibold">Sign in</NavLink>}
       </header>
 
       <main className="customer-main">

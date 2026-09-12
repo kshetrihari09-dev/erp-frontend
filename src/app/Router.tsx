@@ -122,14 +122,18 @@ export default function Router() {
             <Route path="login"    element={<RequireCustomerGuest><CustomerLoginPage /></RequireCustomerGuest>} />
             <Route path="register" element={<RequireCustomerGuest><CustomerRegisterPage /></RequireCustomerGuest>} />
 
-            <Route element={<RequireCustomerAuth><CustomerLayout /></RequireCustomerAuth>}>
+            {/* CustomerLayout itself is NOT behind RequireCustomerAuth —
+                spec §14: browsing, cart, and checkout all work for a guest.
+                Only order history and profile (which need an actual
+                account) are individually guarded below. */}
+            <Route element={<CustomerLayout />}>
               <Route index element={<CustomerHomePage />} />
               <Route path="products/:id" element={<CustomerProductDetailPage />} />
               <Route path="cart"         element={<CustomerCartPage />} />
               <Route path="checkout"     element={<CustomerCheckoutPage />} />
-              <Route path="orders"       element={<CustomerOrdersPage />} />
-              <Route path="orders/:id"   element={<CustomerOrderDetailPage />} />
-              <Route path="profile"      element={<CustomerProfilePage />} />
+              <Route path="orders"       element={<RequireCustomerAuth><CustomerOrdersPage /></RequireCustomerAuth>} />
+              <Route path="orders/:id"   element={<RequireCustomerAuth><CustomerOrderDetailPage /></RequireCustomerAuth>} />
+              <Route path="profile"      element={<RequireCustomerAuth><CustomerProfilePage /></RequireCustomerAuth>} />
             </Route>
           </Route>
 

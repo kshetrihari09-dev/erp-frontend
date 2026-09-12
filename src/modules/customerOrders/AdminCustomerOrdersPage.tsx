@@ -59,7 +59,10 @@ export default function AdminCustomerOrdersPage() {
               className="flex items-center justify-between p-3.5 rounded-xl border border-[var(--border)] bg-[var(--surface)] hover:bg-[var(--surface-2)] text-left"
             >
               <div>
-                <div className="text-sm font-bold">{o.order_no} <span className="font-normal text-[var(--text-3)]">— {o.customer_name}</span></div>
+                <div className="text-sm font-bold">
+                  {o.order_no} <span className="font-normal text-[var(--text-3)]">— {o.customer_name}</span>
+                  {o.is_guest && <span className="ml-1.5 text-[10px] font-bold uppercase text-amber-700 bg-amber-100 rounded px-1.5 py-0.5 align-middle">Guest</span>}
+                </div>
                 <div className="text-xs text-[var(--text-4)]">{o.customer_phone} · {new Date(o.created_at).toLocaleString()}</div>
                 <div className="text-sm font-extrabold mt-1">Rs. {Number(o.grand_total).toFixed(2)}</div>
               </div>
@@ -101,11 +104,20 @@ function OrderDetailModal({ id, onClose }: { id: string; onClose: () => void }) 
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <div>
-            <div className="text-sm font-bold">{order.customer_name}</div>
+            <div className="text-sm font-bold flex items-center gap-1.5">
+              {order.customer_name}
+              {order.is_guest && <span className="text-[10px] font-bold uppercase text-amber-700 bg-amber-100 rounded px-1.5 py-0.5">Guest</span>}
+            </div>
             <div className="text-xs text-[var(--text-4)]">{order.customer_phone}{order.customer_email ? ` · ${order.customer_email}` : ''}</div>
           </div>
           <Badge status={order.status}>{order.status.toUpperCase()}</Badge>
         </div>
+
+        {order.is_guest && (
+          <div className="text-xs font-medium text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            This order was placed by a guest, with no account on file.
+          </div>
+        )}
 
         {order.sale_id && (
           <div className="text-xs font-semibold text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">

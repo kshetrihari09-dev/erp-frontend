@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Plus, Minus, ImageOff } from 'lucide-react'
-import { useAddToCart, useUpdateCartItem, useRemoveCartItem } from '@/hooks/useCustomerQuery'
+import { useCartActions } from '@/hooks/useCustomerQuery'
 import { Button } from '@/components/ui'
 
 export interface CatalogCard {
@@ -20,22 +20,18 @@ function stockClass(label: string | null) {
 
 export default function CustomerProductCard({ product, cartItem }: {
   product: CatalogCard
-  cartItem?: { cart_item_id: string; quantity: number } | null
+  cartItem?: { cart_item_id: string | null; quantity: number } | null
 }) {
-  const addToCart = useAddToCart()
-  const updateItem = useUpdateCartItem()
-  const removeItem = useRemoveCartItem()
+  const { addItem, setQuantity, isBusy } = useCartActions()
   const [imgError, setImgError] = useState(false)
-  const busy = addToCart.isPending || updateItem.isPending || removeItem.isPending
 
   function handleAdd() {
-    addToCart.mutate({ productId: product.id, quantity: product.min_qty || 1 })
+    addItem(product.id, product.min_qty || 1)
   }
   function handleStep(delta: number) {
     if (!cartItem) return
     const next = cartItem.quantity + delta * product.qty_step
-    if (next < product.min_qty) { removeItem.mutate(cartItem.cart_item_id); return }
-    updateItem.mutate({ itemId: cartItem.cart_item_id, quantity: next })
+    setQuantity(product.id, cartItem.cart_item_id, next, product.min_qty)
   }
 
   return (
@@ -57,12 +53,12 @@ export default function CustomerProductCard({ product, cartItem }: {
           <Button variant="secondary" size="sm" disabled className="mt-1">Unavailable</Button>
         ) : cartItem ? (
           <div className="flex items-center justify-between mt-1 border border-[var(--border)] rounded-lg overflow-hidden">
-            <button onClick={() => handleStep(-1)} disabled={busy} className="flex-1 h-7 flex items-center justify-center hover:bg-[var(--surface-2)]"><Minus size={13} /></button>
+            <button onClick={() => handleStep(-1)} disabled={isBusy} className="flex-1 h-7 flex items-center justify-center hover:bg-[var(--surface-2)]"><Minus size={13} /></button>
             <span className="text-xs font-bold px-2">{cartItem.quantity}</span>
-            <button onClick={() => handleStep(1)} disabled={busy} className="flex-1 h-7 flex items-center justify-center hover:bg-[var(--surface-2)]"><Plus size={13} /></button>
+            <button onClick={() => handleStep(1)} disabled={isBusy} className="flex-1 h-7 flex items-center justify-center hover:bg-[var(--surface-2)]"><Plus size={13} /></button>
           </div>
         ) : (
-          <Button variant="primary" size="sm" onClick={handleAdd} disabled={busy} className="mt-1">Add</Button>
+          <Button variant="primary" size="sm" onClick={handleAdd} disabled={isBusy} className="mt-1">Add</Button>
         )}
       </div>
     </div>

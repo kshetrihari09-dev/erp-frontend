@@ -1,14 +1,12 @@
 import { useNavigate } from 'react-router-dom'
 import { Plus, Minus, Trash2, AlertTriangle, ImageOff } from 'lucide-react'
 import { Spinner, Button, Empty } from '@/components/ui'
-import { useCustomerCart, useUpdateCartItem, useRemoveCartItem, useClearCart } from '@/hooks/useCustomerQuery'
+import { useActiveCart, useCartActions } from '@/hooks/useCustomerQuery'
 
 export default function CustomerCartPage() {
   const navigate = useNavigate()
-  const { data: cart, isLoading } = useCustomerCart()
-  const updateItem = useUpdateCartItem()
-  const removeItem = useRemoveCartItem()
-  const clearCart = useClearCart()
+  const { data: cart, isLoading } = useActiveCart()
+  const { setQuantity, removeItem, clear } = useCartActions()
 
   if (isLoading) return <div className="flex justify-center py-16"><Spinner size={26} className="text-brand" /></div>
   if (!cart?.items?.length) return <Empty icon="🛒" message="Your cart is empty." />
@@ -17,22 +15,21 @@ export default function CustomerCartPage() {
 
   function stepQty(item: any, delta: number) {
     const next = item.quantity + delta * (item.qty_step || 1)
-    if (next < item.min_qty) { removeItem.mutate(item.cart_item_id); return }
-    updateItem.mutate({ itemId: item.cart_item_id, quantity: next })
+    setQuantity(item.product_id, item.cart_item_id, next, item.min_qty)
   }
 
   return (
     <div className="pb-28">
       <div className="flex items-center justify-between px-4 pt-3">
         <h1 className="text-base font-extrabold">Your Cart</h1>
-        <button onClick={() => { if (confirm('Clear your entire cart?')) clearCart.mutate(undefined) }} className="text-xs font-semibold text-red-600">
+        <button onClick={() => { if (confirm('Clear your entire cart?')) clear() }} className="text-xs font-semibold text-red-600">
           Clear all
         </button>
       </div>
 
       <div className="flex flex-col gap-2 p-3">
         {items.map(item => (
-          <div key={item.cart_item_id} className={`flex gap-3 p-3 rounded-xl border ${item.valid && item.still_online ? 'border-[var(--border)] bg-[var(--surface)]' : 'border-red-300 bg-red-50/40'}`}>
+          <div key={item.cart_item_id ?? item.product_id} className={`flex gap-3 p-3 rounded-xl border ${item.valid && item.still_online ? 'border-[var(--border)] bg-[var(--surface)]' : 'border-red-300 bg-red-50/40'}`}>
             <div className="w-14 h-14 rounded-lg bg-[var(--surface-3)] flex items-center justify-center flex-shrink-0 overflow-hidden">
               {item.image_url ? <img src={item.image_url} className="w-full h-full object-cover" /> : <ImageOff size={16} className="text-[var(--text-4)]" />}
             </div>
@@ -53,7 +50,7 @@ export default function CustomerCartPage() {
                 <span className="text-sm font-bold">Rs. {item.subtotal.toFixed(2)}</span>
               </div>
             </div>
-            <button onClick={() => removeItem.mutate(item.cart_item_id)} className="text-[var(--text-4)] hover:text-red-600 self-start">
+            <button onClick={() => removeItem(item.product_id, item.cart_item_id)} className="text-[var(--text-4)] hover:text-red-600 self-start">
               <Trash2 size={15} />
             </button>
           </div>

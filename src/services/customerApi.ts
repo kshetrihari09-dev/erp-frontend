@@ -33,6 +33,11 @@ export const customerCartAPI = {
   update: (itemId: string, quantity: number) => customerHttp.patch(`/customer-cart/${itemId}`, { quantity }),
   remove: (itemId: string) => customerHttp.delete(`/customer-cart/${itemId}`),
   clear: () => customerHttp.delete('/customer-cart'),
+  // Guest checkout (spec §14) — stateless equivalent of `list()`: prices/
+  // validates whatever the browser-held guest cart currently holds,
+  // nothing persisted server-side. See store/guestCartStore.ts.
+  preview: (items: { product_id: string; quantity: number }[]) =>
+    customerHttp.post('/customer-cart/preview', { items }),
 }
 
 export const customerOrdersAPI = {
@@ -41,6 +46,12 @@ export const customerOrdersAPI = {
     delivery_address?: string; delivery_phone?: string; delivery_notes?: string
     payment_method: 'cash_on_delivery' | 'pay_at_store'
     notes?: string
+    // Guest checkout only — omitted entirely for a logged-in customer,
+    // who already has a persisted server-side cart the backend reads
+    // instead (routes/customerOrders.js branches on req.customer).
+    items?: { product_id: string; quantity: number }[]
+    guest_name?: string
+    guest_phone?: string
   }) => customerHttp.post('/customer-orders', data),
   list: (params?: Params) => customerHttp.get('/customer-orders', { params }),
   get: (id: string) => customerHttp.get(`/customer-orders/${id}`),

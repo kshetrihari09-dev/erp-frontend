@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { SearchInput, Empty, Spinner, Pagination } from '@/components/ui'
-import { useCustomerProducts, useCustomerCategories, useCustomerCart } from '@/hooks/useCustomerQuery'
+import { useCustomerProducts, useCustomerCategories, useActiveCart } from '@/hooks/useCustomerQuery'
 import CustomerProductCard from './CustomerProductCard'
 
 /** Standard debounce — search-as-you-type without a request per keystroke
@@ -26,10 +26,10 @@ export default function CustomerHomePage() {
   const { data, isLoading, isError, refetch } = useCustomerProducts({
     search: debouncedSearch || undefined, category: category || undefined, page, limit: 24,
   })
-  const { data: cart } = useCustomerCart()
+  const { data: cart } = useActiveCart()
 
   const cartMap = useMemo(() => {
-    const m = new Map<string, { cart_item_id: string; quantity: number }>()
+    const m = new Map<string, { cart_item_id: string | null; quantity: number }>()
     for (const item of cart?.items || []) m.set(item.product_id, { cart_item_id: item.cart_item_id, quantity: item.quantity })
     return m
   }, [cart])

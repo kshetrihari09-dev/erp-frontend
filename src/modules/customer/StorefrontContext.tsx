@@ -29,6 +29,7 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import { useSearchParams } from 'react-router-dom'
 import { config } from '@/config/env'
 import { storefrontAPI } from '@/services/customerApi'
+import { setGuestStorefrontCompanyId } from '@/services/customerHttp'
 
 export type StorefrontStatus = 'loading' | 'ok' | 'missing' | 'invalid' | 'error'
 
@@ -79,6 +80,7 @@ export function StorefrontProvider({ children }: { children: ReactNode }) {
       .then((res) => {
         if (cancelled) return
         const store = res.data.data?.store ?? res.data.store
+        setGuestStorefrontCompanyId(store.company_id) // see customerHttp.ts — carried as X-Store-Company for guest requests
         setState({
           status: 'ok',
           companyId: store.company_id,
@@ -92,6 +94,7 @@ export function StorefrontProvider({ children }: { children: ReactNode }) {
       })
       .catch((err) => {
         if (cancelled) return
+        setGuestStorefrontCompanyId(null)
         const httpStatus = err?.status
         setState({ ...initialState, status: httpStatus === 400 ? 'missing' : httpStatus === 404 ? 'invalid' : 'error' })
       })

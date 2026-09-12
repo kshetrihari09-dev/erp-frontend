@@ -24,9 +24,27 @@ const customerHttp = axios.create({
   headers: { 'Content-Type': 'application/json' },
 })
 
+// Guest checkout (spec §14): a guest has no token, so there's nothing for
+// the request interceptor to attach for company scoping the way it does
+// for a logged-in customer's Authorization header below. Instead,
+// StorefrontContext.tsx calls setGuestStorefrontCompanyId() once it has
+// resolved the store (via the public GET /storefront/config), and every
+// subsequent unauthenticated request carries that as X-Store-Company —
+// the same company_id the backend's resolveCustomerOrGuest middleware
+// already accepts from a request body (routes/customerAuth.js's
+// register/login), just available here for GET requests too.
+let guestStorefrontCompanyId: string | null = null
+export function setGuestStorefrontCompanyId(id: string | null) {
+  guestStorefrontCompanyId = id
+}
+
 customerHttp.interceptors.request.use((config_: InternalAxiosRequestConfig) => {
   const token = localStorage.getItem(CUSTOMER_RAW_TOKEN_KEY)
-  if (token && token !== 'null') config_.headers.Authorization = `Bearer ${token}`
+  if (token && token !== 'null') {
+    config_.headers.Authorization = `Bearer ${token}`
+  } else if (guestStorefrontCompanyId) {
+    config_.headers['X-Store-Company'] = guestStorefrontCompanyId
+  }
   return config_
 })
 

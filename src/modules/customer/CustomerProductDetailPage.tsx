@@ -2,15 +2,14 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ChevronLeft, Plus, Minus, ImageOff } from 'lucide-react'
 import { Spinner, Button, Empty } from '@/components/ui'
-import { useCustomerProduct, useCustomerCart, useAddToCart, useUpdateCartItem } from '@/hooks/useCustomerQuery'
+import { useCustomerProduct, useActiveCart, useCartActions } from '@/hooks/useCustomerQuery'
 
 export default function CustomerProductDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { data: product, isLoading, isError } = useCustomerProduct(id!)
-  const { data: cart } = useCustomerCart()
-  const addToCart = useAddToCart()
-  const updateItem = useUpdateCartItem()
+  const { data: cart } = useActiveCart()
+  const { addItem, setQuantity, isBusy } = useCartActions()
   const [imgError, setImgError] = useState(false)
 
   const cartItem = cart?.items?.find((i: any) => i.product_id === id)
@@ -29,11 +28,9 @@ export default function CustomerProductDetailPage() {
   }
 
   function handlePrimaryAction() {
-    if (cartItem) updateItem.mutate({ itemId: cartItem.cart_item_id, quantity: qty })
-    else addToCart.mutate({ productId: product.id, quantity: qty })
+    if (cartItem) setQuantity(product.id, cartItem.cart_item_id, qty, product.min_qty)
+    else addItem(product.id, qty)
   }
-
-  const busy = addToCart.isPending || updateItem.isPending
 
   return (
     <div className="pb-4">
@@ -76,7 +73,7 @@ export default function CustomerProductDetailPage() {
         )}
 
         <Button
-          variant="primary" className="mt-4" loading={busy} disabled={!product.can_order}
+          variant="primary" className="mt-4" loading={isBusy} disabled={!product.can_order}
           onClick={handlePrimaryAction}
         >
           {!product.can_order ? 'Unavailable' : cartItem ? 'Update Cart' : 'Add to Cart'}
