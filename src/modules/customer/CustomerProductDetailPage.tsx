@@ -64,19 +64,23 @@ export default function CustomerProductDetailPage() {
         {product.can_order && (
           <div className="flex items-center gap-4 mt-4">
             <span className="text-sm font-semibold text-[var(--text-2)]">Quantity</span>
-            <div className="flex items-center border border-[var(--border)] rounded-lg overflow-hidden">
-              <button onClick={() => adjust(-1)} className="w-9 h-9 flex items-center justify-center hover:bg-[var(--surface-2)]"><Minus size={14} /></button>
-              <span className="w-10 text-center text-sm font-bold">{qty}</span>
-              <button onClick={() => adjust(1)} className="w-9 h-9 flex items-center justify-center hover:bg-[var(--surface-2)]"><Plus size={14} /></button>
+            <div className="customer-qty-stepper" style={{ maxWidth: 132 }}>
+              <button onClick={() => adjust(-1)} className="customer-qty-btn" style={{ height: 40, minWidth: 40 }}><Minus size={15} /></button>
+              <span className="customer-qty-value" style={{ minWidth: 36, fontSize: 14 }}>{qty}</span>
+              <button onClick={() => adjust(1)} className="customer-qty-btn" style={{ height: 40, minWidth: 40 }}><Plus size={15} /></button>
             </div>
           </div>
         )}
 
+        {cartItem && (
+          <span className="text-[11px] font-semibold text-brand">Already in your cart: {cartItem.quantity} {product.unit_label}</span>
+        )}
+
         <Button
-          variant="primary" className="mt-4" loading={isBusy} disabled={!product.can_order}
+          variant="primary" size="lg" className="mt-4 !h-12 !text-base" loading={isBusy} disabled={!product.can_order}
           onClick={handlePrimaryAction}
         >
-          {!product.can_order ? 'Unavailable' : cartItem ? 'Update Cart' : 'Add to Cart'}
+          {!product.can_order ? 'Unavailable' : cartItem ? `Update Cart · Rs. ${(product.price * qty).toFixed(0)}` : `Add to Cart · Rs. ${(product.price * qty).toFixed(0)}`}
         </Button>
       </div>
     </div>

@@ -81,14 +81,24 @@ export default function CustomerCheckoutPage() {
         </div>
       )}
 
-      {isGuest && (
+      {isGuest ? (
         <section className="flex flex-col gap-3">
-          <h2 className="text-xs font-bold uppercase text-[var(--text-4)]">Your Details</h2>
+          <h2 className="text-xs font-bold uppercase text-[var(--text-4)]">Customer Details</h2>
           <Input label="Full Name *" value={guestName} onChange={e => setGuestName(e.target.value)} />
           <Input label="Phone Number *" value={guestPhone} onChange={e => setGuestPhone(e.target.value)} placeholder="98XXXXXXXX" />
           <p className="text-[11px] text-[var(--text-3)]">
             Have an account? <a href={`/customer/login${window.location.search}`} className="text-brand font-semibold">Log in</a> to track your orders.
           </p>
+        </section>
+      ) : (
+        <section>
+          <h2 className="text-xs font-bold uppercase text-[var(--text-4)] mb-2">Customer Details</h2>
+          <div className="flex items-center justify-between p-3 border border-[var(--border)] rounded-lg">
+            <div>
+              <div className="text-sm font-semibold">{customer?.name}</div>
+              <div className="text-xs text-[var(--text-4)]">{customer?.phone}</div>
+            </div>
+          </div>
         </section>
       )}
 
@@ -120,9 +130,12 @@ export default function CustomerCheckoutPage() {
             { value: 'pay_at_store', label: 'Pay at Store' },
             { value: 'cash_on_delivery', label: 'Cash on Delivery' },
           ].map(opt => (
-            <label key={opt.value} className="flex items-center gap-2 p-3 border border-[var(--border)] rounded-lg cursor-pointer">
-              <input type="radio" checked={payment === opt.value} onChange={() => setPayment(opt.value as any)} />
-              <span className="text-sm font-medium">{opt.label}</span>
+            <label
+              key={opt.value}
+              className={`flex items-center gap-2.5 p-3 border-2 rounded-lg cursor-pointer transition-colors ${payment === opt.value ? 'border-brand bg-brand/5' : 'border-[var(--border)]'}`}
+            >
+              <input type="radio" checked={payment === opt.value} onChange={() => setPayment(opt.value as any)} className="accent-[var(--brand)]" />
+              <span className={`text-sm font-semibold ${payment === opt.value ? 'text-brand' : 'text-[var(--text-2)]'}`}>{opt.label}</span>
             </label>
           ))}
         </div>
@@ -135,7 +148,9 @@ export default function CustomerCheckoutPage() {
         <div className="flex justify-between text-base font-extrabold pt-1"><span>Total</span><span>Rs. {(cart.subtotal - cart.discount_amount + cart.tax_amount).toFixed(2)}</span></div>
       </section>
 
-      <Button variant="primary" loading={checkout.isPending} onClick={handlePlaceOrder}>Place Order</Button>
+      <Button variant="primary" loading={checkout.isPending} onClick={handlePlaceOrder}>
+        Place Order • Rs. {(cart.subtotal - cart.discount_amount + cart.tax_amount).toFixed(2)}
+      </Button>
     </div>
   )
 }

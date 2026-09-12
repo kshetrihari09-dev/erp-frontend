@@ -200,6 +200,12 @@ export const statusColor = (status: string) => {
     worsening:  'badge-red',
     approved:   'badge-green',
     rejected:   'badge-red',
+    // Customer order statuses (routes/customerOrders.js) — additive, doesn't
+    // touch any key already used elsewhere in the app.
+    confirmed:  'badge-blue',
+    processing: 'badge-amber',
+    ready:      'badge-purple',
+    completed:  'badge-green',
   }
   return map[status?.toLowerCase()] || 'badge-muted'
 }

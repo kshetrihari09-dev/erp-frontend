@@ -184,11 +184,12 @@ export function StatCard({ label, value, sub, color = 'var(--brand)', icon, onCl
 }
 
 // ─── Empty state ──────────────────────────────────────────────────────────────
-export function Empty({ message = 'No data found', icon }: { message?: string; icon?: ReactNode }) {
+export function Empty({ message = 'No data found', icon, action }: { message?: string; icon?: ReactNode; action?: ReactNode }) {
   return (
     <div className="flex flex-col items-center justify-center py-14 gap-3 text-[var(--text-4)]">
       <div className="text-3xl opacity-30">{icon || '📭'}</div>
       <p className="text-sm">{message}</p>
+      {action && <div className="mt-1">{action}</div>}
     </div>
   )
 }
@@ -467,11 +468,21 @@ export function SearchInput({ value, onChange, placeholder = 'Search…', classN
     <div className={cn('relative', className)}>
       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-4)] text-sm pointer-events-none">⌕</span>
       <input
-        className="erp-input pl-8 pr-3"
+        className="erp-input pl-8 pr-8"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
       />
+      {value && (
+        <button
+          type="button"
+          onClick={() => onChange('')}
+          aria-label="Clear search"
+          className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded-full text-[var(--text-4)] hover:text-[var(--text-2)] hover:bg-[var(--surface-3)] text-xs leading-none"
+        >
+          ✕
+        </button>
+      )}
     </div>
   )
 }

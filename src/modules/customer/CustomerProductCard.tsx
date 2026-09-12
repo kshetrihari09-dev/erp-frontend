@@ -52,13 +52,13 @@ export default function CustomerProductCard({ product, cartItem }: {
         {!product.can_order ? (
           <Button variant="secondary" size="sm" disabled className="mt-1">Unavailable</Button>
         ) : cartItem ? (
-          <div className="flex items-center justify-between mt-1 border border-[var(--border)] rounded-lg overflow-hidden">
-            <button onClick={() => handleStep(-1)} disabled={isBusy} className="flex-1 h-7 flex items-center justify-center hover:bg-[var(--surface-2)]"><Minus size={13} /></button>
-            <span className="text-xs font-bold px-2">{cartItem.quantity}</span>
-            <button onClick={() => handleStep(1)} disabled={isBusy} className="flex-1 h-7 flex items-center justify-center hover:bg-[var(--surface-2)]"><Plus size={13} /></button>
+          <div className="customer-qty-stepper mt-1">
+            <button onClick={() => handleStep(-1)} disabled={isBusy} className="customer-qty-btn"><Minus size={14} /></button>
+            <span className="customer-qty-value">{cartItem.quantity}</span>
+            <button onClick={() => handleStep(1)} disabled={isBusy} className="customer-qty-btn"><Plus size={14} /></button>
           </div>
         ) : (
-          <Button variant="primary" size="sm" onClick={handleAdd} disabled={isBusy} className="mt-1">Add</Button>
+          <Button variant="primary" size="sm" onClick={handleAdd} disabled={isBusy} className="mt-1 !h-9">Add</Button>
         )}
       </div>
     </div>

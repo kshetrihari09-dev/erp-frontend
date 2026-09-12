@@ -9,7 +9,15 @@ export default function CustomerCartPage() {
   const { setQuantity, removeItem, clear } = useCartActions()
 
   if (isLoading) return <div className="flex justify-center py-16"><Spinner size={26} className="text-brand" /></div>
-  if (!cart?.items?.length) return <Empty icon="🛒" message="Your cart is empty." />
+  if (!cart?.items?.length) {
+    return (
+      <Empty
+        icon="🛒"
+        message="Your cart is empty."
+        action={<Button variant="primary" size="sm" onClick={() => navigate('/customer')}>Start Shopping</Button>}
+      />
+    )
+  }
 
   const items = cart.items as any[]
 
@@ -42,33 +50,46 @@ export default function CustomerCartPage() {
                 </div>
               )}
               <div className="flex items-center justify-between mt-2">
-                <div className="flex items-center border border-[var(--border)] rounded-lg overflow-hidden">
-                  <button onClick={() => stepQty(item, -1)} className="w-7 h-7 flex items-center justify-center hover:bg-[var(--surface-2)]"><Minus size={12} /></button>
-                  <span className="w-8 text-center text-xs font-bold">{item.quantity}</span>
-                  <button onClick={() => stepQty(item, 1)} className="w-7 h-7 flex items-center justify-center hover:bg-[var(--surface-2)]"><Plus size={12} /></button>
+                <div className="customer-qty-stepper" style={{ borderRadius: 8 }}>
+                  <button onClick={() => stepQty(item, -1)} className="customer-qty-btn" style={{ height: 32, minWidth: 32 }}><Minus size={13} /></button>
+                  <span className="customer-qty-value">{item.quantity}</span>
+                  <button onClick={() => stepQty(item, 1)} className="customer-qty-btn" style={{ height: 32, minWidth: 32 }}><Plus size={13} /></button>
                 </div>
                 <span className="text-sm font-bold">Rs. {item.subtotal.toFixed(2)}</span>
               </div>
             </div>
-            <button onClick={() => removeItem(item.product_id, item.cart_item_id)} className="text-[var(--text-4)] hover:text-red-600 self-start">
+            <button onClick={() => removeItem(item.product_id, item.cart_item_id)} className="w-8 h-8 flex items-center justify-center text-[var(--text-4)] hover:text-red-600 self-start -mr-1 -mt-1" aria-label="Remove item">
               <Trash2 size={15} />
             </button>
           </div>
         ))}
       </div>
 
-      <div className="fixed bottom-[56px] left-0 right-0 bg-[var(--surface)] border-t border-[var(--border)] p-3 flex items-center justify-between gap-3" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0) + 12px)' }}>
-        <div>
-          <div className="text-[10px] text-[var(--text-4)] font-semibold uppercase">Subtotal</div>
-          <div className="text-lg font-extrabold">Rs. {cart.subtotal.toFixed(2)}</div>
+      <div className="customer-sticky-cta">
+        <div className="customer-sticky-cta-inner">
+          <div>
+            <div className="text-[10px] text-[var(--text-4)] font-semibold uppercase">
+              {cart.discount_amount > 0 || cart.tax_amount > 0 ? 'Total' : 'Subtotal'}
+            </div>
+            <div className="text-lg font-extrabold">
+              Rs. {(cart.subtotal - cart.discount_amount + cart.tax_amount).toFixed(2)}
+            </div>
+            {(cart.discount_amount > 0 || cart.tax_amount > 0) && (
+              <div className="text-[10px] text-[var(--text-4)] font-medium">
+                Subtotal Rs. {cart.subtotal.toFixed(2)}
+                {cart.discount_amount > 0 && <> · Discount − Rs. {cart.discount_amount.toFixed(2)}</>}
+                {cart.tax_amount > 0 && <> · Tax Rs. {cart.tax_amount.toFixed(2)}</>}
+              </div>
+            )}
+          </div>
+          <Button
+            variant="primary" disabled={cart.has_issues}
+            onClick={() => navigate('/customer/checkout')}
+            className="flex-1"
+          >
+            {cart.has_issues ? 'Fix Cart to Continue' : 'Proceed to Checkout'}
+          </Button>
         </div>
-        <Button
-          variant="primary" disabled={cart.has_issues}
-          onClick={() => navigate('/customer/checkout')}
-          className="flex-1"
-        >
-          {cart.has_issues ? 'Fix Cart to Continue' : 'Checkout'}
-        </Button>
       </div>
     </div>
   )
