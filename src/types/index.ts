@@ -185,6 +185,9 @@ export interface Product {
   min_stock:     number
   current_stock: number
   is_active:     boolean
+  is_online?:    boolean  // available on the customer storefront (Customer Product Ordering module)
+  auto_sync_online_qty?: boolean  // online availability follows actual physical stock rather than a manual number
+  online_qty?:   number | null    // manual online-available quantity, used when auto_sync_online_qty is false
   created_at?:   string
   // ── Inventory Planning (Smart Purchase Suggestions) — all optional,
   // null/undefined means "use the company default" (see PurchaseSuggestionSettings).

@@ -82,6 +82,28 @@ export const productSchema = z.object({
   opening_stock:  numericField(0, { min: 0 }),
   opening_batch:  z.string().optional().default(''),
   opening_expiry: z.string().optional().default(''),
+
+  // Customer Product Ordering module — whether this product shows up on
+  // the customer storefront. Mirrors POST/PUT /products' own rule
+  // (routes/products.js): the backend rejects turning this on without a
+  // sales rate already set, so it's enforced server-side either way —
+  // this default just keeps a brand-new product (sales_rate 0 until
+  // saved) from being silently created as "online" with no real price.
+  is_online: z.boolean().optional().default(false),
+
+  // Online availability source (services/customerCatalogService.js's
+  // resolveProductForCustomer): with auto-sync ON, online stock always
+  // mirrors actual physical stock (SUM of batch qty_remaining) — the
+  // sensible default for most pharmacy products. With it OFF, online_qty
+  // is a manual number the admin sets themselves. Both default to "off/
+  // zero" at the database level (migration 034) so a half-configured
+  // product fails safe rather than overselling — but that same safe
+  // default means simply flipping `is_online` on with neither of these
+  // set leaves online availability at zero, so this form defaults
+  // auto-sync ON for a NEW product (an edited existing product keeps
+  // showing its real saved value either way).
+  auto_sync_online_qty: z.boolean().optional().default(true),
+  online_qty: numericField(0, { min: 0 }),
 })
 
 export type ProductFormInput = z.input<typeof productSchema>
@@ -119,6 +141,13 @@ export function validateProductInput(input: ProductFormInput): string | null {
  *     opening-stock adjustment fails, the product is still returned
  *     successfully (stock can be adjusted later from the Stock page) —
  *     this mirrors Quick Add's existing, already-shipped behavior exactly.
+ *  3. Customer Product Ordering settings (is_online/auto_sync_online_qty/
+ *     online_qty) — POST /products doesn't accept these at all (only
+ *     PUT /products/:id does — routes/products.js), so turning "Available
+ *     Online" on for a brand-new product needs this same non-fatal
+ *     follow-up PUT, same reasoning as opening stock above: the product
+ *     is still created either way, online settings can be changed later
+ *     from Edit Product.
  *
  * Both callers get back the same shape of Product either way, so the
  * two flows always produce identical database records for the same input.
@@ -147,6 +176,19 @@ export async function createProductWithOpeningStock(raw: ProductFormInput): Prom
 
   const newProduct: Product = res.data.data
 
+  if (input.is_online) {
+    try {
+      await productsAPI.update(newProduct.id, {
+        is_online: true,
+        auto_sync_online_qty: input.auto_sync_online_qty,
+        online_qty: input.auto_sync_online_qty ? null : input.online_qty,
+      } as any)
+    } catch {
+      // Non-fatal — product still created as an in-store item; "Available
+      // Online" can be turned on later from Edit Product.
+    }
+  }
+
   if (input.opening_stock > 0) {
     try {
       await productsAPI.adjust(newProduct.id, {
@@ -171,5 +213,8 @@ export async function createProductWithOpeningStock(raw: ProductFormInput): Prom
     vat_percent: input.vat_percent,
     sales_rate:  input.sales_rate,
     cc_pct:      input.cc_pct,
+    is_online:   input.is_online,
+    auto_sync_online_qty: input.auto_sync_online_qty,
+    online_qty:  input.online_qty,
   }
 }

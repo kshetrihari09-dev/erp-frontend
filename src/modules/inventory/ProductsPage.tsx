@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import type { UseFormRegister, FieldErrors } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Plus, Package, ScanLine, Boxes, Download, Upload, Printer, QrCode, Filter, Pencil, Trash2 } from 'lucide-react'
+import { Plus, Package, ScanLine, Boxes, Download, Upload, Printer, QrCode, Filter, Pencil, Trash2, Globe } from 'lucide-react'
 import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct, useProductOpeningBatches, useAddOpeningInventory, useNextBarcode, useSuppliers } from '@/hooks/useQuery'
 import { Button, Modal, Badge, Pagination, SkeletonRows, Empty, SearchInput, ConfirmDialog, Select, ToggleSwitch } from '@/components/ui'
 import ManufacturerSelect from '@/components/forms/ManufacturerSelect'
@@ -300,11 +300,18 @@ function ProductForm({ initial, onClose }: { initial?: Product | null; onClose: 
       // C.C% — `cc_pct` is the real column name on products.
       cc_pct: initial.cc_pct ?? 0,
       min_stock: initial.min_stock,
+      is_online: !!initial.is_online,
+      // A brand-new product defaults to auto-sync ON (see productCreation.ts's
+      // comment on why) — an existing product keeps showing whatever it's
+      // actually saved as, defaulting to false only if truly never configured.
+      auto_sync_online_qty: !!initial.auto_sync_online_qty,
+      online_qty: initial.online_qty ?? 0,
     } : {
       // Same defaults Quick Add has always used, so a product created
       // without touching these fields is identical either way.
       unit: 'Strip', vat_percent: 13, cc_pct: 0, min_stock: 50, mrp: 0, sales_rate: '' as any, purchase_rate: 0,
       barcode: '', opening_stock: '' as any, opening_batch: '', opening_expiry: '',
+      is_online: false, auto_sync_online_qty: true, online_qty: 0,
     },
   })
 
@@ -464,6 +471,33 @@ function ProductForm({ initial, onClose }: { initial?: Product | null; onClose: 
       ) : (
         <OpeningInventorySection productId={initial.id} />
       )}
+
+      <div className="mt-5 pt-4 border-t border-[var(--border)]">
+        <div className="flex items-center gap-1.5 mb-3 text-xs font-bold uppercase tracking-wide text-[var(--text-3)]">
+          <Globe size={13} className="text-brand" />
+          Online Ordering <span className="normal-case font-medium text-[var(--text-4)]">(optional — Customer Product Ordering)</span>
+        </div>
+        <ToggleSwitch checked={!!watch('is_online')} onChange={(v) => setValue('is_online', v, { shouldDirty: true })} label="Available on the customer storefront" />
+        {watch('sales_rate') !== undefined && Number(watch('sales_rate')) <= 0 && watch('is_online') && (
+          <p className="text-xs text-amber-600 mt-1.5">Set a Sale Rate above 0 — customers see this product's price from Sale Rate.</p>
+        )}
+        {watch('is_online') && (
+          <div className="mt-3 pl-0.5 flex flex-col gap-2.5">
+            <ToggleSwitch
+              checked={!!watch('auto_sync_online_qty')}
+              onChange={(v) => setValue('auto_sync_online_qty', v, { shouldDirty: true })}
+              label="Online quantity follows actual stock"
+            />
+            {!watch('auto_sync_online_qty') && (
+              <div className="max-w-[220px]">
+                <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">Online Quantity</label>
+                <input type="number" min={0} className="erp-input" placeholder="0" {...register('online_qty')} />
+                <p className="text-[11px] text-[var(--text-4)] mt-1">Set manually instead of following actual stock.</p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       <InventoryPlanningSection value={planning} onChange={setPlanning} />
 
