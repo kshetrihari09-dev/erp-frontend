@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form'
 import type { UseFormRegister, FieldErrors } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Plus, Package, ScanLine, Boxes, Download, Upload, Printer, QrCode, Filter, Pencil, Trash2, Globe } from 'lucide-react'
-import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct, useProductOpeningBatches, useAddOpeningInventory, useNextBarcode, useSuppliers } from '@/hooks/useQuery'
+import { useProducts, useCreateProduct, useUpdateProduct, useUpdateProductOnlineSettings, useDeleteProduct, useProductOpeningBatches, useAddOpeningInventory, useNextBarcode, useSuppliers } from '@/hooks/useQuery'
 import { Button, Modal, Badge, Pagination, SkeletonRows, Empty, SearchInput, ConfirmDialog, Select, ToggleSwitch } from '@/components/ui'
 import ManufacturerSelect from '@/components/forms/ManufacturerSelect'
 import ExportProductsModal from './ExportProductsModal'
@@ -287,6 +287,7 @@ function InventoryPlanningSection({ value, onChange }: { value: PlanningState; o
 function ProductForm({ initial, onClose }: { initial?: Product | null; onClose: () => void }) {
   const create = useCreateProduct()
   const update = useUpdateProduct()
+  const updateOnlineSettings = useUpdateProductOnlineSettings()
   const { register, handleSubmit, setValue, watch, formState: { errors, isSubmitting, dirtyFields } } = useForm<Form>({
     resolver: zodResolver(productSchema),
     defaultValues: initial ? {
@@ -350,8 +351,18 @@ function ProductForm({ initial, onClose }: { initial?: Product | null; onClose: 
   const onSubmit = handleSubmit(async (data) => {
     if (initial) {
       // Editing never touches opening stock — that's a "new product" concept.
-      const { opening_stock, opening_batch, opening_expiry, ...editable } = data as any
+      // is_online/auto_sync_online_qty/online_qty are pulled out too: PUT
+      // /products/:id's own whitelist excludes them on purpose (routes/
+      // products.js) — sending them there is silently ignored, so they go
+      // through the dedicated online-settings endpoint instead.
+      const { opening_stock, opening_batch, opening_expiry, is_online, auto_sync_online_qty, online_qty, ...editable } = data as any
       await update.mutateAsync({ id: initial.id, data: { ...editable, ...planningToPayload(planning) } })
+      try {
+        await updateOnlineSettings.mutateAsync({
+          id: initial.id,
+          data: { is_online, auto_sync_online_qty, online_qty: auto_sync_online_qty ? null : online_qty },
+        })
+      } catch { /* toasted by useUpdateProductOnlineSettings itself */ }
     } else {
       const newProduct = await create.mutateAsync(data)
       // Inventory Planning is optional and applied as a non-fatal follow-up
@@ -362,6 +373,8 @@ function ProductForm({ initial, onClose }: { initial?: Product | null; onClose: 
       if (hasAnyPlanning) {
         try { await update.mutateAsync({ id: newProduct.id, data: payload as any }) } catch { /* non-fatal */ }
       }
+      // is_online etc. for a brand-new product are already handled inside
+      // createProductWithOpeningStock itself (services/productCreation.ts).
     }
     onClose()
   })

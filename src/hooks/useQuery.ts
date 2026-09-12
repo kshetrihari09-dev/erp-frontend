@@ -74,6 +74,22 @@ export function useUpdateProduct() {
   })
 }
 
+/** PUT /products/:id's own whitelist deliberately excludes online-ordering
+ *  fields (is_online, auto_sync_online_qty, online_qty, etc.) — they only
+ *  ever go through this dedicated endpoint (routes/products.js). No
+ *  success toast of its own: ProductsPage.tsx always calls this alongside
+ *  useUpdateProduct for the same save, and that one already shows it. */
+export function useUpdateProductOnlineSettings() {
+  const qc = useQueryClient()
+  const { error } = useUIStore()
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Parameters<typeof productsAPI.updateOnlineSettings>[1] }) =>
+      productsAPI.updateOnlineSettings(id, data),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: [QK.PRODUCTS] }) },
+    onError:   (e: { message: string }) => error('Online ordering settings not saved', e.message),
+  })
+}
+
 export function useDeleteProduct() {
   const qc = useQueryClient()
   const { success, error } = useUIStore()

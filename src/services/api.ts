@@ -123,6 +123,26 @@ export const productsAPI = {
   get:        (id: string)      => http.get<ApiResponse<Product>>(`/products/${id}`),
   create:     (data: Partial<Product>) => http.post<ApiResponse<Product>>('/products', data),
   update:     (id: string, data: Partial<Product>) => http.put<ApiResponse<Product>>(`/products/${id}`, data),
+  // Dedicated endpoint (routes/products.js) — PUT /products/:id's own
+  // `allowed` whitelist deliberately does NOT include is_online/
+  // auto_sync_online_qty/online_qty/etc.; they live here instead, with
+  // their own validation (min<=max, price-required-when-source-is-online).
+  // Sending them to update() above silently drops them.
+  updateOnlineSettings: (id: string, data: {
+    is_online?: boolean
+    online_price_source?: 'regular' | 'online'
+    online_price?: number | null
+    auto_sync_online_qty?: boolean
+    online_qty?: number | null
+    min_order_qty?: number
+    max_order_qty?: number | null
+    qty_step?: number
+    stock_visibility?: 'exact' | 'range' | 'available' | 'hide'
+    allow_backorder?: boolean
+    online_description?: string | null
+    online_image_url?: string | null
+    display_order?: number
+  }) => http.patch<ApiResponse<Product>>(`/products/${id}/online-settings`, data),
   delete:     (id: string)      => http.delete(`/products/${id}`),
   stock:      (id: string)      => http.get(`/products/${id}/stock`),
   adjust:     (id: string, data: {

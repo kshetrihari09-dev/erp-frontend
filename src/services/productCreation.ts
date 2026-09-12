@@ -142,12 +142,14 @@ export function validateProductInput(input: ProductFormInput): string | null {
  *     successfully (stock can be adjusted later from the Stock page) —
  *     this mirrors Quick Add's existing, already-shipped behavior exactly.
  *  3. Customer Product Ordering settings (is_online/auto_sync_online_qty/
- *     online_qty) — POST /products doesn't accept these at all (only
- *     PUT /products/:id does — routes/products.js), so turning "Available
- *     Online" on for a brand-new product needs this same non-fatal
- *     follow-up PUT, same reasoning as opening stock above: the product
- *     is still created either way, online settings can be changed later
- *     from Edit Product.
+ *     online_qty) — POST /products doesn't accept these at all; only the
+ *     dedicated PATCH /products/:id/online-settings endpoint does
+ *     (routes/products.js — PUT /:id's own whitelist excludes them on
+ *     purpose, see services/api.ts's updateOnlineSettings), so turning
+ *     "Available Online" on for a brand-new product needs this same
+ *     non-fatal follow-up call, same reasoning as opening stock above:
+ *     the product is still created either way, online settings can be
+ *     changed later from Edit Product.
  *
  * Both callers get back the same shape of Product either way, so the
  * two flows always produce identical database records for the same input.
@@ -178,11 +180,14 @@ export async function createProductWithOpeningStock(raw: ProductFormInput): Prom
 
   if (input.is_online) {
     try {
-      await productsAPI.update(newProduct.id, {
+      // routes/products.js's PUT /:id whitelist does NOT include these
+      // fields — they're only ever accepted by the dedicated
+      // PATCH /:id/online-settings endpoint (see services/api.ts).
+      await productsAPI.updateOnlineSettings(newProduct.id, {
         is_online: true,
         auto_sync_online_qty: input.auto_sync_online_qty,
         online_qty: input.auto_sync_online_qty ? null : input.online_qty,
-      } as any)
+      })
     } catch {
       // Non-fatal — product still created as an in-store item; "Available
       // Online" can be turned on later from Edit Product.
