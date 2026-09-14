@@ -2,7 +2,7 @@ import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom'
 import { RequireAuth, RequireGuest } from '@/router/guards'
 import { RequireCustomerAuth, RequireCustomerGuest } from '@/router/customerGuards'
-import { StorefrontProvider } from '@/modules/customer/StorefrontContext'
+import { StorefrontProvider, RequireStorefront } from '@/modules/customer/StorefrontContext'
 import AppLayout from '@/layouts/AppLayout'
 import CustomerLayout from '@/layouts/CustomerLayout'
 import { PATHS } from '@/constants'
@@ -32,10 +32,13 @@ const ReportsPage  = lazy(() => import('@/modules/reports/ReportsPage'))
 const SettingsPage = lazy(() => import('@/modules/settings/SettingsPage'))
 const RemindersPage = lazy(() => import('@/modules/reminders/RemindersPage'))
 const AdminCustomerOrdersPage = lazy(() => import('@/modules/customerOrders/AdminCustomerOrdersPage'))
+const AdminCustomerRegistrationsPage = lazy(() => import('@/modules/customerOrders/AdminCustomerRegistrationsPage'))
 
 // Customer storefront pages (Customer Product Ordering module)
+const StoreSelectPage      = lazy(() => import('@/modules/customer/StoreSelectPage'))
 const CustomerLoginPage    = lazy(() => import('@/modules/customer/CustomerLoginPage'))
 const CustomerRegisterPage = lazy(() => import('@/modules/customer/CustomerRegisterPage'))
+const CustomerRegistrationStatusPage = lazy(() => import('@/modules/customer/CustomerRegistrationStatusPage'))
 const CustomerHomePage     = lazy(() => import('@/modules/customer/CustomerHomePage'))
 const CustomerProductDetailPage = lazy(() => import('@/modules/customer/CustomerProductDetailPage'))
 const CustomerCartPage     = lazy(() => import('@/modules/customer/CustomerCartPage'))
@@ -87,6 +90,7 @@ export default function Router() {
             <Route path="credit-risk" element={<CreditRiskDashboardPage />} />
             <Route path="reminders" element={<RemindersPage />} />
             <Route path="customer-orders" element={<AdminCustomerOrdersPage />} />
+            <Route path="customer-registrations" element={<AdminCustomerRegistrationsPage />} />
 
             {/* Parties */}
             <Route path="customers"    element={<CustomersPage />} />
@@ -117,10 +121,17 @@ export default function Router() {
                mounted once here, above every /customer/* page — the single
                source of truth for "which company" (spec §5), resolved from
                ?store=<slug> / VITE_STOREFRONT_CODE (no UUID in the URL in
-               production), never re-resolved independently per page. */}
-          <Route path="/customer" element={<StorefrontProvider><Outlet /></StorefrontProvider>}>
+               production), never re-resolved independently per page.
+               RequireStorefront (same file) is what turns "no store chosen
+               yet" into a redirect to the /store picker below instead of
+               every page dead-ending on its own "store unavailable"
+               message — see that component's docblock. */}
+          <Route path="/store" element={<StoreSelectPage />} />
+
+          <Route path="/customer" element={<StorefrontProvider><RequireStorefront><Outlet /></RequireStorefront></StorefrontProvider>}>
             <Route path="login"    element={<RequireCustomerGuest><CustomerLoginPage /></RequireCustomerGuest>} />
             <Route path="register" element={<RequireCustomerGuest><CustomerRegisterPage /></RequireCustomerGuest>} />
+            <Route path="registration-status" element={<RequireCustomerGuest><CustomerRegistrationStatusPage /></RequireCustomerGuest>} />
 
             {/* CustomerLayout itself is NOT behind RequireCustomerAuth —
                 spec §14: browsing, cart, and checkout all work for a guest.

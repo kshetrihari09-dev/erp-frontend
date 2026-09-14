@@ -7,6 +7,10 @@ type Params = Record<string, unknown>
 export const storefrontAPI = {
   config: (params: { store?: string; company?: string }) =>
     customerHttp.get('/storefront/config', { params }),
+  // Powers the store picker (spec: customer must never type a slug/UUID
+  // themselves) — GET /storefront/list, added alongside /config.
+  list: (params?: { q?: string }) =>
+    customerHttp.get('/storefront/list', { params }),
 }
 
 export const customerAuthAPI = {

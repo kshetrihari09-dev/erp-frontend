@@ -50,7 +50,7 @@ customerHttp.interceptors.request.use((config_: InternalAxiosRequestConfig) => {
 
 customerHttp.interceptors.response.use(
   (res) => res,
-  async (error: AxiosError<{ message?: string; code?: string }>) => {
+  async (error: AxiosError<{ message?: string; code?: string; data?: unknown }>) => {
     const status     = error.response?.status
     const rawMessage = error.response?.data?.message || error.message || 'Network error'
 
@@ -67,7 +67,11 @@ customerHttp.interceptors.response.use(
       }
     }
 
-    return Promise.reject({ message: rawMessage, status, original: error })
+    // code/data carried through alongside message — e.g. login's
+    // REGISTRATION_PENDING/REGISTRATION_REJECTED (routes/customerAuth.js)
+    // need more than a string to render the right status screen.
+    // Existing call sites that only read `.message` are unaffected.
+    return Promise.reject({ message: rawMessage, status, code: error.response?.data?.code, data: error.response?.data?.data, original: error })
   },
 )
 

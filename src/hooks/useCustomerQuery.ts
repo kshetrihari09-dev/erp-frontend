@@ -8,7 +8,7 @@
  * accidentally invalidate staff-side cached data, or vice versa.
  */
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
-import { customerAuthAPI, customerProductsAPI, customerCartAPI, customerOrdersAPI } from '@/services/customerApi'
+import { customerAuthAPI, customerProductsAPI, customerCartAPI, customerOrdersAPI, storefrontAPI } from '@/services/customerApi'
 import useCustomerAuthStore from '@/store/customerAuthStore'
 import useGuestCartStore from '@/store/guestCartStore'
 import useUIStore from '@/store/uiStore'
@@ -16,6 +16,21 @@ import useUIStore from '@/store/uiStore'
 const unwrap = <T,>(res: { data: { data: T } }) => res.data.data
 const unwrapPaginated = <T,>(res: { data: { data: T; pagination?: unknown } }) =>
   ({ data: res.data.data, pagination: (res.data as any).pagination })
+
+export interface StorefrontListing { name: string; logo: string | null; address: string | null; storefront_code: string }
+
+// ─── Store selection (customer landing / "Change Store") ───────────────────
+export function useStoreList(q: string) {
+  return useQuery({
+    queryKey: ['storefront-list', q],
+    // /storefront/list responds { success, stores: [...] } — no `.data`
+    // wrapper, same shape as /storefront/config's `{ success, store }`
+    // (see StorefrontContext.tsx), so this reads res.data.stores directly
+    // rather than through the customer-auth-API `unwrap` convention.
+    queryFn: () => storefrontAPI.list(q ? { q } : undefined).then(res => (res.data as any).stores as StorefrontListing[]),
+    placeholderData: keepPreviousData,
+  })
+}
 
 // ─── Catalog ────────────────────────────────────────────────────────────────
 export function useCustomerProducts(params: Record<string, unknown>) {

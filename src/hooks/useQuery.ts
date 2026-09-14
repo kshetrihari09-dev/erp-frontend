@@ -5,7 +5,7 @@ import {
   productsAPI, salesAPI, purchasesAPI, partiesAPI, accountingAPI,
   reportsAPI, stockAPI, settingsAPI, returnsAPI, dateAPI, companiesAPI,
   purchaseSuggestionsAPI, purchaseOrdersAPI, creditRiskAPI, approvalsAPI, notificationsAPI,
-  remindersAPI, adminCustomerOrdersAPI,
+  remindersAPI, adminCustomerOrdersAPI, adminCustomerRegistrationsAPI,
 } from '@/services/api'
 import * as manufacturersService from '@/services/manufacturers'
 import type { ManufacturerInput } from '@/services/manufacturers'
@@ -87,6 +87,32 @@ export function useUpdateProductOnlineSettings() {
       productsAPI.updateOnlineSettings(id, data),
     onSuccess: () => { qc.invalidateQueries({ queryKey: [QK.PRODUCTS] }) },
     onError:   (e: { message: string }) => error('Online ordering settings not saved', e.message),
+  })
+}
+
+export function useUploadProductImage() {
+  const qc = useQueryClient()
+  const { success, error } = useUIStore()
+  return useMutation({
+    mutationFn: ({ id, file }: { id: string; file: File }) => productsAPI.uploadImage(id, file).then(r => r.data.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [QK.PRODUCTS] })
+      success('Product image uploaded')
+    },
+    onError: (e: { message: string }) => error('Image upload failed', e.message),
+  })
+}
+
+export function useRemoveProductImage() {
+  const qc = useQueryClient()
+  const { success, error } = useUIStore()
+  return useMutation({
+    mutationFn: (id: string) => productsAPI.removeImage(id).then(r => r.data.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [QK.PRODUCTS] })
+      success('Product image removed')
+    },
+    onError: (e: { message: string }) => error('Could not remove image', e.message),
   })
 }
 
@@ -632,6 +658,53 @@ export function useSetCustomerOrderStatus() {
       success(vars.status === 'confirmed' ? 'Order confirmed — sale created' : 'Order updated')
     },
     onError: (e: { message: string }) => error('Could not update order', e.message),
+  })
+}
+
+// ─── Customer Registrations (approval workflow, migration 037) ─────────────
+export function useAdminCustomerRegistrations(params?: Record<string, unknown>) {
+  return useQuery({
+    queryKey: ['admin-customer-registrations', params],
+    queryFn: () => adminCustomerRegistrationsAPI.list(params).then(unwrapPaginated),
+    placeholderData: keepPreviousData,
+    refetchInterval: 30_000, // new registrations should show up without a manual refresh
+  })
+}
+
+export function useAdminCustomerRegistration(id: string) {
+  return useQuery({
+    queryKey: ['admin-customer-registration', id],
+    queryFn: () => adminCustomerRegistrationsAPI.get(id).then(unwrap),
+    enabled: !!id,
+  })
+}
+
+export function useApproveCustomerRegistration() {
+  const qc = useQueryClient()
+  const { success, error } = useUIStore()
+  return useMutation({
+    mutationFn: (id: string) => adminCustomerRegistrationsAPI.approve(id).then(unwrap),
+    onSuccess: (_data, id) => {
+      qc.invalidateQueries({ queryKey: ['admin-customer-registrations'] })
+      qc.invalidateQueries({ queryKey: ['admin-customer-registration', id] })
+      success('Customer approved successfully.')
+    },
+    onError: (e: { message: string }) => error('Could not approve registration', e.message),
+  })
+}
+
+export function useRejectCustomerRegistration() {
+  const qc = useQueryClient()
+  const { success, error } = useUIStore()
+  return useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason?: string }) =>
+      adminCustomerRegistrationsAPI.reject(id, reason).then(unwrap),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ['admin-customer-registrations'] })
+      qc.invalidateQueries({ queryKey: ['admin-customer-registration', vars.id] })
+      success('Registration rejected.')
+    },
+    onError: (e: { message: string }) => error('Could not reject registration', e.message),
   })
 }
 

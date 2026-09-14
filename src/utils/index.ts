@@ -1,9 +1,26 @@
 import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
+import { config } from '@/config/env'
 
 // ─── Tailwind merge helper ─────────────────────────────────────────────────────
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
+}
+
+// ─── Product/company image URL resolution ──────────────────────────────────────
+// An image field (products.online_image_url, companies.logo_url) can hold
+// either a full external URL (someone pasted a link) or a relative
+// /uploads/products/... path from the file-upload endpoints (routes/
+// products.js) — those are served by the BACKEND, not whatever origin the
+// frontend itself is running on, so a relative path needs config.backendUrl
+// prefixed or it 404s against the frontend's own dev server / static host.
+// Used anywhere a stored image field is put into an <img src>: the admin
+// product table/uploader here, and CustomerProductCard/
+// CustomerProductDetailPage on the storefront side.
+export function resolveImageUrl(url: string | null | undefined): string | null {
+  if (!url) return null
+  if (/^https?:\/\//i.test(url) || url.startsWith('data:')) return url
+  return `${config.backendUrl}${url.startsWith('/') ? '' : '/'}${url}`
 }
 
 // ─── Currency formatting ──────────────────────────────────────────────────────

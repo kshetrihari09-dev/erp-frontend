@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { Plus, Minus, ImageOff } from 'lucide-react'
 import { useCartActions } from '@/hooks/useCustomerQuery'
 import { Button } from '@/components/ui'
+import { resolveImageUrl } from '@/utils'
 
 export interface CatalogCard {
   id: string; name: string; unit: string; category: string | null
@@ -24,6 +25,7 @@ export default function CustomerProductCard({ product, cartItem }: {
 }) {
   const { addItem, setQuantity, isBusy } = useCartActions()
   const [imgError, setImgError] = useState(false)
+  const resolvedImage = resolveImageUrl(product.image_url)
 
   function handleAdd() {
     addItem(product.id, product.min_qty || 1)
@@ -37,8 +39,8 @@ export default function CustomerProductCard({ product, cartItem }: {
   return (
     <div className="customer-card">
       <Link to={`/customer/products/${product.id}`} className="customer-card-img">
-        {product.image_url && !imgError
-          ? <img src={product.image_url} alt={product.name} loading="lazy" onError={() => setImgError(true)} />
+        {resolvedImage && !imgError
+          ? <img src={resolvedImage} alt={product.name} loading="lazy" onError={() => setImgError(true)} />
           : <ImageOff size={22} />}
       </Link>
       <div className="customer-card-body">

@@ -3,26 +3,27 @@
  *
  * Deliberately does NOT render AppLayout's sidebar/topbar/nav — a
  * customer must never see staff navigation (spec's own non-negotiable).
- * Mobile-first bottom nav (spec #26/#44); on wider screens the same nav
- * just becomes a slim top bar instead of taking over the bottom of a
- * desktop window, via CSS breakpoints in globals.css (customer-* classes
- * appended there), not a second duplicated component per screen size.
+ * Mobile-first bottom nav; on wider screens the same nav just becomes a
+ * slim top bar instead of taking over the bottom of a desktop window,
+ * via CSS breakpoints in globals.css (customer-* classes), not a second
+ * duplicated component per screen size.
  *
  * Header reads the real store identity from StorefrontContext (name,
- * logo) instead of a hardcoded "🛍️ Store" label — a customer never sees
- * the company_id/UUID, only what StorefrontContext already resolved for
- * public display. Search/Cart/Account are quick-access icon actions
- * (spec's header requirement); Search links back to the storefront home,
- * where the actual search field lives (CustomerHomePage), rather than
- * duplicating a second search implementation here.
+ * logo) instead of a hardcoded label — a customer never sees the
+ * company_id/UUID, only what StorefrontContext already resolved for
+ * public display. RequireStorefront (StorefrontContext.tsx) guarantees
+ * status === 'ok' by the time this renders, so there's no missing/
+ * invalid handling needed here anymore.
  */
+import { useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { Home, ShoppingCart, ClipboardList, User, Search, Store as StoreIcon } from 'lucide-react'
+import { Home, ShoppingCart, ClipboardList, User, Search, Store as StoreIcon, ArrowLeftRight } from 'lucide-react'
 import { useActiveCart } from '@/hooks/useCustomerQuery'
 import useCustomerAuthStore from '@/store/customerAuthStore'
+import useGuestCartStore from '@/store/guestCartStore'
 import ToastContainer from '@/components/shared/ToastContainer'
 import { useStorefront } from '@/modules/customer/StorefrontContext'
-import { Spinner, Button } from '@/components/ui'
+import { ConfirmDialog } from '@/components/ui'
 
 const TABS = [
   { to: '/customer',         label: 'Home',    icon: Home,           end: true },
@@ -36,37 +37,35 @@ export default function CustomerLayout() {
   const storefront = useStorefront()
   // useActiveCart() — the persisted server cart when logged in, or the
   // guest's browser-held cart (store/guestCartStore.ts) otherwise — so
-  // the badge count is correct either way (spec §14: browsing/cart work
-  // without an account).
+  // the badge count is correct either way (browsing/cart work without
+  // an account).
   const { data: cart } = useActiveCart()
   const customer = useCustomerAuthStore(s => s.customer)
+  const logout = useCustomerAuthStore(s => s.logout)
+  const clearGuestCart = useGuestCartStore(s => s.clear)
   const cartCount = cart?.items?.length || 0
 
-  // Storefront couldn't be resolved (bad/missing ?store= link, backend
-  // down, etc.) — show a clear customer-facing message instead of a
-  // shell with an empty catalog and no explanation (spec #14: never
-  // surface raw technical errors, but never say nothing either).
-  if (storefront.status === 'missing' || storefront.status === 'invalid' || storefront.status === 'error') {
-    return (
-      <div className="customer-store-error">
-        <StoreIcon size={32} className="text-[var(--text-4)]" />
-        <h1 className="customer-store-error-title">Store not found</h1>
-        <p className="customer-store-error-text">
-          {storefront.status === 'invalid'
-            ? "This store link doesn't look right. Please check the link and try again."
-            : "We couldn't load this store right now. Please check your link or try again shortly."}
-        </p>
-        <Button variant="secondary" size="sm" onClick={() => window.location.reload()}>Try Again</Button>
-      </div>
-    )
-  }
+  const [confirmChangeStore, setConfirmChangeStore] = useState(false)
 
-  if (storefront.status === 'loading') {
-    return (
-      <div className="customer-store-error">
-        <Spinner size={26} className="text-brand" />
-      </div>
-    )
+  // "Change Store" cart safety: a guest's cart is a plain, unscoped
+  // browser bucket of product_ids (store/guestCartStore.ts) — carrying
+  // it into a different store's catalog would be meaningless or wrong,
+  // so it's cleared on confirmed change. A logged-in customer's account
+  // is itself 1:1 with a single company (customer_accounts.company_id,
+  // migration 034) — their token only ever authorizes THIS store, so
+  // "switching" really means logging out and letting them log in fresh
+  // under the new store (their cart/orders at the old store aren't
+  // deleted, just no longer the active session — see
+  // middleware/customerAuth.js for how that scope is derived and
+  // enforced server-side, never from anything set here).
+  function requestChangeStore() {
+    if (customer || cartCount > 0) { setConfirmChangeStore(true); return }
+    goToStorePicker()
+  }
+  function goToStorePicker() {
+    clearGuestCart()
+    if (customer) logout()
+    navigate('/store')
   }
 
   return (
@@ -80,6 +79,9 @@ export default function CustomerLayout() {
         </div>
 
         <div className="customer-topbar-actions">
+          <button onClick={requestChangeStore} className="customer-topbar-iconbtn" aria-label="Change store" title="Change Store">
+            <ArrowLeftRight size={17} strokeWidth={1.8} />
+          </button>
           <NavLink to="/customer" end className="customer-topbar-iconbtn" aria-label="Search products">
             <Search size={18} strokeWidth={1.8} />
           </NavLink>
@@ -119,6 +121,19 @@ export default function CustomerLayout() {
           </NavLink>
         ))}
       </nav>
+
+      <ConfirmDialog
+        open={confirmChangeStore}
+        onClose={() => setConfirmChangeStore(false)}
+        onConfirm={goToStorePicker}
+        title="Change Store?"
+        confirmLabel="Change Store"
+        message={
+          customer
+            ? `You're logged in to ${storefront.name || 'this store'}. Changing stores will log you out${cartCount > 0 ? ' and clear your cart' : ''}.`
+            : `Your cart belongs to ${storefront.name || 'this store'}. Changing stores will clear this cart.`
+        }
+      />
 
       <ToastContainer />
     </div>

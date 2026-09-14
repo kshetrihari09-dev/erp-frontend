@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { ChevronLeft, Plus, Minus, ImageOff } from 'lucide-react'
 import { Spinner, Button, Empty } from '@/components/ui'
 import { useCustomerProduct, useActiveCart, useCartActions } from '@/hooks/useCustomerQuery'
+import { resolveImageUrl } from '@/utils'
 
 export default function CustomerProductDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -22,6 +23,7 @@ export default function CustomerProductDetailPage() {
   if (isLoading) return <div className="flex justify-center py-16"><Spinner size={26} className="text-brand" /></div>
   if (isError || !product) return <Empty icon="📦" message="Product not found." />
 
+  const resolvedImage = resolveImageUrl(product.image_url)
   const step = product.qty_step || 1
   function adjust(delta: number) {
     setQty(q => Math.max(product.min_qty, q + delta * step))
@@ -40,7 +42,7 @@ export default function CustomerProductDetailPage() {
 
       <div className="aspect-square bg-[var(--surface-3)] flex items-center justify-center mx-3 rounded-2xl overflow-hidden">
         {product.image_url && !imgError
-          ? <img src={product.image_url} alt={product.name} onError={() => setImgError(true)} className="w-full h-full object-cover" />
+          ? <img src={resolvedImage!} alt={product.name} onError={() => setImgError(true)} className="w-full h-full object-cover" />
           : <ImageOff size={40} className="text-[var(--text-4)]" />}
       </div>
 

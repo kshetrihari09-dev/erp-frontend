@@ -50,10 +50,14 @@ export function RequireCustomerAuth({ children }: { children: React.ReactNode })
 }
 
 export function RequireCustomerGuest({ children }: { children: React.ReactNode }) {
+  const location = useLocation()
   const rawToken = localStorage.getItem(CUSTOMER_RAW_TOKEN_KEY)
   const isAuthenticated = useCustomerAuthStore((s) => s.isAuthenticated)
   if (rawToken && rawToken !== 'null' && isAuthenticated) {
-    return <Navigate to="/customer" replace />
+    // Preserve ?store=/?company= — dropping it here would bounce straight
+    // back into RequireStorefront's 'missing' branch (see
+    // StorefrontContext.tsx) for any multi-store deployment.
+    return <Navigate to={`/customer${location.search}`} replace />
   }
   return <>{children}</>
 }

@@ -6,7 +6,7 @@ import {
   Users, Truck, BookOpen, BookCopy,
   FileBarChart, Settings, LogOut, Building2, CalendarDays, Moon,
   Sun, Menu, X, AlertTriangle, Bell, Search, ChevronRight, Home,
-  PackageX, CalendarClock, Sparkles, ShieldAlert,
+  PackageX, CalendarClock, Sparkles, ShieldAlert, UserCheck,
 } from 'lucide-react'
 import useAuthStore from '@/store/authStore'
 import useUIStore from '@/store/uiStore'
@@ -14,7 +14,7 @@ import { PATHS } from '@/constants'
 import { initials, cn } from '@/utils'
 import { todayBS as computeTodayBS } from '@/utils/nepaliDate'
 import { authAPI, reportsAPI } from '@/services/api'
-import { useReminderCounts, useAdminCustomerOrders } from '@/hooks/useQuery'
+import { useReminderCounts, useAdminCustomerOrders, useAdminCustomerRegistrations } from '@/hooks/useQuery'
 import ToastContainer from '@/components/shared/ToastContainer'
 import ReminderAlarmWatcher from '@/components/reminders/ReminderAlarmWatcher'
 import CompanySwitcher from '@/modules/company/CompanySwitcher'
@@ -37,6 +37,7 @@ const NAV = [
   { to: PATHS.SALES_RETURNS,    label: 'Sales Returns',    icon: <RotateCcw       size={20} strokeWidth={1.8}/> },
   { to: PATHS.CUSTOMERS,  label: 'Customers',      icon: <Users           size={20} strokeWidth={1.8}/> },
   { to: PATHS.CUSTOMER_ORDERS, label: 'Customer Orders', icon: <Package   size={20} strokeWidth={1.8}/>, alertKey: 'pendingCustomerOrders' },
+  { to: PATHS.CUSTOMER_REGISTRATIONS, label: 'Registrations', icon: <UserCheck size={20} strokeWidth={1.8}/>, alertKey: 'pendingRegistrations' },
 
   { section: 'PURCHASE' },
   { to: PATHS.PURCHASE,   label: 'Purchase',       icon: <ShoppingBag     size={20} strokeWidth={1.8}/> },
@@ -110,6 +111,8 @@ export default function AppLayout() {
   const { data: reminderCounts } = useReminderCounts()
   const { data: pendingCustomerOrdersData } = useAdminCustomerOrders({ status: 'pending', limit: 1 })
   const pendingCustomerOrdersCount = pendingCustomerOrdersData?.pagination?.total || 0
+  const { data: pendingRegistrationsData } = useAdminCustomerRegistrations({ status: 'pending', limit: 1 })
+  const pendingRegistrationsCount = pendingRegistrationsData?.pagination?.total || 0
 
   // Close search/notification dropdowns on outside click
   useEffect(() => {
@@ -190,6 +193,7 @@ export default function AppLayout() {
     [PATHS.CREDIT_RISK]: 'Credit Risk Dashboard',
     [PATHS.CUSTOMERS]:  'Customers',
     [PATHS.CUSTOMER_ORDERS]: 'Customer Orders',
+    [PATHS.CUSTOMER_REGISTRATIONS]: 'Customer Registrations',
     [PATHS.SUPPLIERS]:  'Suppliers',
     [PATHS.ACCOUNTING]:    'Accounting',
     [PATHS.LEDGER]:     'Ledger',
@@ -299,6 +303,7 @@ export default function AppLayout() {
             const badge = item.alertKey === 'lowStock' ? alerts.lowStock
               : item.alertKey === 'remindersOverdue' ? (reminderCounts?.overdue || 0)
               : item.alertKey === 'pendingCustomerOrders' ? pendingCustomerOrdersCount
+              : item.alertKey === 'pendingRegistrations' ? pendingRegistrationsCount
               : 0
             return (
               <div

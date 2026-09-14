@@ -143,6 +143,15 @@ export const productsAPI = {
     online_image_url?: string | null
     display_order?: number
   }) => http.patch<ApiResponse<Product>>(`/products/${id}/online-settings`, data),
+  // File upload variant of online_image_url above — same column, just
+  // filled by an actual uploaded file instead of a pasted link (routes/
+  // products.js's dedicated POST/DELETE .../image pair).
+  uploadImage: (id: string, file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    return http.post<ApiResponse<Product>>(`/products/${id}/image`, form, { headers: { 'Content-Type': 'multipart/form-data' } })
+  },
+  removeImage: (id: string) => http.delete<ApiResponse<Product>>(`/products/${id}/image`),
   delete:     (id: string)      => http.delete(`/products/${id}`),
   stock:      (id: string)      => http.get(`/products/${id}/stock`),
   adjust:     (id: string, data: {
@@ -309,6 +318,18 @@ export const adminCustomerOrdersAPI = {
   get:    (id: string) => http.get<ApiResponse<any>>(`/admin/customer-orders/${id}`),
   setStatus: (id: string, status: string, cancel_reason?: string) =>
     http.patch<ApiResponse<any>>(`/admin/customer-orders/${id}/status`, { status, cancel_reason }),
+}
+
+// ─── Customer Registrations (admin/staff side) ──────────────────────────────
+// Customer Product Ordering approval workflow (migration 037) — Owner/Admin
+// review of pending storefront registrations. Backend: requireRole('admin')
+// on every one of these (routes/adminCustomerRegistrations.js) — owner
+// always passes that check too (middleware/index.js).
+export const adminCustomerRegistrationsAPI = {
+  list:    (params?: Params) => http.get<ApiResponse<any[]>>('/admin/customer-registrations', { params }),
+  get:     (id: string) => http.get<ApiResponse<any>>(`/admin/customer-registrations/${id}`),
+  approve: (id: string) => http.patch<ApiResponse<any>>(`/admin/customer-registrations/${id}/approve`),
+  reject:  (id: string, reason?: string) => http.patch<ApiResponse<any>>(`/admin/customer-registrations/${id}/reject`, { reason }),
 }
 
 // ─── Reminders ────────────────────────────────────────────────────────────────

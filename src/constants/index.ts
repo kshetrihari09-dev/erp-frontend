@@ -156,4 +156,5 @@ export const PATHS = {
   SETTINGS:   '/settings',
   REMINDERS:  '/reminders',
   CUSTOMER_ORDERS: '/customer-orders',
+  CUSTOMER_REGISTRATIONS: '/customer-registrations',
 } as const

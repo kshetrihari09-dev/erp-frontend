@@ -488,9 +488,9 @@ export function SearchInput({ value, onChange, placeholder = 'Search…', classN
 }
 
 // ─── Confirm Dialog ───────────────────────────────────────────────────────────
-export function ConfirmDialog({ open, onClose, onConfirm, title, message, danger = false }: {
+export function ConfirmDialog({ open, onClose, onConfirm, title, message, danger = false, confirmLabel = 'Confirm' }: {
   open: boolean; onClose: () => void; onConfirm: () => void;
-  title: string; message?: string; danger?: boolean;
+  title: string; message?: string; danger?: boolean; confirmLabel?: string;
 }) {
   return (
     <Modal open={open} onClose={onClose} title={title} size="sm"
@@ -498,7 +498,7 @@ export function ConfirmDialog({ open, onClose, onConfirm, title, message, danger
         <>
           <Button variant="secondary" size="sm" onClick={onClose}>Cancel</Button>
           <Button variant={danger ? 'danger' : 'primary'} size="sm" onClick={() => { onConfirm(); onClose() }}>
-            Confirm
+            {confirmLabel}
           </Button>
         </>
       }
