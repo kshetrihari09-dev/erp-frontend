@@ -35,7 +35,7 @@ export default function CustomerProductDetailPage() {
   }
 
   return (
-    <div className="pb-4">
+    <div className="customer-detail-page pb-4">
       <button onClick={() => navigate(-1)} className="flex items-center gap-1 text-sm font-semibold text-[var(--text-2)] p-3">
         <ChevronLeft size={16} /> Back
       </button>

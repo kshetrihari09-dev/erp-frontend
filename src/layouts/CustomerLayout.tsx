@@ -81,14 +81,18 @@ export default function CustomerLayout() {
         <div className="customer-topbar-actions">
           <button onClick={requestChangeStore} className="customer-topbar-iconbtn" aria-label="Change store" title="Change Store">
             <ArrowLeftRight size={17} strokeWidth={1.8} />
+            <span className="customer-topbar-iconbtn-label">Change Store</span>
           </button>
-          <NavLink to="/customer" end className="customer-topbar-iconbtn" aria-label="Search products">
+          <NavLink to="/customer" end className="customer-topbar-iconbtn" aria-label="Search products" title="Search">
             <Search size={18} strokeWidth={1.8} />
+            <span className="customer-topbar-iconbtn-label">Search</span>
           </NavLink>
-          <NavLink to="/customer/cart" className="customer-topbar-iconbtn" aria-label="Cart">
+          <NavLink to="/customer/cart" className="customer-topbar-iconbtn" aria-label="Cart" title="Cart">
             <ShoppingCart size={18} strokeWidth={1.8} />
+            <span className="customer-topbar-iconbtn-label">Cart</span>
             {cartCount > 0 && <span className="customer-header-cart-badge">{cartCount}</span>}
           </NavLink>
+          <span className="customer-topbar-divider" aria-hidden="true" />
           {customer
             ? <NavLink to="/customer/profile" className="customer-topbar-user" title={customer.name}>
                 Hi, {customer.name.split(' ')[0]}
