@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
-import { SearchInput, Empty, Spinner, Pagination } from '@/components/ui'
+import { SearchInput, Empty, Pagination } from '@/components/ui'
 import { useCustomerProducts, useCustomerCategories, useActiveCart } from '@/hooks/useCustomerQuery'
-import CustomerProductCard from './CustomerProductCard'
+import CustomerProductCard, { CustomerProductCardSkeleton } from './CustomerProductCard'
 
 /** Standard debounce — search-as-you-type without a request per keystroke
  *  (spec #19/#7's explicit requirement). */
@@ -57,7 +57,12 @@ export default function CustomerHomePage() {
       )}
 
       {isLoading ? (
-        <div className="flex justify-center py-16"><Spinner size={26} className="text-brand" /></div>
+        // Skeleton cards in the real grid (spec §21) — same layout the
+        // actual cards will occupy, so there's no empty-white-card flash
+        // and no layout shift once data arrives.
+        <div className="customer-grid">
+          {Array.from({ length: 12 }).map((_, i) => <CustomerProductCardSkeleton key={i} />)}
+        </div>
       ) : isError ? (
         <div className="flex flex-col items-center gap-3 py-16">
           <p className="text-sm text-[var(--text-3)]">Something went wrong.</p>
