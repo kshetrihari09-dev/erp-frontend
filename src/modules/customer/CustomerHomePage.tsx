@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { SearchInput, Empty, Pagination } from '@/components/ui'
 import { useCustomerProducts, useCustomerCategories, useActiveCart } from '@/hooks/useCustomerQuery'
 import CustomerProductCard, { CustomerProductCardSkeleton } from './CustomerProductCard'
@@ -15,8 +16,13 @@ function useDebounced<T>(value: T, ms: number) {
 }
 
 export default function CustomerHomePage() {
+  // Read once on mount so the product-detail page's breadcrumb category
+  // link (?category=X) actually lands on a pre-filtered grid, rather than
+  // being a dead label — category filtering itself is unchanged, this
+  // just seeds its initial state from the URL.
+  const [params] = useSearchParams()
   const [search, setSearch] = useState('')
-  const [category, setCategory] = useState('')
+  const [category, setCategory] = useState(() => params.get('category') || '')
   const [page, setPage] = useState(1)
   const debouncedSearch = useDebounced(search, 350)
 
