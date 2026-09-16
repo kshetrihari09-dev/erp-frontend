@@ -15,7 +15,11 @@ export interface Pagination {
 }
 
 // ─── Auth ──────────────────────────────────────────────────────────────────────
-export type UserRole = 'owner' | 'admin' | 'manager' | 'accountant' | 'cashier' | 'viewer'
+// 'auditor' and 'delivery_partner' both exist in the backend's role
+// constraint (utils/roles.js + migration 038) but were missing here.
+// 'manager' is kept because ROLE_PERMISSIONS below still references it,
+// even though users.role has never actually accepted it.
+export type UserRole = 'owner' | 'admin' | 'manager' | 'accountant' | 'cashier' | 'auditor' | 'viewer' | 'delivery_partner'
 
 export interface User {
   id:              string

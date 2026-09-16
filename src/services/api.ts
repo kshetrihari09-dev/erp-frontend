@@ -318,6 +318,31 @@ export const adminCustomerOrdersAPI = {
   get:    (id: string) => http.get<ApiResponse<any>>(`/admin/customer-orders/${id}`),
   setStatus: (id: string, status: string, cancel_reason?: string) =>
     http.patch<ApiResponse<any>>(`/admin/customer-orders/${id}/status`, { status, cancel_reason }),
+
+  // ── Delivery OTP (migration 038) ──────────────────────────────────────
+  // Note what is NOT here: any way to read a delivery code. The backend
+  // has no such endpoint for staff, so there is nothing to call.
+  deliveryPartners: () =>
+    http.get<ApiResponse<{ id: string; name: string; phone: string | null }[]>>('/admin/customer-orders/meta/delivery-partners'),
+  assignDeliveryPartner: (id: string, delivery_partner_id: string | null) =>
+    http.patch<ApiResponse<any>>(`/admin/customer-orders/${id}/delivery-partner`, { delivery_partner_id }),
+  overrideDelivery: (id: string, reason: string) =>
+    http.post<ApiResponse<any>>(`/admin/customer-orders/${id}/delivery-override`, { reason }),
+}
+
+// ─── Delivery partner app (migration 038) ───────────────────────────────────
+// The rider's own view of their assigned work. Backend:
+// routes/deliveryPartner.js, which scopes every one of these to the
+// authenticated rider's assigned orders — there is no order-id a rider
+// can pass here to reach someone else's delivery.
+export const deliveryAPI = {
+  myOrders: (history = false) =>
+    http.get<ApiResponse<any[]>>('/delivery/orders', { params: history ? { history: 'true' } : undefined }),
+  get:      (id: string) => http.get<ApiResponse<any>>(`/delivery/orders/${id}`),
+  arrived:  (id: string) => http.post<ApiResponse<any>>(`/delivery/orders/${id}/arrived`),
+  verifyOtp: (id: string, otp: string) =>
+    http.post<ApiResponse<any>>(`/delivery/orders/${id}/verify-otp`, { otp }),
+  resendOtp: (id: string) => http.post<ApiResponse<any>>(`/delivery/orders/${id}/resend-otp`),
 }
 
 // ─── Customer Registrations (admin/staff side) ──────────────────────────────

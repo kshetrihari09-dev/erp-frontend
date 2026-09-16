@@ -5,7 +5,7 @@ import {
   productsAPI, salesAPI, purchasesAPI, partiesAPI, accountingAPI,
   reportsAPI, stockAPI, settingsAPI, returnsAPI, dateAPI, companiesAPI,
   purchaseSuggestionsAPI, purchaseOrdersAPI, creditRiskAPI, approvalsAPI, notificationsAPI,
-  remindersAPI, adminCustomerOrdersAPI, adminCustomerRegistrationsAPI,
+  remindersAPI, adminCustomerOrdersAPI, adminCustomerRegistrationsAPI, deliveryAPI,
 } from '@/services/api'
 import * as manufacturersService from '@/services/manufacturers'
 import type { ManufacturerInput } from '@/services/manufacturers'
@@ -658,6 +658,119 @@ export function useSetCustomerOrderStatus() {
       success(vars.status === 'confirmed' ? 'Order confirmed — sale created' : 'Order updated')
     },
     onError: (e: { message: string }) => error('Could not update order', e.message),
+  })
+}
+
+// ─── Delivery partner app (migration 038) ─────────────────────────────────
+/**
+ * The rider's job list. Polls, because a rider leaves this screen open on
+ * a phone while riding and a dispatch from the store should appear
+ * without a pull-to-refresh.
+ */
+export function useMyDeliveries(history = false) {
+  return useQuery({
+    queryKey: ['delivery-orders', { history }],
+    queryFn: () => deliveryAPI.myOrders(history).then(unwrap),
+    refetchInterval: history ? false : 30_000,
+  })
+}
+
+export function useMyDelivery(id: string) {
+  return useQuery({
+    queryKey: ['delivery-order', id],
+    queryFn: () => deliveryAPI.get(id).then(unwrap),
+    enabled: !!id,
+  })
+}
+
+export function useMarkArrived() {
+  const qc = useQueryClient()
+  const { error } = useUIStore()
+  return useMutation({
+    mutationFn: (id: string) => deliveryAPI.arrived(id).then(unwrap),
+    onSuccess: (data: any, id) => {
+      qc.setQueryData(['delivery-order', id], (prev: any) => ({ ...prev, ...data }))
+      qc.invalidateQueries({ queryKey: ['delivery-orders'] })
+    },
+    onError: (e: { message: string }) => error('Could not update', e.message),
+  })
+}
+
+/**
+ * OTP verification.
+ *
+ * Deliberately has NO onError toast. Every failure here is an expected,
+ * in-flow outcome the rider needs to read and act on inside the keypad
+ * screen — wrong code, expired, locked out — and a toast that slides
+ * away is the wrong place for "you have 2 attempts left". DeliveryVerify
+ * renders the error inline from this mutation's `error` instead.
+ *
+ * `already_delivered` comes back as a SUCCESS (spec §27): if the rider
+ * double-taps, or retries after a response was lost in a tunnel, the
+ * second call reports the existing delivered state rather than an error.
+ */
+export function useVerifyDeliveryOtp() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, otp }: { id: string; otp: string }) =>
+      deliveryAPI.verifyOtp(id, otp).then(res => res.data),
+    onSuccess: (_res, vars) => {
+      qc.invalidateQueries({ queryKey: ['delivery-order', vars.id] })
+      qc.invalidateQueries({ queryKey: ['delivery-orders'] })
+    },
+  })
+}
+
+export function useResendDeliveryOtp() {
+  const qc = useQueryClient()
+  const { success, error } = useUIStore()
+  return useMutation({
+    mutationFn: (id: string) => deliveryAPI.resendOtp(id).then(res => res.data),
+    onSuccess: (_res, id) => {
+      qc.invalidateQueries({ queryKey: ['delivery-order', id] })
+      success('New code sent', 'The customer has a new delivery code.')
+    },
+    onError: (e: { message: string }) => error('Could not resend', e.message),
+  })
+}
+
+// ─── Delivery assignment / override (staff side) ──────────────────────────
+export function useDeliveryPartners(enabled = true) {
+  return useQuery({
+    queryKey: ['delivery-partners'],
+    queryFn: () => adminCustomerOrdersAPI.deliveryPartners().then(unwrap),
+    enabled,
+    staleTime: 5 * 60_000,
+  })
+}
+
+export function useAssignDeliveryPartner() {
+  const qc = useQueryClient()
+  const { success, error } = useUIStore()
+  return useMutation({
+    mutationFn: ({ id, delivery_partner_id }: { id: string; delivery_partner_id: string | null }) =>
+      adminCustomerOrdersAPI.assignDeliveryPartner(id, delivery_partner_id).then(unwrap),
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: ['admin-customer-orders'] })
+      qc.invalidateQueries({ queryKey: ['admin-customer-order', vars.id] })
+      success(vars.delivery_partner_id ? 'Delivery partner assigned' : 'Delivery partner removed')
+    },
+    onError: (e: { message: string }) => error('Could not assign', e.message),
+  })
+}
+
+export function useOverrideDelivery() {
+  const qc = useQueryClient()
+  const { success, error } = useUIStore()
+  return useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+      adminCustomerOrdersAPI.overrideDelivery(id, reason).then(unwrap),
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: ['admin-customer-orders'] })
+      qc.invalidateQueries({ queryKey: ['admin-customer-order', vars.id] })
+      success('Delivery completed', 'Recorded as an override in the audit log.')
+    },
+    onError: (e: { message: string }) => error('Could not override', e.message),
   })
 }
 

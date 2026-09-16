@@ -5,6 +5,8 @@ import { RequireCustomerAuth, RequireCustomerGuest } from '@/router/customerGuar
 import { StorefrontProvider, RequireStorefront } from '@/modules/customer/StorefrontContext'
 import AppLayout from '@/layouts/AppLayout'
 import CustomerLayout from '@/layouts/CustomerLayout'
+import DeliveryLayout from '@/layouts/DeliveryLayout'
+import useAuthStore from '@/store/authStore'
 import { PATHS } from '@/constants'
 import { Spinner } from '@/components/ui'
 
@@ -34,6 +36,10 @@ const RemindersPage = lazy(() => import('@/modules/reminders/RemindersPage'))
 const AdminCustomerOrdersPage = lazy(() => import('@/modules/customerOrders/AdminCustomerOrdersPage'))
 const AdminCustomerRegistrationsPage = lazy(() => import('@/modules/customerOrders/AdminCustomerRegistrationsPage'))
 
+// Delivery partner app (migration 038)
+const DeliveryOrdersPage = lazy(() => import('@/modules/delivery/DeliveryOrdersPage'))
+const DeliveryOrderPage  = lazy(() => import('@/modules/delivery/DeliveryOrderPage'))
+
 // Customer storefront pages (Customer Product Ordering module)
 const StoreSelectPage      = lazy(() => import('@/modules/customer/StoreSelectPage'))
 const CustomerLoginPage    = lazy(() => import('@/modules/customer/CustomerLoginPage'))
@@ -46,6 +52,34 @@ const CustomerCheckoutPage = lazy(() => import('@/modules/customer/CustomerCheck
 const CustomerOrdersPage   = lazy(() => import('@/modules/customer/CustomerOrdersPage'))
 const CustomerOrderDetailPage = lazy(() => import('@/modules/customer/CustomerOrderDetailPage'))
 const CustomerProfilePage  = lazy(() => import('@/modules/customer/CustomerProfilePage'))
+
+/**
+ * A delivery partner has no back office: ROLE_PERMISSIONS for that role
+ * is empty and every staff endpoint would reject them, so landing them
+ * on /dashboard would show a page of things they cannot do. They get
+ * bounced to their own queue instead.
+ *
+ * This only redirects AWAY from the staff tree — it is a routing
+ * convenience, not a security boundary. The boundary is server-side:
+ * routes/deliveryPartner.js checks the role and the per-order
+ * assignment, and every back-office route has its own guard.
+ */
+function RequireStaff({ children }: { children: React.ReactNode }) {
+  const role = useAuthStore(s => s.user?.role)
+  if (role === 'delivery_partner') return <Navigate to={PATHS.DELIVERY} replace />
+  return <>{children}</>
+}
+
+/** The mirror of the above: keep staff out of the rider shell, so an
+ *  admin clicking a stale link gets their own app back rather than an
+ *  empty "no deliveries assigned to you" screen. */
+function RequireDeliveryPartner({ children }: { children: React.ReactNode }) {
+  const role = useAuthStore(s => s.user?.role)
+  if (role && role !== 'delivery_partner' && role !== 'owner') {
+    return <Navigate to={PATHS.DASHBOARD} replace />
+  }
+  return <>{children}</>
+}
 
 function PageLoader() {
   return (
@@ -65,7 +99,21 @@ export default function Router() {
           <Route path={PATHS.SIGNUP} element={<RequireGuest><SignupPage /></RequireGuest>} />
 
           {/* Protected */}
-          <Route path="/" element={<RequireAuth><AppLayout /></RequireAuth>}>
+          {/* ── Delivery partner app (migration 038) ───────────────────
+               Same staff session and token as the back office — a rider
+               is an ordinary `users` row — but its own shell, because
+               the sidebar app is entirely inapplicable to them. See
+               layouts/DeliveryLayout.tsx. */}
+          <Route
+            path={PATHS.DELIVERY}
+            element={<RequireAuth><RequireDeliveryPartner><DeliveryLayout /></RequireDeliveryPartner></RequireAuth>}
+          >
+            <Route index element={<DeliveryOrdersPage />} />
+            <Route path="orders" element={<Navigate to={PATHS.DELIVERY} replace />} />
+            <Route path="orders/:id" element={<DeliveryOrderPage />} />
+          </Route>
+
+          <Route path="/" element={<RequireAuth><RequireStaff><AppLayout /></RequireStaff></RequireAuth>}>
             <Route index element={<Navigate to={PATHS.DASHBOARD} replace />} />
 
             <Route path="dashboard"    element={<Dashboard />} />

@@ -189,10 +189,62 @@ export function useCustomerOrders(params?: Record<string, unknown>) {
   })
 }
 
+/**
+ * One order, as routes/customerOrders.js's GET /:id returns it.
+ *
+ * Typed explicitly because `unwrap` is generic over a parameter these
+ * hooks never supplied, so every consumer was reading an untyped `{}`
+ * and reaching for properties TypeScript could not see. The delivery
+ * fields would have compounded that, so the shape is written down here
+ * instead.
+ *
+ * `delivery_otp` is optional on purpose, and that is the type mirroring
+ * a real backend guarantee rather than laziness: the server omits the
+ * field entirely at every stage except out_for_delivery, so a component
+ * is forced to narrow before rendering it and cannot show a code that
+ * was never sent.
+ */
+export interface CustomerOrderDetail {
+  id: string
+  order_no: string
+  status: 'pending' | 'confirmed' | 'processing' | 'ready' | 'out_for_delivery' | 'delivered' | 'completed' | 'cancelled'
+  fulfillment_type: 'pickup' | 'delivery'
+  payment_method: 'cash_on_delivery' | 'pay_at_store'
+  payment_status: 'unpaid' | 'paid'
+  delivery_address: string | null
+  delivery_notes: string | null
+  cancel_reason: string | null
+  subtotal: number | string
+  discount_amount: number | string
+  tax_amount: number | string
+  delivery_charge: number | string
+  grand_total: number | string
+  created_at: string
+  items: {
+    id: string
+    product_name_snapshot: string
+    unit_snapshot: string | null
+    unit_price: number | string
+    quantity: number | string
+    subtotal: number | string
+  }[]
+
+  // ── Delivery verification (migration 038) ──
+  /** Present ONLY while status === 'out_for_delivery'. */
+  delivery_otp?: string
+  delivery_otp_expires_at?: string
+  /** Set when a code was issued but can no longer be shown (expired). */
+  delivery_otp_unavailable?: boolean
+  delivery_otp_verified_at: string | null
+  /** Display name only — never an id (spec §24). */
+  delivery_partner_name: string | null
+  delivery_partner_phone: string | null
+}
+
 export function useCustomerOrder(id: string) {
   return useQuery({
     queryKey: ['customer-order', id],
-    queryFn: () => customerOrdersAPI.get(id).then(unwrap),
+    queryFn: () => customerOrdersAPI.get(id).then(unwrap<CustomerOrderDetail>),
     enabled: !!id,
   })
 }

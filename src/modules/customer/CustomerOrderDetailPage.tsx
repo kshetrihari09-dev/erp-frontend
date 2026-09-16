@@ -1,11 +1,19 @@
 import { useParams, useNavigate } from 'react-router-dom'
-import { ChevronLeft, Check, Circle } from 'lucide-react'
+import { ChevronLeft, Check, Circle, Truck, ShieldAlert, CheckCircle2 } from 'lucide-react'
 import { Spinner, Empty, Badge } from '@/components/ui'
 import { useCustomerOrder } from '@/hooks/useCustomerQuery'
 
-const STEPS = ['pending', 'confirmed', 'processing', 'ready', 'completed']
+/* ── Progress steps ───────────────────────────────────────────────────────
+ * Two branches, matching the backend's flow (migration 038): a pickup
+ * order still ends at `completed`, a delivery order continues through
+ * `out_for_delivery` to `delivered`. A customer should never see a step
+ * for a stage their order will never reach, so the tracker is chosen by
+ * fulfillment_type rather than showing all seven and greying some out. */
+const PICKUP_STEPS   = ['pending', 'confirmed', 'processing', 'ready', 'completed']
+const DELIVERY_STEPS = ['pending', 'confirmed', 'processing', 'ready', 'out_for_delivery', 'delivered']
 const STEP_LABELS: Record<string, string> = {
-  pending: 'Order Placed', confirmed: 'Confirmed', processing: 'Processing', ready: 'Ready', completed: 'Completed',
+  pending: 'Order Placed', confirmed: 'Confirmed', processing: 'Processing', ready: 'Ready',
+  out_for_delivery: 'On the way', delivered: 'Delivered', completed: 'Completed',
 }
 
 export default function CustomerOrderDetailPage() {
@@ -16,8 +24,10 @@ export default function CustomerOrderDetailPage() {
   if (isLoading) return <div className="flex justify-center py-16"><Spinner size={26} className="text-brand" /></div>
   if (!order) return <Empty icon="🧾" message="Order not found." />
 
+  const STEPS = order.fulfillment_type === 'delivery' ? DELIVERY_STEPS : PICKUP_STEPS
   const currentIdx = STEPS.indexOf(order.status)
   const isCancelled = order.status === 'cancelled'
+  const isOutForDelivery = order.status === 'out_for_delivery'
 
   return (
     <div className="p-4 pb-8 max-w-lg mx-auto">
@@ -53,6 +63,56 @@ export default function CustomerOrderDetailPage() {
         </div>
       )}
 
+      {/* ── Delivery verification code ───────────────────────────────────
+          Shown ONLY while the order is out for delivery (spec §6). The
+          backend simply omits `delivery_otp` from the payload at every
+          other stage — this page cannot render a code early even if it
+          tried, because there is nothing to render. It is also never on
+          the cart, checkout, or order-list screens for the same reason.
+
+          `delivery_otp_unavailable` is the expired case: rather than
+          showing a stale code that will be rejected at the door, say so
+          and point at the partner, who can trigger a resend. */}
+      {isOutForDelivery && (order.delivery_otp || order.delivery_otp_unavailable) && (
+        <section className="mb-4 rounded-xl border-2 border-brand/30 bg-brand/[0.04] p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Truck size={17} className="text-brand" />
+            <h2 className="text-sm font-extrabold">Your order is out for delivery</h2>
+          </div>
+
+          {order.delivery_otp ? (
+            <>
+              <p className="text-xs text-[var(--text-3)] mb-2">Your delivery verification code:</p>
+              <div className="flex justify-center my-2">
+                <span className="text-3xl font-extrabold tracking-[0.3em] tabular-nums text-[var(--text)] select-all">
+                  {order.delivery_otp}
+                </span>
+              </div>
+              <p className="text-xs text-[var(--text-3)] text-center">
+                Share this code with the delivery partner when your order arrives.
+              </p>
+              <div className="flex items-start gap-1.5 mt-3 text-[11px] font-medium text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-2">
+                <ShieldAlert size={13} className="mt-px shrink-0" />
+                <span>Do not share this code before receiving your order.</span>
+              </div>
+            </>
+          ) : (
+            <p className="text-xs text-[var(--text-3)]">
+              Your verification code has expired. Ask the delivery partner to send a new one when they arrive.
+            </p>
+          )}
+        </section>
+      )}
+
+      {order.status === 'delivered' && order.delivery_otp_verified_at && (
+        <section className="mb-4 flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-4 py-3">
+          <CheckCircle2 size={17} className="text-green-600 shrink-0" />
+          <span className="text-sm font-semibold text-green-800">
+            Delivered at {new Date(order.delivery_otp_verified_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+          </span>
+        </section>
+      )}
+
       <section className="flex flex-col gap-2 mb-4">
         {order.items.map((item: any) => (
           <div key={item.id} className="flex justify-between text-sm">
@@ -80,6 +140,17 @@ export default function CustomerOrderDetailPage() {
         )}
         <div><span className="text-[var(--text-4)]">Payment: </span>{order.payment_method === 'cash_on_delivery' ? 'Cash on Delivery' : 'Pay at Store'} ({order.payment_status})</div>
         {order.delivery_notes && <div><span className="text-[var(--text-4)]">Notes: </span>{order.delivery_notes}</div>}
+        {/* Name and a number to call, nothing more (spec §24) — the
+            backend's select list is what actually enforces this. */}
+        {order.delivery_partner_name && (
+          <div>
+            <span className="text-[var(--text-4)]">Delivery partner: </span>
+            {order.delivery_partner_name}
+            {order.delivery_partner_phone && (
+              <a href={`tel:${order.delivery_partner_phone}`} className="ml-2 font-semibold text-brand">Call</a>
+            )}
+          </div>
+        )}
       </section>
     </div>
   )
