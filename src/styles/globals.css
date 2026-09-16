@@ -7339,7 +7339,25 @@ canvas{
   border-bottom: 1px solid var(--border);
 }
 .customer-topbar-name { font-weight: 800; font-size: 15px; }
-.customer-topbar-user { font-size: 12px; color: var(--text-3); font-weight: 600; }
+.customer-topbar-actions { display: flex; align-items: center; }
+.customer-topbar-user {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 12px; color: var(--text-3); font-weight: 600;
+  text-decoration: none;
+}
+.customer-topbar-user:hover { color: var(--text-2); }
+.customer-topbar-signin { color: var(--brand); font-weight: 700; }
+.customer-topbar-signin:hover { color: var(--brand); opacity: 0.85; }
+.customer-topbar-cart {
+  display: none; /* desktop-only shortcut — see 900px override below; mobile's bottom nav already has Cart */
+  position: relative;
+  align-items: center;
+  color: var(--text-2);
+  text-decoration: none;
+  margin-right: 16px;
+}
+.customer-topbar-cart:hover { color: var(--brand); }
+.customer-topbar-cart .customer-cart-badge { top: -7px; right: -8px; }
 
 .customer-main {
   flex: 1;
@@ -7616,6 +7634,7 @@ canvas{
 /* Desktop: bottom nav becomes a slim top nav instead of taking screen space */
 @media (min-width: 900px) {
   .customer-main { padding-bottom: 24px; }
+  .customer-topbar-cart { display: flex; }
   .customer-bottomnav {
     position: sticky;
     top: 49px; /* right under the topbar */
