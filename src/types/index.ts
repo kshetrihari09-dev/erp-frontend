@@ -188,7 +188,7 @@ export interface Product {
   is_online?:    boolean  // available on the customer storefront (Customer Product Ordering module)
   auto_sync_online_qty?: boolean  // online availability follows actual physical stock rather than a manual number
   online_qty?:   number | null    // manual online-available quantity, used when auto_sync_online_qty is false
-  online_image_url?: string | null // customer storefront product image (migration 034) — pasted URL or an uploaded file's /uploads/products/... path, same column either way
+  online_image_url?: string | null  // storefront image (paste-a-link, no upload service — see Customer Product Ordering module)
   created_at?:   string
   // ── Inventory Planning (Smart Purchase Suggestions) — all optional,
   // null/undefined means "use the company default" (see PurchaseSuggestionSettings).

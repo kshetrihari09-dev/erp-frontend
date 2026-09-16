@@ -104,6 +104,12 @@ export const productSchema = z.object({
   // showing its real saved value either way).
   auto_sync_online_qty: z.boolean().optional().default(true),
   online_qty: numericField(0, { min: 0 }),
+  // Plain URL, same as every other image field in this app (Company
+  // Settings' logo_url, etc.) — there's no upload/storage service
+  // anywhere in the codebase, so this is a paste-a-link field, not a
+  // file picker (see routes/products.js's PATCH /:id/online-settings,
+  // which accepts it as-is with no upload step).
+  online_image_url: z.string().optional().default(''),
 })
 
 export type ProductFormInput = z.input<typeof productSchema>
@@ -187,6 +193,7 @@ export async function createProductWithOpeningStock(raw: ProductFormInput): Prom
         is_online: true,
         auto_sync_online_qty: input.auto_sync_online_qty,
         online_qty: input.auto_sync_online_qty ? null : input.online_qty,
+        online_image_url: input.online_image_url.trim() || null,
       })
     } catch {
       // Non-fatal — product still created as an in-store item; "Available
@@ -221,5 +228,6 @@ export async function createProductWithOpeningStock(raw: ProductFormInput): Prom
     is_online:   input.is_online,
     auto_sync_online_qty: input.auto_sync_online_qty,
     online_qty:  input.online_qty,
+    online_image_url: input.online_image_url,
   }
 }

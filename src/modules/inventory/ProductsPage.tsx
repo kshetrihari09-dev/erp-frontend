@@ -4,14 +4,13 @@ import { useForm } from 'react-hook-form'
 import type { UseFormRegister, FieldErrors } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Plus, Package, ScanLine, Boxes, Download, Upload, Printer, QrCode, Filter, Pencil, Trash2, Globe } from 'lucide-react'
-import { useProducts, useCreateProduct, useUpdateProduct, useUpdateProductOnlineSettings, useUploadProductImage, useDeleteProduct, useProductOpeningBatches, useAddOpeningInventory, useNextBarcode, useSuppliers } from '@/hooks/useQuery'
+import { useProducts, useCreateProduct, useUpdateProduct, useUpdateProductOnlineSettings, useDeleteProduct, useProductOpeningBatches, useAddOpeningInventory, useNextBarcode, useSuppliers } from '@/hooks/useQuery'
 import { Button, Modal, Badge, Pagination, SkeletonRows, Empty, SearchInput, ConfirmDialog, Select, ToggleSwitch } from '@/components/ui'
 import ManufacturerSelect from '@/components/forms/ManufacturerSelect'
 import ExportProductsModal from './ExportProductsModal'
 import ImportProductsModal from './ImportProductsModal'
-import ProductImageUploader from './ProductImageUploader'
 import { useDebounce } from '@/hooks/useDebounce'
-import { fmt, resolveImageUrl } from '@/utils'
+import { fmt } from '@/utils'
 import { PRODUCT_UNITS } from '@/constants'
 import { productSchema, PRODUCT_VAT_OPTIONS, type ProductFormInput } from '@/services/productCreation'
 import type { Product, OpeningInventoryBatch } from '@/types'
@@ -40,23 +39,6 @@ const UNIT_BADGE_CLASS: Record<string, string> = {
 }
 function unitBadgeClass(unit?: string) {
   return (unit && UNIT_BADGE_CLASS[unit]) || 'badge-muted'
-}
-
-// Small consistent-size thumbnail for the admin product table (spec #4) —
-// resolveImageUrl (utils/index.ts) handles both a pasted external URL and
-// an uploaded /uploads/products/... path; a missing image or a failed
-// load both fall back to the same neutral placeholder, never a broken-
-// image icon.
-function ProductThumb({ src, alt }: { src?: string | null; alt: string }) {
-  const [failed, setFailed] = useState(false)
-  const resolved = resolveImageUrl(src)
-  return (
-    <div className="w-8 h-8 rounded-md border border-[var(--border)] bg-[var(--surface-2)] overflow-hidden flex items-center justify-center flex-shrink-0">
-      {resolved && !failed
-        ? <img src={resolved} alt={alt} loading="lazy" onError={() => setFailed(true)} className="w-full h-full object-cover" />
-        : <Package size={14} className="text-[var(--text-4)]" />}
-    </div>
-  )
 }
 
 // ── Opening Inventory — Edit Product ────────────────────────────────────────
@@ -306,7 +288,6 @@ function ProductForm({ initial, onClose }: { initial?: Product | null; onClose: 
   const create = useCreateProduct()
   const update = useUpdateProduct()
   const updateOnlineSettings = useUpdateProductOnlineSettings()
-  const uploadImage = useUploadProductImage()
   const { register, handleSubmit, setValue, watch, formState: { errors, isSubmitting, dirtyFields } } = useForm<Form>({
     resolver: zodResolver(productSchema),
     defaultValues: initial ? {
@@ -326,23 +307,19 @@ function ProductForm({ initial, onClose }: { initial?: Product | null; onClose: 
       // actually saved as, defaulting to false only if truly never configured.
       auto_sync_online_qty: !!initial.auto_sync_online_qty,
       online_qty: initial.online_qty ?? 0,
+      online_image_url: initial.online_image_url ?? '',
     } : {
       // Same defaults Quick Add has always used, so a product created
       // without touching these fields is identical either way.
       unit: 'Strip', vat_percent: 13, cc_pct: 0, min_stock: 50, mrp: 0, sales_rate: '' as any, purchase_rate: 0,
       barcode: '', opening_stock: '' as any, opening_batch: '', opening_expiry: '',
-      is_online: false, auto_sync_online_qty: true, online_qty: 0,
+      is_online: false, auto_sync_online_qty: true, online_qty: 0, online_image_url: '',
     },
   })
 
   const [scanOpen, setScanOpen]   = useState(false)
   const [scanBanner, setScanBanner] = useState<string | null>(null)
   const [planning, setPlanning] = useState<PlanningState>(() => emptyPlanning(initial))
-  // Create Product only — there's no product id to upload against until
-  // after create.mutateAsync() returns one; see onSubmit below and
-  // ProductImageUploader's own docblock for why this lives up here
-  // instead of inside that component when there's no productId yet.
-  const [stagedImage, setStagedImage] = useState<File | null>(null)
 
   // Create Product only: pre-fetch the next auto-generated barcode (same
   // global product_auto_barcode_seq / nextAutoBarcode() the backend already
@@ -379,12 +356,12 @@ function ProductForm({ initial, onClose }: { initial?: Product | null; onClose: 
       // /products/:id's own whitelist excludes them on purpose (routes/
       // products.js) — sending them there is silently ignored, so they go
       // through the dedicated online-settings endpoint instead.
-      const { opening_stock, opening_batch, opening_expiry, is_online, auto_sync_online_qty, online_qty, ...editable } = data as any
+      const { opening_stock, opening_batch, opening_expiry, is_online, auto_sync_online_qty, online_qty, online_image_url, ...editable } = data as any
       await update.mutateAsync({ id: initial.id, data: { ...editable, ...planningToPayload(planning) } })
       try {
         await updateOnlineSettings.mutateAsync({
           id: initial.id,
-          data: { is_online, auto_sync_online_qty, online_qty: auto_sync_online_qty ? null : online_qty },
+          data: { is_online, auto_sync_online_qty, online_qty: auto_sync_online_qty ? null : online_qty, online_image_url: online_image_url?.trim() || null },
         })
       } catch { /* toasted by useUpdateProductOnlineSettings itself */ }
     } else {
@@ -396,12 +373,6 @@ function ProductForm({ initial, onClose }: { initial?: Product | null; onClose: 
       const hasAnyPlanning = Object.values(payload).some(v => v !== null && v !== false)
       if (hasAnyPlanning) {
         try { await update.mutateAsync({ id: newProduct.id, data: payload as any }) } catch { /* non-fatal */ }
-      }
-      // Same non-fatal-follow-up pattern as planning above — the product
-      // is already created successfully regardless of whether this
-      // (optional) image upload succeeds.
-      if (stagedImage) {
-        try { await uploadImage.mutateAsync({ id: newProduct.id, file: stagedImage }) } catch { /* toasted by useUploadProductImage itself */ }
       }
       // is_online etc. for a brand-new product are already handled inside
       // createProductWithOpeningStock itself (services/productCreation.ts).
@@ -525,7 +496,14 @@ function ProductForm({ initial, onClose }: { initial?: Product | null; onClose: 
           <p className="text-xs text-amber-600 mt-1.5">Set a Sale Rate above 0 — customers see this product's price from Sale Rate.</p>
         )}
         {watch('is_online') && (
-          <div className="mt-3 pl-0.5 flex flex-col gap-2.5">
+          <div className="mt-3 pl-0.5 flex flex-col gap-3">
+            <div className="max-w-[360px]">
+              <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">Storefront Image URL</label>
+              <input type="text" className="erp-input" placeholder="https://…" {...register('online_image_url')} />
+              <p className="text-[11px] text-[var(--text-4)] mt-1">
+                Paste a link to an already-hosted image — there's no upload/photo storage in this app, so this needs a URL (e.g. a link from your phone's cloud storage or an image host). Left blank, customers see a placeholder instead.
+              </p>
+            </div>
             <ToggleSwitch
               checked={!!watch('auto_sync_online_qty')}
               onChange={(v) => setValue('auto_sync_online_qty', v, { shouldDirty: true })}
@@ -538,14 +516,6 @@ function ProductForm({ initial, onClose }: { initial?: Product | null; onClose: 
                 <p className="text-[11px] text-[var(--text-4)] mt-1">Set manually instead of following actual stock.</p>
               </div>
             )}
-            <div className="max-w-[280px]">
-              <ProductImageUploader
-                productId={initial?.id}
-                currentImageUrl={initial?.online_image_url}
-                stagedFile={stagedImage}
-                onStage={setStagedImage}
-              />
-            </div>
           </div>
         )}
       </div>
@@ -682,19 +652,16 @@ export default function ProductsPage() {
         <div className="overflow-x-auto prod-desktop-table">
           <table className="erp-table">
             <thead>
-              <tr><th></th><th>Code</th><th>Product</th><th>Generic</th><th>Unit</th>
+              <tr><th>Code</th><th>Product</th><th>Generic</th><th>Unit</th>
                 <th className="td-right">MRP</th><th className="td-right">Sale Rate</th>
                 <th className="td-right">Stock</th><th>Status</th><th></th></tr>
             </thead>
             <tbody>
               {isLoading
-                ? <SkeletonRows cols={10} />
+                ? <SkeletonRows cols={9} />
                 : rows.length
                   ? rows.map(p => (
                       <tr key={p.id}>
-                        <td className="w-10">
-                          <ProductThumb src={p.online_image_url} alt={p.name} />
-                        </td>
                         <td className="td-mono text-brand">
                           {p.item_code}
                           {p.barcode && <div className="text-[10px] text-[var(--text-4)] font-normal mt-0.5">{p.barcode}</div>}
