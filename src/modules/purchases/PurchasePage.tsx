@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useForm } from 'react-hook-form'
-import { FilePlus, List, Printer, ChevronDown, Plus, Truck } from 'lucide-react'
+import { FilePlus, List, Printer, ChevronDown, Plus, Truck, ScanLine, AlertTriangle, CheckCircle2, HelpCircle, XCircle } from 'lucide-react'
 import ScanButton from '@/components/scanner/ScanButton'
+import ScanPurchaseBillModal from './ScanPurchaseBillModal'
 import type { ScanResult } from '@/types/scanner'
-import { purchasesAPI, partiesAPI, productsAPI } from '@/services/api'
+import { purchasesAPI, partiesAPI, productsAPI, purchaseScansAPI } from '@/services/api'
+import http from '@/services/http'
 import useUIStore from '@/store/uiStore'
 import {
   Button, Tabs, Modal, Badge, Pagination,
@@ -53,6 +55,15 @@ export default function PurchasePage() {
   const [detail,     setDetail]     = useState<Purchase | null>(null)
   const [confirmCreate, setConfirmCreate] = useState(false)
   const [showNewSupplier, setShowNewSupplier] = useState(false)
+
+  // ── Scan Purchase Bill (OCR review state) ────────────────────────────
+  // sourceScanId is threaded onto purchasesAPI.create() as source_scan_id
+  // — the ONLY effect a scan has on saving a purchase. Everything else
+  // here (scanReview) is purely for the banner/badges below; it never
+  // reaches the API payload.
+  const [showScanModal, setShowScanModal] = useState(false)
+  const [sourceScanId, setSourceScanId] = useState<string | null>(null)
+  const [scanReview, setScanReview] = useState<any | null>(null) // extracted_data from the scan
 
   // Mobile: which rows have Batch/Expiry expanded
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set())
@@ -110,6 +121,56 @@ export default function PurchasePage() {
     },
   })
 
+  /**
+   * Populates the SAME form/rows state manual entry uses — this is the
+   * whole of the "Populate Existing Purchase Form" step in the spec's
+   * pipeline (#12). Nothing about calculation happens here: rate/qty/
+   * bonus/cc_pct are copied in as scanned, and InvoiceRowsTable's own
+   * calcRowAmount (the one true frontend formula) computes amount/
+   * cc_amount from them exactly as it would for a row typed by hand —
+   * see PurchasePage's onSubmit, which then sends cc_pct through for the
+   * backend to recompute again from scratch. The scanner never writes a
+   * pre-computed amount into a row.
+   */
+  function handleScanExtracted(scanId: string, extracted: any) {
+    const supplierId = extracted?.supplier_match?.party_id
+    if (supplierId) setValue('supplier_id', supplierId)
+    const invDate = extracted?.header?.invoice_date?.value
+    if (invDate && /^\d{4}-\d{2}-\d{2}$/.test(invDate)) setValue('date', invDate)
+    const invoiceNo = extracted?.header?.invoice_no?.value
+    if (invoiceNo) setValue('supplier_bill_no', invoiceNo)
+
+    const items = extracted?.items || []
+    if (items.length) {
+      const newRows: InvoiceRow[] = items.map((it: any) => {
+        const productId = it.match?.product_id || ''
+        const { amount } = calcRowAmount({
+          qty: Number(it.qty) || 0, rate: Number(it.rate) || 0,
+          bonus: Number(it.free_qty) || 0, discount_pct: 0, cc_pct: Number(it.cc_pct) || 0,
+        })
+        return {
+          ...newRow(),
+          product_id: productId,
+          // Kept even when unmatched — spec #6 requires manual product
+          // selection for anything not auto-matched, and the scanned
+          // name is what the user needs to see to pick the right one.
+          product_name: it.product_name || '',
+          batch_no: it.batch_no || '',
+          expiry: it.expiry || '',
+          qty: Number(it.qty) || 1,
+          bonus: Number(it.free_qty) || 0,
+          rate: it.rate ?? '',
+          cc_pct: Number(it.cc_pct) || 0,
+          amount,
+        }
+      })
+      setRows(newRows)
+    }
+
+    setSourceScanId(scanId)
+    setScanReview(extracted)
+  }
+
   useEffect(() => {
     partiesAPI.suppliers({ limit: 500 }).then(r => setSuppliers(r.data.data || [])).catch(() => {})
     productsAPI.list({ limit: 500 }).then(r => setProducts(r.data.data || [])).catch(() => {})
@@ -154,6 +215,12 @@ export default function PurchasePage() {
         date_ad:          data.date,
         payment_mode:     data.payment_mode,
         supplier_bill_no: data.supplier_bill_no || undefined,
+        // The ONLY thing that changes between a manually-entered and a
+        // scanned purchase: this one field. Same endpoint, same items
+        // shape, same calculation — see routes/purchases.js, which uses
+        // this only to link the resulting purchase back to its source
+        // document and mark the scan confirmed in the same transaction.
+        source_scan_id:   sourceScanId || undefined,
         items: validRows.map(r => ({
           product_id:  r.product_id,
           product_name: r.product_name,
@@ -162,6 +229,14 @@ export default function PurchasePage() {
           qty:         Number(r.qty),
           bonus:       Number(r.bonus)   || 0,
           rate:        Number(r.rate),
+          // Previously omitted, which meant a CC% typed into this screen
+          // changed the row's Amount and the on-screen Grand Total, then
+          // was silently discarded on save — the backend received no
+          // cc_pct, defaulted it to 0, and persisted cc_amount = 0. Now
+          // sent through, and recalculated server-side from it (never
+          // trusted as-is) via the same formula the row preview uses —
+          // see utils/purchaseCalc.js on the backend.
+          cc_pct:      Number(r.cc_pct)  || 0,
           amount:      r.amount,
         })),
       })
@@ -212,6 +287,8 @@ export default function PurchasePage() {
     setFlash(null)
     reset()
     setRows([newRow()])
+    setSourceScanId(null)
+    setScanReview(null)
   }
 
   /* ── Keyboard shortcuts (New Purchase tab only) ────────────────────────
@@ -300,6 +377,24 @@ export default function PurchasePage() {
 
           {/* ── Header form ─────────────────────────────────────────── */}
           <div className="pos-card mb-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="pos-card-title">Bill Details</div>
+              {/* The scanner is only an input method (spec's own words) —
+                  this button does nothing but open the capture modal and
+                  hand extracted data to the same form below. Hidden once
+                  a scan is already attached, since re-scanning over a
+                  populated form would be confusing; Ctrl+N / New Bill
+                  clears sourceScanId and brings it back. */}
+              {!sourceScanId && (
+                <button
+                  type="button"
+                  onClick={() => setShowScanModal(true)}
+                  className="flex items-center gap-1.5 text-xs font-bold text-brand px-2.5 py-1.5 rounded-lg border border-brand/30 hover:bg-brand/5"
+                >
+                  <ScanLine size={14} /> Scan Purchase Bill
+                </button>
+              )}
+            </div>
             {/* pos-customer-grid: 2-col desktop → 1-col mobile */}
             <div className="pos-customer-grid">
               <div>
@@ -348,6 +443,72 @@ export default function PurchasePage() {
               </div>
             </div>
           </div>
+
+          {/* ── Scan review banner ──────────────────────────────────────
+              Only rendered when this bill came from a scan. Per-row
+              match/mismatch detail lives here rather than inside
+              InvoiceRowsTable itself — that table is shared with Sales,
+              and threading OCR-specific state through a component with
+              no concept of "this came from a scan" would be exactly the
+              kind of parallel system the spec says not to build. This
+              banner is purely a read-only summary; every value it
+              describes is still the same, single, editable row below. */}
+          {scanReview && (
+            <div className={`pos-card mb-4 border-2 ${scanReview.needs_review || scanReview.duplicate_warning ? 'border-amber-300' : 'border-green-200'}`}>
+              <div className="flex items-center gap-2 mb-2">
+                <ScanLine size={15} className="text-brand" />
+                <span className="text-xs font-extrabold uppercase tracking-wide">Scanned Bill — Review Before Confirming</span>
+              </div>
+
+              {scanReview.duplicate_warning && (
+                <div className="flex items-start gap-2 text-xs font-semibold text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-2">
+                  <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+                  <span>
+                    ⚠️ Possible Duplicate Purchase — this supplier already has bill{' '}
+                    <strong>{scanReview.duplicate_warning.bill_no}</strong> dated {scanReview.duplicate_warning.date_ad} for the same invoice number.
+                  </span>
+                </div>
+              )}
+
+              {scanReview.flags?.grand_total_mismatch && (
+                <div className="flex items-start gap-2 text-xs font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-2">
+                  <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+                  <span>
+                    ⚠️ CC / total mismatch — review required. Scanned Grand Total:{' '}
+                    <strong>{fmt(scanReview.header?.grand_total?.value)}</strong> · Calculated Grand Total:{' '}
+                    <strong>{fmt(scanReview.calculated?.grand_total)}</strong>
+                  </span>
+                </div>
+              )}
+
+              {!scanReview.needs_review && !scanReview.duplicate_warning && (
+                <div className="flex items-center gap-2 text-xs font-semibold text-green-700">
+                  <CheckCircle2 size={14} /> Scanned totals match this app's calculations.
+                </div>
+              )}
+
+              {/* Per-line match status — index-aligned with the rows below. */}
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {(scanReview.items || []).map((it: any, i: number) => {
+                  const status = it.match?.status
+                  const Icon = status === 'matched' ? CheckCircle2 : status === 'possible_match' ? HelpCircle : XCircle
+                  const cls = status === 'matched' ? 'text-green-700 bg-green-50 border-green-200'
+                    : status === 'possible_match' ? 'text-amber-700 bg-amber-50 border-amber-200'
+                    : 'text-red-700 bg-red-50 border-red-200'
+                  const label = status === 'matched' ? 'Matched' : status === 'possible_match' ? 'Possible Match' : 'Not Found'
+                  return (
+                    <span key={i} className={`inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded border ${cls}`}>
+                      <Icon size={10} /> Line {i + 1}: {label}
+                      {it.flags?.cc_amount_mismatch && ' · CC ⚠️'}
+                    </span>
+                  )
+                })}
+              </div>
+              <p className="text-[10px] text-[var(--text-4)] mt-2">
+                Every field below is editable — fix anything the scan got wrong before confirming.
+              </p>
+            </div>
+          )}
 
           {/* ── Items card ──────────────────────────────────────────── */}
           <div className="pos-card mb-4">
@@ -705,6 +866,17 @@ export default function PurchasePage() {
       >
         {detail && (
           <div>
+            {/* Only present when this purchase came from Scan Purchase
+                Bill (source_scan_id set) — spec #11: "allow the user to
+                open the original document later from Purchase History."
+                Fetched as an authenticated blob, not a plain <img src>/
+                <a href>, because this app authenticates with a bearer
+                token, not a cookie — see ViewOriginalScanLink below. */}
+            {detail.source === 'scanned' && detail.source_scan_id && (
+              <div className="mb-3">
+                <ViewOriginalScanLink scanId={detail.source_scan_id} />
+              </div>
+            )}
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
               {[
                 ['Supplier',  detail.party_name || '—'],
@@ -762,18 +934,30 @@ export default function PurchasePage() {
         )}
       </Modal>
 
+      <ScanPurchaseBillModal
+        open={showScanModal}
+        onClose={() => setShowScanModal(false)}
+        onExtracted={handleScanExtracted}
+      />
+
       <ConfirmDialog
         open={confirmCreate}
         onClose={() => setConfirmCreate(false)}
         onConfirm={onSubmit}
         title="Create Purchase"
-        message="Are you sure you want to create this purchase? This will update your inventory and accounts."
+        message={
+          scanReview?.duplicate_warning
+            ? `⚠️ Possible duplicate: this supplier + invoice number matches an existing purchase (${scanReview.duplicate_warning.bill_no}, dated ${scanReview.duplicate_warning.date_ad}). Create this purchase anyway?`
+            : scanReview?.needs_review
+              ? '⚠️ Some scanned values didn\u2019t match this app\u2019s calculations and were flagged for review above. Are you sure the figures are correct?'
+              : 'Are you sure you want to create this purchase? This will update your inventory and accounts.'
+        }
       />
       <PrintPreviewModal
         data={printData}
         open={!!printData}
         onClose={() => setPrintData(null)}
-        onNextBill={() => { setPrintData(null); reset(); setRows([newRow()]) }}
+        onNextBill={() => { setPrintData(null); reset(); setRows([newRow()]); setSourceScanId(null); setScanReview(null) }}
       />
       <AutoCloudBackup data={printData} />
 
@@ -797,5 +981,68 @@ export default function PurchasePage() {
         />
       )}
     </div>
+  )
+}
+
+/**
+ * ViewOriginalScanLink — opens page 1 of a purchase's source scan
+ * (spec #11's "open the original document later from Purchase History").
+ *
+ * Fetched as a blob via the app's own authenticated `http` client rather
+ * than rendered as `<img src="...">` or `<a href="...">`: this app's
+ * auth is a bearer token attached by an axios interceptor
+ * (services/http.ts), which a plain browser-native src/href request
+ * never carries — that request would hit the backend with no
+ * Authorization header and 401. Fetching through `http` and handing the
+ * browser an object URL is the only way this actually works with this
+ * app's auth model.
+ *
+ * Multi-page bills: this opens page 1 only, with a note if there's
+ * more — a full paged viewer is more UI than a "here's the original"
+ * link needs, and every field on it is already editable in the form
+ * that was built from it.
+ */
+function ViewOriginalScanLink({ scanId }: { scanId: string }) {
+  const [loading, setLoading] = useState(false)
+  const [pageCount, setPageCount] = useState<number | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    purchaseScansAPI.get(scanId).then(r => {
+      if (!cancelled) setPageCount(r.data.data?.pages?.length ?? 1)
+    }).catch(() => {})
+    return () => { cancelled = true }
+  }, [scanId])
+
+  async function open() {
+    setLoading(true)
+    try {
+      const res = await http.get(purchaseScansAPI.pagePath(scanId, 1), { responseType: 'blob' })
+      const url = URL.createObjectURL(res.data)
+      window.open(url, '_blank')
+      // Revoke well after the new tab has had time to load it — an
+      // immediate revoke can race the new tab's own fetch of the blob:
+      // URL and leave it showing a broken image.
+      setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    } catch {
+      // The scan's files may have been cleaned up independently of the
+      // purchase record itself — fail quietly rather than blocking the
+      // rest of the purchase detail view over a missing attachment.
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={open}
+      disabled={loading}
+      className="flex items-center gap-1.5 text-xs font-bold text-brand px-2.5 py-1.5 rounded-lg border border-brand/30 hover:bg-brand/5 disabled:opacity-50"
+    >
+      <ScanLine size={13} />
+      {loading ? 'Opening…' : 'View Original Scanned Bill'}
+      {pageCount && pageCount > 1 && <span className="text-[10px] font-medium text-[var(--text-4)]">(page 1 of {pageCount})</span>}
+    </button>
   )
 }

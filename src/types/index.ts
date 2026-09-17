@@ -470,6 +470,11 @@ export interface Purchase {
   status:        'active' | 'cancelled'
   items?:        PurchaseItem[]
   created_at:    string
+  /** 'scanned' when this purchase was created via Scan Purchase Bill
+   *  (migration 039); absent/'manual' otherwise. Drives the "View
+   *  Original Scanned Bill" link in the purchase detail view. */
+  source?:          'manual' | 'scanned'
+  source_scan_id?:  string | null
 }
 
 // ─── Accounting ───────────────────────────────────────────────────────────────

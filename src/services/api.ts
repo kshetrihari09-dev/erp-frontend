@@ -222,6 +222,9 @@ export const purchasesAPI = {
   create: (data: {
     party_id?: string; date_ad: string; payment_mode: string;
     supplier_bill_no?: string; items: PurchaseItem[]; purchase_order_id?: string
+    /** Links this purchase back to a Scan Purchase Bill session (migration 039)
+     *  — see routes/purchases.js and PurchasePage.tsx's handleScanExtracted. */
+    source_scan_id?: string
   }) => http.post<ApiResponse<Purchase>>('/purchases', data),
   cancel: (id: string) => http.put(`/purchases/${id}/cancel`),
 }
@@ -330,7 +333,31 @@ export const adminCustomerOrdersAPI = {
     http.post<ApiResponse<any>>(`/admin/customer-orders/${id}/delivery-override`, { reason }),
 }
 
-// ─── Delivery partner app (migration 038) ───────────────────────────────────
+// ─── Scan Purchase Bill / Invoice OCR ────────────────────────────────────────
+// The scanner is only an input method (spec's architecture rule) — nothing
+// here creates a purchase. Confirming a reviewed scan is a normal call to
+// purchasesAPI.create(...) with source_scan_id set; see PurchasePage.tsx.
+export const purchaseScansAPI = {
+  upload: (files: File[]) => {
+    const form = new FormData()
+    files.forEach(f => form.append('files', f))
+    return http.post<ApiResponse<{ id: string; status: string; page_count: number }>>(
+      '/purchase-scans', form, { headers: { 'Content-Type': 'multipart/form-data' } },
+    )
+  },
+  get: (id: string) => http.get<ApiResponse<any>>(`/purchase-scans/${id}`),
+  discard: (id: string) => http.delete<ApiResponse<any>>(`/purchase-scans/${id}`),
+  checkDuplicate: (party_id: string, supplier_bill_no: string) =>
+    http.get<ApiResponse<any>>('/purchase-scans/check-duplicate', { params: { party_id, supplier_bill_no } }),
+  /** Not fetched via axios — used directly as an <img>/<a> src. The
+   *  browser sends the existing auth cookie/header automatically only if
+   *  http's interceptor attaches to plain requests too; since this app's
+   *  auth is a bearer token (not a cookie), an <img src> alone can't
+   *  authenticate — components needing this call http.get with
+   *  responseType 'blob' and build an object URL instead. This helper
+   *  just centralizes the path so it's written in one place. */
+  pagePath: (scanId: string, pageNo: number) => `/purchase-scans/${scanId}/pages/${pageNo}/file`,
+}
 // The rider's own view of their assigned work. Backend:
 // routes/deliveryPartner.js, which scopes every one of these to the
 // authenticated rider's assigned orders — there is no order-id a rider

@@ -5,7 +5,7 @@ import {
   productsAPI, salesAPI, purchasesAPI, partiesAPI, accountingAPI,
   reportsAPI, stockAPI, settingsAPI, returnsAPI, dateAPI, companiesAPI,
   purchaseSuggestionsAPI, purchaseOrdersAPI, creditRiskAPI, approvalsAPI, notificationsAPI,
-  remindersAPI, adminCustomerOrdersAPI, adminCustomerRegistrationsAPI, deliveryAPI,
+  remindersAPI, adminCustomerOrdersAPI, adminCustomerRegistrationsAPI, deliveryAPI, purchaseScansAPI,
 } from '@/services/api'
 import * as manufacturersService from '@/services/manufacturers'
 import type { ManufacturerInput } from '@/services/manufacturers'
@@ -658,6 +658,40 @@ export function useSetCustomerOrderStatus() {
       success(vars.status === 'confirmed' ? 'Order confirmed — sale created' : 'Order updated')
     },
     onError: (e: { message: string }) => error('Could not update order', e.message),
+  })
+}
+
+// ─── Scan Purchase Bill / Invoice OCR ────────────────────────────────────────
+export function useUploadPurchaseScan() {
+  const { error } = useUIStore()
+  return useMutation({
+    mutationFn: (files: File[]) => purchaseScansAPI.upload(files).then(unwrap),
+    onError: (e: { message: string }) => error('Could not upload bill', e.message),
+  })
+}
+
+/**
+ * Polls a scan while OCR is running. `enabled` lets the caller only
+ * start polling once it actually has a scan id (right after upload).
+ * Stops polling itself once status leaves 'uploaded'/'processing' —
+ * react-query's refetchInterval function form re-evaluates on every
+ * fetch, so this doesn't need a separate effect to cancel a timer.
+ */
+export function usePurchaseScan(id: string | null) {
+  return useQuery({
+    queryKey: ['purchase-scan', id],
+    queryFn: () => purchaseScansAPI.get(id!).then(unwrap),
+    enabled: !!id,
+    refetchInterval: (query) => {
+      const status = (query.state.data as any)?.status
+      return status === 'uploaded' || status === 'processing' ? 2000 : false
+    },
+  })
+}
+
+export function useDiscardPurchaseScan() {
+  return useMutation({
+    mutationFn: (id: string) => purchaseScansAPI.discard(id).then(unwrap),
   })
 }
 
