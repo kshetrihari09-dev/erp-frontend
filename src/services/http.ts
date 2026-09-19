@@ -14,6 +14,7 @@ import { config }      from '@/config/env'
 import { getEffectiveApiBaseUrl } from '@/config/serverConnection'
 import { RAW_TOKEN_KEY, REFRESH_TOKEN_KEY as AUTH_REFRESH_KEY } from '@/store/authStore'
 import { getValidStepUpToken, clearStepUpToken } from './stepUpToken'
+import useUIStore from '@/store/uiStore'
 
 // REFRESH_TOKEN_KEY is exported from authStore.ts
 export { AUTH_REFRESH_KEY as REFRESH_TOKEN_KEY }
@@ -33,6 +34,27 @@ let refreshSubscribers: Array<(token: string) => void> = []
 function onRefreshDone(token: string) {
   refreshSubscribers.forEach(cb => cb(token))
   refreshSubscribers = []
+}
+
+// ─── 429 handling ───────────────────────────────────────────────────────────
+// One toast per cooldown window, not one per rejected request — a burst of
+// 429s (e.g. several queries firing around the same time) would otherwise
+// stack a toast per request, which reads as the app spamming itself and
+// does nothing to help the person understand what happened. This never
+// retries the request itself; the caller's own error handling (or, for a
+// query, react-query's shouldRetryQuery in app/queryClient.ts, which
+// already treats 429 as non-retryable) decides what happens next.
+const RATE_LIMIT_TOAST_COOLDOWN_MS = 10_000
+let lastRateLimitToastAt = 0
+
+function notifyRateLimited() {
+  const now = Date.now()
+  if (now - lastRateLimitToastAt < RATE_LIMIT_TOAST_COOLDOWN_MS) return
+  lastRateLimitToastAt = now
+  useUIStore.getState().warning(
+    'Too many requests',
+    'Please wait a moment and try again.',
+  )
 }
 
 function clearAuthAndRedirect() {
@@ -105,6 +127,11 @@ http.interceptors.response.use(
 
     if (config.enableApiLogs || config.isDev) {
       console.error(`[API ✗] ${status || 'NET'}:`, rawMessage, error.config?.url)
+    }
+
+    // ── 429: server asked us to slow down — surface it, never hammer it ────
+    if (status === 429) {
+      notifyRateLimited()
     }
 
     // ── 401: attempt silent token refresh ──────────────────────────────────

@@ -158,6 +158,16 @@ const UnifiedProductInput = forwardRef<UnifiedProductInputHandle, Props>(functio
   // endpoint (partial — needs a hydrate step on pick) or the offline
   // catalog (already a full Product — no extra lookup needed on pick).
   const resultsOnlineRef = useRef(true)
+  // Aborts the in-flight fuzzy search (if any) the moment a newer one is
+  // fired, and a monotonically increasing token to double-guard against
+  // a response that was already in-flight when abort() was called (fetch
+  // aborts are cooperative — a request can still resolve a moment after
+  // .abort() if it was already at the "parsing response" stage). Without
+  // both of these, a fast typist on a slow/variable connection could see
+  // an older, slower response for "para" land AFTER a newer one for
+  // "paracetamol" and silently overwrite it on screen.
+  const searchAbortRef = useRef<AbortController | null>(null)
+  const searchSeqRef   = useRef(0)
 
   useImperativeHandle(ref, () => ({
     focus: () => inputRef.current?.focus(),
@@ -188,6 +198,10 @@ const UnifiedProductInput = forwardRef<UnifiedProductInputHandle, Props>(functio
   /* ── Debounced multi-field search (name / generic / company / code) ──── */
   const runSearch = useCallback((q: string) => {
     if (debounceRef.current) clearTimeout(debounceRef.current)
+    // A new keystroke supersedes whatever search was still in flight —
+    // cancel it so a slow response for the old query can't land after
+    // (and overwrite) the result of a newer one.
+    if (searchAbortRef.current) { searchAbortRef.current.abort(); searchAbortRef.current = null }
     const trimmed = q.trim()
     if (trimmed.length < 2) {
       setResults([])
@@ -197,25 +211,44 @@ const UnifiedProductInput = forwardRef<UnifiedProductInputHandle, Props>(functio
     }
     setLoading(true)
     debounceRef.current = setTimeout(async () => {
+      const seq = ++searchSeqRef.current
+      const controller = new AbortController()
+      searchAbortRef.current = controller
       try {
         if (!isOnline) {
           resultsOnlineRef.current = false
           const offline = companyId ? await searchProductsOffline(companyId, trimmed, 8) : []
+          if (seq !== searchSeqRef.current) return // superseded while awaiting
           setResults(offline.map(toProduct) as unknown as FuzzyResult[])
         } else {
           resultsOnlineRef.current = true
-          const res = await scannerAPI.fuzzySearch(trimmed, 8)
+          const res = await scannerAPI.fuzzySearch(trimmed, 8, controller.signal)
+          if (seq !== searchSeqRef.current) return // superseded while awaiting
           setResults((res.data as any)?.data || [])
         }
         setOpen(true)
         setHL(0)
-      } catch {
+      } catch (err: any) {
+        // A cancelled request isn't a real failure — the query it was
+        // for no longer matters, so don't flash the "no results" state
+        // for it (that belongs to whichever search actually completes).
+        if (err?.code === 'ERR_CANCELED' || err?.name === 'CanceledError') return
+        if (seq !== searchSeqRef.current) return
         setResults([])
       } finally {
-        setLoading(false)
+        if (seq === searchSeqRef.current) setLoading(false)
       }
     }, 200)
   }, [isOnline, companyId])
+
+  // Cancel any pending debounce timer / in-flight search when the field
+  // itself unmounts (e.g. navigating away from the Sale page mid-search).
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+      if (searchAbortRef.current) searchAbortRef.current.abort()
+    }
+  }, [])
 
   function handleQueryChange(v: string) {
     setQuery(v)

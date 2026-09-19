@@ -533,10 +533,16 @@ export const scannerAPI = {
       `/scanner/products/barcode/${encodeURIComponent(code)}`,
       opts?.timeoutMs ? { timeout: opts.timeoutMs } : undefined,
     ),
-  fuzzySearch: (q: string, limit = 15) =>
+  /**
+   * `signal` (optional) lets a caller abort an in-flight fuzzy search —
+   * used by UnifiedProductInput.tsx to cancel a still-pending search the
+   * moment a newer keystroke supersedes it, instead of letting an older,
+   * slower response race a newer one and overwrite it on arrival.
+   */
+  fuzzySearch: (q: string, limit = 15, signal?: AbortSignal) =>
     http.get<ApiResponse<Array<Omit<ScannedProduct, 'current_stock' | 'batches'>>>>(
       '/scanner/products/fuzzy',
-      { params: { q, limit } },
+      { params: { q, limit }, signal },
     ),
 }
 
