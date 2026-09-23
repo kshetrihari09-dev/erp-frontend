@@ -523,6 +523,17 @@ export function useCreditRiskCheckQuery(customerId: string, invoiceAmount: numbe
     queryFn:  () => creditRiskAPI.check(customerId, invoiceAmount).then(unwrap),
     enabled:  enabled && !!customerId && invoiceAmount > 0,
     staleTime: 30_000,
+    // `invoiceAmount` is part of the query key and changes as the invoice is
+    // built, so every amount change looks like a brand-new query to React
+    // Query. Without this, `data` drops to `undefined` and `isLoading` flips
+    // true on each of those key changes, even though the previous result is
+    // still a perfectly good, momentarily-stale answer. Keeping the previous
+    // page's data visible during the background refetch is what lets the
+    // Sales page's Credit Risk banner stay mounted/stable instead of
+    // blinking out and back in on every keystroke (see
+    // CreditRiskBillingCheck.tsx). Same pattern already used by
+    // useProducts() above.
+    placeholderData: keepPreviousData,
   })
 }
 
