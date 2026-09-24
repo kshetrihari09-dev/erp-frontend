@@ -2,9 +2,10 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { partiesAPI, accountingAPI } from '@/services/api'
 import { SkeletonRows } from '@/components/ui'
-import { fmt, downloadCSV } from '@/utils'
+import { fmt, fmtN, downloadCSV } from '@/utils'
 import { formatDisplayDate } from '@/utils/dateSystem'
 import useUIStore from '@/store/uiStore'
+import useAuthStore from '@/store/authStore'
 import {
   Download, Search, RotateCcw, Printer, TrendingUp,
   TrendingDown, DollarSign, FileText, Receipt, BarChart3,
@@ -36,20 +37,158 @@ const LABEL_STYLE: React.CSSProperties = {
   marginBottom: 6, fontFamily: 'var(--font-mono)',
 }
 
-// ── Print CSS ───────────────────────────────────────────────────────────────
-const PRINT_CSS = `
+/* ─────────────────────────────────────────────────────────────────────────────
+   PRINT — dedicated, independent ledger print system
+   ─────────────────────────────────────────────────────────────────────────
+   The Ledger used to print by temporarily setting rowsPerPage to
+   filteredRows.length and page to 1, waiting on two nested
+   requestAnimationFrame() calls for React to re-render the (now unpaginated)
+   on-screen table, then calling window.print() against that table clipped
+   into view with `#ldg-print-area { position: fixed; inset: 0 }`. That's
+   unreliable for a few concrete reasons:
+     - `position: fixed` only ever shows ONE viewport's worth of content per
+       printed page — fine for a single page, but a multi-page ledger got
+       cut off or repeated content after page 1, because a fixed element
+       doesn't participate in normal page-flow pagination at all.
+     - Waiting on rAF for a React state update to flush before printing is
+       timing-based, not deterministic — under any real load (slow device,
+       big ledger) the print could fire before the DOM actually reflects the
+       widened page size.
+     - It printed whatever the *visible*, responsive on-screen layout
+       happened to be (including the mobile card list on a narrow print
+       preview), plus it had to touch real pagination state, which is
+       exactly the state the user was looking at.
+   The fix below builds a completely separate, static print document (own
+   header, opening balance, full `filteredRows` table with its own totals)
+   as a plain HTML string with no CSS variables, mounts it into a single
+   `#ledger-print-root` node appended directly to <body>, prints it, then
+   removes it — the visible Ledger page and its React state are never
+   touched. See handlePrint() below. */
+
+function escapeHtml(v: unknown): string {
+  return String(v ?? '').replace(/[&<>"']/g, c => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string
+  ))
+}
+
+const LEDGER_PRINT_CSS = `
+#ledger-print-root { display: none; }
+@page { size: A4 portrait; margin: 12mm; }
 @media print {
-  body * { visibility: hidden !important; }
-  #ldg-print-area, #ldg-print-area * { visibility: visible !important; }
-  #ldg-print-area { position: fixed; inset: 0; padding: 24px; background: #fff; color: #000; }
-  #ldg-print-area * { color: #000 !important; background: transparent !important; box-shadow: none !important; }
-  #ldg-no-print { display: none !important; }
-  table { page-break-inside: auto; }
-  tr { page-break-inside: avoid; page-break-after: auto; }
-  thead { display: table-header-group; }
-  tfoot { display: table-footer-group; }
+  /* Hide the entire live app — the print root (appended as the last child
+     of <body>) is the only thing left, in normal document flow so it can
+     paginate across as many pages as the data needs. No position: fixed. */
+  body > *:not(#ledger-print-root) { display: none !important; }
+  #ledger-print-root {
+    display: block !important;
+    position: static !important;
+    width: 100%;
+    margin: 0;
+    background: #fff;
+    color: #000;
+  }
+  #ledger-print-root * { -webkit-print-color-adjust: exact; print-color-adjust: exact; box-shadow: none !important; }
+
+  .ldg-pp { font-family: Arial, Helvetica, sans-serif; font-size: 10.5pt; color: #000; }
+  .ldg-pp-header { text-align: center; padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1.5px solid #000; }
+  .ldg-pp-company { font-size: 14pt; font-weight: 700; }
+  .ldg-pp-title { font-size: 12pt; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; margin-top: 2px; }
+  .ldg-pp-sub { font-size: 10.5pt; font-weight: 600; margin-top: 4px; }
+  .ldg-pp-meta { display: flex; justify-content: center; flex-wrap: wrap; gap: 4px 14px; font-size: 9pt; color: #333; margin-top: 4px; }
+  .ldg-pp-generated { font-size: 8pt; color: #555; margin-top: 4px; }
+  .ldg-pp-opening { display: inline-block; font-size: 10.5pt; font-weight: 700; border: 1px solid #000; padding: 5px 10px; margin: 8px 0; }
+
+  .ldg-pp table { width: 100%; border-collapse: collapse; margin-top: 4px; }
+  .ldg-pp thead { display: table-header-group; }
+  .ldg-pp tfoot { display: table-footer-group; }
+  .ldg-pp tr { break-inside: avoid; page-break-inside: avoid; }
+  .ldg-pp th, .ldg-pp td { border: 1px solid #999; padding: 4px 6px; font-size: 9pt; text-align: left; vertical-align: top; }
+  .ldg-pp th { background: #eaeaea !important; font-weight: 700; text-transform: uppercase; font-size: 7.5pt; letter-spacing: .03em; }
+  .ldg-pp td.num, .ldg-pp th.num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .ldg-pp tfoot td { font-weight: 700; border-top: 2px solid #000; background: #f2f2f2 !important; }
 }
 `
+
+interface LedgerPrintProps {
+  companyName?: string
+  entityName: string
+  entityTypeLabel: string
+  code?: string
+  phone?: string
+  panNo?: string
+  dateFrom: string
+  dateTo: string
+  dateMode: any
+  openingBal: number
+  rows: any[]
+  totalDr: number
+  totalCr: number
+  closingBal: number
+}
+
+/** Builds the standalone print document as an HTML string — no CSS
+ *  variables, no component/refs, driven entirely by filteredRows so it's
+ *  identical regardless of current pagination, screen size, or device. */
+function buildLedgerPrintHTML(p: LedgerPrintProps): string {
+  const generatedAt = new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })
+
+  const rowsHtml = p.rows.length
+    ? p.rows.map((e: any) => {
+        const isOpening = e.type === 'opening'
+        const bal = Number(e.running_balance ?? e.balance ?? 0)
+        const dateLabel = isOpening
+          ? 'Opening'
+          : (e.date_ad ? formatDisplayDate(e.date_ad, p.dateMode) : (e.date || '—'))
+        return `
+          <tr>
+            <td>${escapeHtml(dateLabel)}</td>
+            <td>${escapeHtml(e.reference || '—')}</td>
+            <td>${escapeHtml(e.description || '—')}</td>
+            <td>${escapeHtml((e.type || '—').toString().toUpperCase())}</td>
+            <td class="num">${Number(e.debit)  > 0 ? fmtN(e.debit, 2)  : '—'}</td>
+            <td class="num">${Number(e.credit) > 0 ? fmtN(e.credit, 2) : '—'}</td>
+            <td class="num">${fmtN(bal, 2)}</td>
+          </tr>`
+      }).join('')
+    : `<tr><td colspan="7" style="text-align:center;padding:16px;">No transactions in the selected range</td></tr>`
+
+  return `
+    <div class="ldg-pp">
+      <div class="ldg-pp-header">
+        ${p.companyName ? `<div class="ldg-pp-company">${escapeHtml(p.companyName)}</div>` : ''}
+        <div class="ldg-pp-title">Ledger Statement</div>
+        <div class="ldg-pp-sub">${escapeHtml(p.entityName)}${p.entityTypeLabel ? ` — ${escapeHtml(p.entityTypeLabel)}` : ''}</div>
+        <div class="ldg-pp-meta">
+          ${p.code ? `<span>Code: ${escapeHtml(p.code)}</span>` : ''}
+          ${p.phone ? `<span>Phone: ${escapeHtml(p.phone)}</span>` : ''}
+          ${p.panNo ? `<span>PAN: ${escapeHtml(p.panNo)}</span>` : ''}
+          <span>Period: ${escapeHtml(p.dateFrom)} to ${escapeHtml(p.dateTo)}</span>
+        </div>
+        <div class="ldg-pp-generated">Generated: ${escapeHtml(generatedAt)}</div>
+      </div>
+
+      <div class="ldg-pp-opening">Opening Balance: ${fmtN(p.openingBal, 2)}</div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th><th>Reference</th><th>Description</th><th>Type</th>
+            <th class="num">Debit</th><th class="num">Credit</th><th class="num">Balance</th>
+          </tr>
+        </thead>
+        <tbody>${rowsHtml}</tbody>
+        <tfoot>
+          <tr>
+            <td colspan="4" style="text-align:right;text-transform:uppercase;font-size:7.5pt;">Totals</td>
+            <td class="num">${fmtN(p.totalDr, 2)}</td>
+            <td class="num">${fmtN(p.totalCr, 2)}</td>
+            <td class="num">Closing: ${fmtN(p.closingBal, 2)}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  `
+}
 
 /* ─────────────────────────────────────────────────────────────────────────────
    ACCOUNT SELECTOR — general Chart-of-Accounts + party picker
@@ -368,6 +507,7 @@ const ROWS_PER_PAGE_OPTIONS = [20, 50, 100]
 
 export default function LedgerPage() {
   const { dateMode } = useUIStore()
+  const { company } = useAuthStore()
 
   const [parties,    setParties   ] = useState<Party[]>([])
   const [accounts,   setAccounts  ] = useState<Account[]>([])
@@ -512,25 +652,60 @@ export default function LedgerPage() {
     setDateTo(new Date().toISOString().split('T')[0])
   }
 
-  /** Printing while paginated used to only capture whatever page was
-   *  currently on screen — a 3-page ledger would print page 1 and quietly
-   *  drop the other two. There's no separate print-only render to keep in
-   *  sync with the on-screen table, so instead we temporarily widen the
-   *  page size to show every filtered row, print that, then restore
-   *  exactly what the user had — same style-injection pattern as
-   *  TrialBalTab's handlePrint, just also covering pagination. */
+  /** Builds the dedicated print document from `filteredRows` (independent
+   *  of pagination/page) and mounts it as #ledger-print-root, prints it,
+   *  then tears it down. The visible Ledger — its page, rowsPerPage,
+   *  filters, search text, everything — is never touched, so the user is
+   *  exactly where they were before and after printing. */
   function handlePrint() {
-    const s = document.createElement('style'); s.innerHTML = PRINT_CSS; document.head.appendChild(s)
-    const prevRowsPerPage = rowsPerPage
-    const prevPage = page
-    setRowsPerPage(Math.max(filteredRows.length, 1))
-    setPage(1)
-    requestAnimationFrame(() => requestAnimationFrame(() => {
+    if (!ledgerData) return
+
+    // Only one print root/style pair should ever exist at a time.
+    document.getElementById('ledger-print-root')?.remove()
+    document.getElementById('ledger-print-style')?.remove()
+
+    const styleTag = document.createElement('style')
+    styleTag.id = 'ledger-print-style'
+    styleTag.textContent = LEDGER_PRINT_CSS
+    document.head.appendChild(styleTag)
+
+    const printRoot = document.createElement('div')
+    printRoot.id = 'ledger-print-root'
+    printRoot.innerHTML = buildLedgerPrintHTML({
+      companyName:      company?.name,
+      entityName:       ledgerData.name ?? entity?.name ?? '—',
+      entityTypeLabel:  ledgerData.kind === 'party'
+        ? ledgerData.partyType
+        : (ledgerData.accountType ? ledgerData.accountType.charAt(0).toUpperCase() + ledgerData.accountType.slice(1) : ''),
+      code:    ledgerData.code,
+      phone:   ledgerData.phone,
+      panNo:   ledgerData.pan_no,
+      dateFrom, dateTo, dateMode,
+      openingBal,
+      rows:      filteredRows,
+      totalDr:   printTotalDr,
+      totalCr:   printTotalCr,
+      closingBal: printClosingBal,
+    })
+    document.body.appendChild(printRoot)
+
+    const cleanup = () => {
+      document.getElementById('ledger-print-root')?.remove()
+      document.getElementById('ledger-print-style')?.remove()
+      window.onafterprint = null
+    }
+
+    // A single frame is enough to guarantee the browser has laid out the
+    // freshly-mounted print root before the print dialog opens — this is
+    // not the old nested-rAF wait on a React re-render, just one paint tick
+    // for plain DOM we just inserted ourselves.
+    requestAnimationFrame(() => {
       window.print()
-      setRowsPerPage(prevRowsPerPage)
-      setPage(prevPage)
-      setTimeout(() => document.head.removeChild(s), 2000)
-    }))
+      window.onafterprint = cleanup
+      // Safety net in case a browser doesn't fire afterprint (e.g. the
+      // print dialog is cancelled in a way that skips the event).
+      setTimeout(cleanup, 5000)
+    })
   }
 
   const rows         = ledgerData?.rows ?? []
@@ -561,6 +736,18 @@ export default function LedgerPage() {
   const totalPages = Math.ceil(filteredRows.length / rowsPerPage)
   const pagedRows  = filteredRows.slice((page - 1) * rowsPerPage, page * rowsPerPage)
 
+  // Print-only totals: Debit/Credit are summed from filteredRows (excluding
+  // the synthetic opening row) so the printed report always matches exactly
+  // what's printed — respecting search/type filters — never just the
+  // current on-screen page. Opening/Closing balance stay as the account's
+  // own authoritative values from ledgerData (unchanged calculation) since
+  // those are running balances over the account's full history, not a sum
+  // that's meaningful to recompute over a filtered subset.
+  const printDataRows  = filteredRows.filter((r: any) => r.type !== 'opening')
+  const printTotalDr   = printDataRows.reduce((s: number, e: any) => s + (Number(e.debit)  || 0), 0)
+  const printTotalCr   = printDataRows.reduce((s: number, e: any) => s + (Number(e.credit) || 0), 0)
+  const printClosingBal = closingBal
+
   // Header badge colours — translucent, works on light and dark
   const partyBadgeStyle = ledgerData?.partyType === 'Supplier'
     ? { bg: 'rgba(139,92,246,0.12)', color: '#8b5cf6', border: 'rgba(139,92,246,0.25)' }
@@ -578,10 +765,10 @@ export default function LedgerPage() {
   const balColor = closingBal > 0 ? 'var(--green)' : closingBal < 0 ? 'var(--red)' : 'var(--text-3)'
 
   return (
-    <div id="ldg-print-area" style={{ minHeight: '100vh' }}>
+    <div style={{ minHeight: '100vh' }}>
 
       {/* ── Filter Card ─────────────────────────────────────────────────────── */}
-      <motion.div id="ldg-no-print" initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}
+      <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}
         style={{ ...CARD, padding: '18px 20px', marginBottom: 16 }}
       >
         <div className="ldg-filter-row" style={{ display: 'flex', alignItems: 'flex-end', gap: 12, flexWrap: 'wrap' }}>
@@ -702,7 +889,7 @@ export default function LedgerPage() {
                   </div>
                 </div>
                 {/* Chart panel */}
-                <div id="ldg-no-print" className="ldg-chart-panel" style={{ padding: '18px 22px', width: 300, minWidth: 200 }}>
+                <div className="ldg-chart-panel" style={{ padding: '18px 22px', width: 300, minWidth: 200 }}>
                   <div style={{ ...LABEL_STYLE, marginBottom: 10 }}><Activity size={10} /> Balance Trend</div>
                   {loading
                     ? <div style={{ height: 80, borderRadius: 10, background: 'var(--surface-3)' }} />
@@ -713,7 +900,7 @@ export default function LedgerPage() {
             </motion.div>
 
             {/* KPI row — Opening / Debit / Credit / Closing, per spec */}
-            <div id="ldg-no-print" className="ldg-kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
+            <div className="ldg-kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
               {loading ? (
                 Array.from({ length: 4 }).map((_, i) => <SkeletonKpi key={i} />)
               ) : (
@@ -730,7 +917,7 @@ export default function LedgerPage() {
             </div>
 
             {/* Secondary tiles */}
-            <div id="ldg-no-print" className="ldg-stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 10 }}>
+            <div className="ldg-stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 10 }}>
               {[
                 { icon: <Activity size={13} style={{ color: 'var(--text-3)' }} />,   label: 'Transactions',   value: dataRows.length },
                 { icon: <TrendingDown size={13} style={{ color: '#ef4444' }} />,      label: 'Debit Entries',  value: debitEntries },
@@ -753,7 +940,7 @@ export default function LedgerPage() {
             style={{ ...CARD, overflow: 'hidden' }}>
 
             {/* Toolbar */}
-            <div id="ldg-no-print" className="ldg-toolbar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '12px 18px', borderBottom: '1px solid var(--border)', flexWrap: 'wrap' }}>
+            <div className="ldg-toolbar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '12px 18px', borderBottom: '1px solid var(--border)', flexWrap: 'wrap' }}>
               <div className="ldg-toolbar-search-wrap" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <div className="ldg-search-input-wrap" style={{ position: 'relative' }}>
                   <Search size={13} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-4)', pointerEvents: 'none' }} />
@@ -908,7 +1095,7 @@ export default function LedgerPage() {
 
             {/* Pagination */}
             {!loading && filteredRows.length > rowsPerPage && (
-              <div id="ldg-no-print" className="ldg-pagination" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 18px', borderTop: '1px solid var(--border)', flexWrap: 'wrap', gap: 10 }}>
+              <div className="ldg-pagination" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 18px', borderTop: '1px solid var(--border)', flexWrap: 'wrap', gap: 10 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-3)' }}>
                   <span>Rows per page:</span>
                   <select className="erp-input" style={{ width: 64, padding: '4px 6px', fontSize: 12 }}
