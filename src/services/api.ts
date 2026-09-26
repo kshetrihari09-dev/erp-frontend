@@ -213,6 +213,16 @@ export const salesAPI = {
    */
   updateDate: (id: string, date_ad: string, confirmPassword?: string) =>
     http.put<ApiResponse<Sale>>(`/sales/${id}/date`, { date_ad, confirmPassword }),
+  /**
+   * Sale List "Update Party" — reassigns the Party/Customer on an existing
+   * sale. Does not touch items, totals, stock, payment amounts, invoice
+   * number, or date. Moves the accounting-side ledger too (see
+   * routes/sales.js PUT /:id/party). confirmPassword is the legacy
+   * step-up fallback (see useSensitiveConfirm) — omitted on the normal
+   * path, where a cached step-up token header covers it.
+   */
+  updateParty: (id: string, new_party_id: string, confirmPassword?: string) =>
+    http.put<ApiResponse<Sale>>(`/sales/${id}/party`, { new_party_id, confirmPassword }),
 }
 
 // ─── Purchases ────────────────────────────────────────────────────────────────

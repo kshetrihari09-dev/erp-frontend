@@ -56,6 +56,8 @@ import { PAYMENT_MODES } from '@/constants'
 import type { Product, Party, Sale } from '@/types'
 import PostingStatusBadge from '@/components/PostingStatusBadge'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
+import { useSensitiveConfirm } from '@/modules/settings/hooks/useSensitiveConfirm'
+import UpdatePartyModal from './UpdatePartyModal'
 
 const LIMIT = 20
 
@@ -140,6 +142,13 @@ export default function SalesPage() {
   // the fallback path when it can't reach the server. See onSubmit below.
   const { isOnline, enqueueOfflineSale } = useOffline()
   const companyId = useAuthStore(s => s.company?.id)
+  const user      = useAuthStore(s => s.user)
+  const hasRole   = useAuthStore(s => s.hasRole)
+  // Update Party is a ledger-affecting edit (see routes/sales.js PUT
+  // /:id/party) — same trust bar as editing a posted voucher, so it's
+  // gated by the same permission the Vouchers/Receipts tabs already use.
+  const canUpdateParty = hasRole(['owner', 'admin']) || !!user?.can_reverse_entries
+  const { runWithConfirm, dialog: sensitiveConfirmDialog } = useSensitiveConfirm()
   const [tender,      setTender]      = useState<number | ''>('')
 
   // Phone-width detection (same window-width + resize-listener pattern
@@ -178,6 +187,8 @@ export default function SalesPage() {
   const [mobileStep, setMobileStep] = useState<1 | 2>(1)
 
   const [confirmCancel, setConfirmCancel] = useState<string | null>(null)
+  // Sale currently open in the "Update Party" modal — null means closed.
+  const [updatePartySale, setUpdatePartySale] = useState<Sale | null>(null)
 
   // "Are you sure you want to create this sale?" — same confirm-before-post
   // pattern PurchasePage uses (see its confirmCreate state / ConfirmDialog).
@@ -599,6 +610,32 @@ export default function SalesPage() {
     setCompanyDiscounts({}); setProductDiscounts({})
     setMobileStep(1) // no-op on desktop
     requestAnimationFrame(() => unifiedInputRef.current?.focus())
+  }
+
+  /**
+   * Update Party — submits from UpdatePartyModal. Goes through
+   * runWithConfirm so a company that has turned on the "Sale Party Edit"
+   * step-up (Settings → Users & Permissions → sensitive actions) gets the
+   * PIN/password dialog automatically; when it's off (default) this just
+   * calls straight through.
+   */
+  async function updateSaleParty(saleId: string, newPartyId: string) {
+    try {
+      await runWithConfirm(confirmPassword => salesAPI.updateParty(saleId, newPartyId, confirmPassword))
+      success('Party updated successfully')
+      setUpdatePartySale(null)
+      // Keep filters/page position — just re-pull the current page/search,
+      // same as any other list refresh on this page.
+      loadList()
+      // If the sale that was just edited is also open in the detail modal,
+      // refresh it too so the new party shows up there immediately.
+      if (detailId === saleId) {
+        salesAPI.get(saleId).then(r => setDetail(r.data.data)).catch(() => {})
+      }
+    } catch (e: any) {
+      if (e?.cancelled) return // step-up dialog dismissed — no error toast
+      error('Could not update party', e.message)
+    }
   }
 
   async function cancelSale(id: string) {
@@ -1599,6 +1636,11 @@ export default function SalesPage() {
                                   } catch (e: any) { error('Print failed', e.message) }
                                 }}
                               >Print</Button>
+                              {s.status === 'active' && canUpdateParty && (
+                                <Button variant="secondary" size="sm" icon={<User size={13}/>} style={{ marginLeft: 4 }}
+                                  onClick={() => setUpdatePartySale(s)}
+                                >Update Party</Button>
+                              )}
                               {s.status === 'active' && (
                                 <Button variant="danger" size="sm" style={{ marginLeft: 4 }} onClick={() => setConfirmCancel(s.id)}>Cancel</Button>
                               )}
@@ -1684,6 +1726,9 @@ export default function SalesPage() {
                         } catch (e: any) { error('Print failed', e.message) }
                       }}
                     >Print</Button>
+                    {s.status === 'active' && canUpdateParty && (
+                      <Button variant="secondary" size="sm" icon={<User size={13}/>} onClick={() => setUpdatePartySale(s)}>Update Party</Button>
+                    )}
                     {s.status === 'active' && (
                       <Button variant="danger" size="sm" onClick={() => setConfirmCancel(s.id)}>Cancel</Button>
                     )}
@@ -1852,6 +1897,24 @@ export default function SalesPage() {
           }}
         />
       )}
+
+      {/* Update Party — Sale List row action (see canUpdateParty above).
+          customers is the same list already loaded for the New Sale
+          party selector; the modal filters it client-side, and the
+          "add a new customer" flow (QuickAddPartyModal) is intentionally
+          NOT offered here — reassigning a sale is not the moment to be
+          creating a brand-new party. */}
+      {updatePartySale && (
+        <UpdatePartyModal
+          sale={updatePartySale}
+          customers={customers}
+          onClose={() => setUpdatePartySale(null)}
+          onSubmit={newPartyId => updateSaleParty(updatePartySale.id, newPartyId)}
+        />
+      )}
+      {/* Step-up (PIN/password) dialog for Update Party, when the company
+          has opted into requiring it — see useSensitiveConfirm above. */}
+      {sensitiveConfirmDialog}
 
     </div>
   )
