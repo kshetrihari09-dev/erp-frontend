@@ -519,6 +519,30 @@ export interface Voucher {
   is_edited?:   boolean
 }
 
+/** Current accounting reference of a voucher (see backend services/currentEntry.js). */
+export interface VoucherAccountingRef {
+  /** Internal anchor that owns the CURRENT journal entry (the voucher's own id if never edited). */
+  active_entry_voucher_id: string
+  is_corrected:            boolean
+  correction_count:        number
+  journal_entry_id:        string | null
+}
+
+/**
+ * Shape returned by GET /accounting/vouchers/:id AND by every edit endpoint
+ * (PUT /accounting/{vouchers,receipts,payments}/:id/edit): the updated voucher,
+ * its current lines, and the CURRENT journal entry — never the superseded original.
+ */
+export interface VoucherEditResult {
+  voucher:       Voucher
+  lines:         VoucherLine[]
+  journal_entry: Record<string, any> | null
+  journal_lines: Array<Record<string, any>>
+  accounting:    VoucherAccountingRef
+  correction_voucher_id?: string
+  previous_party_id?:     string | null
+}
+
 export interface TrialBalanceRow {
   account_id:     string
   account_code:   string

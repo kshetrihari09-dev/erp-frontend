@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useForm } from 'react-hook-form'
+import { useQueryClient } from '@tanstack/react-query'
 import { Plus, Printer, CheckCircle2, Pencil } from 'lucide-react'
 import { accountingAPI, partiesAPI, reportsAPI } from '@/services/api'
 import useUIStore from '@/store/uiStore'
@@ -12,6 +13,7 @@ import DateSystemInput from '@/components/shared/DateSystemInput'
 import { PrintPreviewModal } from '@/components/print'
 import type { PrintData } from '@/components/print'
 import type { Account, Party } from '@/types'
+import { invalidateAfterVoucherEdit, currentCashBankAccountId } from '../voucherEditSync'
 
 const LIMIT = 20
 
@@ -24,6 +26,7 @@ function QuickVoucherForm({ type, accounts, parties, partyBalances, balancesLoad
   editRow?: any; editReason?: string
 }) {
   const { success, error } = useUIStore()
+  const qc = useQueryClient()
   const [printData, setPrintData]     = useState<PrintData | null>(null)
   // Holds the just-saved voucher for the "Voucher created successfully"
   // confirmation. Print Preview (printData) is only ever set from the
@@ -57,6 +60,10 @@ function QuickVoucherForm({ type, accounts, parties, partyBalances, balancesLoad
         if (type === 'RECEIPT') await accountingAPI.editReceipt(editRow.id, editPayload)
         else                    await accountingAPI.editPayment(editRow.id, editPayload)
         success(`${type === 'RECEIPT' ? 'Receipt' : 'Payment'} updated — journal entries recalculated`)
+        // The server already holds the new state (voucher, lines, journal, ledgers,
+        // balances). Don't patch local state — invalidate everything derived from
+        // it and refetch, so no stale read model can overwrite the saved values.
+        invalidateAfterVoucherEdit(qc, editRow.id)
         onPosted?.()
         onClose()
         return
@@ -234,15 +241,21 @@ function VoucherListTab({ apiCall, type, title, onCount }: {
   const [editTarget, setEditTarget] = useState<{ row: any; reason: string } | null>(null)
   const [resolvingEdit, setResolvingEdit] = useState(false)
 
+  // Monotonic request id: if a slower, older list request resolves AFTER a newer
+  // one (e.g. the refetch right after an edit), its stale rows are discarded
+  // instead of overwriting the freshly saved server state.
+  const loadSeq = useRef(0)
   const load = useCallback(async () => {
+    const seq = ++loadSeq.current
     setLoading(true)
     try {
       const r    = await apiCall({ page, limit: LIMIT })
+      if (seq !== loadSeq.current) return
       const body = r.data
       setRows(body?.data ?? body ?? [])
       setTotal(body?.pagination?.total ?? body?.total ?? (body?.data?.length ?? 0))
-    } catch (e: any) { error('Load failed', e.message) }
-    finally { setLoading(false) }
+    } catch (e: any) { if (seq === loadSeq.current) error('Load failed', e.message) }
+    finally { if (seq === loadSeq.current) setLoading(false) }
   }, [page])
 
   useEffect(() => { load() }, [load])
@@ -302,12 +315,13 @@ function VoucherListTab({ apiCall, type, title, onCount }: {
       const body = r.data.data as any
       const full  = body.voucher
       const lines = body.lines || []
-      // RECEIPT: cash/bank line is the debit side. PAYMENT: cash/bank line is the credit side.
-      const cashLine = type === 'RECEIPT'
-        ? lines.find((l: any) => Number(l.debit) > 0)
-        : lines.find((l: any) => Number(l.credit) > 0)
+      // Always re-read the voucher from the server (never reuse list rows or an old
+      // form state): Received Into / Paid From and the amount come from the CURRENT
+      // lines. RECEIPT → cash/bank DEBIT line; PAYMENT → cash/bank CREDIT line.
+      const cashAccountId = currentCashBankAccountId(type, lines, accounts)
+      const currentAmount = lines.reduce((m: number, l: any) => Math.max(m, Number(l.debit) || 0, Number(l.credit) || 0), 0)
       refreshPartyBalances()
-      setEditTarget({ row: { ...full, cash_account_id: cashLine?.account_id }, reason })
+      setEditTarget({ row: { ...full, cash_account_id: cashAccountId, total_amount: full.total_amount ?? currentAmount }, reason })
     } catch (e: any) {
       error('Could not load voucher', e.message)
     } finally {
@@ -402,6 +416,7 @@ function VoucherListTab({ apiCall, type, title, onCount }: {
             type={type} accounts={accounts} parties={parties}
             partyBalances={partyBalances} balancesLoaded={balancesLoaded}
             editRow={editTarget.row} editReason={editTarget.reason}
+            onPosted={() => { refreshPartyBalances(); load() }}
             onClose={() => { setEditTarget(null); load() }}
           />
         )}
