@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { useQueryClient } from '@tanstack/react-query'
-import { Plus, Printer, CheckCircle2, Pencil } from 'lucide-react'
+import { Plus, Printer, CheckCircle2, Pencil, Trash2 } from 'lucide-react'
 import { accountingAPI, partiesAPI, reportsAPI } from '@/services/api'
 import useUIStore from '@/store/uiStore'
 import useAuthStore from '@/store/authStore'
@@ -221,7 +221,7 @@ function QuickVoucherForm({ type, accounts, parties, partyBalances, balancesLoad
 function VoucherListTab({ apiCall, type, title, onCount }: {
   apiCall: (p: any) => Promise<any>; type: 'RECEIPT' | 'PAYMENT'; title: string; onCount?: (count: number) => void
 }) {
-  const { error, dateMode } = useUIStore()
+  const { error, success, dateMode } = useUIStore()
   const { user, hasRole } = useAuthStore()
   // "Authorized users" for editing a posted voucher — same trust level the backend requires.
   const canEditPosted = hasRole(['owner', 'admin']) || !!user?.can_reverse_entries
@@ -240,6 +240,9 @@ function VoucherListTab({ apiCall, type, title, onCount }: {
   // Unlocked and ready to edit — the full voucher (with lines) + mandatory reason.
   const [editTarget, setEditTarget] = useState<{ row: any; reason: string } | null>(null)
   const [resolvingEdit, setResolvingEdit] = useState(false)
+  // Delete (= reverse) flow: password + reason dialog → API call.
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null)
+  const qc = useQueryClient()
 
   // Monotonic request id: if a slower, older list request resolves AFTER a newer
   // one (e.g. the refetch right after an edit), its stale rows are discarded
@@ -257,6 +260,20 @@ function VoucherListTab({ apiCall, type, title, onCount }: {
     } catch (e: any) { if (seq === loadSeq.current) error('Load failed', e.message) }
     finally { if (seq === loadSeq.current) setLoading(false) }
   }, [page])
+
+  // Delete a POSTED voucher = reverse it. The server reverses the voucher's CURRENT
+  // accounting effect, marks it REVERSED and audits it (all in one transaction); the
+  // UI just refetches everything derived from it — no local patching.
+  async function deleteVoucher(target: any, reason: string) {
+    try {
+      if (type === 'RECEIPT') await accountingAPI.deleteReceipt(target.id, { reason })
+      else                    await accountingAPI.deletePayment(target.id, { reason })
+      success(`${title} deleted`, `${target.voucher_no} was reversed — accounting entries cancelled`)
+      invalidateAfterVoucherEdit(qc, target.id)
+      refreshPartyBalances()
+      load()
+    } catch (e: any) { error('Cannot delete', e?.message || 'Delete failed') }
+  }
 
   useEffect(() => { load() }, [load])
 
@@ -374,6 +391,10 @@ function VoucherListTab({ apiCall, type, title, onCount }: {
                             <Button variant="secondary" size="sm" icon={<Pencil size={12}/>} disabled={resolvingEdit}
                               onClick={() => setPasswordTarget(v)}>Edit</Button>
                           )}
+                          {(v.status || '').toLowerCase() === 'posted' && canEditPosted && (
+                            <Button variant="danger" size="sm" icon={<Trash2 size={12}/>} disabled={resolvingEdit}
+                              onClick={() => setDeleteTarget(v)}>Delete</Button>
+                          )}
                           </div>
                         </td>
                       </tr>
@@ -406,6 +427,19 @@ function VoucherListTab({ apiCall, type, title, onCount }: {
           const target = passwordTarget
           setPasswordTarget(null)
           if (target) resolveAndOpenEdit(target, reason)
+        }}
+      />
+
+      {/* Delete — password + mandatory reason, then the voucher is reversed server-side */}
+      <VoucherEditPasswordDialog
+        action="voucherDelete"
+        open={!!deleteTarget}
+        voucherLabel={deleteTarget?.voucher_no}
+        onCancel={() => setDeleteTarget(null)}
+        onUnlock={(reason) => {
+          const target = deleteTarget
+          setDeleteTarget(null)
+          if (target) deleteVoucher(target, reason)
         }}
       />
 

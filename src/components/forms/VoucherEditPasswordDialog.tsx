@@ -11,6 +11,29 @@ interface VoucherEditPasswordDialogProps {
   onCancel: () => void
   /** Called only after the password has been verified server-side. Reason is mandatory. */
   onUnlock: (reason: string) => void
+  /**
+   * Which sensitive action this confirmation unlocks. The server mints an
+   * ACTION-SCOPED step-up token, so confirming an edit never authorises a
+   * delete (and vice versa). Defaults to editing.
+   */
+  action?: 'voucherEdit' | 'voucherDelete'
+}
+
+const COPY = {
+  voucherEdit: {
+    title: 'Edit Voucher', reasonLabel: 'Reason for edit',
+    reasonPlaceholder: 'Why is this posted voucher being corrected?',
+    submit: 'Unlock Voucher', variant: 'primary' as const,
+    intro: 'has already been posted. Enter your password to continue.',
+    reasonRequired: 'A reason for this edit is required',
+  },
+  voucherDelete: {
+    title: 'Delete Voucher', reasonLabel: 'Reason for deleting',
+    reasonPlaceholder: 'Why is this posted voucher being deleted?',
+    submit: 'Delete Voucher', variant: 'danger' as const,
+    intro: 'is posted. Deleting it reverses its accounting entries (the voucher stays on record as Reversed). Enter your password to confirm.',
+    reasonRequired: 'A reason for deleting is required',
+  },
 }
 
 /**
@@ -24,7 +47,8 @@ interface VoucherEditPasswordDialogProps {
  * so the actual edit request is now genuinely gated server-side, not
  * just by this dialog existing on the frontend.
  */
-export default function VoucherEditPasswordDialog({ open, voucherLabel, onCancel, onUnlock }: VoucherEditPasswordDialogProps) {
+export default function VoucherEditPasswordDialog({ open, voucherLabel, onCancel, onUnlock, action = 'voucherEdit' }: VoucherEditPasswordDialogProps) {
+  const copy = COPY[action]
   const [password, setPassword] = useState('')
   const [reason,   setReason]   = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -41,10 +65,10 @@ export default function VoucherEditPasswordDialog({ open, voucherLabel, onCancel
   async function handleUnlock() {
     setErrMsg('')
     if (!password) { setErrMsg('Enter your password'); return }
-    if (!reason.trim()) { setErrMsg('A reason for this edit is required'); return }
+    if (!reason.trim()) { setErrMsg(copy.reasonRequired); return }
     setSubmitting(true)
     try {
-      const res = await authAPI.verifyPassword({ password, action: 'voucherEdit' })
+      const res = await authAPI.verifyPassword({ password, action })
       const stepUp = res.data.data
       if (stepUp) setStepUpToken(stepUp.stepUpToken, stepUp.expiresIn)
       const confirmedReason = reason.trim()
@@ -57,12 +81,11 @@ export default function VoucherEditPasswordDialog({ open, voucherLabel, onCancel
   }
 
   return (
-    <Modal open={open} onClose={handleCancel} title="Edit Voucher" size="sm">
+    <Modal open={open} onClose={handleCancel} title={copy.title} size="sm">
       <div className="flex items-start gap-3 mb-4 p-3 rounded-lg bg-[var(--surface-2)] border border-[var(--border)]">
         <Lock size={16} className="mt-0.5 text-[var(--text-4)] shrink-0" />
         <p className="text-[13px] text-[var(--text-3)] leading-snug">
-          {voucherLabel ? <>Voucher <span className="font-semibold text-[var(--text)]">{voucherLabel}</span> has</> : 'This voucher has'} already been posted.
-          Enter your password to continue.
+          {voucherLabel ? <>Voucher <span className="font-semibold text-[var(--text)]">{voucherLabel}</span></> : 'This voucher'} {copy.intro}
         </p>
       </div>
 
@@ -76,9 +99,9 @@ export default function VoucherEditPasswordDialog({ open, voucherLabel, onCancel
           />
         </div>
         <div>
-          <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">Reason for edit</label>
+          <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">{copy.reasonLabel}</label>
           <input
-            className="erp-input" placeholder="Why is this posted voucher being corrected?"
+            className="erp-input" placeholder={copy.reasonPlaceholder}
             value={reason} onChange={e => setReason(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleUnlock()}
           />
@@ -90,7 +113,7 @@ export default function VoucherEditPasswordDialog({ open, voucherLabel, onCancel
 
       <div className="flex justify-end gap-2 mt-5 pt-4 border-t border-[var(--border)]">
         <Button variant="secondary" onClick={handleCancel}>Cancel</Button>
-        <Button variant="primary" loading={submitting} onClick={handleUnlock}>Unlock Voucher</Button>
+        <Button variant={copy.variant} loading={submitting} onClick={handleUnlock}>{copy.submit}</Button>
       </div>
     </Modal>
   )

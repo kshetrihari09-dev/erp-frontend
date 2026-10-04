@@ -459,6 +459,13 @@ export const accountingAPI = {
   createPayment: (data: Params)    => http.post('/accounting/payments', data),
   editPayment:   (id: string, data: { reason: string; party_id?: string | null; date?: string; amount: number; account_id: string; narration?: string }) =>
     http.put<ApiResponse<VoucherEditResult>>(`/accounting/payments/${id}/edit`, data),
+  /** "Delete" a POSTED receipt/payment = reverse it (never a physical delete). Needs a
+   *  'voucherDelete' step-up token, which VoucherEditPasswordDialog (action="voucherDelete")
+   *  caches and the HTTP layer attaches automatically. */
+  deleteReceipt: (id: string, data: { reason: string }) =>
+    http.delete<ApiResponse<VoucherEditResult & { reversal_voucher?: Record<string, any> }>>(`/accounting/receipts/${id}`, { data }),
+  deletePayment: (id: string, data: { reason: string }) =>
+    http.delete<ApiResponse<VoucherEditResult & { reversal_voucher?: Record<string, any> }>>(`/accounting/payments/${id}`, { data }),
   journal:       (params?: Params) => http.get('/accounting/journal', { params }),
   createJV:      (data: Params)    => http.post('/accounting/journal', data),
 
