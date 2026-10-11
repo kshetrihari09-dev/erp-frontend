@@ -25,14 +25,12 @@ interface FormValues {
   currency:         string
   vat_percent:      number
   date_system:      'AD' | 'BS'
-  storefront_code:  string
 }
 
 const BLANK: FormValues = {
   name: '', address: '', phone: '', email: '',
   pan_no: '', registration_no: '', invoice_prefix: 'INV',
   currency: 'NPR', vat_percent: 13, date_system: 'AD',
-  storefront_code: '',
 }
 
 export default function CompanyFormModal({
@@ -64,18 +62,12 @@ export default function CompanyFormModal({
       currency:        company.currency || 'NPR',
       vat_percent:     company.vat_percent ?? 13,
       date_system:     company.date_system || 'AD',
-      storefront_code: company.storefront_code || '',
     } : BLANK)
   }, [open, company])
 
   const onSubmit = handleSubmit(async (data) => {
     try {
-      // storefront_code (migration 036) is server-generated on create
-      // (POST /companies — routes/companies.js) and only ever hand-edited
-      // afterward; never send an empty value on create (would fail the
-      // backend's 2-80-char validation for no reason — the field isn't
-      // shown at all in create mode below, but this stays defensive).
-      const payload = isEdit ? data : (({ storefront_code, ...rest }) => rest)(data)
+      const payload = data
       if (isEdit && company) {
         await companiesAPI.update(company.id, payload)
         onSaved()
@@ -146,21 +138,6 @@ export default function CompanyFormModal({
           <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">Address</label>
           <input className="erp-input" placeholder="Kathmandu, Nepal" {...register('address')} />
         </div>
-        {isEdit && (
-          <div className="stp-span2">
-            <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">Storefront Code</label>
-            <input
-              className="erp-input"
-              placeholder="chandrauta"
-              {...register('storefront_code', {
-                pattern: { value: /^[a-z0-9]+(-[a-z0-9]*)*$/i, message: 'Letters, numbers, and hyphens only' },
-              })}
-            />
-            <p className="text-[11px] text-[var(--text-3)] mt-1">
-              Used in the customer storefront link instead of an internal ID, e.g. /customer/register?store={'{code}'}. Auto-generated from the company name; change it any time.
-            </p>
-          </div>
-        )}
       </div>
       {!isEdit && (
         <p className="text-xs text-[var(--text-4)] mt-4">

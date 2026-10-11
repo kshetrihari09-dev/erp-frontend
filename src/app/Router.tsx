@@ -1,12 +1,7 @@
 import { lazy, Suspense } from 'react'
-import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { RequireAuth, RequireGuest } from '@/router/guards'
-import { RequireCustomerAuth, RequireCustomerGuest } from '@/router/customerGuards'
-import { StorefrontProvider, RequireStorefront } from '@/modules/customer/StorefrontContext'
 import AppLayout from '@/layouts/AppLayout'
-import CustomerLayout from '@/layouts/CustomerLayout'
-import DeliveryLayout from '@/layouts/DeliveryLayout'
-import useAuthStore from '@/store/authStore'
 import { PATHS } from '@/constants'
 import { Spinner } from '@/components/ui'
 
@@ -33,53 +28,8 @@ const LedgerPage   = lazy(() => import('@/modules/accounting/LedgerPage'))
 const ReportsPage  = lazy(() => import('@/modules/reports/ReportsPage'))
 const SettingsPage = lazy(() => import('@/modules/settings/SettingsPage'))
 const RemindersPage = lazy(() => import('@/modules/reminders/RemindersPage'))
-const AdminCustomerOrdersPage = lazy(() => import('@/modules/customerOrders/AdminCustomerOrdersPage'))
-const AdminCustomerRegistrationsPage = lazy(() => import('@/modules/customerOrders/AdminCustomerRegistrationsPage'))
 
-// Delivery partner app (migration 038)
-const DeliveryOrdersPage = lazy(() => import('@/modules/delivery/DeliveryOrdersPage'))
-const DeliveryOrderPage  = lazy(() => import('@/modules/delivery/DeliveryOrderPage'))
 
-// Customer storefront pages (Customer Product Ordering module)
-const StoreSelectPage      = lazy(() => import('@/modules/customer/StoreSelectPage'))
-const CustomerLoginPage    = lazy(() => import('@/modules/customer/CustomerLoginPage'))
-const CustomerRegisterPage = lazy(() => import('@/modules/customer/CustomerRegisterPage'))
-const CustomerRegistrationStatusPage = lazy(() => import('@/modules/customer/CustomerRegistrationStatusPage'))
-const CustomerHomePage     = lazy(() => import('@/modules/customer/CustomerHomePage'))
-const CustomerProductDetailPage = lazy(() => import('@/modules/customer/CustomerProductDetailPage'))
-const CustomerCartPage     = lazy(() => import('@/modules/customer/CustomerCartPage'))
-const CustomerCheckoutPage = lazy(() => import('@/modules/customer/CustomerCheckoutPage'))
-const CustomerOrdersPage   = lazy(() => import('@/modules/customer/CustomerOrdersPage'))
-const CustomerOrderDetailPage = lazy(() => import('@/modules/customer/CustomerOrderDetailPage'))
-const CustomerProfilePage  = lazy(() => import('@/modules/customer/CustomerProfilePage'))
-
-/**
- * A delivery partner has no back office: ROLE_PERMISSIONS for that role
- * is empty and every staff endpoint would reject them, so landing them
- * on /dashboard would show a page of things they cannot do. They get
- * bounced to their own queue instead.
- *
- * This only redirects AWAY from the staff tree — it is a routing
- * convenience, not a security boundary. The boundary is server-side:
- * routes/deliveryPartner.js checks the role and the per-order
- * assignment, and every back-office route has its own guard.
- */
-function RequireStaff({ children }: { children: React.ReactNode }) {
-  const role = useAuthStore(s => s.user?.role)
-  if (role === 'delivery_partner') return <Navigate to={PATHS.DELIVERY} replace />
-  return <>{children}</>
-}
-
-/** The mirror of the above: keep staff out of the rider shell, so an
- *  admin clicking a stale link gets their own app back rather than an
- *  empty "no deliveries assigned to you" screen. */
-function RequireDeliveryPartner({ children }: { children: React.ReactNode }) {
-  const role = useAuthStore(s => s.user?.role)
-  if (role && role !== 'delivery_partner' && role !== 'owner') {
-    return <Navigate to={PATHS.DASHBOARD} replace />
-  }
-  return <>{children}</>
-}
 
 function PageLoader() {
   return (
@@ -99,21 +49,7 @@ export default function Router() {
           <Route path={PATHS.SIGNUP} element={<RequireGuest><SignupPage /></RequireGuest>} />
 
           {/* Protected */}
-          {/* ── Delivery partner app (migration 038) ───────────────────
-               Same staff session and token as the back office — a rider
-               is an ordinary `users` row — but its own shell, because
-               the sidebar app is entirely inapplicable to them. See
-               layouts/DeliveryLayout.tsx. */}
-          <Route
-            path={PATHS.DELIVERY}
-            element={<RequireAuth><RequireDeliveryPartner><DeliveryLayout /></RequireDeliveryPartner></RequireAuth>}
-          >
-            <Route index element={<DeliveryOrdersPage />} />
-            <Route path="orders" element={<Navigate to={PATHS.DELIVERY} replace />} />
-            <Route path="orders/:id" element={<DeliveryOrderPage />} />
-          </Route>
-
-          <Route path="/" element={<RequireAuth><RequireStaff><AppLayout /></RequireStaff></RequireAuth>}>
+          <Route path="/" element={<RequireAuth><AppLayout /></RequireAuth>}>
             <Route index element={<Navigate to={PATHS.DASHBOARD} replace />} />
 
             <Route path="dashboard"    element={<Dashboard />} />
@@ -137,8 +73,6 @@ export default function Router() {
             <Route path="purchase-suggestions" element={<PurchaseSuggestionsPage />} />
             <Route path="credit-risk" element={<CreditRiskDashboardPage />} />
             <Route path="reminders" element={<RemindersPage />} />
-            <Route path="customer-orders" element={<AdminCustomerOrdersPage />} />
-            <Route path="customer-registrations" element={<AdminCustomerRegistrationsPage />} />
 
             {/* Parties */}
             <Route path="customers"    element={<CustomersPage />} />
@@ -155,45 +89,6 @@ export default function Router() {
 
             {/* System */}
             <Route path="settings"     element={<SettingsPage />} />
-          </Route>
-
-          {/* ── Customer storefront (Customer Product Ordering module) ──────
-               Entirely separate from the staff tree above: its own guards
-               (RequireCustomerAuth/Guest — router/customerGuards.tsx), its
-               own layout (CustomerLayout, no staff sidebar/nav), its own
-               auth store/token. A customer session and a staff session can
-               coexist in the same browser (different tabs) without
-               interfering with each other.
-
-               StorefrontProvider (modules/customer/StorefrontContext.tsx) is
-               mounted once here, above every /customer/* page — the single
-               source of truth for "which company" (spec §5), resolved from
-               ?store=<slug> / VITE_STOREFRONT_CODE (no UUID in the URL in
-               production), never re-resolved independently per page.
-               RequireStorefront (same file) is what turns "no store chosen
-               yet" into a redirect to the /store picker below instead of
-               every page dead-ending on its own "store unavailable"
-               message — see that component's docblock. */}
-          <Route path="/store" element={<StoreSelectPage />} />
-
-          <Route path="/customer" element={<StorefrontProvider><RequireStorefront><Outlet /></RequireStorefront></StorefrontProvider>}>
-            <Route path="login"    element={<RequireCustomerGuest><CustomerLoginPage /></RequireCustomerGuest>} />
-            <Route path="register" element={<RequireCustomerGuest><CustomerRegisterPage /></RequireCustomerGuest>} />
-            <Route path="registration-status" element={<RequireCustomerGuest><CustomerRegistrationStatusPage /></RequireCustomerGuest>} />
-
-            {/* CustomerLayout itself is NOT behind RequireCustomerAuth —
-                spec §14: browsing, cart, and checkout all work for a guest.
-                Only order history and profile (which need an actual
-                account) are individually guarded below. */}
-            <Route element={<CustomerLayout />}>
-              <Route index element={<CustomerHomePage />} />
-              <Route path="products/:id" element={<CustomerProductDetailPage />} />
-              <Route path="cart"         element={<CustomerCartPage />} />
-              <Route path="checkout"     element={<CustomerCheckoutPage />} />
-              <Route path="orders"       element={<RequireCustomerAuth><CustomerOrdersPage /></RequireCustomerAuth>} />
-              <Route path="orders/:id"   element={<RequireCustomerAuth><CustomerOrderDetailPage /></RequireCustomerAuth>} />
-              <Route path="profile"      element={<RequireCustomerAuth><CustomerProfilePage /></RequireCustomerAuth>} />
-            </Route>
           </Route>
 
           {/* 404 */}

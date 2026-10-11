@@ -36,10 +36,6 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
   cashier:    ['sales.*', 'products.view', 'parties.view', 'stock.view'],
   viewer:     ['*.view'],
   auditor:    ['*.view'],
-  // A rider has no permission to anything in the back office. Their
-  // access is routes/deliveryPartner.js, which is authorized by role +
-  // per-order assignment on the server, not by this map.
-  delivery_partner: [],
 }
 
 // ─── Payment modes ────────────────────────────────────────────────────────────
@@ -160,11 +156,4 @@ export const PATHS = {
   REPORTS:    '/reports',
   SETTINGS:   '/settings',
   REMINDERS:  '/reminders',
-  CUSTOMER_ORDERS: '/customer-orders',
-  CUSTOMER_REGISTRATIONS: '/customer-registrations',
-  // Delivery partner app (migration 038). A rider's whole experience is
-  // these two screens — see DeliveryLayout's docblock for why they sit
-  // outside AppLayout's sidebar shell.
-  DELIVERY:        '/delivery',
-  DELIVERY_ORDER:  '/delivery/orders',
 } as const

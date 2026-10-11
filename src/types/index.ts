@@ -15,11 +15,10 @@ export interface Pagination {
 }
 
 // ─── Auth ──────────────────────────────────────────────────────────────────────
-// 'auditor' and 'delivery_partner' both exist in the backend's role
-// constraint (utils/roles.js + migration 038) but were missing here.
+// 'auditor' exists in the backend's role constraint (utils/roles.js).
 // 'manager' is kept because ROLE_PERMISSIONS below still references it,
 // even though users.role has never actually accepted it.
-export type UserRole = 'owner' | 'admin' | 'manager' | 'accountant' | 'cashier' | 'auditor' | 'viewer' | 'delivery_partner'
+export type UserRole = 'owner' | 'admin' | 'manager' | 'accountant' | 'cashier' | 'auditor' | 'viewer'
 
 export interface User {
   id:              string
@@ -54,7 +53,6 @@ export interface Company {
   pan_no?:         string
   registration_no?: string
   logo_url?:       string
-  storefront_code?: string | null
   date_system:     'BS' | 'AD'
   invoice_prefix:  string
   currency:        string
@@ -189,10 +187,7 @@ export interface Product {
   min_stock:     number
   current_stock: number
   is_active:     boolean
-  is_online?:    boolean  // available on the customer storefront (Customer Product Ordering module)
-  auto_sync_online_qty?: boolean  // online availability follows actual physical stock rather than a manual number
-  online_qty?:   number | null    // manual online-available quantity, used when auto_sync_online_qty is false
-  online_image_url?: string | null  // storefront image (paste-a-link, no upload service — see Customer Product Ordering module)
+  online_image_url?: string | null  // product photo URL (legacy column name)
   created_at?:   string
   // ── Inventory Planning (Smart Purchase Suggestions) — all optional,
   // null/undefined means "use the company default" (see PurchaseSuggestionSettings).

@@ -123,35 +123,6 @@ export const productsAPI = {
   get:        (id: string)      => http.get<ApiResponse<Product>>(`/products/${id}`),
   create:     (data: Partial<Product>) => http.post<ApiResponse<Product>>('/products', data),
   update:     (id: string, data: Partial<Product>) => http.put<ApiResponse<Product>>(`/products/${id}`, data),
-  // Dedicated endpoint (routes/products.js) — PUT /products/:id's own
-  // `allowed` whitelist deliberately does NOT include is_online/
-  // auto_sync_online_qty/online_qty/etc.; they live here instead, with
-  // their own validation (min<=max, price-required-when-source-is-online).
-  // Sending them to update() above silently drops them.
-  updateOnlineSettings: (id: string, data: {
-    is_online?: boolean
-    online_price_source?: 'regular' | 'online'
-    online_price?: number | null
-    auto_sync_online_qty?: boolean
-    online_qty?: number | null
-    min_order_qty?: number
-    max_order_qty?: number | null
-    qty_step?: number
-    stock_visibility?: 'exact' | 'range' | 'available' | 'hide'
-    allow_backorder?: boolean
-    online_description?: string | null
-    online_image_url?: string | null
-    display_order?: number
-  }) => http.patch<ApiResponse<Product>>(`/products/${id}/online-settings`, data),
-  // File upload variant of online_image_url above — same column, just
-  // filled by an actual uploaded file instead of a pasted link (routes/
-  // products.js's dedicated POST/DELETE .../image pair).
-  uploadImage: (id: string, file: File) => {
-    const form = new FormData()
-    form.append('file', file)
-    return http.post<ApiResponse<Product>>(`/products/${id}/image`, form, { headers: { 'Content-Type': 'multipart/form-data' } })
-  },
-  removeImage: (id: string) => http.delete<ApiResponse<Product>>(`/products/${id}/image`),
   delete:     (id: string)      => http.delete(`/products/${id}`),
   stock:      (id: string)      => http.get(`/products/${id}/stock`),
   adjust:     (id: string, data: {
@@ -321,28 +292,6 @@ export const notificationsAPI = {
   markAllRead: () => http.put('/notifications/read-all'),
 }
 
-// ─── Customer Orders (admin/staff side) ─────────────────────────────────────
-// Customer Product Ordering module — staff view of orders placed through
-// the customer storefront. Confirming an order server-side converts it
-// into a real Sale (routes/adminCustomerOrders.js); nothing about that
-// conversion happens on the frontend.
-export const adminCustomerOrdersAPI = {
-  list:   (params?: Params) => http.get<ApiResponse<any[]>>('/admin/customer-orders', { params }),
-  get:    (id: string) => http.get<ApiResponse<any>>(`/admin/customer-orders/${id}`),
-  setStatus: (id: string, status: string, cancel_reason?: string) =>
-    http.patch<ApiResponse<any>>(`/admin/customer-orders/${id}/status`, { status, cancel_reason }),
-
-  // ── Delivery OTP (migration 038) ──────────────────────────────────────
-  // Note what is NOT here: any way to read a delivery code. The backend
-  // has no such endpoint for staff, so there is nothing to call.
-  deliveryPartners: () =>
-    http.get<ApiResponse<{ id: string; name: string; phone: string | null }[]>>('/admin/customer-orders/meta/delivery-partners'),
-  assignDeliveryPartner: (id: string, delivery_partner_id: string | null) =>
-    http.patch<ApiResponse<any>>(`/admin/customer-orders/${id}/delivery-partner`, { delivery_partner_id }),
-  overrideDelivery: (id: string, reason: string) =>
-    http.post<ApiResponse<any>>(`/admin/customer-orders/${id}/delivery-override`, { reason }),
-}
-
 // ─── Scan Purchase Bill / Invoice OCR ────────────────────────────────────────
 // The scanner is only an input method (spec's architecture rule) — nothing
 // here creates a purchase. Confirming a reviewed scan is a normal call to
@@ -368,32 +317,6 @@ export const purchaseScansAPI = {
    *  just centralizes the path so it's written in one place. */
   pagePath: (scanId: string, pageNo: number) => `/purchase-scans/${scanId}/pages/${pageNo}/file`,
 }
-// The rider's own view of their assigned work. Backend:
-// routes/deliveryPartner.js, which scopes every one of these to the
-// authenticated rider's assigned orders — there is no order-id a rider
-// can pass here to reach someone else's delivery.
-export const deliveryAPI = {
-  myOrders: (history = false) =>
-    http.get<ApiResponse<any[]>>('/delivery/orders', { params: history ? { history: 'true' } : undefined }),
-  get:      (id: string) => http.get<ApiResponse<any>>(`/delivery/orders/${id}`),
-  arrived:  (id: string) => http.post<ApiResponse<any>>(`/delivery/orders/${id}/arrived`),
-  verifyOtp: (id: string, otp: string) =>
-    http.post<ApiResponse<any>>(`/delivery/orders/${id}/verify-otp`, { otp }),
-  resendOtp: (id: string) => http.post<ApiResponse<any>>(`/delivery/orders/${id}/resend-otp`),
-}
-
-// ─── Customer Registrations (admin/staff side) ──────────────────────────────
-// Customer Product Ordering approval workflow (migration 037) — Owner/Admin
-// review of pending storefront registrations. Backend: requireRole('admin')
-// on every one of these (routes/adminCustomerRegistrations.js) — owner
-// always passes that check too (middleware/index.js).
-export const adminCustomerRegistrationsAPI = {
-  list:    (params?: Params) => http.get<ApiResponse<any[]>>('/admin/customer-registrations', { params }),
-  get:     (id: string) => http.get<ApiResponse<any>>(`/admin/customer-registrations/${id}`),
-  approve: (id: string) => http.patch<ApiResponse<any>>(`/admin/customer-registrations/${id}/approve`),
-  reject:  (id: string, reason?: string) => http.patch<ApiResponse<any>>(`/admin/customer-registrations/${id}/reject`, { reason }),
-}
-
 // ─── Reminders ────────────────────────────────────────────────────────────────
 export const remindersAPI = {
   list:    (params?: Params) => http.get<ApiResponse<any[]>>('/reminders', { params }),

@@ -7,7 +7,7 @@
  */
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Building2, Plus, Pencil, Star, ArrowLeftRight, Check, Loader2, Trash2, RotateCcw, AlertTriangle, Link2 } from 'lucide-react'
+import { Building2, Plus, Pencil, Star, ArrowLeftRight, Check, Loader2, Trash2, RotateCcw, AlertTriangle } from 'lucide-react'
 import { useUserCompanies, useDeleteCompany, useRestoreCompany } from '@/hooks/useQuery'
 import { companiesAPI } from '@/services/api'
 import { QK } from '@/constants'
@@ -59,29 +59,6 @@ export default function CompaniesSection() {
       error('Could not set default', e?.response?.data?.message || e.message)
     } finally {
       setBusyId(null); setBusyAction(null)
-    }
-  }
-
-  // Customer-facing registration/login pages read the storefront slug via
-  // `?store=<storefront_code>` (StorefrontContext.tsx resolves it through
-  // GET /storefront/config — see routes/storefront.js) — never the raw
-  // company UUID. A company without a storefront_code yet (shouldn't
-  // normally happen; migration 036 backfills one for every existing
-  // company) falls back to the UUID with a clear warning, since that's
-  // strictly better than silently copying a broken link.
-  async function handleCopyStorefrontLink(c: UserCompany) {
-    const url = c.storefront_code
-      ? `${window.location.origin}/customer/register?store=${c.storefront_code}`
-      : `${window.location.origin}/customer/register?company=${c.id}`
-    try {
-      await navigator.clipboard.writeText(url)
-      if (c.storefront_code) {
-        success('Storefront link copied', url)
-      } else {
-        success('Storefront link copied (no storefront code set)', url + ' — set a storefront code under Settings → Company for a cleaner link.')
-      }
-    } catch {
-      error('Could not copy link', 'Your browser blocked clipboard access. Copy it manually: ' + url)
     }
   }
 
@@ -202,16 +179,6 @@ export default function CompaniesSection() {
                       )}
                       <Button variant="ghost" size="sm" icon={<Pencil size={13} />} onClick={() => openEdit(c)} disabled={!!busyId}>
                         Edit
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        icon={<Link2 size={13} />}
-                        onClick={() => handleCopyStorefrontLink(c)}
-                        disabled={!!busyId}
-                        title="Copy the customer registration link for this company"
-                      >
-                        Storefront Link
                       </Button>
                       <Button
                         variant={c.is_current ? 'secondary' : 'primary'}

@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import type { UseFormRegister, FieldErrors } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Plus, Package, ScanLine, Boxes, Download, Upload, Printer, QrCode, Filter, Pencil, Trash2, Globe } from 'lucide-react'
-import { useProducts, useCreateProduct, useUpdateProduct, useUpdateProductOnlineSettings, useDeleteProduct, useProductOpeningBatches, useAddOpeningInventory, useNextBarcode, useSuppliers } from '@/hooks/useQuery'
+import { Plus, Package, ScanLine, Boxes, Download, Upload, Printer, QrCode, Filter, Pencil, Trash2 } from 'lucide-react'
+import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct, useProductOpeningBatches, useAddOpeningInventory, useNextBarcode, useSuppliers } from '@/hooks/useQuery'
 import { Button, Modal, Badge, Pagination, SkeletonRows, Empty, SearchInput, ConfirmDialog, Select, ToggleSwitch } from '@/components/ui'
 import ManufacturerSelect from '@/components/forms/ManufacturerSelect'
 import ExportProductsModal from './ExportProductsModal'
@@ -287,7 +287,6 @@ function InventoryPlanningSection({ value, onChange }: { value: PlanningState; o
 function ProductForm({ initial, onClose }: { initial?: Product | null; onClose: () => void }) {
   const create = useCreateProduct()
   const update = useUpdateProduct()
-  const updateOnlineSettings = useUpdateProductOnlineSettings()
   const { register, handleSubmit, setValue, watch, formState: { errors, isSubmitting, dirtyFields } } = useForm<Form>({
     resolver: zodResolver(productSchema),
     defaultValues: initial ? {
@@ -301,19 +300,11 @@ function ProductForm({ initial, onClose }: { initial?: Product | null; onClose: 
       // C.C% — `cc_pct` is the real column name on products.
       cc_pct: initial.cc_pct ?? 0,
       min_stock: initial.min_stock,
-      is_online: !!initial.is_online,
-      // A brand-new product defaults to auto-sync ON (see productCreation.ts's
-      // comment on why) — an existing product keeps showing whatever it's
-      // actually saved as, defaulting to false only if truly never configured.
-      auto_sync_online_qty: !!initial.auto_sync_online_qty,
-      online_qty: initial.online_qty ?? 0,
-      online_image_url: initial.online_image_url ?? '',
     } : {
       // Same defaults Quick Add has always used, so a product created
       // without touching these fields is identical either way.
       unit: 'Strip', vat_percent: 13, cc_pct: 0, min_stock: 50, mrp: 0, sales_rate: '' as any, purchase_rate: 0,
       barcode: '', opening_stock: '' as any, opening_batch: '', opening_expiry: '',
-      is_online: false, auto_sync_online_qty: true, online_qty: 0, online_image_url: '',
     },
   })
 
@@ -352,18 +343,8 @@ function ProductForm({ initial, onClose }: { initial?: Product | null; onClose: 
   const onSubmit = handleSubmit(async (data) => {
     if (initial) {
       // Editing never touches opening stock — that's a "new product" concept.
-      // is_online/auto_sync_online_qty/online_qty are pulled out too: PUT
-      // /products/:id's own whitelist excludes them on purpose (routes/
-      // products.js) — sending them there is silently ignored, so they go
-      // through the dedicated online-settings endpoint instead.
-      const { opening_stock, opening_batch, opening_expiry, is_online, auto_sync_online_qty, online_qty, online_image_url, ...editable } = data as any
+      const { opening_stock, opening_batch, opening_expiry, ...editable } = data as any
       await update.mutateAsync({ id: initial.id, data: { ...editable, ...planningToPayload(planning) } })
-      try {
-        await updateOnlineSettings.mutateAsync({
-          id: initial.id,
-          data: { is_online, auto_sync_online_qty, online_qty: auto_sync_online_qty ? null : online_qty, online_image_url: online_image_url?.trim() || null },
-        })
-      } catch { /* toasted by useUpdateProductOnlineSettings itself */ }
     } else {
       const newProduct = await create.mutateAsync(data)
       // Inventory Planning is optional and applied as a non-fatal follow-up
@@ -374,8 +355,6 @@ function ProductForm({ initial, onClose }: { initial?: Product | null; onClose: 
       if (hasAnyPlanning) {
         try { await update.mutateAsync({ id: newProduct.id, data: payload as any }) } catch { /* non-fatal */ }
       }
-      // is_online etc. for a brand-new product are already handled inside
-      // createProductWithOpeningStock itself (services/productCreation.ts).
     }
     onClose()
   })
@@ -485,40 +464,6 @@ function ProductForm({ initial, onClose }: { initial?: Product | null; onClose: 
       ) : (
         <OpeningInventorySection productId={initial.id} />
       )}
-
-      <div className="mt-5 pt-4 border-t border-[var(--border)]">
-        <div className="flex items-center gap-1.5 mb-3 text-xs font-bold uppercase tracking-wide text-[var(--text-3)]">
-          <Globe size={13} className="text-brand" />
-          Online Ordering <span className="normal-case font-medium text-[var(--text-4)]">(optional — Customer Product Ordering)</span>
-        </div>
-        <ToggleSwitch checked={!!watch('is_online')} onChange={(v) => setValue('is_online', v, { shouldDirty: true })} label="Available on the customer storefront" />
-        {watch('sales_rate') !== undefined && Number(watch('sales_rate')) <= 0 && watch('is_online') && (
-          <p className="text-xs text-amber-600 mt-1.5">Set a Sale Rate above 0 — customers see this product's price from Sale Rate.</p>
-        )}
-        {watch('is_online') && (
-          <div className="mt-3 pl-0.5 flex flex-col gap-3">
-            <div className="max-w-[360px]">
-              <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">Storefront Image URL</label>
-              <input type="text" className="erp-input" placeholder="https://…" {...register('online_image_url')} />
-              <p className="text-[11px] text-[var(--text-4)] mt-1">
-                Paste a link to an already-hosted image — there's no upload/photo storage in this app, so this needs a URL (e.g. a link from your phone's cloud storage or an image host). Left blank, customers see a placeholder instead.
-              </p>
-            </div>
-            <ToggleSwitch
-              checked={!!watch('auto_sync_online_qty')}
-              onChange={(v) => setValue('auto_sync_online_qty', v, { shouldDirty: true })}
-              label="Online quantity follows actual stock"
-            />
-            {!watch('auto_sync_online_qty') && (
-              <div className="max-w-[220px]">
-                <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">Online Quantity</label>
-                <input type="number" min={0} className="erp-input" placeholder="0" {...register('online_qty')} />
-                <p className="text-[11px] text-[var(--text-4)] mt-1">Set manually instead of following actual stock.</p>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
 
       <InventoryPlanningSection value={planning} onChange={setPlanning} />
 
