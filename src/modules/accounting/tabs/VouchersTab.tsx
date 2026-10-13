@@ -54,7 +54,7 @@ export default function VouchersTab({ onCount, openSignal }: VouchersTabProps = 
         voucher_type: typeFilter || undefined,
         status: statusFilter || undefined,
       })
-      setVouchers(r.data.data || [])
+      setVouchers([...(r.data.data || [])].sort((a: any, b: any) => String(b.voucher_date ?? '').localeCompare(String(a.voucher_date ?? '')) || String(b.created_at ?? '').localeCompare(String(a.created_at ?? ''))))
       setTotal(r.data.pagination?.total || 0)
     } catch (e: any) { error('Load failed', e.message) }
     finally { setLoading(false) }

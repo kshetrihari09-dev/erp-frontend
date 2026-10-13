@@ -255,7 +255,7 @@ function VoucherListTab({ apiCall, type, title, onCount }: {
       const r    = await apiCall({ page, limit: LIMIT })
       if (seq !== loadSeq.current) return
       const body = r.data
-      setRows(body?.data ?? body ?? [])
+      setRows([...(body?.data ?? body ?? [])].sort((a: any, b: any) => String(b.voucher_date ?? '').localeCompare(String(a.voucher_date ?? '')) || String(b.created_at ?? '').localeCompare(String(a.created_at ?? ''))))
       setTotal(body?.pagination?.total ?? body?.total ?? (body?.data?.length ?? 0))
     } catch (e: any) { if (seq === loadSeq.current) error('Load failed', e.message) }
     finally { if (seq === loadSeq.current) setLoading(false) }
