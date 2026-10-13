@@ -7462,3 +7462,33 @@ canvas{
   .pos-theme.sales-two-step .pos-invoice-actions input,
   .pos-theme.sales-two-step .pos-invoice-actions button { min-height: 0; }
 }
+
+/* Same desktop invoice row (Product · Batch · Expiry · Qty · Bonus · Rate ·
+   C.C % · C.C Amount · Amount · delete) at 768 – 1199px. The row is
+   identical to desktop; only the fixed column widths are tightened so all
+   10 columns fit the narrower content area (sidebar is visible here). The
+   Product column takes the remaining width. Below ~640px of available
+   width the table scrolls sideways inside its own wrapper instead of
+   squeezing further. */
+@media (min-width: 768px) and (max-width: 1199px) {
+  .pos-theme.sales-two-step .pos-table-wrap .pos-table {
+    table-layout: fixed;
+    width: 100%;
+    min-width: 640px;
+    font-size: 12px;
+  }
+  .pos-theme.sales-two-step .pos-table-wrap .pos-table thead th { padding: 8px 4px; font-size: 10px; letter-spacing: .02em; }
+  .pos-theme.sales-two-step .pos-table-wrap .pos-table tbody td { padding: 4px 3px; }
+  .pos-theme.sales-two-step .pos-table-wrap .pos-table thead th:nth-child(1) { width: auto !important; min-width: 0 !important; }
+  .pos-theme.sales-two-step .pos-table-wrap .pos-table thead th:nth-child(2) { width: 78px !important; }  /* Batch */
+  .pos-theme.sales-two-step .pos-table-wrap .pos-table thead th:nth-child(3) { width: 72px !important; }  /* Expiry */
+  .pos-theme.sales-two-step .pos-table-wrap .pos-table thead th:nth-child(4) { width: 50px !important; }  /* Qty */
+  .pos-theme.sales-two-step .pos-table-wrap .pos-table thead th:nth-child(5) { width: 50px !important; }  /* Bonus */
+  .pos-theme.sales-two-step .pos-table-wrap .pos-table thead th:nth-child(6) { width: 66px !important; }  /* Rate */
+  .pos-theme.sales-two-step .pos-table-wrap .pos-table thead th:nth-child(7) { width: 50px !important; }  /* C.C % */
+  .pos-theme.sales-two-step .pos-table-wrap .pos-table thead th:nth-child(8) { width: 66px !important; }  /* C.C Amount */
+  .pos-theme.sales-two-step .pos-table-wrap .pos-table thead th:nth-child(9) { width: 76px !important; }  /* Amount */
+  .pos-theme.sales-two-step .pos-table-wrap .pos-table thead th:nth-child(10){ width: 30px !important; }  /* delete */
+  .pos-theme.sales-two-step .pos-table-wrap .pos-cell-input { padding: 0 5px; font-size: 12px; }
+  .pos-theme.sales-two-step .pos-table-wrap .pos-cell-display { padding-left: 3px; padding-right: 3px; }
+}
