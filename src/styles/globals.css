@@ -7376,35 +7376,57 @@ canvas{
   .pos-theme.sales-two-step .pos-card { max-width: 100%; }
 }
 
-/* 768 – 1099px: content column is ≤ ~840px → single column. Total Payable
-   becomes a normal full-width card right under the Customer card instead of
-   a squeezed sticky side column. */
-@media (min-width: 768px) and (max-width: 1099px) {
+/* Single column across the whole range: Total Payable sits ON TOP of the
+   other cards as one compact full-width row (title + big amount on the left,
+   Sub Total / Discount / Round Off inline on the right). */
+@media (min-width: 768px) and (max-width: 1199px) {
   .pos-theme.sales-two-step > .space-y-4 {
     grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
   }
   .pos-theme.sales-two-step > .space-y-4 > .pos-grid-main > .pos-total-card-desktop {
+    order: -1;                 /* above Customer, Items, Billing Summary */
     grid-column: 1;
     grid-row: auto;
     position: static;
     max-height: none;
     overflow: visible;
+
+    display: grid !important;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    align-items: center;
+    column-gap: 28px;
+    row-gap: 2px;
+    padding: 14px 20px;
   }
+  .pos-theme.sales-two-step .pos-total-card-desktop > :nth-child(1) {   /* "Total Payable" label */
+    grid-column: 1; grid-row: 1; margin: 0;
+  }
+  .pos-theme.sales-two-step .pos-total-card-desktop > :nth-child(2) {   /* big amount */
+    grid-column: 1; grid-row: 2; margin: 0; line-height: 1.1;
+  }
+  .pos-theme.sales-two-step .pos-total-card-desktop > :nth-child(3) {   /* summary rows */
+    grid-column: 2; grid-row: 1 / span 2;
+    display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center;
+    gap: 6px 28px;
+    margin: 0 !important; width: auto;
+  }
+  .pos-theme.sales-two-step .pos-total-card-desktop > :nth-child(3) > * {
+    margin: 0 !important;
+    padding: 0;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+    border: none;
+  }
+  /* the 4th row repeats Total Payable, which is already shown big on the left */
+  .pos-theme.sales-two-step .pos-total-card-desktop > :nth-child(3) > :nth-child(4) { display: none; }
 }
 
-/* 900 – 1099px: single column is wide enough for all four fields in a row. */
-@media (min-width: 900px) and (max-width: 1099px) {
+/* 768 – 899px: 2 × 2 customer fields; 900 – 1199px: all four in one row. */
+@media (min-width: 900px) and (max-width: 1199px) {
   .pos-theme.sales-two-step .pos-cf-quad {
     grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
-
-/* 1100 – 1199px: keep the two-column layout (items left, sticky Total
-   Payable right) but give the right column a slimmer, fixed width so the
-   main column keeps as much room as possible. */
-@media (min-width: 1100px) and (max-width: 1199px) {
-  .pos-theme.sales-two-step > .space-y-4 {
-    grid-template-columns: minmax(0, 1fr) 240px;
-    gap: 14px;
   }
 }
