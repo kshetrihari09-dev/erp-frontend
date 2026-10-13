@@ -7317,3 +7317,94 @@ canvas{
 .ptp-badge--synced  { background: rgba(22,163,74,0.12); color: #15803d; }
 
 .ptp-spin { animation: qam-rotate 0.8s linear infinite; }
+
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   SALES / POS — MEDIUM DESKTOP FIX (768px – 1199px viewport, sidebar visible)
+   ────────────────────────────────────────────────────────────────────────────
+   In this range AppLayout still shows the 260px desktop sidebar (its mobile
+   breakpoint is 768px), so the Sales content area is only ~500–940px wide —
+   far narrower than the tablet rules above assumed. Symptoms fixed here:
+     • Invoice Items header could not wrap → search box overlapped the title
+       and the F2/F9/↵/Tab keyboard hints.
+     • Fixed side-by-side layout (Total Payable column) left the main column
+       too narrow on the low end of the range.
+     • Address / PAN / Telephone / Date forced into 4 tiny columns.
+     • Billing Summary's two cards forced side by side.
+   Scope: strictly 768–1199px and `.pos-theme.sales-two-step`.
+   Phones (≤767px) and wide desktop (≥1200px) are not matched by any rule here.
+══════════════════════════════════════════════════════════════════════════════ */
+@media (min-width: 768px) and (max-width: 1199px) {
+
+  /* 1. Invoice Items header: title on its own line, search + scan buttons
+        full width beneath it, keyboard hints on a final line (wrapping). */
+  .pos-theme.sales-two-step .pos-invoice-header {
+    flex-wrap: wrap;
+    row-gap: 10px;
+  }
+  .pos-theme.sales-two-step .pos-invoice-actions {
+    flex: 1 1 100%;
+    width: 100%;
+    min-width: 0;
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+  .pos-theme.sales-two-step .pos-invoice-actions > * { min-width: 0; }
+  .pos-theme.sales-two-step .pos-kbd-hints {
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 6px 14px;
+    font-size: 11px;
+  }
+
+  /* 2. Billing Summary cards: side by side only when there is room. */
+  .pos-theme.sales-two-step .pos-billing-grid {
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  }
+
+  /* 3. Customer card: 2 × 2 fields while the column is narrow. */
+  .pos-theme.sales-two-step .pos-cf-quad {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  /* 4. Never let the page itself scroll sideways. */
+  .pos-theme.sales-two-step,
+  .pos-theme.sales-two-step > .space-y-4,
+  .pos-theme.sales-two-step .pos-card { min-width: 0; }
+  .pos-theme.sales-two-step .pos-card { max-width: 100%; }
+}
+
+/* 768 – 1099px: content column is ≤ ~840px → single column. Total Payable
+   becomes a normal full-width card right under the Customer card instead of
+   a squeezed sticky side column. */
+@media (min-width: 768px) and (max-width: 1099px) {
+  .pos-theme.sales-two-step > .space-y-4 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .pos-theme.sales-two-step > .space-y-4 > .pos-grid-main > .pos-total-card-desktop {
+    grid-column: 1;
+    grid-row: auto;
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
+}
+
+/* 900 – 1099px: single column is wide enough for all four fields in a row. */
+@media (min-width: 900px) and (max-width: 1099px) {
+  .pos-theme.sales-two-step .pos-cf-quad {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+/* 1100 – 1199px: keep the two-column layout (items left, sticky Total
+   Payable right) but give the right column a slimmer, fixed width so the
+   main column keeps as much room as possible. */
+@media (min-width: 1100px) and (max-width: 1199px) {
+  .pos-theme.sales-two-step > .space-y-4 {
+    grid-template-columns: minmax(0, 1fr) 240px;
+    gap: 14px;
+  }
+}
