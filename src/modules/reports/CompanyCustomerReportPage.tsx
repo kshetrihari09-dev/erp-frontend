@@ -24,7 +24,6 @@ export default function CompanyCustomerReportPage() {
   const [company, setCompany] = useState('all')
   const [companies, setCompanies] = useState<string[]>([])
   const [customerType, setCustomerType] = useState('all')
-  const [discountExcluded, setDiscountExcluded] = useState(false)
 
   const [report, setReport]   = useState<CompanyCustomerReport | null>(null)
   const [loading, setLoading] = useState(false)
@@ -37,11 +36,11 @@ export default function CompanyCustomerReportPage() {
 
   const dateError = !from || !to ? 'Select both From and To dates' : from > to ? 'From date cannot be after To date' : null
 
-  const run = useCallback(async (f: { from: string; to: string; company: string; customerType: string }, excl: boolean) => {
+  const run = useCallback(async (f: { from: string; to: string; company: string; customerType: string }) => {
     const my = ++seq.current
     setLoading(true); setErr(null)
     try {
-      const params: CompanyCustomerParams = { from: f.from, to: f.to, company: f.company, customer_type: f.customerType, discount_excluded: excl }
+      const params: CompanyCustomerParams = { from: f.from, to: f.to, company: f.company, customer_type: f.customerType }
       const r = await companyCustomerAPI.get(params)
       if (my !== seq.current) return
       applied.current = f; setReport(r.data.data as CompanyCustomerReport); setSelId(null)
@@ -54,17 +53,11 @@ export default function CompanyCustomerReportPage() {
   // "Report" — generate / refresh with the filters currently on screen
   const generate = useCallback(() => {
     if (dateError) { toastError('Invalid date range', dateError); return }
-    void run({ from, to, company, customerType }, discountExcluded)
-  }, [dateError, run, from, to, company, customerType, discountExcluded, toastError])
+    void run({ from, to, company, customerType })
+  }, [dateError, run, from, to, company, customerType, toastError])
 
   // first load
-  useEffect(() => { void run({ from: monthStartISO(), to: todayISO(), company: 'all', customerType: 'all' }, false) }, [run])
-
-  // checkbox: recalculates immediately using the filters of the last generated report
-  const toggleExcluded = (v: boolean) => {
-    setDiscountExcluded(v)
-    if (applied.current) void run(applied.current, v)
-  }
+  useEffect(() => { void run({ from: monthStartISO(), to: todayISO(), company: 'all', customerType: 'all' }) }, [run])
 
   const exit = () => (window.history.length > 1 ? navigate(-1) : navigate(PATHS.REPORTS))
   useEffect(() => {
@@ -75,7 +68,7 @@ export default function CompanyCustomerReportPage() {
   const exportCsv = async () => {
     const f = applied.current; if (!f) return
     try {
-      const r = await companyCustomerAPI.exportCsv({ from: f.from, to: f.to, company: f.company, customer_type: f.customerType, discount_excluded: discountExcluded })
+      const r = await companyCustomerAPI.exportCsv({ from: f.from, to: f.to, company: f.company, customer_type: f.customerType })
       const url = URL.createObjectURL(new Blob([r.data], { type: 'text/csv;charset=utf-8' }))
       const a = document.createElement('a'); a.href = url; a.download = `company-vs-customer-${f.from}_${f.to}.csv`
       document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url)
@@ -95,7 +88,7 @@ export default function CompanyCustomerReportPage() {
       @media print{@page{size:portrait;margin:8mm}}</style></head><body>
       <h1>Company vs Customer</h1>
       <p class="meta">Period: ${esc(formatDisplayDate(f.from, dateMode))} to ${esc(formatDisplayDate(f.to, dateMode))} &nbsp;|&nbsp; Company: ${f.company === 'all' ? 'All Companies' : esc(f.company)}
-      &nbsp;|&nbsp; Customer Type: ${esc(TYPE_LABEL[f.customer_type])} &nbsp;|&nbsp; Discount Excluded: ${f.discount_excluded ? 'Yes' : 'No'}</p>
+      &nbsp;|&nbsp; Customer Type: ${esc(TYPE_LABEL[f.customer_type])}</p>
       <table><thead><tr><th>Customer Code</th><th>Particular</th><th>Sales</th><th>Discount</th><th>Sales Return</th><th>Sales Return Expiry</th><th>Net</th></tr></thead>
       <tbody>${rows}</tbody><tfoot><tr><td colspan="2">Total</td><td class="n">${money(t.sales)}</td><td class="n">${money(t.discount)}</td><td class="n">${money(t.sales_return)}</td><td class="n">${money(t.sales_return_expiry)}</td><td class="n">${money(t.net)}</td></tr></tfoot></table>
       <script>window.onload=function(){window.print()}</script></body></html>`
@@ -141,10 +134,6 @@ export default function CompanyCustomerReportPage() {
             {companies.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
         </label>
-        <label className="sr-check" title="Show the Discount column but do not deduct it from Net">
-          <input type="checkbox" checked={discountExcluded} onChange={e => toggleExcluded(e.target.checked)} />
-          <span>Discount Excluded</span>
-        </label>
 
         <div className="sr-actions">
           <button className="btn btn-secondary btn-sm" onClick={printReport} disabled={!report || loading}><Printer size={14} /> Print</button>
@@ -182,7 +171,7 @@ export default function CompanyCustomerReportPage() {
         </div>
         <div className="sr-foot">
           <div className="sr-foot-info">
-            {report ? <>{rows.length} customer{rows.length === 1 ? '' : 's'}{report.filters.discount_excluded ? ' · Discount excluded from Net' : ''}</> : '—'}
+            {report ? <>{rows.length} customer{rows.length === 1 ? '' : 's'}</> : '—'}
           </div>
           <div className="sr-foot-tot">
             <span>Total</span>
@@ -194,7 +183,7 @@ export default function CompanyCustomerReportPage() {
           </div>
         </div>
       </div>
-      <div className="sr-legend">Sales are shown before discount. Net = Sales − Discount − Sales Return − Sales Return Expiry; with “Discount Excluded” ticked the Discount column is still shown but is not deducted.</div>
+      <div className="sr-legend">Sales are shown before discount. Net = Sales − Discount − Sales Return − Sales Return Expiry.</div>
     </div>
   )
 }

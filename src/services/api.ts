@@ -269,11 +269,11 @@ export interface CompanyCustomerRow {
 }
 export interface CompanyCustomerReport {
   title: string
-  filters: { from: string; to: string; company: string; customer_type: string; discount_excluded: boolean }
+  filters: { from: string; to: string; company: string; customer_type: string }
   rows: CompanyCustomerRow[]
   totals: { sales: number; discount: number; sales_return: number; sales_return_expiry: number; net: number }
 }
-export interface CompanyCustomerParams { from: string; to: string; company?: string; customer_type?: string; discount_excluded?: boolean }
+export interface CompanyCustomerParams { from: string; to: string; company?: string; customer_type?: string }
 export const companyCustomerAPI = {
   get:       (params: CompanyCustomerParams) => http.get<ApiResponse<CompanyCustomerReport>>('/reports/company-vs-customer', { params }),
   companies: ()                              => http.get<ApiResponse<string[]>>('/reports/company-vs-customer/companies'),
