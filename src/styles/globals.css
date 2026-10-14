@@ -7492,3 +7492,48 @@ canvas{
   .pos-theme.sales-two-step .pos-table-wrap .pos-cell-input { padding: 0 5px; font-size: 12px; }
   .pos-theme.sales-two-step .pos-table-wrap .pos-cell-display { padding-left: 3px; padding-right: 3px; }
 }
+
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   DARK MODE — components that were hard-coded for light (Tailwind bg-white /
+   slate / amber utilities): Credit Risk warning, product search + dropdown,
+   Scan Barcode / Scan QR buttons.
+══════════════════════════════════════════════════════════════════════════════ */
+.dark .crb-alert--warn    { background: rgba(245,158,11,.12) !important; border-color: rgba(245,158,11,.38) !important; }
+.dark .crb-alert--blocked { background: rgba(239,68,68,.12)  !important; border-color: rgba(239,68,68,.40)  !important; }
+.dark .crb-alert--warn    svg { color: #FBBF24; }
+.dark .crb-alert--blocked svg { color: #F87171; }
+.dark .crb-alert p        { color: var(--text-2); }
+.dark .crb-alert p b      { color: var(--text); }
+.dark .crb-alert button   { color: #7DB0FF; }
+
+.dark .upi-search {
+  background: var(--surface-2) !important;
+  border-color: var(--border-2) !important;
+}
+.dark .upi-search:focus-within {
+  border-color: rgba(96,165,250,.7) !important;
+  box-shadow: 0 0 0 2px rgba(37,99,235,.25) !important;
+}
+.dark .upi-search input { color: var(--text); }
+.dark .upi-search input::placeholder, .dark .upi-search svg { color: var(--text-3); }
+.dark .upi-dropdown {
+  background: var(--surface) !important;
+  border-color: var(--border-2) !important;
+}
+.dark .upi-dropdown li { color: var(--text-2); }
+.dark .upi-dropdown li .text-slate-800 { color: var(--text) !important; }
+.dark .upi-dropdown li.bg-blue-50, .dark .upi-dropdown li:hover { background: rgba(37,99,235,.18) !important; }
+
+.dark .upi-scan-btn {
+  background: var(--surface-2) !important;
+  border-color: var(--border-2) !important;
+  color: var(--text) !important;
+}
+.dark .upi-scan-btn .text-slate-400 { color: var(--text-3) !important; }
+.dark .upi-scan-btn-barcode { background: rgba(37,99,235,.10) !important; border-color: rgba(96,165,250,.30) !important; }
+.dark .upi-scan-btn-qr      { background: rgba(16,185,129,.10) !important; border-color: rgba(52,211,153,.30) !important; }
+.dark .upi-scan-btn-barcode:hover { background: rgba(37,99,235,.20) !important; border-color: rgba(96,165,250,.6) !important; }
+.dark .upi-scan-btn-qr:hover      { background: rgba(16,185,129,.20) !important; border-color: rgba(52,211,153,.6) !important; }
+.dark .upi-scan-btn .bg-blue-100    { background: rgba(37,99,235,.25) !important;  color: #93C5FD !important; }
+.dark .upi-scan-btn .bg-emerald-100 { background: rgba(16,185,129,.25) !important; color: #6EE7B7 !important; }

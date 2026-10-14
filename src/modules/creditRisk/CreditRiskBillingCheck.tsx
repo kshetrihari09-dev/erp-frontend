@@ -88,7 +88,7 @@ export function CreditRiskBillingCheck({ customerId, invoiceAmount, isCredit, on
           exit={{ height: 0, opacity: 0 }}
           transition={{ duration: 0.2, ease: 'easeInOut' }}
         >
-          <div className={`rounded-lg border p-3 text-sm ${check.blocked ? 'bg-red-50 border-red-300' : 'bg-amber-50 border-amber-300'}`}>
+          <div className={`crb-alert ${check.blocked ? 'crb-alert--blocked' : 'crb-alert--warn'} rounded-lg border p-3 text-sm ${check.blocked ? 'bg-red-50 border-red-300' : 'bg-amber-50 border-amber-300'}`}>
             <div className="flex items-start gap-2">
               <AlertTriangle size={16} className={check.blocked ? 'text-red-600' : 'text-amber-600'} style={{ marginTop: 1, flexShrink: 0 }} />
               <div className="flex-1 min-w-0">

@@ -350,7 +350,7 @@ const UnifiedProductInput = forwardRef<UnifiedProductInputHandle, Props>(functio
 
   return (
     <div ref={containerRef} className={`relative flex flex-wrap items-stretch gap-2 w-full ${className || ''}`}>
-      <div className="relative flex-1 min-w-[220px] flex items-center gap-2 h-9 px-3 rounded-lg border border-slate-200 bg-white focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100">
+      <div className="upi-search relative flex-1 min-w-[220px] flex items-center gap-2 h-9 px-3 rounded-lg border border-slate-200 bg-white focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100">
         <Search size={14} className="text-slate-400 flex-shrink-0" />
         <input
           ref={inputRef}
@@ -367,7 +367,7 @@ const UnifiedProductInput = forwardRef<UnifiedProductInputHandle, Props>(functio
         {(loading || busy) && <Loader2 size={13} className="text-slate-400 animate-spin flex-shrink-0" />}
 
         {open && (
-          <div className="absolute left-0 right-0 top-full mt-1 z-30 bg-white rounded-lg border border-slate-200 shadow-lg max-h-72 overflow-y-auto">
+          <div className="upi-dropdown absolute left-0 right-0 top-full mt-1 z-30 bg-white rounded-lg border border-slate-200 shadow-lg max-h-72 overflow-y-auto">
             <ul ref={listRef} role="listbox">
               {results.length === 0 && !loading && (
                 <li className="flex items-center gap-2 px-3 py-3 text-xs text-slate-400">
