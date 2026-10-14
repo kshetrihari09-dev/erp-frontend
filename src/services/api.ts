@@ -262,6 +262,24 @@ export const stockRegisterAPI = {
   exportCsv: (params: StockRegisterParams) => http.get('/stock-register/export', { params, responseType: 'blob' }),
 }
 
+// ─── Company vs Customer report ────────────────────────────────────────────────
+export interface CompanyCustomerRow {
+  customer_id: string | null; customer_code: string; customer_name: string; customer_type: 'customer' | 'credit'
+  sales: number; discount: number; sales_return: number; sales_return_expiry: number; net: number
+}
+export interface CompanyCustomerReport {
+  title: string
+  filters: { from: string; to: string; company: string; customer_type: string; discount_excluded: boolean }
+  rows: CompanyCustomerRow[]
+  totals: { sales: number; discount: number; sales_return: number; sales_return_expiry: number; net: number }
+}
+export interface CompanyCustomerParams { from: string; to: string; company?: string; customer_type?: string; discount_excluded?: boolean }
+export const companyCustomerAPI = {
+  get:       (params: CompanyCustomerParams) => http.get<ApiResponse<CompanyCustomerReport>>('/reports/company-vs-customer', { params }),
+  companies: ()                              => http.get<ApiResponse<string[]>>('/reports/company-vs-customer/companies'),
+  exportCsv: (params: CompanyCustomerParams) => http.get('/reports/company-vs-customer/export', { params, responseType: 'blob' }),
+}
+
 // ─── Smart Purchase Suggestions ─────────────────────────────────────────────────
 export const purchaseSuggestionsAPI = {
   list:    (params?: Params) => http.get<ApiResponse<PurchaseSuggestion[]>>('/purchase-suggestions', { params }),

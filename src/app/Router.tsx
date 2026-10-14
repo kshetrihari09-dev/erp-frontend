@@ -27,6 +27,7 @@ const AccountingPage=lazy(() => import('@/modules/accounting/AccountingPage'))
 const LedgerPage   = lazy(() => import('@/modules/accounting/LedgerPage'))
 const ReportsPage  = lazy(() => import('@/modules/reports/ReportsPage'))
 const StockRegisterPage = lazy(() => import('@/modules/inventory/StockRegisterPage'))
+const CompanyCustomerReportPage = lazy(() => import('@/modules/reports/CompanyCustomerReportPage'))
 const SettingsPage = lazy(() => import('@/modules/settings/SettingsPage'))
 const RemindersPage = lazy(() => import('@/modules/reminders/RemindersPage'))
 
@@ -88,6 +89,7 @@ export default function Router() {
 
             {/* Analytics */}
             <Route path="reports"      element={<ReportsPage />} />
+            <Route path="company-vs-customer" element={<CompanyCustomerReportPage />} />
 
             {/* System */}
             <Route path="settings"     element={<SettingsPage />} />
