@@ -240,6 +240,28 @@ export const stockAPI = {
   summary: ()                => http.get('/stock/summary'),
 }
 
+// ─── Stock Register ───────────────────────────────────────────────────────────
+export interface StockRegisterRow {
+  key: string; date: string; inv_no: string; batch: string; particular: string; narration: string
+  ty: string; qty_in: number; qty_out: number; balance: number; qty_free: number
+  rate: number; store: string; mrp: number; expiry: string
+}
+export interface StockRegisterReport {
+  product: { id: string; item_code: string; name: string; unit?: string }
+  filters: { from: string | null; to: string | null; store: string; include_adj: boolean }
+  opening_balance: number
+  rows: StockRegisterRow[]
+  totals: { qty_in: number; qty_out: number; qty_free: number; opening_balance: number; closing_balance: number }
+  reconciliation: { register_closing_all_time: number; current_stock: number; matches: boolean }
+}
+export interface StockRegisterParams { product_id: string; from?: string; to?: string; store?: string; include_adj?: boolean }
+export const stockRegisterAPI = {
+  get:    (params: StockRegisterParams) => http.get<ApiResponse<StockRegisterReport>>('/stock-register', { params }),
+  lookup: (code: string)                => http.get<ApiResponse<{ id: string; item_code: string; name: string; unit?: string }>>('/stock-register/lookup', { params: { code } }),
+  stores: ()                            => http.get<ApiResponse<{ id: string; name: string }[]>>('/stock-register/stores'),
+  exportCsv: (params: StockRegisterParams) => http.get('/stock-register/export', { params, responseType: 'blob' }),
+}
+
 // ─── Smart Purchase Suggestions ─────────────────────────────────────────────────
 export const purchaseSuggestionsAPI = {
   list:    (params?: Params) => http.get<ApiResponse<PurchaseSuggestion[]>>('/purchase-suggestions', { params }),

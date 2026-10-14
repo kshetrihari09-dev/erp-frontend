@@ -147,6 +147,7 @@ export const PATHS = {
   QR_CODE_PRINT: '/qrcode-print',
   MANUFACTURERS: '/manufacturers',
   STOCK:      '/stock',
+  STOCK_REGISTER: '/stock-register',
   PURCHASE_SUGGESTIONS: '/purchase-suggestions',
   CREDIT_RISK: '/credit-risk',
   CUSTOMERS:  '/customers',
