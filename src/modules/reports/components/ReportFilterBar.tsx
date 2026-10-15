@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Calendar, X, Search, RefreshCw } from 'lucide-react'
+import { X, Search, RefreshCw } from 'lucide-react'
+import { DateRangeFilter } from '@/components/ui/DateRangePopup'
 import { A, QUICK_RANGES, getRange } from '../constants'
 import { CARD } from '../styles'
 import { useWindowWidth } from '../hooks'
@@ -10,10 +11,12 @@ export interface ReportFilterBarProps {
   loading: boolean
   onDateChange: (k: 'from' | 'to', v: string) => void
   onGenerate: () => void
+  /** Called after "Set" in the Date Range popup with the validated AD range, so the tab can refresh its report. */
+  onRangeSet?: (range: { from: string; to: string }) => void
   onReset: () => void
 }
 
-export function ReportFilterBar({ dateFrom, dateTo, loading, onDateChange, onGenerate, onReset }: ReportFilterBarProps) {
+export function ReportFilterBar({ dateFrom, dateTo, loading, onDateChange, onGenerate, onRangeSet, onReset }: ReportFilterBarProps) {
   const [active, setActive] = useState('year')
   const isMobile = useWindowWidth() <= 640
 
@@ -42,13 +45,12 @@ export function ReportFilterBar({ dateFrom, dateTo, loading, onDateChange, onGen
 
       {/* Date pickers + action buttons */}
       <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 8, alignItems: isMobile ? 'stretch' : 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>
-          <Calendar size={13} color="var(--text-4)" style={{ flexShrink: 0 }}/>
-          <input type="date" value={dateFrom} className="erp-input" style={{ flex: 1, minWidth: 0 }}
-            onChange={e => { setActive('custom'); onDateChange('from', e.target.value) }} />
-          <span style={{ color: 'var(--text-4)', fontSize: 12, flexShrink: 0 }}>–</span>
-          <input type="date" value={dateTo} className="erp-input" style={{ flex: 1, minWidth: 0 }}
-            onChange={e => { setActive('custom'); onDateChange('to', e.target.value) }} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <DateRangeFilter fromAD={dateFrom} toAD={dateTo} onApply={r => {
+            setActive('custom')
+            onDateChange('from', r.fromAD); onDateChange('to', r.toAD)
+            onRangeSet?.({ from: r.fromAD, to: r.toAD })
+          }} />
         </div>
         <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
           <button onClick={onReset} className="btn btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, flex: isMobile ? 1 : undefined, justifyContent: 'center' }}>

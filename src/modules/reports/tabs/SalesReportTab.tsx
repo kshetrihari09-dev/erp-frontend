@@ -29,10 +29,12 @@ export function SalesReportTab() {
   const w = useWindowWidth()
   const isMobile = w <= 640
 
-  async function generate() {
+  // `range` lets the Date Range popup refresh with the dates it just set (state is not updated yet in that tick)
+  async function generate(range?: { from: string; to: string }) {
+    const from = range?.from ?? dateFrom, to = range?.to ?? dateTo
     setLoading(true)
     try {
-      const r    = await reportsAPI.sales({ date_from: dateFrom, date_to: dateTo })
+      const r    = await reportsAPI.sales({ date_from: from, date_to: to })
       const body = r.data?.data
       setRows(Array.isArray(body) ? body : (body?.data ?? []))
     } catch (e: any) { error('Failed', e.message) }
@@ -73,7 +75,8 @@ export function SalesReportTab() {
     <>
       <ReportFilterBar dateFrom={dateFrom} dateTo={dateTo} loading={loading}
         onDateChange={(k, v) => k === 'from' ? setDateFrom(v) : setDateTo(v)}
-        onGenerate={generate}
+        onGenerate={() => generate()}
+        onRangeSet={r => generate(r)}
         onReset={() => { setDateFrom(getRange('year')[0]); setDateTo(getRange('year')[1]); setRows([]) }}
       />
 

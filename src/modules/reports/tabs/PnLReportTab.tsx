@@ -15,10 +15,12 @@ export function PnLReportTab() {
   const [loading,  setLoading ] = useState(false)
   const { error } = useUIStore()
 
-  async function generate() {
+  // `range` lets the Date Range popup refresh with the dates it just set (state is not updated yet in that tick)
+  async function generate(range?: { from: string; to: string }) {
+    const from = range?.from ?? dateFrom, to = range?.to ?? dateTo
     setLoading(true); setReport(null)
     try {
-      const r   = await reportsAPI.profitLoss({ date_from: dateFrom, date_to: dateTo })
+      const r   = await reportsAPI.profitLoss({ date_from: from, date_to: to })
       const raw = r.data?.data ?? {}
       setReport({
         incomeRows:   raw.income?.rows  ?? [],
@@ -27,8 +29,8 @@ export function PnLReportTab() {
         totalExpense: Number(raw.expense?.total) || 0,
         netProfit:    Number(raw.net_profit)     || 0,
         netPct:       raw.net_profit_pct != null ? Number(raw.net_profit_pct) : null,
-        date_from:    raw.date_from || dateFrom,
-        date_to:      raw.date_to   || dateTo,
+        date_from:    raw.date_from || from,
+        date_to:      raw.date_to   || to,
       })
     } catch (e: any) { error('Failed to load P&L', e.message) }
     finally { setLoading(false) }
@@ -42,7 +44,8 @@ export function PnLReportTab() {
     <>
       <ReportFilterBar dateFrom={dateFrom} dateTo={dateTo} loading={loading}
         onDateChange={(k, v) => k === 'from' ? setDateFrom(v) : setDateTo(v)}
-        onGenerate={generate}
+        onGenerate={() => generate()}
+        onRangeSet={r => generate(r)}
         onReset={() => { setDateFrom(getRange('year')[0]); setDateTo(getRange('year')[1]); setReport(null) }}
       />
 
