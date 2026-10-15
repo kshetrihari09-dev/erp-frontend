@@ -13,13 +13,13 @@
  * Two library quirks are worked around here so callers don't have to
  * know about them:
  *
- * 1. Off-by-one risk: the library reads a Date's exact instant, not just
- *    its calendar day. Passing it `new Date()` directly (whose time-of-day
- *    is whatever moment the code happens to run) can land it on the wrong
- *    side of a BS/AD day boundary. Every AD date is normalized to UTC
- *    midnight, built from its Y/M/D components, before reaching the
- *    library. Verified round-trip-safe (AD → BS → AD returns the exact
- *    original date) once inputs are normalized this way.
+ * 1. Off-by-one risk: the library reads a Date's *local* calendar fields. Passing
+ *    it `new Date()` directly (time-of-day = whenever the code runs), or a
+ *    UTC-midnight Date (previous day west of UTC), can land it on the wrong
+ *    side of a BS/AD day boundary. Every AD date is normalized to LOCAL NOON,
+ *    built from its Y/M/D components, before reaching the library. Verified
+ *    round-trip-safe in UTC, Asia/Kathmandu, America/Los_Angeles, Pacific/
+ *    Auckland, Pacific/Kiritimati and Pacific/Pago_Pago (see tests/dateRange.test.ts).
  * 2. The library's own multi-letter day-name token ('dddd') has a
  *    formatting bug — it appends a stray digit (e.g. "Thursday4"). We
  *    never use that token; day names are resolved from a static table
@@ -37,8 +37,11 @@ export const BS_DAY_NAMES = [
 ] as const
 
 function normalizedUTCDate(adIso: string): Date {
+  // LOCAL NOON, built from the Y/M/D components. The library reads the Date's *local*
+  // calendar fields, so a UTC-midnight Date lands on the previous day in every timezone
+  // west of UTC (e.g. America/Los_Angeles) — noon is safe in all zones and across DST.
   const [y, m, d] = adIso.split('T')[0].split('-').map(Number)
-  return new Date(Date.UTC(y, m - 1, d))
+  return new Date(y, m - 1, d, 12, 0, 0)
 }
 
 /** AD ISO ('YYYY-MM-DD', or any string Date-parseable with a leading

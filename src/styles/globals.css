@@ -7598,3 +7598,30 @@ canvas{
 .sr-foot-bal b { color: var(--brand); }
 .sr-warn { color: #f59e0b; }
 .sr-legend { margin-top: 6px; font-size: 11px; color: var(--text-3); }
+
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   DATE RANGE POPUP — compact classic-billing-software dialog (components/ui/DateRangePopup.tsx)
+══════════════════════════════════════════════════════════════════════════════ */
+.dr-anchor { position: relative; }
+.dr-trigger { display: flex !important; align-items: center; gap: 7px; height: 32px; padding: 0 9px !important; min-width: 230px; text-align: left;
+  font-size: 13px; font-variant-numeric: tabular-nums; cursor: pointer; white-space: nowrap; }
+.dr-trigger span { flex: 1; }
+.dr-trigger em { font-style: normal; font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 4px; background: var(--brand-light); color: var(--brand); }
+.dr-pop { position: absolute; z-index: 70; top: calc(100% + 4px); left: 0; width: 272px; box-sizing: border-box; padding: 0 0 8px;
+  background: var(--surface); border: 1px solid var(--border-2); border-radius: 4px; box-shadow: var(--shadow-lg); font-size: 12px; color: var(--text-2); }
+.dr-title { padding: 5px 10px; font-weight: 700; font-size: 12px; color: var(--text); background: var(--surface-3); border-bottom: 1px solid var(--border-2); border-radius: 4px 4px 0 0; }
+.dr-box { margin: 8px 8px 8px; padding: 6px 8px 4px; border: 1px solid var(--border-2); border-radius: 3px; min-width: 0; }
+.dr-box legend { padding: 0 4px; font-size: 11px; font-weight: 600; color: var(--text-2); }
+.dr-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 5px 0; }
+.dr-row label { flex: 0 0 96px; font-size: 12px; color: var(--text-2); }
+.dr-input { flex: 1; min-width: 0; height: 24px; padding: 0 6px; box-sizing: border-box; font-size: 12px; font-family: inherit; color: var(--text);
+  background: var(--surface-2); border: 1px solid var(--border-2); border-radius: 2px; outline: none; font-variant-numeric: tabular-nums; }
+.dr-input:focus { border-color: var(--brand); box-shadow: 0 0 0 1px var(--brand); }
+.dr-input.bad { border-color: #ef4444; box-shadow: 0 0 0 1px #ef4444; }
+.dr-hint { margin: 2px 0 0 104px; font-size: 10px; color: var(--text-3); }
+.dr-err { min-height: 14px; margin: 3px 0 2px; font-size: 11px; line-height: 14px; color: #ef4444; }
+.dr-set { display: block; width: calc(100% - 16px); height: 26px; margin: 0 8px; font-size: 12px; font-weight: 700; font-family: inherit;
+  color: var(--text); background: var(--surface-3); border: 1px solid var(--border-2); border-radius: 3px; cursor: pointer; }
+.dr-set:hover:not(:disabled) { background: var(--brand-light); border-color: var(--brand); }
+.dr-set:disabled { opacity: .6; cursor: default; }

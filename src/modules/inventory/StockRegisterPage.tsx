@@ -6,6 +6,7 @@ import { useDebounce } from '@/hooks/useDebounce'
 import useUIStore from '@/store/uiStore'
 import { formatDisplayDate } from '@/utils/dateSystem'
 import { PATHS } from '@/constants'
+import { DateRangeFilter } from '@/components/ui/DateRangePopup'
 
 /* Stock Register — compact, spreadsheet-style, one product at a time.
    All figures come from GET /stock-register (server computes the opening
@@ -165,7 +166,6 @@ export default function StockRegisterPage() {
     w.document.open(); w.document.write(html); w.document.close()
   }
 
-  const showBS = dateMode !== 'AD'
   const t = report?.totals
 
   return (
@@ -209,14 +209,10 @@ export default function StockRegisterPage() {
           </div>
         </div>
 
-        <label className="sr-f">
-          <span>From Date{showBS && from ? <em> · {formatDisplayDate(from, 'BS')}</em> : null}</span>
-          <input type="date" className="erp-input" value={from} max={to || undefined} onChange={e => setFrom(e.target.value)} />
-        </label>
-        <label className="sr-f">
-          <span>To Date{showBS && to ? <em> · {formatDisplayDate(to, 'BS')}</em> : null}</span>
-          <input type="date" className="erp-input" value={to} min={from || undefined} onChange={e => setTo(e.target.value)} />
-        </label>
+        <div className="sr-f">
+          <span>Date Range</span>
+          <DateRangeFilter fromAD={from} toAD={to} onApply={r => { setFrom(r.fromAD); setTo(r.toAD) }} />
+        </div>
 
         <label className="sr-f">
           <span>Store</span>

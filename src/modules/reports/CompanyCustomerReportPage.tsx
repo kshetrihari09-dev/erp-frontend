@@ -4,6 +4,7 @@ import { Printer, Download, LogOut, Loader2, FileBarChart, RefreshCw } from 'luc
 import { companyCustomerAPI, type CompanyCustomerReport, type CompanyCustomerParams } from '@/services/api'
 import useUIStore from '@/store/uiStore'
 import { formatDisplayDate } from '@/utils/dateSystem'
+import { DateRangeFilter, type DateRangeApply } from '@/components/ui/DateRangePopup'
 import { PATHS } from '@/constants'
 
 /* Company vs Customer — per-customer Sales, Discount, Sales Return, Sales Return
@@ -56,6 +57,12 @@ export default function CompanyCustomerReportPage() {
     void run({ from, to, company, customerType })
   }, [dateError, run, from, to, company, customerType, toastError])
 
+  // "Set" in the Date Range popup: store the validated AD range and refresh the report with it
+  const applyRange = useCallback(async (r: DateRangeApply) => {
+    setFrom(r.fromAD); setTo(r.toAD)
+    await run({ from: r.fromAD, to: r.toAD, company, customerType })
+  }, [run, company, customerType])
+
   // first load
   useEffect(() => { void run({ from: monthStartISO(), to: todayISO(), company: 'all', customerType: 'all' }) }, [run])
 
@@ -97,7 +104,6 @@ export default function CompanyCustomerReportPage() {
     w.document.open(); w.document.write(html); w.document.close()
   }
 
-  const showBS = dateMode !== 'AD'
   const t = report?.totals
   const rows = report?.rows || []
 
@@ -119,14 +125,10 @@ export default function CompanyCustomerReportPage() {
             <option value="all">All</option><option value="customer">Customer</option><option value="credit">Credit Customer</option>
           </select>
         </label>
-        <label className="sr-f">
-          <span>From Date{showBS && from ? <em> · {formatDisplayDate(from, 'BS')}</em> : null}</span>
-          <input type="date" className="erp-input" value={from} max={to || undefined} onChange={e => setFrom(e.target.value)} />
-        </label>
-        <label className="sr-f">
-          <span>To Date{showBS && to ? <em> · {formatDisplayDate(to, 'BS')}</em> : null}</span>
-          <input type="date" className="erp-input" value={to} min={from || undefined} onChange={e => setTo(e.target.value)} />
-        </label>
+        <div className="sr-f">
+          <span>Date Range</span>
+          <DateRangeFilter fromAD={from} toAD={to} onApply={applyRange} />
+        </div>
         <label className="sr-f" style={{ flex: '1 1 240px' }}>
           <span>Company</span>
           <select className="erp-input" value={company} onChange={e => setCompany(e.target.value)}>
