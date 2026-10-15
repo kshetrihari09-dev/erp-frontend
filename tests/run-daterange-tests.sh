@@ -17,3 +17,6 @@ TZ=Asia/Kathmandu node --test --test-force-exit $OUT/drc.test.cjs 2>&1 | grep -E
 echo "== Company vs Customer page (Set -> report refresh)"
 $B --alias:@/services/api=./tests/mock-api.ts --alias:@=./src tests/companyCustomerPage.test.tsx --outfile=$OUT/ccp.test.cjs
 TZ=Asia/Kathmandu node --test --test-force-exit $OUT/ccp.test.cjs 2>&1 | grep -E "^# (pass|fail)|^not ok"
+echo "== Ledger page (Set -> ledger refresh)"
+$B --alias:@/services/api=./tests/mock-api-ledger.ts --alias:@=./src tests/ledgerPage.test.tsx --outfile=$OUT/ldg.test.cjs
+TZ=Asia/Kathmandu node --test --test-force-exit $OUT/ldg.test.cjs 2>&1 | grep -E "^# (pass|fail)|^not ok"

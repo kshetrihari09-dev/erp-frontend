@@ -5335,6 +5335,8 @@ bsp-row--disabled { cursor: not-allowed; opacity: .55; }
   gap: 12px;
 }
 .ldg-date-field { width: 150px; }
+.ldg-range-field { width: 260px; }
+.ldg-range-field .dr-trigger { width: 100%; }
 .ldg-type-field { width: 148px; }
 
 @media (max-width: 768px) {
@@ -5342,6 +5344,7 @@ bsp-row--disabled { cursor: not-allowed; opacity: .55; }
   .ldg-party-field { min-width: 0 !important; width: 100%; }
   .ldg-date-fields { width: 100%; gap: 10px; }
   .ldg-date-field  { width: 100%; flex: 1; }
+  .ldg-range-field { width: 100%; flex: 1; }
   .ldg-type-field  { width: 100%; }
   .ldg-actions     { width: 100%; }
   .ldg-actions button,

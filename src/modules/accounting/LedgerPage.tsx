@@ -5,6 +5,7 @@ import { SkeletonRows } from '@/components/ui'
 import { fmt, fmtN, downloadCSV } from '@/utils'
 import { formatDisplayDate } from '@/utils/dateSystem'
 import useUIStore from '@/store/uiStore'
+import { DateRangeFilter } from '@/components/ui/DateRangePopup'
 import useAuthStore from '@/store/authStore'
 import {
   Download, Search, RotateCcw, Printer, TrendingUp,
@@ -592,12 +593,15 @@ export default function LedgerPage() {
     ].filter(cat => cat.subgroups.length > 0)
   }, [accounts, parties])
 
-  async function generate() {
+  // `range` lets the Date Range popup refresh the ledger with the dates it just set
+  // (state updates are not visible yet inside the same tick).
+  async function generate(range?: { from: string; to: string }) {
     if (!entity) return
+    const from = range?.from ?? dateFrom, to = range?.to ?? dateTo
     setLoading(true); setError(''); setLedgerData(null); setPage(1); setSearch('')
     try {
       if (entity.kind === 'account') {
-        const r = await accountingAPI.ledger(entity.id, { date_from: dateFrom, date_to: dateTo, limit: 2000 })
+        const r = await accountingAPI.ledger(entity.id, { date_from: from, date_to: to, limit: 2000 })
         const payload = (r.data?.data ?? r.data) as any
         if (!payload) { setError('No ledger data returned'); return }
         // Cash in Hand / Bank Account ledgers: show the party (customer/supplier)
@@ -627,7 +631,7 @@ export default function LedgerPage() {
           openingBalance: payload.opening_balance ?? 0,
         })
       } else {
-        const r = await partiesAPI.ledger(entity.id, { date_from: dateFrom, date_to: dateTo })
+        const r = await partiesAPI.ledger(entity.id, { date_from: from, date_to: to })
         const payload = (r.data?.data ?? r.data) as any
         if (!payload || (!payload.rows && !payload.data)) { setError('No ledger data returned'); return }
         const rows = payload.rows ?? payload.data ?? []
@@ -782,14 +786,15 @@ export default function LedgerPage() {
             />
           </div>
 
-          {/* Date inputs */}
+          {/* Date range — compact popup (BS/AD, Date/Month); Set also refreshes an open ledger */}
           <div className="ldg-date-fields">
-            {[{ label: 'From Date', val: dateFrom, set: setDateFrom }, { label: 'To Date', val: dateTo, set: setDateTo }].map(f => (
-              <div key={f.label} className="ldg-date-field">
-                <label style={LABEL_STYLE}><Calendar size={10} /> {f.label}</label>
-                <input type="date" className="erp-input" style={{ width: '100%' }} value={f.val} onChange={e => f.set(e.target.value)} />
-              </div>
-            ))}
+            <div className="ldg-range-field">
+              <label style={LABEL_STYLE}><Calendar size={10} /> Date Range</label>
+              <DateRangeFilter fromAD={dateFrom} toAD={dateTo} onApply={r => {
+                setDateFrom(r.fromAD); setDateTo(r.toAD)
+                if (entity) void generate({ from: r.fromAD, to: r.toAD })
+              }} />
+            </div>
           </div>
 
           {/* Tx type */}
@@ -805,7 +810,7 @@ export default function LedgerPage() {
 
           {/* Actions */}
           <div className="ldg-actions" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button disabled={!entity || loading} onClick={generate}
+            <button disabled={!entity || loading} onClick={() => generate()}
               className="ldg-generate-btn"
               style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7, height: 35, padding: '0 20px', fontSize: 13, fontWeight: 700, borderRadius: 9, color: '#fff', border: 'none', cursor: !entity || loading ? 'not-allowed' : 'pointer', background: 'linear-gradient(135deg,#2563eb,#1d4ed8)', boxShadow: '0 2px 10px rgba(37,99,235,.35)', opacity: !entity || loading ? 0.55 : 1 }}>
               {loading ? <RefreshCw size={13} className="animate-spin" /> : <Search size={13} />}
