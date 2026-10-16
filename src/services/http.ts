@@ -15,6 +15,7 @@ import { getEffectiveApiBaseUrl } from '@/config/serverConnection'
 import { RAW_TOKEN_KEY, REFRESH_TOKEN_KEY as AUTH_REFRESH_KEY } from '@/store/authStore'
 import { getValidStepUpToken, clearStepUpToken } from './stepUpToken'
 import useUIStore from '@/store/uiStore'
+import { noteRateLimited, parseRetryAfterMs, readHeader } from './rateLimitState'
 
 // REFRESH_TOKEN_KEY is exported from authStore.ts
 export { AUTH_REFRESH_KEY as REFRESH_TOKEN_KEY }
@@ -131,6 +132,9 @@ http.interceptors.response.use(
 
     // ── 429: server asked us to slow down — surface it, never hammer it ────
     if (status === 429) {
+      // Remember Retry-After so background pollers wait it out (rateLimitState.ts).
+      // Needs `Retry-After` in the backend's CORS exposedHeaders (server.js) to be readable cross-origin.
+      noteRateLimited(parseRetryAfterMs(readHeader(error.response?.headers, 'retry-after')))
       notifyRateLimited()
     }
 

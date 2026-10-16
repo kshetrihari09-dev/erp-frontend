@@ -744,20 +744,8 @@ export function useSnoozeReminder() {
   })
 }
 
-/** Powers ReminderAlarmWatcher.tsx — unread, reminder-category rows from
- *  the existing generic notification feed (routes/notifications.js),
- *  written by services/reminderScheduler.js's processDueReminders() the
- *  moment a reminder becomes due. Short interval + polls even while the
- *  tab isn't focused, since "a reminder rings" is meaningless if it only
- *  fires while you're already looking at the Reminders page. */
-export function useReminderAlerts() {
-  return useQuery({
-    queryKey: ['reminder-alerts'],
-    queryFn: () => notificationsAPI.list({ category: 'reminder', unread_only: 'true', limit: 20 }).then(unwrapPaginated),
-    refetchInterval: 20_000,
-    refetchIntervalInBackground: true,
-  })
-}
+// useReminderAlerts lives in its own module (single shared poller — see the docblock there).
+export { useReminderAlerts } from './useReminderAlerts'
 
 // ─── Accounting ───────────────────────────────────────────────────────────────
 export function useAccounts(params?: Record<string, unknown>) {

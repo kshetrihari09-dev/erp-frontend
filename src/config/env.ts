@@ -29,6 +29,16 @@ const env = {
   MODE:            import.meta.env.MODE  as string,
 }
 
+// Notification polling interval. Default 60 s; clamped to >= 15 s so a typo
+// can't turn the poller into a request flood against the shared rate limit.
+const DEFAULT_NOTIFICATION_POLL_MS = 60_000
+const MIN_NOTIFICATION_POLL_MS     = 15_000
+function parsePollInterval(raw: unknown): number {
+  const n = Number(raw)
+  if (!raw || !Number.isFinite(n)) return DEFAULT_NOTIFICATION_POLL_MS
+  return Math.max(MIN_NOTIFICATION_POLL_MS, Math.round(n))
+}
+
 // ── Validation — crash early if critical vars are missing ──────────────────────
 // In LAN mode there's deliberately no fixed backend baked in — the server is
 // chosen at runtime via the pre-login connect screen (config/serverConnection.ts)
@@ -75,6 +85,9 @@ export const config = {
   // Feature flags
   showDevBadge:  env.SHOW_DEV_BADGE && env.IS_DEV,
   enableApiLogs: env.ENABLE_API_LOGS,
+
+  // Polling
+  notificationPollIntervalMs: parsePollInterval(import.meta.env.VITE_NOTIFICATION_POLL_INTERVAL_MS),
 
   // Backend info
   backendUrl:    backendBase,

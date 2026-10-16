@@ -94,8 +94,13 @@ export default defineConfig(({ mode }) => {
               // replaying a cached POST response would be exactly the
               // duplicate-transaction bug requirement #6 exists to
               // prevent.
+              // /notifications is excluded: it is per-user, constantly-changing
+              // alert data. A 6s-timeout fallback to a cache entry (up to 24h
+              // old, keyed by URL not by user) could replay an already-handled
+              // reminder alarm or show another user's alerts after a user switch.
               urlPattern: ({ url, request }) =>
-                request.method === 'GET' && url.pathname.startsWith('/api/'),
+                request.method === 'GET' && url.pathname.startsWith('/api/') &&
+                !/\/notifications(\/|$)/.test(url.pathname),
               handler: 'NetworkFirst',
               options: {
                 cacheName: 'byapar-api-get-cache',

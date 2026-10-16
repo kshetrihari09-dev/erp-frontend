@@ -346,7 +346,7 @@ export const approvalsAPI = {
 
 // ─── Notifications (generic) ────────────────────────────────────────────────────────
 export const notificationsAPI = {
-  list: (params?: Params) => http.get('/notifications', { params }),
+  list: (params?: Params, requestConfig?: { signal?: AbortSignal }) => http.get('/notifications', { params, ...requestConfig }),
   markRead: (id: string) => http.put(`/notifications/${id}/read`),
   markAllRead: () => http.put('/notifications/read-all'),
 }

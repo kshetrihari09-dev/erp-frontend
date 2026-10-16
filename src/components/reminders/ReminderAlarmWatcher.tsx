@@ -14,7 +14,7 @@
  * services/reminderScheduler.js's processDueReminders() already writes
  * exactly one such row the moment a reminder's due time arrives — this
  * component doesn't recompute "is it due", it just surfaces what the
- * backend already decided, polling every 20s (useReminderAlerts).
+ * backend already decided, via the single shared poller (useReminderAlerts → services/reminderAlertPoller.ts, 60s default).
  *
  * Known limitation (browser policy, not fixable from here): the alarm
  * SOUND only plays once the user has interacted with the page at least
@@ -47,7 +47,7 @@ export default function ReminderAlarmWatcher() {
 
   // Notification IDs already rung/shown this session — a poll returning
   // the same still-unread notification again (nothing actioned yet)
-  // must NOT re-ring the alarm every 20s, only the first time it appears.
+  // must NOT re-ring the alarm on every poll, only the first time it appears.
   const seenRef = useRef<Set<string>>(new Set())
   const [active, setActive] = useState<AlertNotif[]>([])
 
