@@ -281,6 +281,24 @@ export const companyCustomerAPI = {
   exportCsv: (params: CompanyCustomerParams) => http.get('/reports/company-vs-customer/export', { params, responseType: 'blob' }),
 }
 
+// ─── Customer vs Company report ────────────────────────────────────────────────
+export interface CustomerCompanyRow { company: string; sales: number; discount: number; sales_return: number; sales_return_expiry: number; net: number }
+export interface CustomerCompanyReport {
+  title: string
+  customer: { id: string; code: string; name: string }
+  filters: { from: string; to: string; customer_id: string }
+  rows: CustomerCompanyRow[]
+  totals: { sales: number; discount: number; sales_return: number; sales_return_expiry: number; net: number }
+  ledger: { opening_balance: number; receipts: number; closing_balance: number }
+}
+export interface CustomerCompanyParams { from: string; to: string; customer_id: string }
+export interface CustomerLookup { id: string; code: string; name: string }
+export const customerCompanyAPI = {
+  get:       (params: CustomerCompanyParams) => http.get<ApiResponse<CustomerCompanyReport>>('/reports/customer-vs-company', { params }),
+  customers: (search?: string)               => http.get<ApiResponse<CustomerLookup[]>>('/reports/customer-vs-company/customers', { params: { search: search || undefined, limit: 30 } }),
+  exportCsv: (params: CustomerCompanyParams) => http.get('/reports/customer-vs-company/export', { params, responseType: 'blob' }),
+}
+
 // ─── Smart Purchase Suggestions ─────────────────────────────────────────────────
 export const purchaseSuggestionsAPI = {
   list:    (params?: Params) => http.get<ApiResponse<PurchaseSuggestion[]>>('/purchase-suggestions', { params }),

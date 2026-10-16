@@ -6,7 +6,7 @@ import {
   Users, Truck, BookOpen, BookCopy,
   FileBarChart, Settings, LogOut, Building2, CalendarDays, Moon,
   Sun, Menu, X, AlertTriangle, Bell, Search, ChevronRight, Home,
-  PackageX, CalendarClock, Sparkles, ShieldAlert, ClipboardList, Building,
+  PackageX, CalendarClock, Sparkles, ShieldAlert, ClipboardList, Building, ArrowLeftRight,
 } from 'lucide-react'
 import useAuthStore from '@/store/authStore'
 import useUIStore from '@/store/uiStore'
@@ -55,6 +55,7 @@ const NAV = [
   { section: 'REPORTS' },
   { to: PATHS.REPORTS,    label: 'Reports',        icon: <FileBarChart    size={20} strokeWidth={1.8}/> },
   { to: PATHS.COMPANY_CUSTOMER_REPORT, label: 'Company vs Customer', icon: <Building size={20} strokeWidth={1.8}/> },
+  { to: PATHS.CUSTOMER_COMPANY_REPORT, label: 'Customer vs Company', icon: <ArrowLeftRight size={20} strokeWidth={1.8}/> },
 
   { section: 'ADMINISTRATION' },
   { to: PATHS.SETTINGS,   label: 'Settings',       icon: <Settings        size={20} strokeWidth={1.8}/> },
@@ -193,6 +194,7 @@ export default function AppLayout() {
     [PATHS.ACCOUNTING]:    'Accounting',
     [PATHS.LEDGER]:     'Ledger',
     [PATHS.COMPANY_CUSTOMER_REPORT]: 'Company vs Customer',
+    [PATHS.CUSTOMER_COMPANY_REPORT]: 'Customer vs Company',
     [PATHS.REPORTS]:    'Reports',
     [PATHS.SETTINGS]:   'Settings',
   }).find(([path]) => location.pathname.startsWith(path))?.[1] || ''

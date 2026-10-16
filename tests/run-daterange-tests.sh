@@ -23,3 +23,6 @@ TZ=Asia/Kathmandu node --test --test-force-exit $OUT/ldg.test.cjs 2>&1 | grep -E
 echo "== Reports page: Sales / Purchases / P&L (Set -> report refresh)"
 $B --alias:@/services/api=./tests/mock-api-reports.ts --alias:@=./src tests/reportsPage.test.tsx --outfile=$OUT/rp.test.cjs
 TZ=Asia/Kathmandu node --test --test-force-exit $OUT/rp.test.cjs 2>&1 | grep -E "^# (pass|fail)|^not ok"
+echo "== Customer vs Company page"
+$B --alias:@/services/api=./tests/mock-api-cc.ts --alias:@=./src tests/customerCompanyPage.test.tsx --outfile=$OUT/cvc.test.cjs
+TZ=Asia/Kathmandu node --test --test-force-exit $OUT/cvc.test.cjs 2>&1 | grep -E "^# (pass|fail)|^not ok"
