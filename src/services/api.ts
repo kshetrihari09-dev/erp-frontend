@@ -265,13 +265,14 @@ export const stockRegisterAPI = {
 // ─── Company vs Customer report ────────────────────────────────────────────────
 export interface CompanyCustomerRow {
   customer_id: string | null; customer_code: string; customer_name: string; customer_type: 'customer' | 'credit'
-  sales: number; discount: number; sales_return: number; sales_return_expiry: number; net: number
+  opening_balance: number; sales: number; discount: number; sales_return: number; sales_return_expiry: number; net: number
+  receipts: number; ledger_movement: number; closing_balance: number
 }
 export interface CompanyCustomerReport {
   title: string
   filters: { from: string; to: string; company: string; customer_type: string }
   rows: CompanyCustomerRow[]
-  totals: { sales: number; discount: number; sales_return: number; sales_return_expiry: number; net: number }
+  totals: { opening_balance: number; sales: number; discount: number; sales_return: number; sales_return_expiry: number; net: number; receipts: number; ledger_movement: number; closing_balance: number }
 }
 export interface CompanyCustomerParams { from: string; to: string; company?: string; customer_type?: string }
 export const companyCustomerAPI = {

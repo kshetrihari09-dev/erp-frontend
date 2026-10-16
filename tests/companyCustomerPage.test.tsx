@@ -35,6 +35,17 @@ test('Set applies the BS range as AD to the report request, refreshes the grid a
   assert.deepEqual({ f: requests[2].from, t: requests[2].to, c: requests[2].company }, { f: '2026-04-14', t: '2026-04-28', c: 'Cipla' })
 })
 
+test('shows Opening Balance, Receipts and Closing Balance columns with totals', async () => {
+  cleanup(); useUIStore.setState({ dateMode: 'BS' }); requests.length = 0
+  render(<MemoryRouter><CompanyCustomerReportPage /></MemoryRouter>)
+  await waitFor(() => assert.ok(q().getByText(/Alpha/)))
+  const heads = Array.from(document.querySelectorAll('.sr-table th')).map(h => h.textContent)
+  assert.deepEqual(heads, ['Customer Code', 'Particular', 'Opening Balance', 'Sales', 'Discount', 'Sales Return', 'Sales Return Expiry', 'Net', 'Receipts', 'Closing Balance'])
+  const cells = Array.from(document.querySelector('.sr-row')!.querySelectorAll('td')).map(c => c.textContent)
+  assert.equal(cells[2], '11,000.00'); assert.equal(cells[8], '600.00'); assert.equal(cells[9], '10,900.00')
+  assert.match(document.querySelector('.sr-foot-tot')!.textContent!, /Opening\s*11,000\.00/); assert.match(document.querySelector('.sr-foot-tot')!.textContent!, /Closing\s*10,900\.00/)
+})
+
 test('an invalid range never reaches the report API', async () => {
   cleanup(); useUIStore.setState({ dateMode: 'BS' }); requests.length = 0
   render(<MemoryRouter><CompanyCustomerReportPage /></MemoryRouter>)
