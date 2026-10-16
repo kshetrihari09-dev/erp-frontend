@@ -25,8 +25,24 @@
 import { productsAPI, stockAPI, partiesAPI } from '@/services/api'
 import { getOfflineDb, getMeta, setMeta, type OfflineProduct, type OfflineBatch, type OfflineParty } from './db'
 import type { Product, StockBatch, Party } from '@/types'
+import { getRateLimitedUntil } from '@/services/rateLimitState'
 
 const PAGE_SIZE = 500
+/** Hard ceiling on pages per crawl — a loop guard, never reached by a healthy server. */
+const MAX_PAGES = 400
+
+/** Thrown to abandon a sync while the server's rate limiter is asking us to back off. */
+export class CatalogSyncRateLimited extends Error {
+  constructor(public retryAtMs: number) { super('Catalog sync paused: server rate limit (429) — will retry on the next cycle') }
+}
+
+/** Every catalog request goes through this first: if ANY request recently got a 429,
+ *  stop instead of adding load to an exhausted per-IP bucket. The cache already on
+ *  the device stays in place and the next scheduled/reconnect sync tries again. */
+function assertNotRateLimited() {
+  const until = getRateLimitedUntil()
+  if (until > Date.now()) throw new CatalogSyncRateLimited(until)
+}
 
 function toOfflineProduct(p: Product): OfflineProduct {
   // Tokenize into distinct lowercased words across every searchable field
@@ -77,7 +93,23 @@ export interface CatalogSyncProgress {
  *  subsequent calls cheap. `onProgress` is optional and purely cosmetic
  *  (e.g. a "Preparing offline data…" toast on first login); the sync
  *  proceeds identically whether or not anyone's listening. */
-export async function syncCatalog(
+const inFlightSyncs = new Map<string, Promise<void>>()
+
+export function syncCatalog(
+  companyId: string,
+  onProgress?: (p: CatalogSyncProgress) => void,
+): Promise<void> {
+  // One crawl per company at a time: the login sync, the reconnect sync, the
+  // 10-minute timer and a manual "sync now" all land here, and overlapping
+  // crawls would multiply requests against the shared rate limit.
+  const running = inFlightSyncs.get(companyId)
+  if (running) return running
+  const p = runCatalogSync(companyId, onProgress).finally(() => { inFlightSyncs.delete(companyId) })
+  inFlightSyncs.set(companyId, p)
+  return p
+}
+
+async function runCatalogSync(
   companyId: string,
   onProgress?: (p: CatalogSyncProgress) => void,
 ): Promise<void> {
@@ -87,13 +119,17 @@ export async function syncCatalog(
 
   // ── Products ────────────────────────────────────────────────────────────
   let page = 1
+  let prevFirstId: string | undefined
   for (;;) {
+    assertNotRateLimited()
     const res = await productsAPI.list({
       page, limit: PAGE_SIZE,
       ...(lastProductSync ? { updated_since: lastProductSync } : {}),
     })
     const rows: Product[] = res.data?.data || []
     if (rows.length === 0) break
+    if (rows[0]?.id === prevFirstId || page > MAX_PAGES) break   // server ignored `page` → stop, don't re-request the same rows
+    prevFirstId = rows[0]?.id
 
     const tx = db.transaction('products', 'readwrite')
     await Promise.all(rows.map(p => tx.store.put(toOfflineProduct(p))))
@@ -108,20 +144,25 @@ export async function syncCatalog(
   // ── Batches (full refresh every sync — quantities change on every sale,
   //    so there's no safe "updated_since" cursor for this one like there
   //    is for products; PAGE_SIZE paging still keeps memory bounded) ─────
-  page = 1
+  // GET /stock/batches is NOT paginated: routes/stock.js ignores `page`/`limit` and returns
+  // every in-stock batch company-wide in one response. The old page loop only stopped when a
+  // page held fewer than PAGE_SIZE rows, which a non-paginated endpoint never satisfies once a
+  // company has >= PAGE_SIZE batches — so it re-requested the identical full response
+  // (page=2, 3 … 83 …) until the rate limiter answered 429. One request is the complete set.
+  // If the endpoint ever starts returning `pagination`, honour it (bounded by MAX_PAGES).
   const seenBatchIds = new Set<string>()
-  for (;;) {
-    const res = await stockAPI.batches({ page, limit: PAGE_SIZE })
+  for (let batchPage = 1; ; batchPage++) {
+    assertNotRateLimited()
+    const res = await stockAPI.batches(batchPage === 1 ? undefined : { page: batchPage })
     const rows: StockBatch[] = res.data?.data || []
-    if (rows.length === 0) break
 
     const tx = db.transaction('batches', 'readwrite')
     await Promise.all(rows.map(b => { seenBatchIds.add(b.id); return tx.store.put(toOfflineBatch(b)) }))
     await tx.done
 
-    onProgress?.({ phase: 'batches', pagesLoaded: page })
-    if (rows.length < PAGE_SIZE) break
-    page++
+    onProgress?.({ phase: 'batches', pagesLoaded: batchPage })
+    const totalPages = (res.data as { pagination?: { totalPages?: number } } | undefined)?.pagination?.totalPages
+    if (!totalPages || batchPage >= totalPages || batchPage >= MAX_PAGES || rows.length === 0) break
   }
   // Batches that sold out (qty_remaining hit 0) drop out of the
   // /stock/batches response entirely — prune anything not seen in this
@@ -139,10 +180,14 @@ export async function syncCatalog(
 
   // ── Customers ───────────────────────────────────────────────────────────
   page = 1
+  prevFirstId = undefined
   for (;;) {
+    assertNotRateLimited()
     const res = await partiesAPI.customers({ page, limit: PAGE_SIZE })
     const rows: Party[] = res.data?.data || []
     if (rows.length === 0) break
+    if (rows[0]?.id === prevFirstId || page > MAX_PAGES) break
+    prevFirstId = rows[0]?.id
 
     const tx = db.transaction('parties', 'readwrite')
     await Promise.all(rows.map(p => tx.store.put(toOfflineParty(p))))

@@ -23,7 +23,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import useAuthStore from '@/store/authStore'
 import { useOnlineStatus } from '@/hooks/useOnlineStatus'
-import { syncCatalog } from './catalogSync'
+import { syncCatalog, CatalogSyncRateLimited } from './catalogSync'
 import { runSync, pendingSyncCount } from './syncEngine'
 import { enqueueSale, listQueue, retryQueueItem, discardQueueItem } from './syncQueue'
 import type { QueuedTransaction } from './db'
@@ -105,7 +105,8 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
       // (from the last successful sync) stays in place and offline
       // billing keeps working against it; this only means today's data
       // might be one sync cycle stale until the next successful attempt.
-      console.error('[offline] catalog sync failed', e)
+      if (e instanceof CatalogSyncRateLimited) console.warn('[offline]', e.message)
+      else console.error('[offline] catalog sync failed', e)
     }
     setSyncPhase('idle')
   }, [company?.id, isOnline, refreshPendingCount])
