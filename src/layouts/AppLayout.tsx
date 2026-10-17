@@ -6,7 +6,7 @@ import {
   Users, Truck, BookOpen, BookCopy,
   FileBarChart, Settings, LogOut, Building2, CalendarDays, Moon,
   Sun, Menu, X, AlertTriangle, Bell, Search, ChevronRight, Home,
-  PackageX, CalendarClock, Sparkles, ShieldAlert, ClipboardList, Building, ArrowLeftRight,
+  PackageX, CalendarClock, Sparkles, ShieldAlert, ClipboardList, Building, ArrowLeftRight, BarChart3,
 } from 'lucide-react'
 import useAuthStore from '@/store/authStore'
 import useUIStore from '@/store/uiStore'
@@ -45,6 +45,7 @@ const NAV = [
   { section: 'INVENTORY' },
   { to: PATHS.PRODUCTS,   label: 'Products',       icon: <Package         size={20} strokeWidth={1.8}/>, alertKey: 'lowStock' },
   { to: PATHS.STOCK_REGISTER, label: 'Stock Register', icon: <ClipboardList size={20} strokeWidth={1.8}/> },
+  { to: PATHS.STOCK_SUMMARY,  label: 'Stock & Sales Summary', icon: <BarChart3 size={20} strokeWidth={1.8}/> },
   { to: PATHS.PURCHASE_SUGGESTIONS, label: 'Smart Purchase Suggestions', icon: <Sparkles size={20} strokeWidth={1.8}/> },
 
   { section: 'ACCOUNTING' },
@@ -188,6 +189,7 @@ export default function AppLayout() {
     [PATHS.BARCODE_PRINT]: 'Barcode Print',
     [PATHS.QR_CODE_PRINT]: 'QR Code Print',
     [PATHS.STOCK_REGISTER]: 'Stock Register',   // must stay above STOCK ('/stock' is a prefix of it)
+    [PATHS.STOCK_SUMMARY]:  'Stock & Sales Summary',   // same: above STOCK
     [PATHS.STOCK]:      'Stock Report',
     [PATHS.PURCHASE_SUGGESTIONS]: 'Smart Purchase Suggestions',
     [PATHS.CREDIT_RISK]: 'Credit Risk Dashboard',

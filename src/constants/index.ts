@@ -148,6 +148,7 @@ export const PATHS = {
   MANUFACTURERS: '/manufacturers',
   STOCK:      '/stock',
   STOCK_REGISTER: '/stock-register',
+  STOCK_SUMMARY:  '/stock-summary',
   COMPANY_CUSTOMER_REPORT: '/company-vs-customer',
   CUSTOMER_COMPANY_REPORT: '/customer-vs-company',
   PURCHASE_SUGGESTIONS: '/purchase-suggestions',

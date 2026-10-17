@@ -245,6 +245,8 @@ export interface StockRegisterRow {
   key: string; date: string; inv_no: string; batch: string; particular: string; narration: string
   ty: string; qty_in: number; qty_out: number; balance: number; qty_free: number
   rate: number; store: string; mrp: number; expiry: string
+  /** 1 when the free qty also moves stock (purchases/receipts/entries); 0 for sale bonus (reference only). */
+  free_effect?: number
 }
 export interface StockRegisterReport {
   product: { id: string; item_code: string; name: string; unit?: string }
@@ -254,12 +256,50 @@ export interface StockRegisterReport {
   totals: { qty_in: number; qty_out: number; qty_free: number; opening_balance: number; closing_balance: number }
   reconciliation: { register_closing_all_time: number; current_stock: number; matches: boolean }
 }
-export interface StockRegisterParams { product_id: string; from?: string; to?: string; store?: string; include_adj?: boolean }
+export interface StockRegisterParams {
+  product_id: string; from?: string; to?: string; store?: string; include_adj?: boolean
+  batch?: string; expiry_from?: string; expiry_to?: string
+}
 export const stockRegisterAPI = {
   get:    (params: StockRegisterParams) => http.get<ApiResponse<StockRegisterReport>>('/stock-register', { params }),
   lookup: (code: string)                => http.get<ApiResponse<{ id: string; item_code: string; name: string; unit?: string }>>('/stock-register/lookup', { params: { code } }),
   stores: ()                            => http.get<ApiResponse<{ id: string; name: string }[]>>('/stock-register/stores'),
   exportCsv: (params: StockRegisterParams) => http.get('/stock-register/export', { params, responseType: 'blob' }),
+}
+
+// ─── Stock & Sales Summary ────────────────────────────────────────────────────
+export interface StockSummaryRow {
+  id: string; item_code: string; name: string; unit: string; company_name: string; category: string; is_active: boolean
+  opening: number; purchased: number; received: number; free_in: number; purchase_returns: number
+  sold: number; free_out: number; sales_returns: number; adjustments: number; closing: number
+  rate: number; stock_value: number; purchase_value: number; sales_value: number; sales_discount: number
+  sales_return_value: number; min_stock: number; status: 'ok' | 'low' | 'out'
+}
+export interface StockSummaryTotals {
+  total_products: number; opening: number; purchased: number; received: number; free_in: number
+  purchase_returns: number; sold: number; free_out: number; sales_returns: number; adjustments: number
+  closing: number; stock_value: number; purchase_value: number; sales_value: number; sales_discount: number
+  sales_return_value: number; net_sales_value: number; low_stock_count: number; out_of_stock_count: number
+}
+export interface StockSummaryParams {
+  from: string; to: string; company?: string; category?: string; search?: string; supplier_id?: string
+  batch?: string; expiry_from?: string; expiry_to?: string; include_inactive?: boolean
+  stock_status?: 'all' | 'in_stock' | 'low' | 'zero'; include_discount?: boolean
+  sort_by?: string; sort_dir?: 'asc' | 'desc'; page?: number; limit?: number; all?: boolean
+}
+export interface StockSummaryReport {
+  filters: Record<string, unknown>
+  rows: StockSummaryRow[]
+  totals: StockSummaryTotals
+  pagination: { page: number; limit: number; total: number; pages: number }
+}
+export interface StockBatchRow { batch_no: string; expiry: string; opening: number; qty_in: number; qty_out: number; closing: number }
+export const stockSummaryAPI = {
+  get:       (params: StockSummaryParams) => http.get<ApiResponse<StockSummaryReport>>('/stock-register/summary', { params }),
+  filters:   ()                           => http.get<ApiResponse<{ companies: string[]; categories: string[] }>>('/stock-register/summary/filters'),
+  batches:   (params: { product_id: string; from: string; to: string; batch?: string; expiry_from?: string; expiry_to?: string }) =>
+               http.get<ApiResponse<StockBatchRow[]>>('/stock-register/summary/batches', { params }),
+  exportCsv: (params: StockSummaryParams) => http.get('/stock-register/summary/export', { params, responseType: 'blob' }),
 }
 
 // ─── Company vs Customer report ────────────────────────────────────────────────
