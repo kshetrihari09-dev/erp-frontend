@@ -125,23 +125,41 @@ export function computeItemDiscounts(
   const pctById: Record<number, number> = {}
   let totalDiscount = 0
 
+  // The backend applies discount_pct to the goods value only
+  // (qty × rate — CC is never discounted; see routes/sales.js and
+  // routes/purchases.js), while the on-screen discount is worked out
+  // against row.amount (goods + CC). `pctFor` converts "Rs. X of
+  // discount allocated to this row" into the percentage of qty × rate
+  // that makes the server deduct exactly X, so the figure on screen,
+  // the saved amount and the printed invoice all agree even when a row
+  // carries both CC and a discount. When a row has no CC, goods ===
+  // row.amount and this is identical to the previous behaviour.
+  const pctFor = (r: InvoiceRow, share: number): number => {
+    const goods = (Number(r.qty) || 0) * (Number(r.rate) || 0)
+    return goods > 0 ? Math.min(100, (share / goods) * 100) : 0
+  }
+
   if (scope === 'invoice') {
     const rowsIn  = validRows(rows)
     const subtotal = rowsIn.reduce((s, r) => s + r.amount, 0)
     const discAmt  = discountAmountFor(invoiceDiscount, subtotal)
-    const pct      = subtotal > 0 ? (discAmt / subtotal) * 100 : 0
-    rowsIn.forEach(r => { pctById[r._id] = pct })
+    rowsIn.forEach(r => {
+      const share = subtotal > 0 ? discAmt * (r.amount / subtotal) : 0
+      pctById[r._id] = pctFor(r, share)
+    })
     totalDiscount  = discAmt
   } else if (scope === 'company') {
     buildCompanyGroups(rows, products, companyDiscounts).forEach(g => {
       totalDiscount += g.discountAmount
-      const pct = g.subtotal > 0 ? (g.discountAmount / g.subtotal) * 100 : 0
-      g.rows.forEach(r => { pctById[r._id] = pct })
+      g.rows.forEach(r => {
+        const share = g.subtotal > 0 ? g.discountAmount * (r.amount / g.subtotal) : 0
+        pctById[r._id] = pctFor(r, share)
+      })
     })
   } else {
     buildProductRows(rows, products, productDiscounts).forEach(pr => {
       totalDiscount += pr.discountAmount
-      pctById[pr.row._id] = pr.row.amount > 0 ? (pr.discountAmount / pr.row.amount) * 100 : 0
+      pctById[pr.row._id] = pctFor(pr.row, pr.discountAmount)
     })
   }
 

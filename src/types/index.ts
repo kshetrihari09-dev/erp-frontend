@@ -445,16 +445,26 @@ export interface PurchaseItem {
   bonus?:       number
   rate:         number
   vat_pct?:     number
+  /** Per-line discount % — same field/meaning as SaleItem.discount_pct
+   *  (migration 043). Absent/0 on bills saved before the Purchase page
+   *  gained discounts. */
+  discount_pct?: number
+  cc_pct?:      number
+  cc_amount?:   number
   amount:       number
 }
 
 export interface Purchase {
   id:            string
   bill_no:       string
+  supplier_bill_no?: string | null
   date_ad:       string
   party_id?:     string
   party_name?:   string
   payment_mode:  PaymentMode
+  /** Sum of already-discounted line amounts (same meaning as Sale.subtotal). */
+  subtotal?:     number
+  cc_amount?:    number
   net_total:     number
   /** Difference applied to reach a whole-number Grand Total (nearest rupee).
    *  0 (or absent, for bills posted before this field existed) means no

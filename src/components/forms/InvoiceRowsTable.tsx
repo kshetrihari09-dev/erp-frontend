@@ -113,7 +113,8 @@ const InvoiceRowsTable = forwardRef<InvoiceRowsTableHandle, Props>(function Invo
         const p = products.find(x => x.id === val)
         if (p) {
           updated.product_name = p.name
-          updated.rate         = p.sales_rate
+          // Purchase mode must default to the purchase rate, not the selling price.
+          updated.rate         = mode === 'purchase' ? p.purchase_rate : p.sales_rate
         }
       }
       const { amount, cc_amount } = calcRowAmount({
@@ -161,7 +162,7 @@ const InvoiceRowsTable = forwardRef<InvoiceRowsTableHandle, Props>(function Invo
         ...r,
         product_id:   p.id,
         product_name: p.name,
-        rate:         p.sales_rate,
+        rate:         mode === 'purchase' ? p.purchase_rate : p.sales_rate,
         // A previously-picked batch belongs to the OLD product — carrying
         // it over would silently submit the wrong batch. The new
         // BatchSelect fetches this product's own batches fresh and the

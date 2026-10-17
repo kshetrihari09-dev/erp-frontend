@@ -202,7 +202,7 @@ export const purchasesAPI = {
   get:    (id: string)      => http.get<ApiResponse<Purchase>>(`/purchases/${id}`),
   create: (data: {
     party_id?: string; date_ad: string; payment_mode: string;
-    supplier_bill_no?: string; items: PurchaseItem[]; purchase_order_id?: string
+    supplier_bill_no?: string; notes?: string; items: PurchaseItem[]; purchase_order_id?: string
     /** Links this purchase back to a Scan Purchase Bill session (migration 039)
      *  — see routes/purchases.js and PurchasePage.tsx's handleScanExtracted. */
     source_scan_id?: string
