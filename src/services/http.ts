@@ -15,7 +15,8 @@ import { getEffectiveApiBaseUrl } from '@/config/serverConnection'
 import { RAW_TOKEN_KEY, REFRESH_TOKEN_KEY as AUTH_REFRESH_KEY } from '@/store/authStore'
 import { getValidStepUpToken, clearStepUpToken } from './stepUpToken'
 import useUIStore from '@/store/uiStore'
-import { noteRateLimited, parseRetryAfterMs, readHeader } from './rateLimitState'
+import { noteRateLimited, parseRetryAfterMs, readHeader, classifyRateLimit, scopeForLimiter } from './rateLimitState'
+import { createRequestGuard } from './requestGuard'
 
 // REFRESH_TOKEN_KEY is exported from authStore.ts
 export { AUTH_REFRESH_KEY as REFRESH_TOKEN_KEY }
@@ -28,12 +29,22 @@ const http = axios.create({
   withCredentials: false,
 })
 
+// Cooldown gate + in-flight GET dedupe + per-caller cancellation (see requestGuard.ts).
+// Must wrap axios' real adapter, so it is installed once right after creation.
+http.defaults.adapter = createRequestGuard({ base: axios.getAdapter(http.defaults.adapter) })
+
 // ─── Token refresh state ───────────────────────────────────────────────────────
+// Requests that hit a 401 while a refresh is already running wait here. They are
+// settled on BOTH outcomes — previously a failed refresh left them pending forever.
 let isRefreshing       = false
-let refreshSubscribers: Array<(token: string) => void> = []
+let refreshSubscribers: Array<{ ok: (token: string) => void; fail: (err: unknown) => void }> = []
 
 function onRefreshDone(token: string) {
-  refreshSubscribers.forEach(cb => cb(token))
+  refreshSubscribers.forEach(s => s.ok(token))
+  refreshSubscribers = []
+}
+function onRefreshFailed(err: unknown) {
+  refreshSubscribers.forEach(s => s.fail(err))
   refreshSubscribers = []
 }
 
@@ -48,13 +59,16 @@ function onRefreshDone(token: string) {
 const RATE_LIMIT_TOAST_COOLDOWN_MS = 10_000
 let lastRateLimitToastAt = 0
 
-function notifyRateLimited() {
+function notifyRateLimited(waitMs: number | null) {
   const now = Date.now()
   if (now - lastRateLimitToastAt < RATE_LIMIT_TOAST_COOLDOWN_MS) return
   lastRateLimitToastAt = now
+  const secs = waitMs && waitMs > 0 ? Math.ceil(waitMs / 1000) : null
   useUIStore.getState().warning(
     'Too many requests',
-    'Please wait a moment and try again.',
+    secs
+      ? `Please wait ${secs >= 90 ? `${Math.ceil(secs / 60)} minutes` : `${secs} seconds`} and try again.`
+      : 'Please wait a moment and try again.',
   )
 }
 
@@ -102,7 +116,11 @@ http.interceptors.request.use(
 
     return config_
   },
-  (error) => Promise.reject(error)
+  (error) => Promise.reject(error),
+  // `synchronous` makes axios dispatch the request in the SAME tick as the http.get()
+  // call, which is what lets requestSignal.ts attach the caller's AbortSignal.
+  // (Every request interceptor must be synchronous for this to hold.)
+  { synchronous: true },
 )
 
 // ─── Response interceptor — handle errors + token refresh ─────────────────────
@@ -130,12 +148,22 @@ http.interceptors.response.use(
       console.error(`[API ✗] ${status || 'NET'}:`, rawMessage, error.config?.url)
     }
 
-    // ── 429: server asked us to slow down — surface it, never hammer it ────
+    // ── 429: classify WHO said it (rateLimitState.ts), then react accordingly ───
+    //  - traffic limiter / nginx / unknown infra  → remember Retry-After so pollers and reads wait it out
+    //  - application rule (PIN lockout, OTP quota) → NOT traffic: no cooldown, the caller shows its message
+    //  - our own client gate                       → already cooling down: just surface it
+    let retryAfterMs: number | null = null
+    let rateLimitKind: string | null = null
     if (status === 429) {
-      // Remember Retry-After so background pollers wait it out (rateLimitState.ts).
-      // Needs `Retry-After` in the backend's CORS exposedHeaders (server.js) to be readable cross-origin.
-      noteRateLimited(parseRetryAfterMs(readHeader(error.response?.headers, 'retry-after')))
-      notifyRateLimited()
+      const body = error.response?.data
+      const info = classifyRateLimit(error.response?.headers, body)
+      rateLimitKind = info.kind
+      retryAfterMs = parseRetryAfterMs(readHeader(error.response?.headers, 'retry-after'))
+      if (info.kind === 'limiter' || info.kind === 'proxy' || info.kind === 'unknown') {
+        // Needs `Retry-After` in the backend's CORS exposedHeaders (server.js) to be readable cross-origin.
+        noteRateLimited(retryAfterMs, Date.now(), scopeForLimiter(info.limiter))
+      }
+      if (info.kind !== 'application') notifyRateLimited(retryAfterMs)
     }
 
     // ── 401: attempt silent token refresh ──────────────────────────────────
@@ -148,10 +176,13 @@ http.interceptors.response.use(
       }
 
       if (isRefreshing) {
-        return new Promise(resolve => {
-          refreshSubscribers.push(newToken => {
-            originalRequest.headers.Authorization = `Bearer ${newToken}`
-            resolve(http(originalRequest))
+        return new Promise((resolve, reject) => {
+          refreshSubscribers.push({
+            ok: newToken => {
+              originalRequest.headers.Authorization = `Bearer ${newToken}`
+              resolve(http(originalRequest))
+            },
+            fail: reject,
           })
         })
       }
@@ -172,15 +203,30 @@ http.interceptors.response.use(
         onRefreshDone(newToken)
         originalRequest.headers.Authorization = `Bearer ${newToken}`
         return http(originalRequest)
-      } catch {
-        clearAuthAndRedirect()
-        return Promise.reject({ message: 'Session expired. Please log in again.', status: 401, errors: null, original: error })
+      } catch (refreshErr) {
+        // Only a REJECTED refresh token ends the session. A rate-limited (429), 5xx or
+        // offline refresh says nothing about the token — logging the user out there turned
+        // a brief throttle into a forced re-login.
+        const refreshStatus = (refreshErr as AxiosError | undefined)?.response?.status
+        const sessionIsDead = refreshStatus === 400 || refreshStatus === 401 || refreshStatus === 403 || refreshStatus === undefined && !(refreshErr as AxiosError | undefined)?.isAxiosError
+        if (sessionIsDead) {
+          clearAuthAndRedirect()
+          const dead = { message: 'Session expired. Please log in again.', status: 401, errors: null, original: error }
+          onRefreshFailed(dead)
+          return Promise.reject(dead)
+        }
+        const transient = {
+          message: (refreshErr as AxiosError<{ message?: string }>)?.response?.data?.message || 'Could not refresh your session. Please try again.',
+          status: refreshStatus, errors: null, original: error,
+        }
+        onRefreshFailed(transient)
+        return Promise.reject(transient)
       } finally {
         isRefreshing = false
       }
     }
 
-    return Promise.reject({ message: rawMessage, status, errors, code, retryable, original: error })
+    return Promise.reject({ message: rawMessage, status, errors, code, retryable, retryAfterMs, rateLimitKind, original: error })
   }
 )
 

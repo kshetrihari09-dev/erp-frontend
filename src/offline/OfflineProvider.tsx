@@ -131,7 +131,12 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
   // Periodic light refresh while online (see docblock).
   useEffect(() => {
     if (!isOnline || !company?.id) return
-    const id = setInterval(() => { syncCatalog(company.id).catch(() => {}) }, CATALOG_REFRESH_INTERVAL_MS)
+    const id = setInterval(() => {
+      // A hidden tab has nobody to benefit from a multi-page catalog sync; the next tick after it
+      // becomes visible again picks up. (Avoids background tabs spending the shared rate budget.)
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
+      syncCatalog(company.id).catch(() => {})
+    }, CATALOG_REFRESH_INTERVAL_MS)
     return () => clearInterval(id)
   }, [isOnline, company?.id])
 

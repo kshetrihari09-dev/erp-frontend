@@ -14,6 +14,10 @@
  *  - Failures back off exponentially (base·2^(n-1), capped). A 429 is never
  *    retried before Retry-After (and never before any other 429's Retry-After
  *    recorded in rateLimitState) has elapsed.
+ *  - `setPaused(true)` (e.g. tab hidden) schedules NOTHING: no timers fire and no
+ *    requests are sent. On `setPaused(false)` the next attempt is due relative to
+ *    the last real attempt, so a tab hidden for an hour polls once immediately
+ *    (catch-up) — still subject to any Retry-After / backoff floor.
  *  - A scope change (different user/company) drops cached data and polls
  *    immediately; `reset()` (logout) stops everything and forgets all state.
  */
@@ -47,10 +51,15 @@ export interface PollingLoop<T> {
   retain(scope: string): () => void
   subscribe(listener: () => void): () => void
   getSnapshot(): PollState<T>
+  /** Pause/resume polling without losing data or timing (tab hidden/visible). Idempotent. */
+  setPaused(paused: boolean): void
+  /** Re-arm the timer now, e.g. after getIntervalMs() would return a different value. */
+  poke(): void
   /** Stop everything and forget data/timing (logout). Does not touch retain counts. */
   reset(): void
   /** Diagnostics / tests */
   readonly isRunning: boolean
+  readonly isPaused: boolean
   readonly retainCount: number
 }
 
@@ -77,6 +86,7 @@ export function createPollingLoop<T>(opts: PollingLoopOptions<T>): PollingLoop<T
   let retained = 0
   let scope: string | null = null
   let running = false
+  let paused = false
   let timer: unknown = null
   let controller: AbortController | null = null
   let inFlight = false
@@ -100,7 +110,7 @@ export function createPollingLoop<T>(opts: PollingLoopOptions<T>): PollingLoop<T
 
   function schedule() {
     clearScheduled()
-    if (!running) return
+    if (!running || paused) return
     const t = now()
     const interval = state.failureCount > 0 ? backoffMs(state.failureCount) : opts.getIntervalMs()
     const due = Math.max(
@@ -113,7 +123,7 @@ export function createPollingLoop<T>(opts: PollingLoopOptions<T>): PollingLoop<T
 
   async function tick() {
     timer = null
-    if (!running || inFlight) return
+    if (!running || paused || inFlight) return
     // Another request (any endpoint) may have hit a 429 after this timer was armed.
     if (getRateLimitedUntil() > now()) { schedule(); return }
     if (opts.canRun && !opts.canRun()) { lastAttemptAt = now(); schedule(); return }   // e.g. offline: wait a full interval
@@ -188,6 +198,13 @@ export function createPollingLoop<T>(opts: PollingLoopOptions<T>): PollingLoop<T
       return () => { listeners.delete(listener) }
     },
     getSnapshot: () => state,
+    setPaused(next: boolean) {
+      if (paused === next) return
+      paused = next
+      if (paused) clearScheduled()          // an in-flight request may finish; it will not re-arm while paused
+      else if (running) schedule()          // due = lastAttemptAt + interval → fires now if overdue
+    },
+    poke() { if (running && !paused) schedule() },
     reset() {
       stop()
       scope = null
@@ -196,6 +213,7 @@ export function createPollingLoop<T>(opts: PollingLoopOptions<T>): PollingLoop<T
       emit(empty())
     },
     get isRunning() { return running },
+    get isPaused() { return paused },
     get retainCount() { return retained },
   }
 }

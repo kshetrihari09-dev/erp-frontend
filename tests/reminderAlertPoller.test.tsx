@@ -97,3 +97,18 @@ test('switching company/user restarts for the new scope immediately without a se
   assert.equal(calls.length, 2)
   await advance(60_000); assert.equal(calls.length, 3, 'still exactly one request per interval')
 })
+
+// ── hidden tab ────────────────────────────────────────────────────────────────
+function setVisibility(state: 'hidden' | 'visible') {
+  Object.defineProperty(document, 'visibilityState', { value: state, configurable: true })
+  document.dispatchEvent(new window.Event('visibilitychange'))
+}
+test('hidden tab: polling pauses (no requests), and ONE catch-up request is sent when it is visible again', async () => {
+  render(<Probe />); await advance(0); assert.equal(calls.length, 1)
+  await act(async () => { setVisibility('hidden') })
+  await advance(10 * 60_000); assert.equal(calls.length, 1, '10 minutes hidden → zero requests')
+  await act(async () => { setVisibility('visible') }); await advance(0)
+  assert.equal(calls.length, 2, 'immediate catch-up')
+  await advance(60_000); assert.equal(calls.length, 3, 'normal cadence resumes')
+  Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true })
+})

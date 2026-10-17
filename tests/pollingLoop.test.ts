@@ -157,3 +157,57 @@ test('canRun=false (offline) pauses requests without spinning', async () => {
   await clock.advance(59_000); assert.equal(count(), 0)
   online = true; await clock.advance(1_000); assert.equal(count(), 1)
 })
+
+// ── pause / resume (hidden tab) ───────────────────────────────────────────────
+test('setPaused(true): no timers, no requests across many intervals', async () => {
+  const { clock, loop, count } = make(async () => 'ok')
+  loop.retain('s'); await clock.advance(0); assert.equal(count(), 1)
+  loop.setPaused(true)
+  assert.equal(clock.pending(), 0, 'pausing cancels the scheduled timer')
+  await clock.advance(30 * 60_000)
+  assert.equal(count(), 1, 'nothing sent while paused')
+  assert.equal(loop.isPaused, true)
+})
+
+test('resume after a long pause sends exactly ONE catch-up request immediately, then resumes the normal cadence', async () => {
+  const { clock, loop, count } = make(async () => 'ok')
+  loop.retain('s'); await clock.advance(0)
+  loop.setPaused(true); await clock.advance(60 * 60_000)
+  loop.setPaused(false); await clock.advance(0)
+  assert.equal(count(), 2, 'one catch-up poll, not one per missed interval')
+  await clock.advance(60_000); assert.equal(count(), 3)
+})
+
+test('resume shortly after pausing does not fire early (cadence is relative to the last real attempt)', async () => {
+  const { clock, loop, count } = make(async () => 'ok')
+  loop.retain('s'); await clock.advance(0)
+  await clock.advance(10_000)
+  loop.setPaused(true); loop.setPaused(false); await clock.advance(0)
+  assert.equal(count(), 1)
+  await clock.advance(50_000); assert.equal(count(), 2)
+})
+
+test('a request in flight when paused finishes but does not re-arm the timer', async () => {
+  let release!: () => void
+  const { clock, loop, count } = make(() => new Promise(r => { release = () => r('ok') }))
+  loop.retain('s'); await clock.advance(0); assert.equal(count(), 1)
+  loop.setPaused(true)
+  release(); for (let i = 0; i < 10; i++) await Promise.resolve()
+  assert.equal(clock.pending(), 0)
+  await clock.advance(10 * 60_000); assert.equal(count(), 1)
+})
+
+test('resume still honours an active Retry-After / rate-limit cooldown', async () => {
+  const { clock, loop, count } = make(async (n) => { if (n === 1) throw err429('300'); return 'ok' })
+  loop.retain('s'); await clock.advance(0); assert.equal(count(), 1)
+  loop.setPaused(true); await clock.advance(60_000); loop.setPaused(false)
+  await clock.advance(0); assert.equal(count(), 1, 'cooldown (300s) not over yet')
+  await clock.advance(250_000); assert.equal(count(), 2)
+})
+
+test('setPaused is idempotent and works before the loop is retained', async () => {
+  const { clock, loop, count } = make(async () => 'ok')
+  loop.setPaused(true); loop.setPaused(true)
+  loop.retain('s'); await clock.advance(5 * 60_000); assert.equal(count(), 0, 'retained while paused → still silent')
+  loop.setPaused(false); await clock.advance(0); assert.equal(count(), 1)
+})

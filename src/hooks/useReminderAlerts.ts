@@ -12,9 +12,11 @@ import { reminderAlertPoller } from '@/services/reminderAlertPoller'
  *  it has no Retry-After awareness. This reads the single module-level
  *  poller (services/reminderAlertPoller.ts): one loop per tab no matter how
  *  many components use this hook, 60 s default interval, exponential backoff
- *  on failure, 429 honours Retry-After. It still polls while the tab is in
- *  the background (a reminder alarm is pointless if it only fires when the
- *  Reminders page is open) and stops on unmount / logout. */
+ *  on failure, 429 honours Retry-After. It keeps polling on every page of the
+ *  app (a reminder alarm is pointless if it only fires when the Reminders page
+ *  is open), but PAUSES while the browser tab is hidden and sends one catch-up
+ *  request when the tab is visible again (see reminderAlertPoller.ts for the
+ *  VITE_NOTIFICATION_POLL_HIDDEN_INTERVAL_MS opt-out). Stops on unmount / logout. */
 export function useReminderAlerts() {
   const userId    = useAuthStore((s) => s.user?.id)
   const companyId = useAuthStore((s) => s.company?.id)

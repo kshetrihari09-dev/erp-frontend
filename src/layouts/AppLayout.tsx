@@ -13,8 +13,8 @@ import useUIStore from '@/store/uiStore'
 import { PATHS } from '@/constants'
 import { initials, cn } from '@/utils'
 import { todayBS as computeTodayBS } from '@/utils/nepaliDate'
-import { authAPI, reportsAPI } from '@/services/api'
-import { useReminderCounts } from '@/hooks/useQuery'
+import { authAPI } from '@/services/api'
+import { useReminderCounts, useDashboard } from '@/hooks/useQuery'
 import ToastContainer from '@/components/shared/ToastContainer'
 import ReminderAlarmWatcher from '@/components/reminders/ReminderAlarmWatcher'
 import CompanySwitcher from '@/modules/company/CompanySwitcher'
@@ -144,13 +144,15 @@ export default function AppLayout() {
     document.documentElement.classList.toggle('dark', theme === 'dark')
   }, [])
 
-  // Load alerts
+  // Sidebar alert counts come from the SAME react-query entry the Dashboard page uses
+  // (useDashboard). Previously this layout called reportsAPI.dashboard() itself on every
+  // mount, so each Dashboard visit sent /reports/dashboard twice — and that endpoint is on
+  // the heavy "reports" rate-limit tier.
+  const { data: dashboardData } = useDashboard()
   useEffect(() => {
-    reportsAPI.dashboard().then((r) => {
-      const d = r.data.data
-      setAlerts({ lowStock: d?.low_stock_items || 0, expiry: d?.expiry_alerts || 0 })
-    }).catch(() => {})
-  }, [])
+    const d = dashboardData as { low_stock_items?: number; expiry_alerts?: number } | undefined
+    if (d) setAlerts({ lowStock: d.low_stock_items || 0, expiry: d.expiry_alerts || 0 })
+  }, [dashboardData])
 
   // BS date — computed locally now that nepali-date-converter is
   // available client-side, instead of a separate authenticated fetch to

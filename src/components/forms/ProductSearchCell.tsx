@@ -48,6 +48,7 @@ import {
 import { createPortal } from 'react-dom'
 import { Search, Plus, PackageSearch, Loader2 } from 'lucide-react'
 import { productsAPI, scannerAPI } from '@/services/api'
+import { runWithSignal } from '@/services/requestSignal'
 import type { Product } from '@/types'
 import QuickAddModal from './QuickAddModal'
 import { useOffline } from '@/offline/OfflineProvider'
@@ -231,28 +232,33 @@ const ProductSearchCell = forwardRef<ProductSearchCellHandle, Props>(function Pr
         }
         return
       }
+      // Cancel the previous in-flight search: while typing, every superseded request is
+      // aborted at the network layer instead of finishing and counting against the rate limit.
+      abortRef.current?.abort()
+      const controller = new AbortController()
+      abortRef.current = controller
       try {
-        const res = await productsAPI.search(trimmed, 20)
+        const res = await runWithSignal(controller.signal, () => productsAPI.search(trimmed, 20))
+        if (controller.signal.aborted) return          // a newer search owns the results/loading state now
         setResults(res.data.data || [])
       } catch (err: any) {
-        if (err?.name !== 'CanceledError' && err?.code !== 'ERR_CANCELED') {
-          // Real network failure mid-search (connection dropped just as
-          // the user typed) — same offline fallback as the isOnline-false
-          // branch above, rather than showing "no product found" for
-          // something that's actually in the offline catalog.
-          if (isNetworkError(err) && companyId) {
-            try {
-              const offline = await searchProductsOffline(companyId, trimmed, 20)
-              setResults(offline.map(toProduct))
-            } catch {
-              setResults([])
-            }
-          } else {
+        if (controller.signal.aborted || err?.name === 'CanceledError' || err?.original?.code === 'ERR_CANCELED') return
+        // Real network failure mid-search (connection dropped just as
+        // the user typed) — same offline fallback as the isOnline-false
+        // branch above, rather than showing "no product found" for
+        // something that's actually in the offline catalog.
+        if (isNetworkError(err) && companyId) {
+          try {
+            const offline = await searchProductsOffline(companyId, trimmed, 20)
+            setResults(offline.map(toProduct))
+          } catch {
             setResults([])
           }
+        } else {
+          setResults([])
         }
       } finally {
-        setLoading(false)
+        if (!controller.signal.aborted) setLoading(false)
       }
     }, 200)
   }, [isOnline, companyId])

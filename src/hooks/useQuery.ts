@@ -1,5 +1,7 @@
-import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
-import type { UseQueryOptions } from '@tanstack/react-query'
+import { useQuery as useRQQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
+import type { UseQueryOptions, QueryKey, DefaultError, UseQueryResult } from '@tanstack/react-query'
+import { runWithSignal } from '@/services/requestSignal'
+import { purchaseScanPollInterval, REMINDER_COUNTS_POLL_MS } from './pollIntervals'
 import { QK, DEFAULT_PAGE_SIZE } from '@/constants'
 import {
   productsAPI, salesAPI, purchasesAPI, partiesAPI, accountingAPI,
@@ -19,6 +21,24 @@ const unwrapPaginated = <T>(res: { data: { data: T; pagination?: unknown } }) =>
   ({ data: res.data.data, pagination: res.data.pagination })
 
 // ─── Products ─────────────────────────────────────────────────────────────────
+/**
+ * Drop-in replacement for react-query's useQuery used by every hook in this file.
+ * It hands the query's AbortSignal to the HTTP layer (services/requestSignal.ts), so when
+ * the params change, the component unmounts or a newer fetch supersedes an in-flight one,
+ * the obsolete request is really cancelled instead of finishing in the background and
+ * counting against the rate limit. Identical concurrent GETs are merged by the request
+ * guard (services/requestGuard.ts).
+ */
+function useQuery<TQueryFnData = unknown, TError = DefaultError, TData = TQueryFnData, TQueryKey extends QueryKey = QueryKey>(
+  options: UseQueryOptions<TQueryFnData, TError, TData, TQueryKey>,
+): UseQueryResult<TData, TError> {
+  const original = options.queryFn
+  const queryFn = typeof original === 'function'
+    ? ((ctx: Parameters<typeof original>[0]) => runWithSignal(ctx.signal, () => (original as (c: typeof ctx) => unknown)(ctx))) as typeof original
+    : original
+  return useRQQuery({ ...options, queryFn })
+}
+
 export function useProducts(params?: Record<string, unknown>) {
   return useQuery({
     queryKey: [QK.PRODUCTS, params],
@@ -618,10 +638,9 @@ export function usePurchaseScan(id: string | null) {
     queryKey: ['purchase-scan', id],
     queryFn: () => purchaseScansAPI.get(id!).then(unwrap),
     enabled: !!id,
-    refetchInterval: (query) => {
-      const status = (query.state.data as any)?.status
-      return status === 'uploaded' || status === 'processing' ? 2000 : false
-    },
+    // Adaptive + bounded, stops on completion / permanent error, honours Retry-After on 429
+    // (see hooks/pollIntervals.ts). The next poll is scheduled only after the current one settles.
+    refetchInterval: (query) => purchaseScanPollInterval(query.state as never),
   })
 }
 
@@ -653,9 +672,10 @@ export function useReminderCounts() {
     queryKey: [QK.REMINDER_COUNTS],
     queryFn:  () => remindersAPI.counts().then(unwrap),
     // Counts drive the sidebar's overdue badge (AppLayout.tsx) as well as
-    // this page — a short refetch interval keeps "Overdue: 3" from going
+    // this page — a modest refetch interval keeps "Overdue: 3" from going
     // stale while the app just sits open, without needing a websocket.
-    refetchInterval: 60_000,
+    refetchInterval: REMINDER_COUNTS_POLL_MS,
+    staleTime: 60_000,
   })
 }
 

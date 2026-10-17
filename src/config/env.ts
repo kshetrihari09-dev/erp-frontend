@@ -39,6 +39,16 @@ function parsePollInterval(raw: unknown): number {
   return Math.max(MIN_NOTIFICATION_POLL_MS, Math.round(n))
 }
 
+// Poll interval while the tab is hidden. 0 (default) = pause completely and catch up with one
+// request when the tab becomes visible again. A positive value (min 5 min) keeps a slow
+// background poll, e.g. for an always-open reminder-alarm station.
+const MIN_HIDDEN_POLL_MS = 5 * 60_000
+function parseHiddenPollInterval(raw: unknown): number {
+  const n = Number(raw)
+  if (!raw || !Number.isFinite(n) || n <= 0) return 0
+  return Math.max(MIN_HIDDEN_POLL_MS, Math.round(n))
+}
+
 // ── Validation — crash early if critical vars are missing ──────────────────────
 // In LAN mode there's deliberately no fixed backend baked in — the server is
 // chosen at runtime via the pre-login connect screen (config/serverConnection.ts)
@@ -88,6 +98,7 @@ export const config = {
 
   // Polling
   notificationPollIntervalMs: parsePollInterval(import.meta.env.VITE_NOTIFICATION_POLL_INTERVAL_MS),
+  notificationHiddenPollIntervalMs: parseHiddenPollInterval(import.meta.env.VITE_NOTIFICATION_POLL_HIDDEN_INTERVAL_MS),
 
   // Backend info
   backendUrl:    backendBase,
