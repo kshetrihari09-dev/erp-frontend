@@ -8,16 +8,13 @@
  * filters too (never the unapplied draft).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import {
-  BarChart3, Download, Printer, RotateCcw, Filter, Package, PackageX, AlertTriangle, ArrowUp, ArrowDown,
-  ArrowUpDown, DollarSign, ShoppingCart, ShoppingBag, Boxes, TrendingUp,
-} from 'lucide-react'
+import { Download, Printer, RotateCcw, Filter, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
 import {
   stockSummaryAPI, stockRegisterAPI, partiesAPI,
   type StockSummaryParams, type StockSummaryReport, type StockSummaryRow, type StockBatchRow, type StockRegisterReport,
 } from '@/services/api'
 import useUIStore from '@/store/uiStore'
-import { Button, StatCard, Pagination, SkeletonRows, Empty, Alert, Modal, Tabs, Badge } from '@/components/ui'
+import { Button, Pagination, SkeletonRows, Empty, Alert, Modal, Tabs, Badge } from '@/components/ui'
 import { DateRangeFilter } from '@/components/ui/DateRangePopup'
 import DateSystemInput from '@/components/shared/DateSystemInput'
 import { fmt } from '@/utils'
@@ -281,20 +278,6 @@ export default function StockSummaryPage() {
           <Button variant="secondary" size="sm" onClick={() => void load()}>Retry</Button>
         </div>
       )}
-
-      {/* ── Totals (server-computed over ALL filtered products) ─────────────── */}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 mb-4">
-        <StatCard label="Total Products"    value={t ? String(t.total_products) : '–'}  color="var(--teal)"   icon={<Package size={20} strokeWidth={1.8}/>} />
-        <StatCard label="Opening Stock"     value={t ? num(t.opening) : '–'}           color="var(--brand)"  icon={<Boxes size={20} strokeWidth={1.8}/>} sub="Units before From date" />
-        <StatCard label="Purchased Qty"     value={t ? num(t.purchased) : '–'}         color="var(--blue, var(--brand))" icon={<ShoppingBag size={20} strokeWidth={1.8}/>} sub={t ? `+ ${num(t.free_in)} free, ${num(t.received)} receipts` : undefined} />
-        <StatCard label="Sold Qty"          value={t ? num(t.sold) : '–'}              color="var(--green, var(--brand))" icon={<ShoppingCart size={20} strokeWidth={1.8}/>} sub={t ? `${num(t.sales_returns)} returned` : undefined} />
-        <StatCard label="Closing Stock"     value={t ? num(t.closing) : '–'}           color="var(--purple)" icon={<Boxes size={20} strokeWidth={1.8}/>} sub="Units on To date" />
-        <StatCard label="Total Sales Value" value={t ? fmt(t.sales_value) : '–'}       color="var(--green, var(--brand))" icon={<TrendingUp size={20} strokeWidth={1.8}/>} sub={t ? `Net of returns ${fmt(t.net_sales_value)}` : undefined} />
-        <StatCard label="Total Stock Value" value={t ? fmt(t.stock_value) : '–'}       color="var(--purple)" icon={<DollarSign size={20} strokeWidth={1.8}/>} sub="Closing × latest purchase rate" />
-        <StatCard label="Total Purchase Value" value={t ? fmt(t.purchase_value) : '–'} color="var(--blue, var(--brand))" icon={<DollarSign size={20} strokeWidth={1.8}/>} sub="Purchases in period" />
-        <StatCard label="Low-stock Products"   value={t ? String(t.low_stock_count) : '–'} color="var(--amber, #d97706)" icon={<AlertTriangle size={20} strokeWidth={1.8}/>} sub="0 < closing < minimum" />
-        <StatCard label="Out-of-stock Products" value={t ? String(t.out_of_stock_count) : '–'} color="var(--red)" icon={<PackageX size={20} strokeWidth={1.8}/>} sub="Closing ≤ 0" />
-      </div>
 
       {/* ── Table ─────────────────────────────────────────────────────────── */}
       <div className="table-card">
