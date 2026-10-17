@@ -7611,7 +7611,7 @@ canvas{
   font-size: 13px; font-variant-numeric: tabular-nums; cursor: pointer; white-space: nowrap; }
 .dr-trigger span { flex: 1; }
 .dr-trigger em { font-style: normal; font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 4px; background: var(--brand-light); color: var(--brand); }
-.dr-pop { position: absolute; z-index: 70; top: calc(100% + 4px); left: 0; width: 272px; box-sizing: border-box; padding: 0 0 8px;
+.dr-pop { position: absolute; z-index: var(--z-dropdown); top: calc(100% + 4px); left: 0; width: 272px; box-sizing: border-box; padding: 0 0 8px;
   background: var(--surface); border: 1px solid var(--border-2); border-radius: 4px; box-shadow: var(--shadow-lg); font-size: 12px; color: var(--text-2); }
 .dr-title { padding: 5px 10px; font-weight: 700; font-size: 12px; color: var(--text); background: var(--surface-3); border-bottom: 1px solid var(--border-2); border-radius: 4px 4px 0 0; }
 .dr-box { margin: 8px 8px 8px; padding: 6px 8px 4px; border: 1px solid var(--border-2); border-radius: 3px; min-width: 0; }

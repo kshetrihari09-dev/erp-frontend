@@ -207,7 +207,8 @@ export default function StockSummaryPage() {
       </div>
 
       {/* ── Filters ─────────────────────────────────────────────────────── */}
-      <div className="table-card mb-4" style={{ padding: 16 }}>
+      {/* overflow visible: .table-card clips children, which would cut off the date-range popup */}
+      <div className="table-card mb-4" style={{ padding: 16, overflow: 'visible' }}>
         <form onSubmit={e => { e.preventDefault(); applyFilters() }}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <div className="flex flex-col gap-1.5">
