@@ -32,13 +32,12 @@ const dash = (n: number | undefined) => (Number(n) ? num(n) : '–')
 
 interface Filters {
   from: string; to: string; company: string; category: string; supplier_id: string; search: string
-  batch: string; expiry_from: string; expiry_to: string
   stock_status: 'all' | 'in_stock' | 'low' | 'zero'
   include_inactive: boolean; include_discount: boolean
 }
 const defaultFilters = (): Filters => ({
   from: daysAgoISO(30), to: todayISO(), company: '', category: '', supplier_id: '', search: '',
-  batch: '', expiry_from: '', expiry_to: '', stock_status: 'all', include_inactive: false, include_discount: true,
+  stock_status: 'all', include_inactive: false, include_discount: true,
 })
 
 /** Only send what the user actually set — empty strings never reach the API. */
@@ -48,9 +47,6 @@ function toParams(f: Filters): StockSummaryParams {
   if (f.category) p.category = f.category
   if (f.supplier_id) p.supplier_id = f.supplier_id
   if (f.search.trim()) p.search = f.search.trim()
-  if (f.batch.trim()) p.batch = f.batch.trim()
-  if (f.expiry_from) p.expiry_from = f.expiry_from
-  if (f.expiry_to) p.expiry_to = f.expiry_to
   return p
 }
 
@@ -108,7 +104,6 @@ export default function StockSummaryPage() {
   const draftDateError = useMemo(() => {
     if (!draft.from || !draft.to) return 'Select both From and To dates'
     if (draft.from > draft.to) return 'From date cannot be after To date'
-    if (draft.expiry_from && draft.expiry_to && draft.expiry_from > draft.expiry_to) return 'Expiry From cannot be after Expiry To'
     return null
   }, [draft])
 
@@ -165,7 +160,7 @@ export default function StockSummaryPage() {
       const tags = [
         applied.company && `Company: ${applied.company}`, applied.category && `Category: ${applied.category}`,
         applied.search && `Search: ${applied.search}`, applied.supplier_id && `Supplier: ${suppliers.find(s => s.id === applied.supplier_id)?.name ?? ''}`,
-        applied.batch && `Batch: ${applied.batch}`, applied.stock_status !== 'all' && `Stock: ${applied.stock_status.replace('_', ' ')}`,
+        applied.stock_status !== 'all' && `Stock: ${applied.stock_status.replace('_', ' ')}`,
         applied.include_inactive && 'Inactive included', `Sales value ${applied.include_discount ? 'net of discount' : 'before discount'}`,
       ].filter(Boolean).join(' · ')
       const body = rep.rows.map(x => `<tr><td>${esc(x.item_code)}</td><td>${esc(x.name)}</td><td>${esc(x.unit)}</td>
@@ -249,10 +244,6 @@ export default function StockSummaryPage() {
               <input className="erp-input" placeholder="Search product…" value={draft.search} onChange={e => set('search', e.target.value)} />
             </label>
             <label className="flex flex-col gap-1.5">
-              <span className={filterTitle}>Batch No.</span>
-              <input className="erp-input" placeholder="Batch contains…" value={draft.batch} onChange={e => set('batch', e.target.value)} />
-            </label>
-            <label className="flex flex-col gap-1.5">
               <span className={filterTitle}>Stock Level (at To date)</span>
               <select className="erp-input" value={draft.stock_status} onChange={e => set('stock_status', e.target.value as Filters['stock_status'])}>
                 <option value="all">All</option>
@@ -262,15 +253,7 @@ export default function StockSummaryPage() {
               </select>
             </label>
 
-            <div className="flex flex-col gap-1.5">
-              <span className={filterTitle}>Expiry From</span>
-              <DateSystemInput className="erp-input" valueAD={draft.expiry_from} onChangeAD={ad => set('expiry_from', ad)} />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <span className={filterTitle}>Expiry To</span>
-              <DateSystemInput className="erp-input" valueAD={draft.expiry_to} onChangeAD={ad => set('expiry_to', ad)} />
-            </div>
-            <div className="flex flex-col gap-2 justify-end sm:col-span-2">
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 sm:col-span-2 lg:col-span-4">
               <label className="flex items-center gap-2 text-sm text-[var(--text-2)] cursor-pointer">
                 <input type="checkbox" checked={draft.include_inactive} onChange={e => set('include_inactive', e.target.checked)} />
                 Include inactive products
@@ -409,12 +392,7 @@ function MovementModal({ row, filters, onClose, dateMode }: { row: StockSummaryR
     if (!row) return
     let live = true
     setTab('moves'); setReg(null); setBatches(null); setErr(null); setLoading(true)
-    const common = {
-      from: filters.from, to: filters.to,
-      ...(filters.batch.trim() ? { batch: filters.batch.trim() } : {}),
-      ...(filters.expiry_from ? { expiry_from: filters.expiry_from } : {}),
-      ...(filters.expiry_to ? { expiry_to: filters.expiry_to } : {}),
-    }
+    const common = { from: filters.from, to: filters.to }
     Promise.all([
       stockRegisterAPI.get({ product_id: row.id, ...common }),
       stockSummaryAPI.batches({ product_id: row.id, ...common }),
@@ -432,7 +410,6 @@ function MovementModal({ row, filters, onClose, dateMode }: { row: StockSummaryR
           <p className="text-xs text-[var(--text-3)] mb-3">
             {formatDisplayDate(filters.from, dateMode)} to {formatDisplayDate(filters.to, dateMode)}
             {' · '}Opening <b>{num(row.opening)}</b> · Closing <b>{num(row.closing)}</b>
-            {filters.batch.trim() && <> · Batch filter: <b>{filters.batch}</b></>}
           </p>
           <Tabs tabs={[{ id: 'moves', label: 'Movements' }, { id: 'batches', label: 'Batches' }]} active={tab} onChange={id => setTab(id as 'moves' | 'batches')} />
           {err && <Alert type="danger" message={err} />}
