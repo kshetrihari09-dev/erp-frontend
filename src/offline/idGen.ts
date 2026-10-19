@@ -41,7 +41,7 @@ export function generateTempRef(clientTxnId: string): string {
  *  debugging — "Device A ... Device B ..."). Not an auth mechanism, not
  *  sent anywhere except inside the transaction payload itself. */
 export function getDeviceId(): string {
-  const KEY = 'byapar_device_id'
+  const KEY = 'zerthix_device_id'
   let id = localStorage.getItem(KEY)
   if (!id) {
     id = generateClientTxnId()

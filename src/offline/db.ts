@@ -149,7 +149,7 @@ const dbCache = new Map<string, Promise<IDBPDatabase<OfflineDBSchema>>>()
 /** IndexedDB database name for a given company — see the module docblock
  *  for why this (not a shared DB) is the tenant-isolation boundary. */
 function dbNameFor(companyId: string) {
-  return `byapar-offline-${companyId}`
+  return `zerthix-offline-${companyId}`
 }
 
 export function getOfflineDb(companyId: string): Promise<IDBPDatabase<OfflineDBSchema>> {

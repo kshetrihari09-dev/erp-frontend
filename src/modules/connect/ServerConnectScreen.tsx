@@ -87,8 +87,8 @@ export default function ServerConnectScreen({ onConnected }: { onConnected: () =
   async function handleScannedCode(raw: string) {
     setScanOpen(false)
     let parsed: { token?: string; apiBaseUrl?: string }
-    try { parsed = JSON.parse(raw) } catch { setManualError('That QR code isn\u2019t a Byapar pairing code.'); setStep('manual'); return }
-    if (!parsed.token || !parsed.apiBaseUrl) { setManualError('That QR code isn\u2019t a Byapar pairing code.'); setStep('manual'); return }
+    try { parsed = JSON.parse(raw) } catch { setManualError('That QR code isn\u2019t a Zerthix pairing code.'); setStep('manual'); return }
+    if (!parsed.token || !parsed.apiBaseUrl) { setManualError('That QR code isn\u2019t a Zerthix pairing code.'); setStep('manual'); return }
 
     setManualBusy(true)
     setManualError(null)
@@ -112,7 +112,7 @@ export default function ServerConnectScreen({ onConnected }: { onConnected: () =
     const found = await probeServerUrl(normalized)
     setManualBusy(false)
     if (!found) {
-      setManualError('No Byapar server found at that address.')
+      setManualError('No Zerthix server found at that address.')
       return
     }
     setPending({ baseUrl: found.baseUrl, name: found.name })
@@ -160,7 +160,7 @@ export default function ServerConnectScreen({ onConnected }: { onConnected: () =
           </div>
           <h1 className="text-lg font-bold text-[var(--text)]">Connect to Server</h1>
           <p className="text-sm text-[var(--text-4)] mt-1">
-            This device needs to connect to your company's Byapar server before you can log in.
+            This device needs to connect to your company's Zerthix server before you can log in.
           </p>
         </div>
 

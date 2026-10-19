@@ -32,6 +32,10 @@ export interface PrintData {
   subtotal?:    number
   discountAmt?: number
   ccAmount?:    number
+  /** VAT already included in the total (e.g. reversed VAT on a sales return). >0 → an informational row is rendered. */
+  taxAmt?:      number
+  /** Human-readable settlement line (sales return: "Adjusted against receivable", "Cash refund", …). */
+  settlement?:  string
   /** Amount added/subtracted to reach a whole-number Grand Total. Positive
    *  rounds up, negative rounds down. Omitted or 0 → no row is rendered. */
   roundOff?:    number
@@ -278,7 +282,7 @@ const InvoiceTemplate = forwardRef<HTMLDivElement, {
             <table style={{ fontSize: '11px' }}>
               <tbody>
                 <tr>
-                  <td style={s.metaLabel}>{data.offlinePending ? 'Offline Ref:' : 'Invoice No:'}</td>
+                  <td style={s.metaLabel}>{data.offlinePending ? 'Offline Ref:' : data.type === 'SALE_RETURN' || data.type === 'PURCHASE_RETURN' ? 'Return No:' : 'Invoice No:'}</td>
                   <td style={s.metaVal}>{data.voucherNo}</td>
                 </tr>
                 <tr>
@@ -299,7 +303,7 @@ const InvoiceTemplate = forwardRef<HTMLDivElement, {
                 )}
                 {data.referenceNo && (
                   <tr>
-                    <td style={s.metaLabel}>Ref:</td>
+                    <td style={s.metaLabel}>{data.type === 'SALE_RETURN' ? 'Original Invoice:' : data.type === 'PURCHASE_RETURN' ? 'Original Bill:' : 'Ref:'}</td>
                     <td style={s.metaVal}>{data.referenceNo}</td>
                   </tr>
                 )}
@@ -384,6 +388,9 @@ const InvoiceTemplate = forwardRef<HTMLDivElement, {
             {(data.ccAmount ?? 0) > 0 && (
               <tr><td style={s.totalLabel}>CC Charge</td><td style={s.totalVal}>{fmt(data.ccAmount)}</td></tr>
             )}
+            {(data.taxAmt ?? 0) > 0 && (
+              <tr><td style={s.totalLabel}>VAT (incl.)</td><td style={s.totalVal}>{fmt(data.taxAmt)}</td></tr>
+            )}
             {(data.roundOff ?? 0) !== 0 && (
               <tr>
                 <td style={s.totalLabel}>Round Off</td>
@@ -396,6 +403,9 @@ const InvoiceTemplate = forwardRef<HTMLDivElement, {
               <td style={{ ...s.totalLabel, paddingTop: '6px', color: accent, fontWeight: 'bold' }}>TOTAL</td>
               <td style={{ ...s.totalVal, paddingTop: '6px', color: accent, fontWeight: 'bold' }}>{fmt(data.netTotal)}</td>
             </tr>
+            {data.settlement && (
+              <tr><td colSpan={2} style={{ ...s.totalLabel, textAlign: 'right', fontStyle: 'italic' }}>{data.settlement}</td></tr>
+            )}
             {(data.paidAmount ?? 0) > 0 && (
               <tr>
                 <td style={{ ...s.totalLabel, color: '#16a34a' }}>Paid</td>

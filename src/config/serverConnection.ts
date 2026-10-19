@@ -21,7 +21,7 @@ export interface SavedServer {
   connectedAt: string
 }
 
-const KEY = 'byapar_server_connection'
+const KEY = 'zerthix_server_connection'
 
 export function getSavedServer(): SavedServer | null {
   try {

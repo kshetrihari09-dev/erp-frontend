@@ -223,6 +223,12 @@ export const salesReturnsAPI = {
   getSale:   (id: string)      => http.get<ApiResponse<Sale>>(`/sales/${id}`),
   list:      (params?: Params) => http.get('/returns', { params: { ...params, type: 'sales' } }),
   create:    (data: Params)    => http.post('/returns/sales', data),
+  // Reverse-sale workflow: invoices that can be returned against (with returned/returnable figures),
+  // one invoice with authoritative per-line remaining returnable qty, and a posted return's detail.
+  invoices:  (params?: Params) => http.get('/returns/sales/invoices', { params }),
+  invoice:   (saleId: string)  => http.get(`/returns/sales/invoices/${saleId}`),
+  detail:    (voucherId: string) => http.get(`/returns/sales/detail/${voucherId}`),
+  preview:   (data: Params)    => http.post('/returns/sales/preview', data),
 }
 
 // ─── Purchase Returns (dedicated module) ───────────────────────────────────────
@@ -231,6 +237,12 @@ export const purchaseReturnsAPI = {
   getPurchase:   (id: string)      => http.get<ApiResponse<Purchase>>(`/purchases/${id}`),
   list:          (params?: Params) => http.get('/returns', { params: { ...params, type: 'purchase' } }),
   create:        (data: Params)    => http.post('/returns/purchase', data),
+  // Reverse-purchase workflow (mirror of salesReturnsAPI): returnable bills, one bill with authoritative
+  // per-line returnable qty + batch stock, server dry-run, and a posted return's detail.
+  bills:         (params?: Params) => http.get('/returns/purchase/bills', { params }),
+  bill:          (purchaseId: string) => http.get(`/returns/purchase/bills/${purchaseId}`),
+  preview:       (data: Params)    => http.post('/returns/purchase/preview', data),
+  detail:        (voucherId: string) => http.get(`/returns/purchase/detail/${voucherId}`),
 }
 
 // ─── Stock ────────────────────────────────────────────────────────────────────

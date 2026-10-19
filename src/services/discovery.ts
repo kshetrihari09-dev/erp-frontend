@@ -149,7 +149,7 @@ export async function discoverLanServers(
 }
 
 /** Used by both the manual-IP form and QR-derived URLs to confirm a
- *  candidate is actually reachable and is a Byapar server before saving it. */
+ *  candidate is actually reachable and is a Zerthix server before saving it. */
 export async function probeServerUrl(baseUrl: string): Promise<DiscoveredServer | null> {
   try {
     const url = new URL(baseUrl)

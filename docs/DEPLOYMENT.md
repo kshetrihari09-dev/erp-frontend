@@ -1,4 +1,4 @@
-# Byapar — Security & HTTPS Deployment Guide
+# Zerthix — Security & HTTPS Deployment Guide
 
 ## What changed and why
 

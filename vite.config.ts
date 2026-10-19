@@ -46,8 +46,8 @@ export default defineConfig(({ mode }) => {
         registerType: 'autoUpdate',
         injectRegister: false, // registered explicitly in main.tsx for control over *when*
         manifest: {
-          name:             'Byapar — Pharma + Accounting',
-          short_name:       'Byapar',
+          name:             'Zerthix — Pharma + Accounting',
+          short_name:       'Zerthix',
           description:      'Offline-capable billing and accounting for pharmacies.',
           theme_color:      '#0f172a',
           background_color: '#0f172a',
@@ -103,7 +103,7 @@ export default defineConfig(({ mode }) => {
                 !/\/notifications(\/|$)/.test(url.pathname),
               handler: 'NetworkFirst',
               options: {
-                cacheName: 'byapar-api-get-cache',
+                cacheName: 'zerthix-api-get-cache',
                 networkTimeoutSeconds: 6,
                 expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 },
                 cacheableResponse: { statuses: [0, 200] },
