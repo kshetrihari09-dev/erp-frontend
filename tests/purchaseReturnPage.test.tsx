@@ -10,99 +10,123 @@ import { calls, state } from './mock-api-purchase-return'
 const q = () => within(document.body)
 const type = (el: HTMLElement, v: string) => fireEvent.change(el, { target: { value: v } })
 const qtyInput = (name: string) => q().getAllByLabelText(`Return quantity for ${name}`)[0] as HTMLInputElement
-const reviewBtn = () => q().getByText('Review & Post Return').closest('button') as HTMLButtonElement
+const postBtn = () => q().getAllByText(/Review & Post/)[0].closest('button') as HTMLButtonElement
+const scan = async (id: string) => { const s = q().getByLabelText('scan'); type(s, id); fireEvent.keyDown(s, { key: 'Enter' }) }
 const reset = () => {
   cleanup(); useUIStore.setState({ dateMode: 'AD' })
   Object.assign(state, { refundable: 0, createDelayMs: 40, createFails: '', listRows: [], listTotal: 0 })
   for (const k of Object.keys(calls) as (keyof typeof calls)[]) calls[k].length = 0
 }
-async function openBill() {
+async function open(supplier = 's1') {
   render(<PurchaseReturnPage />)
-  await waitFor(() => assert.ok(q().getByText('PB-0001')))
-  fireEvent.click(q().getByText('PB-0001'))
-  await waitFor(() => assert.ok(q().getAllByText('Paracetamol 500').length))
+  await waitFor(() => assert.ok(q().getByText('Alpha Pharma', { exact: false })))
+  if (supplier) type(q().getByLabelText('Supplier'), supplier)
 }
 
-test('bill list is searchable (bill no / supplier) with payment status + returnable balance; selecting loads real lines incl. stock on hand', async () => {
+test('opens straight into the Purchase-style billing screen: no bill search, no bill picker', async () => {
   reset(); render(<PurchaseReturnPage />)
-  await waitFor(() => assert.ok(q().getByText('PB-0001')))
-  assert.ok(q().getAllByText(fmt(1220)).length)
-  type(q().getByLabelText('Search bills'), 'Alpha'); await waitFor(() => assert.ok(calls.bills.some(c => c.search === 'Alpha')))
-  fireEvent.click(q().getByText('PB-0001'))
-  await waitFor(() => assert.deepEqual(calls.bill, ['pur-1']))
-  await waitFor(() => assert.ok(q().getAllByText('Paracetamol 500').length))
-  assert.ok(q().getByText(/Previous returns: DN-0000/)); assert.ok(q().getAllByText('expired').length)
-  assert.ok(q().getAllByText('In stock').length)
-  assert.ok(q().getByText(/Supplier ledger balance/))
+  assert.ok(q().getByText('Supplier Information')); assert.ok(q().getByText('Return Items')); assert.ok(q().getByLabelText('scan'))
+  assert.equal(q().queryByLabelText('Search bills'), null); assert.equal(q().queryByText(/Find the original/i), null)
+  assert.equal(calls.preview.length, 0)
+  await waitFor(() => assert.equal(calls.suppliers.length, 1))
 })
 
-test('quantity is capped by stock still on hand (5 of 8 already sold): over-cap blocked client-side, valid qty gets a server dry-run', async () => {
-  reset(); await openBill()
-  type(qtyInput('Paracetamol 500'), '4')                               // 8 remain on the bill but only 3 are in stock
-  assert.ok(q().getAllByText(/Only 3 is still in stock/).length)
-  assert.equal(reviewBtn().disabled, true); assert.equal(calls.preview.length, 0)
-  type(qtyInput('Paracetamol 500'), '3')
+test('supplier + scanned product → server dry run with {party_id, lines} only (no invoice, no rates); shows historical rate/discount/debit and the linked bill', async () => {
+  reset(); await open(); await scan('p1')
   await waitFor(() => assert.equal(calls.preview.length, 1))
-  assert.deepEqual(calls.preview[0], { purchase_id: 'pur-1', items: [{ purchase_item_id: 'l1', qty: 3 }] })
-  await waitFor(() => assert.ok(q().getByText('Net credit'))); assert.ok(q().getAllByText(fmt(270)).length)
-  await waitFor(() => assert.equal(reviewBtn().disabled, false))
+  const b = calls.preview[0]
+  assert.deepEqual(Object.keys(JSON.parse(JSON.stringify(b))).sort(), ['date_ad', 'lines', 'party_id'])
+  assert.deepEqual(b.lines, [{ product_id: 'p1', qty: 1 }]); assert.equal(b.party_id, 's1')
+  await waitFor(() => assert.ok(q().getAllByText(fmt(90)).length))           // 1 × net-of-discount, from the server
+  assert.ok(q().getAllByText(/from PB-0001/).length); assert.ok(q().getByText(/Matched to this supplier/))
+  type(qtyInput('Paracetamol 500'), '3'); await waitFor(() => assert.equal(calls.preview.length, 2))
+  await waitFor(() => assert.ok(q().getAllByText(fmt(270)).length))
+  assert.ok(q().getAllByText('Total Debit').length)
 })
 
-test('"All" fills the real cap (stock), and scanning stops at the cap', async () => {
-  reset(); await openBill()
-  fireEvent.click(q().getAllByText('All')[0]); await waitFor(() => assert.equal(qtyInput('Paracetamol 500').value, '3'))
-  type(qtyInput('Paracetamol 500'), '')
-  const scan = q().getByLabelText('scan'); type(scan, 'p1')
-  for (let i = 0; i < 5; i++) fireEvent.keyDown(scan, { key: 'Enter' })
-  await waitFor(() => assert.equal(qtyInput('Paracetamol 500').value, '3'))      // never above stock
-  type(scan, 'p-other'); fireEvent.keyDown(scan, { key: 'Enter' })
-  await waitFor(() => assert.ok(q().getByText(/is not on bill PB-0001/)))
+test('re-scanning bumps quantity; quantity above what the supplier can still be sent is flagged and blocks posting; no-purchase product flagged', async () => {
+  reset(); await open(); await scan('p2'); await scan('p2')
+  await waitFor(() => assert.equal(qtyInput('Amoxicillin 250').value, '2'))
+  type(qtyInput('Amoxicillin 250'), '9')
+  await waitFor(() => assert.ok(q().getAllByText(/only 5 still returnable/).length))
+  fireEvent.click(postBtn()); await waitFor(() => assert.ok(q().getByText(/Fix the highlighted items/)))
+  assert.equal(q().queryByText('Confirm purchase return'), null)
+  fireEvent.click(q().getAllByLabelText('Remove Amoxicillin 250')[0]); await scan('p9')
+  await waitFor(() => assert.ok(q().getAllByText(/No returnable purchase of "Never Bought"/).length))
 })
 
-test('refund (supplier pays us) is unavailable when the supplier owes us nothing; default is debit to the supplier account', async () => {
-  reset(); state.refundable = 0; await openBill()
-  type(qtyInput('Paracetamol 500'), '1'); await waitFor(() => assert.ok(q().getByText('Net credit')))
-  assert.equal((q().getByLabelText(/Cash refund/) as HTMLInputElement).disabled, true)
-  assert.equal((q().getByLabelText(/Debit to supplier account/) as HTMLInputElement).checked, true)
+test('product not found shows the shared dialog; posting needs a supplier and at least one product', async () => {
+  reset(); await open(''); fireEvent.click(postBtn()); await waitFor(() => assert.ok(q().getByText('Add at least one product')))
+  await scan('p1'); fireEvent.click(postBtn()); await waitFor(() => assert.ok(q().getByText(/Select a supplier before posting/)))
+  assert.equal(calls.preview.length, 0)                                   // nothing is priced until a supplier is chosen
+  await scan('NOPE'); await waitFor(() => assert.ok(q().getByText('Product Not Found')))
 })
 
-test('confirm → post sends only {purchase_id, qty per line, date, settlement, client_txn_id}; double click posts ONCE; success + print data', async () => {
-  reset(); await openBill()
-  type(qtyInput('Paracetamol 500'), '3'); type(qtyInput('Amoxicillin 250'), '1')
-  await waitFor(() => assert.ok(q().getByText('Net credit'))); await waitFor(() => assert.equal(reviewBtn().disabled, false))
-  fireEvent.click(q().getByText('Review & Post Return')); await waitFor(() => assert.ok(q().getByText('Confirm purchase return')))
+test('batch can be chosen when several batches are returnable; choice is sent as batch_no', async () => {
+  reset(); await open(); await scan('p1')
+  await waitFor(() => assert.ok(q().getAllByLabelText('Batch for Paracetamol 500').length))
+  type(q().getAllByLabelText('Batch for Paracetamol 500')[0], 'B0')
+  await waitFor(() => assert.deepEqual(calls.preview.at(-1).lines, [{ product_id: 'p1', qty: 1, batch_no: 'B0' }]))
+})
+
+test('confirm → post sends only {party_id, lines, date, settlement, narration?, client_txn_id}; double click posts ONCE; print data + form reset', async () => {
+  reset(); await open(); await scan('p1'); await scan('p2')
+  type(qtyInput('Paracetamol 500'), '4')
+  await waitFor(() => assert.ok(q().getAllByText(fmt(460)).length))
+  await waitFor(() => assert.equal(postBtn().disabled, false))
+  fireEvent.click(postBtn()); await waitFor(() => assert.ok(q().getByText('Confirm purchase return')))
   const post = q().getByText('Post Return')
   await act(async () => { fireEvent.click(post); fireEvent.click(post); fireEvent.click(post) })
-  await waitFor(() => assert.ok(q().getByText(/Purchase return posted — DN-2026-00001/)))
+  await waitFor(() => assert.ok(q().getAllByText(/DN-2026-00001/).length))
   assert.equal(calls.create.length, 1)
   const b = calls.create[0]
-  assert.deepEqual(Object.keys(JSON.parse(JSON.stringify(b))).sort(), ['client_txn_id', 'date_ad', 'items', 'purchase_id', 'settlement'])
-  assert.deepEqual(b.items, [{ purchase_item_id: 'l1', qty: 3 }, { purchase_item_id: 'l2', qty: 1 }]); assert.equal(b.settlement, 'adjust')
-  fireEvent.click(q().getByText('Print Debit Note'))
+  assert.deepEqual(Object.keys(JSON.parse(JSON.stringify(b))).sort(), ['client_txn_id', 'date_ad', 'lines', 'party_id', 'settlement'])
+  assert.deepEqual(b.lines, [{ product_id: 'p1', qty: 4 }, { product_id: 'p2', qty: 1 }]); assert.equal(b.settlement, 'adjust'); assert.match(b.client_txn_id, /^[0-9a-f-]{36}$/)
   const pd = JSON.parse(q().getByTestId('print').textContent!)
-  assert.equal(pd.type, 'PURCHASE_RETURN'); assert.equal(pd.voucherNo, 'DN-2026-00001'); assert.equal(pd.referenceNo, 'PB-0001'); assert.equal(pd.partyName, 'Alpha Pharma')
-  assert.equal(pd.netTotal, 370); assert.equal(pd.subtotal, 400); assert.equal(pd.discountAmt, 30); assert.equal(pd.items[0].batch_no, 'B1')
-  assert.match(pd.settlement, /adjusted against bill outstanding/)
+  assert.equal(pd.type, 'PURCHASE_RETURN'); assert.equal(pd.voucherNo, 'DN-2026-00001'); assert.equal(pd.referenceNo, 'PB-0001')
+  assert.equal(pd.netTotal, 460); assert.equal(pd.subtotal, 500); assert.equal(pd.discountAmt, 40); assert.equal(pd.items.length, 2); assert.match(pd.settlement, /adjusted against bill outstanding/)
+  assert.equal((q().getByLabelText('Supplier') as HTMLSelectElement).value, '')            // ready for the next return
+  assert.equal(q().queryByLabelText('Return quantity for Paracetamol 500'), null)
 })
 
-test('server rejection because stock was sold meanwhile shows the message and reloads the bill from the server', async () => {
-  reset(); state.createFails = 'Only 1 of "Paracetamol 500" (batch B1) is still in stock — the rest has already been sold'; await openBill()
-  type(qtyInput('Paracetamol 500'), '3'); await waitFor(() => assert.ok(q().getByText('Net credit'))); await waitFor(() => assert.equal(reviewBtn().disabled, false))
-  fireEvent.click(q().getByText('Review & Post Return')); await waitFor(() => assert.ok(q().getByText('Post Return')))
+test('refund options are unavailable when the supplier owes nothing; cash refund sends refund_amount; no-supplier is refund-only and sends no party_id', async () => {
+  reset(); state.refundable = 0; await open(); await scan('p1')
+  await waitFor(() => assert.ok(q().getAllByText(fmt(90)).length))
+  assert.equal((q().getByText('Cash refund') as HTMLButtonElement).disabled, true)
+  state.refundable = 500; type(qtyInput('Paracetamol 500'), '2'); await waitFor(() => assert.equal((q().getByText('Cash refund') as HTMLButtonElement).disabled, false))
+  fireEvent.click(q().getByText('Cash refund')); type(q().getByLabelText('Refund amount'), '100')
+  fireEvent.click(postBtn()); await waitFor(() => assert.ok(q().getByText('Post Return')))
   await act(async () => { fireEvent.click(q().getByText('Post Return')) })
-  await waitFor(() => assert.ok(q().getByText(/is still in stock/))); await waitFor(() => assert.equal(calls.bill.length, 2))
+  await waitFor(() => assert.equal(calls.create.length, 1))
+  assert.equal(calls.create[0].settlement, 'cash_refund'); assert.equal(calls.create[0].refund_amount, 100)
+  await waitFor(() => assert.equal((q().getByLabelText('Supplier') as HTMLSelectElement).value, ''))   // posted → form reset
+  type(q().getByLabelText('Supplier'), '__walkin__'); await waitFor(() => assert.equal(q().queryByText('Debit to supplier account'), null))
+  await scan('p1'); await waitFor(() => assert.ok(calls.preview.some(c => c.party_id === undefined)))
 })
 
-test('All Returns: filters + pagination reach the API; an older return without detail still prints from its voucher', async () => {
+test('server rejection shows the message, keeps the lines, and re-reads what is still returnable', async () => {
+  reset(); state.createFails = 'Cannot return 4 of "Paracetamol 500" — only 1 still returnable.'; await open(); await scan('p1')
+  type(qtyInput('Paracetamol 500'), '4'); await waitFor(() => assert.ok(q().getAllByText(fmt(360)).length))
+  await waitFor(() => assert.equal(postBtn().disabled, false)); const before = calls.preview.length
+  fireEvent.click(postBtn()); await waitFor(() => assert.ok(q().getByText('Post Return')))
+  await act(async () => { fireEvent.click(q().getByText('Post Return')) })
+  await waitFor(() => assert.ok(q().getByText(/only 1 still returnable/)))
+  await waitFor(() => assert.ok(calls.preview.length > before)); assert.equal(qtyInput('Paracetamol 500').value, '4')
+})
+
+test('All Returns: search/date/status filters + pagination reach the API; older return without detail still prints from its voucher', async () => {
   reset()
-  state.listRows = [{ id: 'v1', voucher_no: 'DN-OLD-1', voucher_date: '2026-05-01', total_amount: 250, status: 'POSTED', party_name: 'Beta Distributors', original_invoice_no: 'PB-0009', purchase_return_id: null }]
+  state.listRows = [{ id: 'v1', voucher_no: 'DN-OLD-1', voucher_date: '2026-05-01', total_amount: 250, status: 'POSTED', party_name: 'XYZ Labs', original_invoice_no: 'PB-0009', purchase_return_id: null }]
   state.listTotal = 45
   render(<PurchaseReturnPage />)
-  fireEvent.click(q().getByText('All Returns')); await waitFor(() => assert.ok(q().getAllByText('DN-OLD-1').length))
+  fireEvent.click(q().getByText('All Returns'))
+  await waitFor(() => assert.ok(q().getAllByText('DN-OLD-1').length))
   type(q().getByLabelText('Search returns'), 'PB-0009'); await waitFor(() => assert.ok(calls.list.some(c => c.search === 'PB-0009')))
   type(q().getByLabelText('Status'), 'POSTED'); await waitFor(() => assert.ok(calls.list.some(c => c.status === 'POSTED')))
-  fireEvent.click(q().getByText('2')); await waitFor(() => assert.ok(calls.list.some(c => c.page === 2)))
-  await act(async () => { fireEvent.click(q().getAllByText('Print')[0]) }); await waitFor(() => assert.ok(q().getByTestId('print')))
+  fireEvent.click(q().getByText('2'))
+  await waitFor(() => assert.ok(calls.list.some(c => c.page === 2)))
+  await act(async () => { fireEvent.click(q().getAllByText('Print')[0]) })
+  await waitFor(() => assert.ok(q().getByTestId('print')))
   const pd = JSON.parse(q().getByTestId('print').textContent!)
-  assert.equal(pd.voucherNo, 'DN-OLD-1'); assert.equal(pd.netTotal, 250); assert.equal(pd.referenceNo, 'PB-0009'); assert.equal(pd.type, 'PURCHASE_RETURN')
+  assert.equal(pd.voucherNo, 'DN-OLD-1'); assert.equal(pd.netTotal, 250); assert.equal(pd.referenceNo, 'PB-0009')
 })
