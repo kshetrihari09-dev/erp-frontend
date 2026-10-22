@@ -43,7 +43,7 @@ import {
   derivePrintDiscount, grossItemAmount,
   type DiscountScope, type DiscountEntry,
 } from '@/components/forms/discount/discountUtils'
-import { fmt, calcRowAmount } from '@/utils'
+import { fmt, calcRowAmount, productCcPct } from '@/utils'
 import { formatDisplayDate } from '@/utils/dateSystem'
 import DateSystemInput from '@/components/shared/DateSystemInput'
 import { PAYMENT_MODES } from '@/constants'
@@ -239,7 +239,7 @@ export default function PurchasePage() {
     row.product_id   = p.id
     row.product_name = p.name
     row.rate         = p.purchase_rate
-    row.cc_pct       = p.cc_pct ?? 0
+    row.cc_pct       = productCcPct(p)
     const { amount, cc_amount } = calcRowAmount({
       qty: row.qty, rate: Number(row.rate), bonus: 0,
       discount_pct: 0, cc_pct: Number(row.cc_pct) || 0,
@@ -878,8 +878,11 @@ export default function PurchasePage() {
                         value={row.product_id}
                         products={products}
                         onChange={p => {
-                          const { amount, cc_amount } = reCalc({ rate: Number(p.purchase_rate) })
-                          updateRow({ product_id: p.id, product_name: p.name, rate: p.purchase_rate, amount, cc_amount, batch_no: '', expiry: '' })
+                          // CC% is taken from the newly selected product (not the
+                          // row's previous one) and drives cc_amount below.
+                          const cc_pct = productCcPct(p)
+                          const { amount, cc_amount } = reCalc({ rate: Number(p.purchase_rate), cc_pct })
+                          updateRow({ product_id: p.id, product_name: p.name, rate: p.purchase_rate, cc_pct, amount, cc_amount, batch_no: '', expiry: '' })
                           setProducts(prev => prev.some(x => x.id === p.id) ? prev : [...prev, p])
                         }}
                         onCreated={p => setProducts(prev => prev.some(x => x.id === p.id) ? prev : [...prev, p])}

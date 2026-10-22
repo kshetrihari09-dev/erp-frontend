@@ -657,12 +657,40 @@ export interface InvoiceTemplate {
 }
 
 export interface FiscalYear {
-  id:         string
-  name:       string
-  start_date: string
-  end_date:   string
-  is_active:  boolean
-  is_locked:  boolean
+  id:               string
+  name:             string
+  start_date:       string   // alias of start_date_ad
+  end_date:         string   // alias of end_date_ad
+  start_date_ad:    string
+  end_date_ad:      string
+  start_date_bs?:   string | null
+  end_date_bs?:     string | null
+  is_active:        boolean
+  is_current:       boolean
+  is_locked:        boolean
+  period_count?:    number
+  locked_period_count?: number
+}
+
+/** Accounting period — always belongs to a fiscal year (Settings → Fiscal Years is authoritative). */
+export interface AccountingPeriod {
+  id:                     string
+  name:                   string
+  start_date:             string
+  end_date:               string
+  is_locked:              boolean
+  fiscal_year_id:         string | null
+  fiscal_year_name:       string | null
+  fiscal_year_start_ad:   string | null
+  fiscal_year_end_ad:     string | null
+  fiscal_year_start_bs?:  string | null
+  fiscal_year_end_bs?:    string | null
+  fiscal_year_is_locked:  boolean
+  fiscal_year_is_active:  boolean
+  fiscal_year_is_current: boolean
+  is_effectively_locked:  boolean
+  lock_source:            'period' | 'fiscal_year' | 'both' | null
+  needs_review:           boolean
 }
 
 export interface AuditLog {

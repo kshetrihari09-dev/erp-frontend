@@ -11,7 +11,7 @@
 
 import { useRef, forwardRef, useImperativeHandle } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
-import { fmt, calcRowAmount } from '@/utils'
+import { fmt, calcRowAmount, productCcPct } from '@/utils'
 import type { Product } from '@/types'
 import ProductSearchCell, { type ProductSearchCellHandle } from './ProductSearchCell'
 import BatchSelect from './BatchSelect'
@@ -115,6 +115,8 @@ const InvoiceRowsTable = forwardRef<InvoiceRowsTableHandle, Props>(function Invo
           updated.product_name = p.name
           // Purchase mode must default to the purchase rate, not the selling price.
           updated.rate         = mode === 'purchase' ? p.purchase_rate : p.sales_rate
+          // CC% belongs to the product just picked — never the previous one's.
+          updated.cc_pct       = productCcPct(p)
         }
       }
       const { amount, cc_amount } = calcRowAmount({
@@ -163,6 +165,10 @@ const InvoiceRowsTable = forwardRef<InvoiceRowsTableHandle, Props>(function Invo
         product_id:   p.id,
         product_name: p.name,
         rate:         mode === 'purchase' ? p.purchase_rate : p.sales_rate,
+        // C.C% comes from the newly selected product's saved value, so a row
+        // re-pointed at another product doesn't keep the old product's CC%
+        // (the user can still edit it afterwards; see the C.C % input below).
+        cc_pct:       productCcPct(p),
         // A previously-picked batch belongs to the OLD product — carrying
         // it over would silently submit the wrong batch. The new
         // BatchSelect fetches this product's own batches fresh and the

@@ -40,7 +40,7 @@ import ProductSearchCell from '@/components/forms/ProductSearchCell'
 import BatchSelect from '@/components/forms/BatchSelect'
 import QtyGate from '@/components/forms/QtyGate'
 import QuickAddPartyModal from '@/components/forms/QuickAddPartyModal'
-import { fmt, calcRowAmount } from '@/utils'
+import { fmt, calcRowAmount, productCcPct } from '@/utils'
 import { formatDisplayDate } from '@/utils/dateSystem'
 import DateSystemInput from '@/components/shared/DateSystemInput'
 import DiscountReviewModal from '@/components/forms/discount/DiscountReviewModal'
@@ -283,7 +283,7 @@ export default function SalesPage() {
     row.product_id   = p.id
     row.product_name = p.name
     row.rate         = p.sales_rate
-    row.cc_pct       = p.cc_pct ?? 0
+    row.cc_pct       = productCcPct(p)
     const { amount, cc_amount } = calcRowAmount({
       qty: row.qty, rate: Number(row.rate), bonus: 0,
       discount_pct: 0, cc_pct: Number(row.cc_pct) || 0,
@@ -1079,10 +1079,13 @@ export default function SalesPage() {
                         value={row.product_id}
                         products={products}
                         onChange={p => {
-                          const { amount, cc_amount } = reCalc({ rate: Number(p.sales_rate) })
+                          // CC% is taken from the newly selected product (not the
+                          // row's previous one) and drives cc_amount below.
+                          const cc_pct = productCcPct(p)
+                          const { amount, cc_amount } = reCalc({ rate: Number(p.sales_rate), cc_pct })
                           // batch_no/expiry cleared: they belonged to whatever
                           // product was previously in this row, if any.
-                          updateRow({ product_id: p.id, product_name: p.name, rate: p.sales_rate, amount, cc_amount, batch_no: '', expiry: '' })
+                          updateRow({ product_id: p.id, product_name: p.name, rate: p.sales_rate, cc_pct, amount, cc_amount, batch_no: '', expiry: '' })
                           // Keep `products` in sync with whatever the live search
                           // just resolved — same merge every other product-
                           // resolution path in this file already does (camera

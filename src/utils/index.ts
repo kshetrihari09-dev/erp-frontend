@@ -84,6 +84,19 @@ export interface InvoiceRow {
 }
 
 /**
+ * productCcPct — a product's saved C.C% (`products.cc_pct`) as a real number.
+ *
+ * The API serialises the DECIMAL(5,2) column as a string ("5.00", "0.00"), so the raw
+ * value can't be compared with 0 or shown as-is. Null/undefined/non-numeric → 0.
+ * Deliberately NOT a truthiness check: a legitimate 0 stays 0 (and never falls
+ * through to the previous product's value).
+ */
+export function productCcPct(p?: { cc_pct?: unknown } | null): number {
+  const n = Number(p?.cc_pct)
+  return Number.isFinite(n) ? n : 0
+}
+
+/**
  * calcRowAmount — single source of truth for invoice line math.
  *
  * Formula:

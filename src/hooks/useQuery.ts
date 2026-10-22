@@ -916,6 +916,23 @@ export function useFiscalYears() {
   })
 }
 
+export function usePeriods() {
+  return useQuery({
+    queryKey: [QK.PERIODS],
+    queryFn:  () => accountingAPI.periods().then(unwrap),
+  })
+}
+
+/** Fiscal years and accounting periods are two views of ONE configuration: any change
+ *  to either must refresh both, so the two screens can never disagree. */
+export function useInvalidateFiscalData() {
+  const qc = useQueryClient()
+  return () => Promise.all([
+    qc.invalidateQueries({ queryKey: [QK.FISCAL_YEARS] }),
+    qc.invalidateQueries({ queryKey: [QK.PERIODS] }),
+  ])
+}
+
 export function useAuditLog(params?: Record<string, unknown>) {
   return useQuery({
     queryKey: [QK.AUDIT_LOG, params],

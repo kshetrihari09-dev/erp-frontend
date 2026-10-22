@@ -109,6 +109,7 @@ export const QK = {
   USERS:       'users',
   TEMPLATES:   'templates',
   FISCAL_YEARS:'fiscal-years',
+  PERIODS:     'accounting-periods',
   AUDIT_LOG:       'audit-log',
   ACCOUNT_DEFAULTS: 'account-defaults',
   VOUCHER_POSTINGS: 'voucher-postings',

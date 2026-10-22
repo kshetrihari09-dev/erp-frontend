@@ -2,7 +2,7 @@ import http, { REFRESH_TOKEN_KEY } from '@/services/http'
 import type { ApiResponse, Company, User, Sale, SaleItem, Purchase, PurchaseItem,
   Product, Party, Account, AccountDefault, Voucher, VoucherLine,
   VoucherPosting, PostingStatus, DashboardStats, PnLReport,
-  TrialBalanceRow, LedgerEntry, StockBatch, OpeningInventoryBatch, InvoiceTemplate, FiscalYear, AuditLog,
+  TrialBalanceRow, LedgerEntry, StockBatch, OpeningInventoryBatch, InvoiceTemplate, FiscalYear, AccountingPeriod, AuditLog,
   CompanyPreferences, Backup, AccountLedgerResponse, UserCompany,
   PurchaseSuggestion, PurchaseSuggestionSummary, PurchaseSuggestionSettings,
   PurchaseOrder, PurchaseOrderItem,
@@ -514,7 +514,9 @@ export const accountingAPI = {
     http.get(`/accounting/party-ledger/${id}`, { params }),
 
   // Periods
-  periods:       ()           => http.get('/accounting/periods'),
+  periods:       ()           => http.get<ApiResponse<AccountingPeriod[]>>('/accounting/periods'),
+  createPeriod:  (data: { name: string; start_date: string; end_date: string; fiscal_year_id?: string }) =>
+    http.post('/accounting/periods', data),
   lockPeriod:    (id: string) => http.post(`/accounting/periods/${id}/lock`, {}),
   unlockPeriod:  (id: string) => http.post(`/accounting/periods/${id}/unlock`, {}),
 
@@ -625,6 +627,10 @@ export const settingsAPI = {
   setDefaultTemplate:(id: string) => http.put(`/settings/invoice-templates/${id}/set-default`),
   fiscalYears:      () => http.get<ApiResponse<FiscalYear[]>>('/settings/fiscal-years'),
   createFiscalYear: (data: Params) => http.post('/settings/fiscal-years', data),
+  updateFiscalYear: (id: string, data: Params) => http.put(`/settings/fiscal-years/${id}`, data),
+  activateFiscalYear: (id: string) => http.post(`/settings/fiscal-years/${id}/activate`, {}),
+  lockFiscalYear:   (id: string) => http.post(`/settings/fiscal-years/${id}/lock`, {}),
+  unlockFiscalYear: (id: string) => http.post(`/settings/fiscal-years/${id}/unlock`, {}),
   auditLog:         (params?: Params) => http.get<ApiResponse<AuditLog[]>>('/settings/audit-log', { params }),
 
   // ── Preferences (General / Sales & Purchase / Accounting & Vouchers /
