@@ -5,6 +5,7 @@
  * Logic: 100% unchanged — all auth flows, API calls, validation, OTP preserved exactly
  */
 
+import ZerthixLogo from '@/components/brand/ZerthixLogo'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
@@ -123,15 +124,11 @@ function LeftPanel() {
             <motion.div animate={{ scale:[1,1.09,1], opacity:[0.35,0.1,0.35] }} transition={{ duration:3.5, repeat:Infinity, ease:'easeInOut', delay:0.6 }}
               style={{ position:'absolute', inset:-10, borderRadius:'50%', border:'1px solid rgba(139,92,246,0.3)' }}/>
             <div style={{
-              width:88, height:88, borderRadius:24,
-              background:'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)',
+              width:88, height:88, borderRadius:20,
               display:'flex', alignItems:'center', justifyContent:'center',
-              boxShadow:'0 0 48px rgba(99,102,241,0.55), 0 0 96px rgba(99,102,241,0.18), inset 0 1px 0 rgba(255,255,255,0.2)',
+              boxShadow:'0 0 48px rgba(99,102,241,0.45), 0 0 96px rgba(99,102,241,0.16)',
             }}>
-              <svg width="44" height="44" viewBox="0 0 44 44" fill="none" aria-hidden>
-                <rect x="17" y="6" width="10" height="32" rx="3" fill="white"/>
-                <rect x="6" y="17" width="32" height="10" rx="3" fill="white"/>
-              </svg>
+              <ZerthixLogo size={88} />
             </div>
           </div>
           <motion.div initial={{ opacity:0, y:12 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.3, duration:0.5 }}>
@@ -384,11 +381,8 @@ export default function LoginPage() {
 
           {/* Mobile logo */}
           <div className="ml-only" style={{ textAlign:'center', marginBottom:28 }}>
-            <div style={{ display:'inline-flex', alignItems:'center', justifyContent:'center', width:64, height:64, borderRadius:18, background:'linear-gradient(135deg,#4f46e5,#7c3aed)', boxShadow:'0 0 32px rgba(99,102,241,0.5)', marginBottom:12 }}>
-              <svg width="32" height="32" viewBox="0 0 32 32" fill="none" aria-hidden>
-                <rect x="12" y="4" width="8" height="24" rx="2.5" fill="white"/>
-                <rect x="4" y="12" width="24" height="8" rx="2.5" fill="white"/>
-              </svg>
+            <div style={{ display:'inline-flex', alignItems:'center', justifyContent:'center', width:64, height:64, borderRadius:15, boxShadow:'0 0 32px rgba(99,102,241,0.4)', marginBottom:12 }}>
+              <ZerthixLogo size={64} />
             </div>
             <h1 style={{ fontSize:24, fontWeight:800, background:'linear-gradient(135deg,#fff,#a5b4fc)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', backgroundClip:'text', marginBottom:4 }}>Zerthix</h1>
             <p style={{ color:'rgba(165,180,252,0.6)', fontSize:13 }}>Pharma + Accounting System</p>

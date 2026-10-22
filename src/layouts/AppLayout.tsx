@@ -1,3 +1,4 @@
+import ZerthixLogo from '@/components/brand/ZerthixLogo'
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -238,11 +239,8 @@ export default function AppLayout() {
       >
         {/* Logo */}
         <div className="sidebar-logo" style={{ overflow: 'hidden' }}>
-          <div className="sidebar-logo-icon flex-shrink-0">
-            <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
-              <rect width="26" height="26" rx="7" fill="#2563eb"/>
-              <path d="M8 13h10M13 8v10" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"/>
-            </svg>
+          <div className="sidebar-logo-icon flex-shrink-0" style={{ background: 'transparent', boxShadow: 'none' }}>
+            <ZerthixLogo size={36} />
           </div>
           {!collapsed && (
             <div className="min-w-0">

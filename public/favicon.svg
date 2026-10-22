@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><defs>
+<linearGradient id="top" x1="500" y1="250" x2="1040" y2="190" gradientUnits="userSpaceOnUse">
+  <stop offset="0" stop-color="#2A1A9E"/><stop offset=".30" stop-color="#7A2A9A"/><stop offset=".58" stop-color="#F0603C"/><stop offset=".78" stop-color="#FF8A2A"/><stop offset="1" stop-color="#FFC926"/></linearGradient>
+<linearGradient id="diag" x1="800" y1="300" x2="540" y2="600" gradientUnits="userSpaceOnUse">
+  <stop offset="0" stop-color="#1E1180"/><stop offset=".5" stop-color="#4F26C8"/><stop offset="1" stop-color="#8A2BE2"/></linearGradient>
+<linearGradient id="diagShade" x1="780" y1="0" x2="940" y2="0" gradientUnits="userSpaceOnUse">
+  <stop offset="0" stop-color="#3A0A50" stop-opacity="0"/><stop offset="1" stop-color="#4A0C3C" stop-opacity=".5"/></linearGradient>
+<linearGradient id="bot" x1="560" y1="600" x2="1040" y2="480" gradientUnits="userSpaceOnUse">
+  <stop offset="0" stop-color="#FF5A1F"/><stop offset=".45" stop-color="#FF8A28"/><stop offset="1" stop-color="#FFC62A"/></linearGradient>
+<linearGradient id="botShade" x1="560" y1="590" x2="700" y2="490" gradientUnits="userSpaceOnUse">
+  <stop offset="0" stop-color="#5A0F1A" stop-opacity=".85"/><stop offset="1" stop-color="#7A1A1A" stop-opacity="0"/></linearGradient>
+<linearGradient id="xo" x1="1150" y1="800" x2="1250" y2="690" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#FF5F1F"/><stop offset="1" stop-color="#FFA526"/></linearGradient>
+<linearGradient id="xp" x1="1240" y1="690" x2="1315" y2="800" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#7C3AED"/><stop offset="1" stop-color="#5B21D6"/></linearGradient>
+<clipPath id="cBot"><path id="pBot" d="M742 474 H1043 L977 566 Q946 610 898 610 H528 Z"/></clipPath>
+<clipPath id="cDiag"><path d="M760 298 H918 Q948 300 936 328 Q916 356 896 368 L546 605 Q520 618 504 596 Q482 560 500 520 Q514 492 536 472 Z"/></clipPath>
+</defs><rect width="1024" height="1024" rx="230" fill="#FFFFFF"/><g transform="translate(512 512) scale(1.3) translate(-768 -392)">
+<path d="M497 298 L551 214 Q578 172 624 172 H1038 Q1050 172 1043 186 L941 322 Q936 300 918 298 Z" fill="url(#top)"/>
+<path d="M742 474 H1043 L977 566 Q946 610 898 610 H528 Z" fill="url(#bot)"/>
+<g clip-path="url(#cBot)"><path d="M520 612 L560 612 L760 470 L700 470 Z" fill="url(#botShade)"/></g>
+<path d="M760 298 H918 Q948 300 936 328 Q916 356 896 368 L546 605 Q520 618 504 596 Q482 560 500 520 Q514 492 536 472 Z" fill="url(#diag)"/>
+<g clip-path="url(#cDiag)"><rect x="780" y="290" width="170" height="90" fill="url(#diagShade)"/></g>
+</g></svg>

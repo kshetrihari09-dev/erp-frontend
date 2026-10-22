@@ -1,4 +1,5 @@
 
+import ZerthixLogo from '@/components/brand/ZerthixLogo'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -468,15 +469,11 @@ export default function SignupPage() {
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
           <div style={{
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            width: 56, height: 56, borderRadius: 16,
-            background: 'linear-gradient(135deg,#4f46e5,#7c3aed)',
-            boxShadow: '0 0 32px rgba(99,102,241,0.5), inset 0 1px 0 rgba(255,255,255,0.2)',
+            width: 56, height: 56, borderRadius: 13,
+            boxShadow: '0 0 32px rgba(99,102,241,0.4)',
             marginBottom: 12,
           }}>
-            <svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden>
-              <rect x="10" y="4" width="8" height="20" rx="2" fill="white"/>
-              <rect x="4" y="10" width="20" height="8" rx="2" fill="white"/>
-            </svg>
+            <ZerthixLogo size={56} />
           </div>
           <h1 style={{
             fontSize: 22, fontWeight: 800, marginBottom: 4,
