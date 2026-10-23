@@ -4276,11 +4276,15 @@ bsp-row--disabled { cursor: not-allowed; opacity: .55; }
 .sil-search-bar {
   display:       flex;
   align-items:   center;
+  flex-wrap:     wrap;
+  gap:           10px;
   margin-bottom: 12px;
 }
+.sil-range { min-width: 230px; }
 .sil-search-input { width: 260px; }
 @media (max-width: 768px) {
   .sil-search-input { width: 100% !important; }
+  .sil-range { width: 100%; }
 }
 
 /* Desktop table — visible on desktop, hidden on mobile */

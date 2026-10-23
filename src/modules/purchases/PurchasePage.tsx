@@ -13,6 +13,7 @@
  * (utils/purchaseCalc.js): row amount = qty × rate × (1 − disc%) + CC,
  * discount resolved per scope into discount_pct, net = round(Σ amounts).
  */
+import { DateRangeFilter } from '@/components/ui/DateRangePopup'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import {
@@ -140,6 +141,9 @@ export default function PurchasePage() {
   const [total,      setTotal]      = useState(0)
   const [page,       setPage]       = useState(1)
   const [search,     setSearch]     = useState('')
+  // List date range (AD, inclusive). '' / '' = no date filter. Sent to the list API as date_from / date_to.
+  const [dFrom, setDFrom] = useState('')
+  const [dTo,   setDTo]   = useState('')
   const [loading,    setLoading]    = useState(false)
   const [rows,       setRows]       = useState<InvoiceRow[]>([newRow()])
   const [saving,     setSaving]     = useState(false)
@@ -345,12 +349,12 @@ export default function PurchasePage() {
   const loadList = useCallback(async () => {
     setLoading(true)
     try {
-      const r = await purchasesAPI.list({ page, limit: LIMIT, search: search || undefined })
+      const r = await purchasesAPI.list({ page, limit: LIMIT, search: search || undefined, date_from: dFrom || undefined, date_to: dTo || undefined })
       setPurchases(r.data.data || [])
       setTotal(r.data.pagination?.total || 0)
     } catch (e: any) { error('Load failed', e.message) }
     finally { setLoading(false) }
-  }, [page, search])
+  }, [page, search, dFrom, dTo])
 
   useEffect(() => { if (tab === 'list') loadList() }, [tab, loadList])
 
@@ -1220,6 +1224,11 @@ export default function PurchasePage() {
         <div>
           <div className="sil-search-bar">
             <SearchInput value={search} onChange={v => { setSearch(v); setPage(1) }} className="sil-search-input"/>
+            <div className="sil-range">
+              <DateRangeFilter fromAD={dFrom} toAD={dTo} emptyLabel="All dates"
+                onApply={r => { setDFrom(r.fromAD); setDTo(r.toAD); setPage(1) }}
+                onClear={() => { setDFrom(''); setDTo(''); setPage(1) }} />
+            </div>
           </div>
 
           <div className="table-card sil-desktop-table">
@@ -1257,7 +1266,7 @@ export default function PurchasePage() {
                             </td>
                           </tr>
                         ))
-                      : <tr><td colSpan={10}><Empty message="No purchases found"/></td></tr>
+                      : <tr><td colSpan={10}><Empty message={(dFrom || dTo) ? "No purchases found in this date range" : "No purchases found"}/></td></tr>
                   }
                 </tbody>
               </table>
@@ -1271,7 +1280,7 @@ export default function PurchasePage() {
                 {[1,2,3,4,5].map(i => <div key={i} className="sil-card sil-card-skeleton"/>)}
               </div>
             ) : purchases.length === 0 ? (
-              <Empty message="No purchases found"/>
+              <Empty message={(dFrom || dTo) ? "No purchases found in this date range" : "No purchases found"}/>
             ) : (
               purchases.map(p => (
                 <div key={p.id} className="sil-card" onClick={() => setDetailId(p.id)}>

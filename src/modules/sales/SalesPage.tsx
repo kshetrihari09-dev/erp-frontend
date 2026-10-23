@@ -11,6 +11,7 @@
  * Business logic, calculations, API calls, validation — 100% unchanged.
  */
 
+import { DateRangeFilter } from '@/components/ui/DateRangePopup'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import UnifiedProductInput, { type UnifiedProductInputHandle } from '@/components/forms/UnifiedProductInput'
 import ProductNotFoundDialog from '@/components/scanner/ProductNotFoundDialog'
@@ -127,6 +128,9 @@ export default function SalesPage() {
   const [total,   setTotal]   = useState(0)
   const [page,    setPage]    = useState(1)
   const [search,  setSearch]  = useState('')
+  // List date range (AD, inclusive). '' / '' = no date filter. Sent to the list API as date_from / date_to.
+  const [dFrom, setDFrom] = useState('')
+  const [dTo,   setDTo]   = useState('')
   const [loading, setLoading] = useState(false)
 
   const [rows,        setRows]        = useState<InvoiceRow[]>([newRow()])
@@ -368,12 +372,12 @@ export default function SalesPage() {
   const loadList = useCallback(async () => {
     setLoading(true)
     try {
-      const r = await salesAPI.list({ page, limit: LIMIT, search: search || undefined })
+      const r = await salesAPI.list({ page, limit: LIMIT, search: search || undefined, date_from: dFrom || undefined, date_to: dTo || undefined })
       setSales(r.data.data || [])
       setTotal(r.data.pagination?.total || 0)
     } catch (e: any) { error('Load failed', e.message) }
     finally { setLoading(false) }
-  }, [page, search])
+  }, [page, search, dFrom, dTo])
 
   useEffect(() => { if (tab === 'list') loadList() }, [tab, loadList])
 
@@ -1580,6 +1584,11 @@ export default function SalesPage() {
           {/* Search bar — full width on mobile */}
           <div className="sil-search-bar">
             <SearchInput value={search} onChange={v => { setSearch(v); setPage(1) }} className="sil-search-input"/>
+            <div className="sil-range">
+              <DateRangeFilter fromAD={dFrom} toAD={dTo} emptyLabel="All dates"
+                onApply={r => { setDFrom(r.fromAD); setDTo(r.toAD); setPage(1) }}
+                onClear={() => { setDFrom(''); setDTo(''); setPage(1) }} />
+            </div>
           </div>
 
           {/* ── DESKTOP: full table ─────────────────────────────────── */}
@@ -1650,7 +1659,7 @@ export default function SalesPage() {
                             </td>
                           </tr>
                         ))
-                      : <tr><td colSpan={9}><Empty message="No sales found"/></td></tr>
+                      : <tr><td colSpan={9}><Empty message={(dFrom || dTo) ? "No sales found in this date range" : "No sales found"}/></td></tr>
                   }
                 </tbody>
               </table>
@@ -1665,7 +1674,7 @@ export default function SalesPage() {
                 {[1,2,3,4,5].map(i => <div key={i} className="sil-card sil-card-skeleton"/>)}
               </div>
             ) : sales.length === 0 ? (
-              <Empty message="No sales found"/>
+              <Empty message={(dFrom || dTo) ? "No sales found in this date range" : "No sales found"}/>
             ) : (
               sales.map(s => (
                 <div
