@@ -16,7 +16,7 @@ import { RotateCcw, FilePlus, List, Search, X, Printer, Eye } from 'lucide-react
 import { salesReturnsAPI, partiesAPI } from '@/services/api'
 import useUIStore from '@/store/uiStore'
 import { Button, Tabs, Badge, Pagination, SkeletonRows, Empty, Modal } from '@/components/ui'
-import DateSystemInput from '@/components/shared/DateSystemInput'
+import { DateRangeFilter } from '@/components/ui/DateRangePopup'
 import { PrintPreviewModal } from '@/components/print'
 import type { PrintData } from '@/components/print'
 import { formatDisplayDate } from '@/utils/dateSystem'
@@ -158,8 +158,10 @@ function AllReturns({ refreshKey }: { refreshKey: number }) {
           <option value="">All statuses</option><option value="POSTED">Posted</option><option value="REVERSED">Reversed</option><option value="DRAFT">Draft</option>
         </select>
         <div />
-        <label className="text-xs text-[var(--text-3)] flex items-center gap-2 md:col-span-2">From <DateSystemInput valueAD={dFrom} onChangeAD={setDFrom} className="flex-1" /></label>
-        <label className="text-xs text-[var(--text-3)] flex items-center gap-2 md:col-span-2">To <DateSystemInput valueAD={dTo} onChangeAD={setDTo} className="flex-1" /></label>
+        <label className="text-xs text-[var(--text-3)] flex items-center gap-2 md:col-span-4">Date
+          <DateRangeFilter fromAD={dFrom} toAD={dTo} emptyLabel="All dates"
+            onApply={r => { setDFrom(r.fromAD); setDTo(r.toAD) }} onClear={() => { setDFrom(''); setDTo('') }} />
+        </label>
         {(dFrom || dTo || customer || status || search) && <div><Button variant="ghost" size="sm" onClick={() => { setDFrom(''); setDTo(''); setCustomer(null); setStatus(''); setSearch('') }}>Clear filters</Button></div>}
       </div>
 

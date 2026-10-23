@@ -1,3 +1,4 @@
+import { DateRangeFilter } from '@/components/ui/DateRangePopup'
 import { useMemo, useState } from 'react'
 import {
   usePurchaseSuggestions, usePurchaseSuggestionSettings, useUpdatePurchaseSuggestionSettings,
@@ -232,8 +233,9 @@ export default function PurchaseSuggestionsPage() {
           <Select value={period} onChange={(e) => { setPeriod(e.target.value); setPage(1) }} options={PERIOD_OPTIONS} className="w-auto min-w-[150px]" />
           {period === 'custom' && (
             <>
-              <input type="date" className="erp-input w-auto" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setPage(1) }} />
-              <input type="date" className="erp-input w-auto" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPage(1) }} />
+              <DateRangeFilter fromAD={dateFrom} toAD={dateTo} emptyLabel="Select date range"
+                onApply={r => { setDateFrom(r.fromAD); setDateTo(r.toAD); setPage(1) }}
+                onClear={() => { setDateFrom(''); setDateTo(''); setPage(1) }} />
             </>
           )}
           <Select value={supplierId} onChange={(e) => { setSupplierId(e.target.value); setPage(1) }} placeholder="All Suppliers"

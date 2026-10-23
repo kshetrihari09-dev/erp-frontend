@@ -3,6 +3,7 @@
  * Theme-aware: adapts to light and dark mode via useUIStore.
  * All accounting logic, hook, API endpoint, and TrialBalanceRow calculations unchanged.
  */
+import { DateRangeFilter } from '@/components/ui/DateRangePopup'
 import { useState, useMemo, useCallback, memo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTrialBalance } from '@/hooks/useQuery'
@@ -390,15 +391,10 @@ export default function TrialBalTab() {
         style={{ ...cardStyle, padding: '18px 20px', marginBottom: 16 }}
       >
         <div className="acc-tb-filter-row" style={{ display: 'flex', alignItems: 'flex-end', gap: 12, flexWrap: 'wrap' }}>
-          {[
-            { label: 'From Date',     value: dateFrom, onChange: setDateFrom, width: 155 },
-            { label: 'As of Date',    value: dateTo,   onChange: setDateTo,   width: 155 },
-          ].map(f => (
-            <div key={f.label} className="acc-tb-filter-field">
-              <label style={{ fontSize: 10, fontWeight: 700, color: tk.textMuted, textTransform: 'uppercase', letterSpacing: '0.1em', display: 'block', marginBottom: 6, fontFamily: 'var(--font-mono)' }}>{f.label}</label>
-              <input type="date" className="erp-input" style={{ width: f.width }} value={f.value} onChange={e => f.onChange(e.target.value)} />
-            </div>
-          ))}
+          <div className="acc-tb-filter-field">
+            <label style={{ fontSize: 10, fontWeight: 700, color: tk.textMuted, textTransform: 'uppercase', letterSpacing: '0.1em', display: 'block', marginBottom: 6, fontFamily: 'var(--font-mono)' }}>Date Range (From – As of)</label>
+            <DateRangeFilter fromAD={dateFrom} toAD={dateTo} onApply={r => { setDateFrom(r.fromAD); setDateTo(r.toAD) }} />
+          </div>
           <div className="acc-tb-filter-field">
             <label style={{ fontSize: 10, fontWeight: 700, color: tk.textMuted, textTransform: 'uppercase', letterSpacing: '0.1em', display: 'block', marginBottom: 6, fontFamily: 'var(--font-mono)' }}>Account Type</label>
             <select className="erp-input" style={{ width: 148 }} value={typeFilter} onChange={e => setTypeFilter(e.target.value)}>

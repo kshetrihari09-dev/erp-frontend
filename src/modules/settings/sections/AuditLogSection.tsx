@@ -1,3 +1,4 @@
+import { DateRangeFilter } from '@/components/ui/DateRangePopup'
 import { useMemo, useState } from 'react'
 import { Shield, Download, Search, X } from 'lucide-react'
 import { useAuditLog, useUsers } from '@/hooks/useQuery'
@@ -90,8 +91,11 @@ export default function AuditLogSection() {
             value={search}
             onChange={e => { setSearch(e.target.value); setPage(1) }}
           />
-          <input type="date" className="erp-input" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setPage(1) }} title="From date" />
-          <input type="date" className="erp-input" value={dateTo} onChange={e => { setDateTo(e.target.value); setPage(1) }} title="To date" />
+          <div style={{ gridColumn: 'span 2', minWidth: 230 }}>
+            <DateRangeFilter fromAD={dateFrom} toAD={dateTo} emptyLabel="All dates"
+              onApply={r => { setDateFrom(r.fromAD); setDateTo(r.toAD); setPage(1) }}
+              onClear={() => { setDateFrom(''); setDateTo(''); setPage(1) }} />
+          </div>
           <Select value={userId} onChange={e => { setUserId(e.target.value); setPage(1) }}
             options={[{ value: '', label: 'All Users' }, ...users.map(u => ({ value: u.id, label: u.name }))]} />
           <Select value={action} onChange={e => { setAction(e.target.value); setPage(1) }}

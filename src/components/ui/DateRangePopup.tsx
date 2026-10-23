@@ -122,9 +122,14 @@ export function DateRangePopup({ open, fromAD, toAD, system: initialSystem, onAp
 }
 
 /** Button showing the applied range + the popup anchored under it. Drop-in for a From/To pair. */
-export function DateRangeFilter({ fromAD, toAD, onApply }: {
+export function DateRangeFilter({ fromAD, toAD, onApply, emptyLabel, onClear }: {
   fromAD: string; toAD: string; onApply: (r: DateRangeApply) => void | Promise<void>
+  /** For filters where "no dates" means "no date filter": text shown while from/to are empty. */
+  emptyLabel?: string
+  /** Shows a small ✕ while a range is set; call it to go back to "no date filter". */
+  onClear?: () => void
 }) {
+  const isEmpty = !fromAD && !toAD
   const dateMode = useUIStore(s => s.dateMode)
   const [system, setSystem] = useState<CalSystem>(dateMode === 'AD' ? 'AD' : 'BS')   // last used calendar
   const [open, setOpen] = useState(false)
@@ -141,9 +146,13 @@ export function DateRangeFilter({ fromAD, toAD, onApply }: {
       <button type="button" className="erp-input dr-trigger" onClick={() => setOpen(o => !o)} aria-haspopup="dialog" aria-expanded={open}
         title="Change date range">
         <CalendarDays size={14} />
-        <span>{describeRange(fromAD, toAD, system)}</span>
-        <em>{system}</em>
+        <span>{isEmpty ? (emptyLabel ?? 'Select date range') : describeRange(fromAD, toAD, system)}</span>
+        {!isEmpty && <em>{system}</em>}
       </button>
+      {onClear && !isEmpty && (
+        <button type="button" className="dr-clear" aria-label="Clear date range" title="Clear date range"
+          onClick={() => { setOpen(false); onClear() }}>✕</button>
+      )}
       <DateRangePopup
         open={open} fromAD={fromAD} toAD={toAD} system={system} onClose={() => setOpen(false)}
         onApply={async r => { await onApply(r); setSystem(r.system) }}

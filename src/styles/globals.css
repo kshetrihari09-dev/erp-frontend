@@ -7610,6 +7610,10 @@ canvas{
 .dr-trigger { display: flex !important; align-items: center; gap: 7px; height: 32px; padding: 0 9px !important; min-width: 230px; text-align: left;
   font-size: 13px; font-variant-numeric: tabular-nums; cursor: pointer; white-space: nowrap; }
 .dr-trigger span { flex: 1; }
+.dr-clear { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; border: 0; border-radius: 4px;
+  background: transparent; color: var(--text-4); font-size: 11px; line-height: 1; cursor: pointer; }
+.dr-clear:hover { background: var(--surface-3); color: var(--text); }
+.dr-anchor:has(.dr-clear) .dr-trigger { padding-right: 52px !important; }
 .dr-trigger em { font-style: normal; font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 4px; background: var(--brand-light); color: var(--brand); }
 .dr-pop { position: absolute; z-index: var(--z-dropdown); top: calc(100% + 4px); left: 0; width: 272px; box-sizing: border-box; padding: 0 0 8px;
   background: var(--surface); border: 1px solid var(--border-2); border-radius: 4px; box-shadow: var(--shadow-lg); font-size: 12px; color: var(--text-2); }
