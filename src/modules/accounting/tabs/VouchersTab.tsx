@@ -1,3 +1,4 @@
+import FiscalYearHint, { useFiscalYearCheck } from '@/components/forms/FiscalYearHint'
 import { useState, useCallback, useEffect } from 'react'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { Plus, Trash2, CheckCircle2, RotateCcw, Printer, Pencil } from 'lucide-react'
@@ -273,7 +274,10 @@ function VoucherForm({ onClose, editVoucher, editReason }: { onClose: () => void
   const totalCr = lines.reduce((s, l) => s + (Number(l.credit) || 0), 0)
   const balanced = Math.abs(totalDr - totalCr) < 0.01
 
+  const fyCheck = useFiscalYearCheck(watch('voucher_date'))   // server is authoritative; this blocks an invalid date early
+
   const onSubmit = handleSubmit(async (data) => {
+    if (fyCheck.blocked) { error('Fiscal year', fyCheck.message || ''); return }
     const validLines = data.lines.filter(l => l.account_id && (Number(l.debit) > 0 || Number(l.credit) > 0))
     if (validLines.length < 2) { error('Need at least 2 lines'); return }
     if (!balanced) { error('Debits must equal credits'); return }
@@ -333,6 +337,7 @@ function VoucherForm({ onClose, editVoucher, editReason }: { onClose: () => void
             valueAD={watch('voucher_date')}
             onChangeAD={(ad) => setValue('voucher_date', ad)}
           />
+          <FiscalYearHint check={fyCheck} />
         </div>
         <div>
           <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">Party</label>
@@ -406,7 +411,7 @@ function VoucherForm({ onClose, editVoucher, editReason }: { onClose: () => void
 
       <div className="flex justify-end gap-2 mt-5 pt-4 border-t border-[var(--border)]">
         <Button variant="secondary" onClick={onClose}>Cancel</Button>
-        <Button variant="primary" loading={isSubmitting} onClick={onSubmit}>{isEdit ? 'Save Changes' : 'Create Voucher'}</Button>
+        <Button variant="primary" loading={isSubmitting} disabled={fyCheck.blocked} onClick={onSubmit}>{isEdit ? 'Save Changes' : 'Create Voucher'}</Button>
       <PrintPreviewModal
         data={printData}
         open={!!printData}

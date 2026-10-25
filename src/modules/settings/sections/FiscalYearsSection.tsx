@@ -3,6 +3,7 @@ import { Plus, X, Lock, Unlock, Pencil, CheckCircle2 } from 'lucide-react'
 import { useFiscalYears, useInvalidateFiscalData } from '@/hooks/useQuery'
 import { settingsAPI } from '@/services/api'
 import useUIStore from '@/store/uiStore'
+import useAuthStore from '@/store/authStore'
 import { Button, SkeletonRows, Empty } from '@/components/ui'
 import { fmtDate } from '@/utils'
 
@@ -11,7 +12,7 @@ const EMPTY_FORM = { name: '', start_date_ad: '', end_date_ad: '', start_date_bs
 function StatusBadges({ y }: { y: any }) {
   return (
     <>
-      {y.is_locked ? <span className="badge badge-red">Locked</span> : <span className="badge badge-green">Open</span>}
+      {y.is_locked ? <span className="badge badge-red">Closed</span> : <span className="badge badge-green">Open</span>}
       {y.is_current && <span className="badge badge-blue ml-1.5">Current</span>}
     </>
   )
@@ -21,6 +22,12 @@ export default function FiscalYearsSection() {
   const { data, isLoading } = useFiscalYears()
   const refreshAll = useInvalidateFiscalData()   // fiscal years AND Accounting → Periods
   const { success: toastOk, error: toastErr } = useUIStore()
+  // UI mirrors the server's rules (the API enforces them regardless of what is shown here):
+  //   view: everyone · create / edit / set current: owner, admin · close (lock): owner or can_lock_periods · reopen: owner only
+  const user = useAuthStore(s => s.user)
+  const canManage = user?.role === 'owner' || user?.role === 'admin'
+  const canClose  = user?.role === 'owner' || !!user?.can_lock_periods
+  const canReopen = user?.role === 'owner'
   // unwrap returns the array directly: r.data.data = [...fiscal_years]
   const years = Array.isArray(data) ? data : ((data as any)?.data ?? [])
 
@@ -78,18 +85,18 @@ export default function FiscalYearsSection() {
 
   const Actions = ({ y }: { y: any }) => (
     <div className="flex flex-wrap gap-1.5">
-      <Button size="sm" variant="ghost" icon={<Pencil size={12}/>} disabled={y.is_locked || busyId === y.id}
-        title={y.is_locked ? 'Unlock the fiscal year to edit it' : undefined} onClick={() => startEdit(y)}>Edit</Button>
-      {!y.is_current || !y.is_active
-        ? <Button size="sm" variant="ghost" icon={<CheckCircle2 size={12}/>} disabled={y.is_locked || y.is_active || busyId === y.id}
-            title={y.is_locked ? 'A locked fiscal year cannot be made current' : undefined}
-            onClick={() => run(y, () => settingsAPI.activateFiscalYear(y.id), `${y.name} is now the current fiscal year`)}>Set current</Button>
-        : null}
+      {canManage && <Button size="sm" variant="ghost" icon={<Pencil size={12}/>} disabled={y.is_locked || busyId === y.id}
+        title={y.is_locked ? 'Unlock the fiscal year to edit it' : undefined} onClick={() => startEdit(y)}>Edit</Button>}
+      {canManage && (!y.is_current || !y.is_active) && (
+        <Button size="sm" variant="ghost" icon={<CheckCircle2 size={12}/>} disabled={y.is_locked || y.is_active || busyId === y.id}
+          title={y.is_locked ? 'A locked fiscal year cannot be made current' : undefined}
+          onClick={() => run(y, () => settingsAPI.activateFiscalYear(y.id), `${y.name} is now the current fiscal year`)}>Set current</Button>
+      )}
       {y.is_locked
-        ? <Button size="sm" variant="success" icon={<Unlock size={12}/>} loading={busyId === y.id}
-            onClick={() => run(y, () => settingsAPI.unlockFiscalYear(y.id), 'Fiscal year unlocked')}>Unlock</Button>
-        : <Button size="sm" variant="danger" icon={<Lock size={12}/>} loading={busyId === y.id}
-            onClick={() => run(y, () => settingsAPI.lockFiscalYear(y.id), 'Fiscal year locked')}>Lock</Button>}
+        ? (canReopen && <Button size="sm" variant="success" icon={<Unlock size={12}/>} loading={busyId === y.id}
+            onClick={() => run(y, () => settingsAPI.unlockFiscalYear(y.id), 'Fiscal year reopened')}>Reopen</Button>)
+        : (canClose && <Button size="sm" variant="danger" icon={<Lock size={12}/>} loading={busyId === y.id}
+            onClick={() => run(y, () => settingsAPI.lockFiscalYear(y.id), 'Fiscal year closed')}>Close</Button>)}
     </div>
   )
 
@@ -98,14 +105,16 @@ export default function FiscalYearsSection() {
 
   return (
     <div>
-      <div className="flex justify-end mb-3">
-        <Button variant="primary" size="sm" icon={showForm ? <X size={14}/> : <Plus size={14}/>}
-          onClick={() => (showForm ? closeForm() : setShowForm(true))}>
-          {showForm ? 'Cancel' : 'Add Fiscal Year'}
-        </Button>
-      </div>
+      {canManage && (
+        <div className="flex justify-end mb-3">
+          <Button variant="primary" size="sm" icon={showForm ? <X size={14}/> : <Plus size={14}/>}
+            onClick={() => (showForm ? closeForm() : setShowForm(true))}>
+            {showForm ? 'Cancel' : 'Add Fiscal Year'}
+          </Button>
+        </div>
+      )}
 
-      {showForm && (
+      {canManage && showForm && (
         <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-4 mb-4 shadow-card">
           <div className="form-grid">
             <div>

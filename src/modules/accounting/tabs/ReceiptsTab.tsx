@@ -1,3 +1,4 @@
+import FiscalYearHint, { useFiscalYearCheck } from '@/components/forms/FiscalYearHint'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { useQueryClient } from '@tanstack/react-query'
@@ -50,7 +51,10 @@ function QuickVoucherForm({ type, accounts, parties, partyBalances, balancesLoad
     },
   })
 
+  const fyCheck = useFiscalYearCheck(watch('date'))   // server is authoritative; this blocks an invalid date early
+
   const onSubmit = handleSubmit(async (data) => {
+    if (fyCheck.blocked) { error('Fiscal year', fyCheck.message || ''); return }
     if (!data.account_id)     { error('Select an account'); return }
     if (!Number(data.amount)) { error('Enter a valid amount'); return }
     try {
@@ -153,6 +157,7 @@ function QuickVoucherForm({ type, accounts, parties, partyBalances, balancesLoad
             valueAD={watch('date')}
             onChangeAD={(ad) => setValue('date', ad)}
           />
+          <FiscalYearHint check={fyCheck} />
         </div>
         <div>
           <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">
@@ -210,7 +215,7 @@ function QuickVoucherForm({ type, accounts, parties, partyBalances, balancesLoad
         onNextBill={() => { setPrintData(null); resetForNextVoucher() }}
       />
         <Button variant="secondary" onClick={onClose}>Cancel</Button>
-        <Button variant="primary" loading={isSubmitting} onClick={() => isEdit ? onSubmit() : setConfirmSave(true)}>
+        <Button variant="primary" loading={isSubmitting} disabled={fyCheck.blocked} onClick={() => isEdit ? onSubmit() : setConfirmSave(true)}>
           {isEdit ? 'Save Changes' : `Create ${type === 'RECEIPT' ? 'Receipt' : 'Payment'}`}
         </Button>
       </div>

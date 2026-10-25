@@ -11,6 +11,7 @@
  * Business logic, calculations, API calls, validation — 100% unchanged.
  */
 
+import FiscalYearHint, { useFiscalYearCheck } from '@/components/forms/FiscalYearHint'
 import { DateRangeFilter } from '@/components/ui/DateRangePopup'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import UnifiedProductInput, { type UnifiedProductInputHandle } from '@/components/forms/UnifiedProductInput'
@@ -22,7 +23,7 @@ import {
   CalendarDays, CreditCard, User, MapPin, Hash, Home,
   Phone as PhoneIcon, ChevronDown, AlertCircle,
   CheckCircle2, RotateCcw, Save, Plus, UserPlus,
-  ArrowLeft, HelpCircle, Trash2,
+  ArrowLeft, HelpCircle, Trash2, XCircle,
 } from 'lucide-react'
 import { salesAPI, partiesAPI, productsAPI } from '@/services/api'
 import { useOffline } from '@/offline/OfflineProvider'
@@ -446,6 +447,7 @@ export default function SalesPage() {
 
   // ── onSubmit — now requires a customer to be selected before posting ────
   const onSubmit = handleSubmit(async (data) => {
+    if (fyCheck.blocked) { error('Fiscal year', fyCheck.message || ''); return }   // re-validate on submit (server is authoritative)
     const validRows = rows.filter(r => r.product_id && Number(r.qty) > 0)
     if (!validRows.length) { setFlash({ type: 'danger', msg: 'Add at least one product' }); return }
     if (!data.customer_id) { setFlash({ type: 'danger', msg: 'Select a customer before posting the sale' }); setCustomerOpen(true); return }
@@ -651,7 +653,11 @@ export default function SalesPage() {
   // to run before posting), then opens the Discount Review popup. The
   // Sale page no longer posts directly; the popup's own Post Invoice
   // button is what actually calls onSubmit.
+  // Fiscal year of the entered date (server re-validates everything; this blocks an obviously invalid post early).
+  const fyCheck = useFiscalYearCheck(watch('date'))
+
   function handleNextClick() {
+    if (fyCheck.blocked) { error('Fiscal year', fyCheck.message || ''); return }
     const v = validDiscountRows(rows)
     if (!v.length) { setFlash({ type: 'danger', msg: 'Add at least one product' }); return }
     if (!customerId) { setFlash({ type: 'danger', msg: 'Select a customer before posting the sale' }); setCustomerOpen(true); return }
@@ -938,6 +944,7 @@ export default function SalesPage() {
                         />
                         <CalendarDays size={14} className="pos-cf-trailing-icon pos-cf-date-icon" aria-hidden="true" />
                       </div>
+                      <FiscalYearHint check={fyCheck} />
                     </div>
                   </div>
 
@@ -1367,7 +1374,7 @@ export default function SalesPage() {
                 <Save size={14}/> Save Draft
               </button>
               <button
-                type="button" onClick={handleNextClick} disabled={saving}
+                type="button" onClick={handleNextClick} disabled={saving || fyCheck.blocked}
                 className="pos-action-btn pos-action-btn--post" title="Next — Review Discount (F12)"
               >
                 {saving ? <span className="pos-spinner"/> : <FileText size={14}/>}
@@ -1742,7 +1749,7 @@ export default function SalesPage() {
                       <Button variant="secondary" size="sm" icon={<User size={13}/>} onClick={() => setUpdatePartySale(s)}>Update Party</Button>
                     )}
                     {s.status === 'active' && (
-                      <Button variant="danger" size="sm" onClick={() => setConfirmCancel(s.id)}>Cancel</Button>
+                      <Button variant="danger" size="sm" icon={<XCircle size={13}/>} onClick={() => setConfirmCancel(s.id)}>Cancel</Button>
                     )}
                   </div>
                 </div>

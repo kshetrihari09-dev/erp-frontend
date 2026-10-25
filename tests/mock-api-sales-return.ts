@@ -51,3 +51,5 @@ export const salesReturnsAPI = {
   list: (p: any) => { calls.list.push(p); return ok(state.listRows, { pagination: { total: state.listTotal || state.listRows.length, page: p.page, limit: p.limit } }) },
   detail: (id: string) => { calls.detail.push(id); return Promise.reject({ response: { status: 404, data: { message: 'n/a' } } }) },
 }
+// the return forms now check the transaction date against the company's fiscal years
+export const settingsAPI = { fiscalYears: () => ok([]) }

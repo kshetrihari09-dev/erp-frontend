@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import './setup-dom'
 import test from 'node:test'
 import assert from 'node:assert/strict'
@@ -18,13 +19,13 @@ const reset = () => {
   for (const k of Object.keys(calls) as (keyof typeof calls)[]) calls[k].length = 0
 }
 async function open(customer = 'c1') {
-  render(<SalesReturnPage />)
+  render(<QueryClientProvider client={new QueryClient()}><SalesReturnPage /></QueryClientProvider>)
   await waitFor(() => assert.ok(q().getByText('ABC Traders', { exact: false })))
   if (customer) type(q().getByLabelText('Customer'), customer)
 }
 
 test('opens straight into the Sales-style billing screen: no invoice search, no invoice picker', async () => {
-  reset(); render(<SalesReturnPage />)
+  reset(); render(<QueryClientProvider client={new QueryClient()}><SalesReturnPage /></QueryClientProvider>)
   assert.ok(q().getByText('Customer Information')); assert.ok(q().getByText('Return Items')); assert.ok(q().getByLabelText('scan'))
   assert.equal(q().queryByLabelText('Search invoices'), null); assert.equal(q().queryByText(/Find the original/i), null)
   assert.equal(calls.preview.length, 0)
@@ -118,7 +119,7 @@ test('All Returns: search/date/status filters + pagination reach the API; older 
   reset()
   state.listRows = [{ id: 'v1', voucher_no: 'CN-OLD-1', voucher_date: '2026-05-01', total_amount: 250, status: 'POSTED', party_name: 'XYZ Stores', original_invoice_no: 'INV-0009', sales_return_id: null }]
   state.listTotal = 45
-  render(<SalesReturnPage />)
+  render(<QueryClientProvider client={new QueryClient()}><SalesReturnPage /></QueryClientProvider>)
   fireEvent.click(q().getByText('All Returns'))
   await waitFor(() => assert.ok(q().getAllByText('CN-OLD-1').length))
   type(q().getByLabelText('Search returns'), 'INV-0009'); await waitFor(() => assert.ok(calls.list.some(c => c.search === 'INV-0009')))

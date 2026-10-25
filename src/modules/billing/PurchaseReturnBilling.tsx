@@ -15,6 +15,7 @@
  *     what is saved == what is printed.
  *   - the footer settles the debit (supplier account / cash refund received / bank refund received) instead of taking a payment.
  */
+import FiscalYearHint, { useFiscalYearCheck } from '@/components/forms/FiscalYearHint'
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import {
   Truck, MapPin, Hash, Home, Phone as PhoneIcon, CalendarDays, ChevronDown, CreditCard, ShoppingCart,
@@ -187,7 +188,11 @@ export default function PurchaseReturnBilling({ active, onPosted }: { active: bo
     requestAnimationFrame(() => unifiedInputRef.current?.focus())
   }
 
+  // Fiscal year of the return date (server re-validates; this blocks an obviously invalid post early).
+  const fyCheck = useFiscalYearCheck(date)
+
   function handleNextClick() {
+    if (fyCheck.blocked) { toastError('Fiscal year', fyCheck.message || ''); return }
     if (!isOnline) { setFlash({ type: 'danger', msg: 'You are offline. A purchase return must be checked against the supplier’s real bills and stock on the server, so it can only be posted online.' }); return }
     if (!live.length) { setFlash({ type: 'danger', msg: 'Add at least one product' }); return }
     if (!supplierId) { setFlash({ type: 'danger', msg: 'Select a supplier before posting the return' }); setSupplierOpen(true); return }
@@ -199,6 +204,7 @@ export default function PurchaseReturnBilling({ active, onPosted }: { active: bo
 
   async function post() {
     if (savingRef.current || !pv || !totals) return
+    if (fyCheck.blocked) { toastError('Fiscal year', fyCheck.message || ''); return }   // re-validate on submit
     savingRef.current = true; setSaving(true)
     try {
       const body: Record<string, unknown> = {
@@ -269,7 +275,7 @@ export default function PurchaseReturnBilling({ active, onPosted }: { active: bo
     return <span className="pos-cell-display">{batches.join(', ') || '—'}</span>
   }
 
-  const postDisabled = saving || !isOnline
+  const postDisabled = saving || !isOnline || fyCheck.blocked
 
   return (
     <div className="space-y-4">
@@ -332,6 +338,7 @@ export default function PurchaseReturnBilling({ active, onPosted }: { active: bo
                     <DateSystemInput className="erp-input pos-cf-date-input" valueAD={date} onChangeAD={setDate} />
                     <CalendarDays size={14} className="pos-cf-trailing-icon pos-cf-date-icon" aria-hidden="true" />
                   </div>
+                  <FiscalYearHint check={fyCheck} />
                 </div>
               </div>
 
@@ -545,7 +552,7 @@ export default function PurchaseReturnBilling({ active, onPosted }: { active: bo
       {/* confirmation */}
       <Modal open={confirmOpen} onClose={() => !saving && setConfirmOpen(false)} title="Confirm purchase return" size="md"
         footer={<><Button variant="secondary" disabled={saving} onClick={() => setConfirmOpen(false)}>Back</Button>
-          <Button variant="primary" loading={saving} disabled={saving} onClick={post}>Post Return</Button></>}>
+          <Button variant="primary" loading={saving} disabled={saving || fyCheck.blocked} onClick={post}>Post Return</Button></>}>
         {totals && pv && (
           <div className="space-y-3 text-sm">
             <div>{isWalkin ? 'No supplier account' : supplier?.name} · {formatDisplayDate(date, dateMode)}</div>

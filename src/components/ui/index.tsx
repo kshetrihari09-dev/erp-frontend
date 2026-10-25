@@ -1,3 +1,4 @@
+import { Search } from 'lucide-react'
 import { forwardRef, useEffect, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type MouseEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { cn, statusColor } from '@/utils'
@@ -466,9 +467,10 @@ export function ToggleSwitch({ checked, onChange, label }: { checked: boolean; o
 export function SearchInput({ value, onChange, placeholder = 'Search…', className }: { value: string; onChange: (v: string) => void; placeholder?: string; className?: string }) {
   return (
     <div className={cn('relative', className)}>
-      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-4)] text-sm pointer-events-none">⌕</span>
+      <Search size={16} aria-hidden className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-4)] pointer-events-none" />
       <input
-        className="erp-input pl-8 pr-8"
+        className="erp-input pr-8"
+        style={{ paddingLeft: 38 }}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}

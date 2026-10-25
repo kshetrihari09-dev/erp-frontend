@@ -13,6 +13,7 @@
  * (utils/purchaseCalc.js): row amount = qty × rate × (1 − disc%) + CC,
  * discount resolved per scope into discount_pct, net = round(Σ amounts).
  */
+import FiscalYearHint, { useFiscalYearCheck } from '@/components/forms/FiscalYearHint'
 import { DateRangeFilter } from '@/components/ui/DateRangePopup'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useForm } from 'react-hook-form'
@@ -394,6 +395,7 @@ export default function PurchasePage() {
 
   // ── Submit ────────────────────────────────────────────────────────────
   const onSubmit = handleSubmit(async (data) => {
+    if (fyCheck.blocked) { error('Fiscal year', fyCheck.message || ''); return }   // re-validate on submit (server is authoritative)
     const validRows = rows.filter(r => r.product_id && Number(r.qty) > 0)
     if (!validRows.length) { setFlash({ type: 'danger', msg: 'Add at least one product' }); return }
     if (!data.payment_mode) { setFlash({ type: 'danger', msg: 'Please select a payment mode.' }); return }
@@ -474,7 +476,11 @@ export default function PurchasePage() {
 
   // "Next (F12)" — validates the bill, then opens the Discount Review popup;
   // the popup's Post button opens the confirm dialog, which posts.
+  // Fiscal year of the entered date (server re-validates everything; this blocks an obviously invalid post early).
+  const fyCheck = useFiscalYearCheck(watch('date'))
+
   function handleNextClick() {
+    if (fyCheck.blocked) { error('Fiscal year', fyCheck.message || ''); return }
     const v = validDiscountRows(rows)
     if (!v.length) { setFlash({ type: 'danger', msg: 'Add at least one product' }); return }
     if (!currentPayMode) { setFlash({ type: 'danger', msg: 'Please select a payment mode.' }); return }
@@ -691,6 +697,7 @@ export default function PurchasePage() {
                         />
                         <CalendarDays size={14} className="pos-cf-trailing-icon pos-cf-date-icon" aria-hidden="true" />
                       </div>
+                      <FiscalYearHint check={fyCheck} />
                     </div>
                   </div>
 
@@ -1105,7 +1112,7 @@ export default function PurchasePage() {
                 <Save size={14}/> Save Draft
               </button>
               <button
-                type="button" onClick={handleNextClick} disabled={saving}
+                type="button" onClick={handleNextClick} disabled={saving || fyCheck.blocked}
                 className="pos-action-btn pos-action-btn--post" title="Next — Review Discount (F12)"
               >
                 {saving ? <span className="pos-spinner"/> : <FileText size={14}/>}
