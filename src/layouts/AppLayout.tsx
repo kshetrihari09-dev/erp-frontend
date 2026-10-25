@@ -8,6 +8,7 @@ import {
   FileBarChart, Settings, LogOut, Building2, CalendarDays, Moon,
   Sun, Menu, X, AlertTriangle, Bell, Search, ChevronRight, Home,
   PackageX, CalendarClock, Sparkles, ShieldAlert, ClipboardList, Building, ArrowLeftRight, BarChart3,
+  Scissors,
 } from 'lucide-react'
 import useAuthStore from '@/store/authStore'
 import useUIStore from '@/store/uiStore'
@@ -35,6 +36,7 @@ const NAV = [
 
   { section: 'SALES' },
   { to: PATHS.SALES,      label: 'Sales / POS',   icon: <ShoppingCart    size={20} strokeWidth={1.8}/>, alertKey: 'due' },
+  { to: PATHS.RETAIL_SALE, label: 'Retail Sale',    icon: <Scissors        size={20} strokeWidth={1.8}/> },
   { to: PATHS.SALES_RETURNS,    label: 'Sales Returns',    icon: <RotateCcw       size={20} strokeWidth={1.8}/> },
   { to: PATHS.CUSTOMERS,  label: 'Customers',      icon: <Users           size={20} strokeWidth={1.8}/> },
 
@@ -183,6 +185,7 @@ export default function AppLayout() {
   const pageTitle = Object.entries({
     [PATHS.DASHBOARD]:  'Dashboard',
     [PATHS.SALES]:      'Sales / POS',
+    [PATHS.RETAIL_SALE]: 'Retail Sale',
     [PATHS.PURCHASE]:   'Purchase',
     [PATHS.SALES_RETURNS]:    'Sales Returns',
     [PATHS.PURCHASE_RETURNS]: 'Purchase Returns',

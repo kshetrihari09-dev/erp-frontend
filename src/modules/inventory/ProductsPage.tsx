@@ -5,6 +5,7 @@ import type { UseFormRegister, FieldErrors } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Plus, Package, ScanLine, Boxes, Download, Upload, Printer, QrCode, Filter, Pencil, Trash2 } from 'lucide-react'
 import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct, useProductOpeningBatches, useAddOpeningInventory, useNextBarcode, useSuppliers } from '@/hooks/useQuery'
+import { RetailProfileSection, emptyRetailProfile, retailProfileToPayload, retailProfileError } from './RetailProfileFields'
 import { Button, Modal, Badge, Pagination, SkeletonRows, Empty, SearchInput, ConfirmDialog, Select, ToggleSwitch } from '@/components/ui'
 import ManufacturerSelect from '@/components/forms/ManufacturerSelect'
 import ExportProductsModal from './ExportProductsModal'
@@ -311,6 +312,7 @@ function ProductForm({ initial, onClose }: { initial?: Product | null; onClose: 
   const [scanOpen, setScanOpen]   = useState(false)
   const [scanBanner, setScanBanner] = useState<string | null>(null)
   const [planning, setPlanning] = useState<PlanningState>(() => emptyPlanning(initial))
+  const [retail, setRetail] = useState(() => emptyRetailProfile(initial))
 
   // Create Product only: pre-fetch the next auto-generated barcode (same
   // global product_auto_barcode_seq / nextAutoBarcode() the backend already
@@ -341,16 +343,22 @@ function ProductForm({ initial, onClose }: { initial?: Product | null; onClose: 
   }
 
   const onSubmit = handleSubmit(async (data) => {
+    // Retail Sale profile is optional, but if a pack size is typed it must be valid.
+    if (retailProfileError(retail)) return
     if (initial) {
       // Editing never touches opening stock — that's a "new product" concept.
       const { opening_stock, opening_batch, opening_expiry, ...editable } = data as any
-      await update.mutateAsync({ id: initial.id, data: { ...editable, ...planningToPayload(planning) } })
+      await update.mutateAsync({ id: initial.id, data: { ...editable, ...planningToPayload(planning), ...retailProfileToPayload(retail) } })
     } else {
       const newProduct = await create.mutateAsync(data)
       // Inventory Planning is optional and applied as a non-fatal follow-up
       // PATCH, same pattern as opening-stock — the product is still
       // created successfully even if this secondary call fails.
       const payload = planningToPayload(planning)
+      // Retail Sale profile: same non-fatal follow-up pattern, only when a pack size was entered.
+      if (retail.pack.trim() !== '') {
+        try { await update.mutateAsync({ id: newProduct.id, data: retailProfileToPayload(retail) as any }) } catch { /* non-fatal */ }
+      }
       const hasAnyPlanning = Object.values(payload).some(v => v !== null && v !== false)
       if (hasAnyPlanning) {
         try { await update.mutateAsync({ id: newProduct.id, data: payload as any }) } catch { /* non-fatal */ }
@@ -466,6 +474,7 @@ function ProductForm({ initial, onClose }: { initial?: Product | null; onClose: 
       )}
 
       <InventoryPlanningSection value={planning} onChange={setPlanning} />
+      <RetailProfileSection value={retail} onChange={setRetail} />
 
       <div className="flex justify-end gap-2 mt-5 pt-4 border-t border-[var(--border)]">
         <Button variant="secondary" onClick={onClose}>Cancel</Button>

@@ -140,6 +140,7 @@ export const PATHS = {
   SIGNUP:     '/signup',
   DASHBOARD:  '/dashboard',
   SALES:      '/sales',
+  RETAIL_SALE: '/retail-sale',
   PURCHASE:   '/purchase',
   SALES_RETURNS:    '/sales-returns',
   PURCHASE_RETURNS: '/purchase-returns',

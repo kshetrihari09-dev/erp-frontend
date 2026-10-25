@@ -197,6 +197,10 @@ export interface Product {
   safety_stock_qty?:         number | null
   reorder_point_override?:   number | null
   exclude_from_suggestions?: boolean
+  // ── Retail Sale (blister cutting) profile — migration 048, all optional.
+  tablets_per_strip?: number | null
+  tablet_shape?:      'round' | 'oval' | 'capsule' | 'square' | 'oblong' | 'diamond' | null
+  tablet_colors?:     string | null   // "#rrggbb" or "#rrggbb,#rrggbb" (two-tone)
 }
 
 // ─── Smart Purchase Suggestions ────────────────────────────────────────────────

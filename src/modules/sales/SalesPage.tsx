@@ -244,6 +244,46 @@ export default function SalesPage() {
     return () => { if (flashTimerRef.current) clearTimeout(flashTimerRef.current) }
   }, [])
 
+  // ── Retail Sale hand-off ────────────────────────────────────────────────
+  // The Retail Sale page (blister cutting) puts its basket in sessionStorage and
+  // navigates here. We turn it into ordinary invoice rows — loose tablets as a
+  // fraction of a strip — and nothing else: no save, no posting. Batch picking,
+  // customer, payment, discount and Save all run through this page's normal flow.
+  // The key is removed as soon as it is read, so it can never apply twice.
+  useEffect(() => {
+    let raw: string | null = null
+    try {
+      raw = sessionStorage.getItem('retailSaleHandoff')
+      sessionStorage.removeItem('retailSaleHandoff')
+    } catch { return }
+    if (!raw) return
+    try {
+      const { at, items } = JSON.parse(raw) as { at: number; items: Array<{ product: Product; qty: number; rate: number; tablets: number; pack: number }> }
+      if (!Array.isArray(items) || Date.now() - Number(at) > 10 * 60 * 1000) return
+      const built: InvoiceRow[] = items
+        .filter(it => it?.product?.id && Number.isFinite(it.qty) && it.qty > 0 && Number.isFinite(it.rate) && it.rate >= 0)
+        .map(it => {
+          const row: InvoiceRow = { ...newRow(), _scanned: true }
+          row.product_id   = it.product.id
+          row.product_name = it.product.name
+          row.qty          = it.qty
+          row.rate         = it.rate
+          row.cc_pct       = productCcPct(it.product)
+          const { amount, cc_amount } = calcRowAmount({ qty: row.qty, rate: Number(row.rate), bonus: 0, discount_pct: 0, cc_pct: Number(row.cc_pct) || 0 })
+          row.amount = amount
+          row.cc_amount = cc_amount
+          return row
+        })
+      if (!built.length) return
+      setRows(prev => {
+        const last = prev[prev.length - 1]
+        return [...((last && !last.product_id) ? prev.slice(0, -1) : prev), ...built]
+      })
+      setProducts(prev => [...prev, ...items.map(i => i.product).filter(p => p?.id && !prev.some(x => x.id === p.id))])
+      info('Loaded from Retail Sale', `${built.length} item${built.length > 1 ? 's' : ''} added. Choose batches and confirm as usual.`)
+    } catch { /* malformed hand-off: ignore, invoice stays as it was */ }
+  }, [])
+
   const handleProductSelected = useCallback((p: Product) => {
     playSuccessBeep()
 

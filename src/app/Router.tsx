@@ -10,6 +10,7 @@ const LoginPage    = lazy(() => import('@/modules/auth/LoginPage'))
 const SignupPage   = lazy(() => import('@/modules/auth/SignupPage'))
 const Dashboard    = lazy(() => import('@/modules/dashboard/DashboardPage'))
 const SalesPage    = lazy(() => import('@/modules/sales/SalesPage'))
+const RetailSalePage = lazy(() => import('@/modules/retail/RetailSalePage'))
 const PurchasePage = lazy(() => import('@/modules/purchases/PurchasePage'))
 const ReturnsPage  = lazy(() => import('@/modules/billing/ReturnsPage'))
 const SalesReturnPage    = lazy(() => import('@/modules/billing/SalesReturnPage'))
@@ -60,6 +61,7 @@ export default function Router() {
 
             {/* Transactions */}
             <Route path="sales"        element={<SalesPage />} />
+            <Route path="retail-sale"  element={<RetailSalePage />} />
             <Route path="purchase"     element={<PurchasePage />} />
             <Route path="purchases"    element={<PurchasePage />} />
             <Route path="returns"          element={<ReturnsPage />} />
