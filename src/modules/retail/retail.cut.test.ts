@@ -115,4 +115,10 @@ ok('STRAIGHT: a second straight cut across the resulting pieces separates them a
   const r2 = cutPieces(r1.pieces, line({ x: 10, y: 56 }, { x: f.W - 10, y: 56 }), f.tablets, f.shape, f.nid, 'straight')
   assert.ok(r2.changed); assert.ok(r2.pieces.length >= 3); assert.equal(wholeTotal(r2.pieces, f.tablets, f.shape), 10)
 })
+ok('single-tablet strip: a cut beside the tablet separates the foil margin; the one tablet stays whole in one piece', () => {
+  const f = fresh(1)
+  const r = cutPieces(f.start, line({ x: 12, y: -10 }, { x: 12, y: f.H + 10 }), f.tablets, f.shape, f.nid, 'straight')
+  assert.ok(r.changed)
+  assert.equal(wholeTotal(r.pieces, f.tablets, f.shape), 1); assert.equal(cutTotal(r.pieces, f.tablets, f.shape), 0)
+})
 console.log(`\n${n} cut tests passed`)

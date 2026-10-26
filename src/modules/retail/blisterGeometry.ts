@@ -47,7 +47,7 @@ export interface Piece { id: number; rings: MPoly; ox: number; oy: number }
 export const KERF = 2.2        // half-width of the cut line
 export const PROTECT = 1.25    // protected zone = dome outline × this
 export const PITCH = 48        // distance between neighbouring tablets
-export const MIN_PACK = 2
+export const MIN_PACK = 1      // a single-tablet strip is allowed
 export const MAX_PACK = 40
 export const PER_ROW = 5       // tablets per row (fewer only when the strip holds fewer than 5)
 

@@ -164,7 +164,7 @@ export default function RetailSalePage() {
             <div className="mt-3">
               <Alert type="warning" message={
                 <span>
-                  <b>{needsSetup.name}</b> is a strip but has no “Tablets per strip” set (2–{MAX_PACK}), so its blister can’t be shown.{' '}
+                  <b>{needsSetup.name}</b> is a strip but has no “Tablets per strip” set ({MIN_PACK}–{MAX_PACK}), so its blister can’t be shown.{' '}
                   <Link to={PATHS.PRODUCTS} className="underline font-semibold">Open Products</Link> to set it, along with the tablet shape and colour.
                 </span>
               } />
@@ -187,7 +187,7 @@ export default function RetailSalePage() {
                     ))}
                   </div>
                   <p className="mt-2 text-xs">
-                    This choice applies to this scan only. {!validPack(Number(ambiguous.product.tablets_per_strip)) && 'Blister needs “Tablets per strip” (2–{MAX_PACK}) on the product. '}
+                    This choice applies to this scan only. {!validPack(Number(ambiguous.product.tablets_per_strip)) && `Blister needs “Tablets per strip” (${MIN_PACK}–${MAX_PACK}) on the product. `}
                     To fix it permanently, correct the product’s Unit in <Link to={PATHS.PRODUCTS} className="underline font-semibold">Products</Link>.
                   </p>
                 </div>

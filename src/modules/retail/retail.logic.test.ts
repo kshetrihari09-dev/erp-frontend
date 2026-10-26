@@ -16,11 +16,11 @@ import { addToBasket, totals, lineTotal, toHandoff, overStock, defaultPricePerTa
 let n = 0; const ok = (name: string, f: () => void) => { f(); n++; console.log('ok  ', name) }
 
 // 1. valid scan → complete, uncut blister
-ok('5 tablets per row, filled row by row, up to 8 rows (2..40)', () => {
+ok('5 tablets per row, filled row by row, up to 8 rows (1..40)', () => {
   const rowsOf = (n: number) => { const l = layoutBlister(n); const by = new Map<number, number>(); l.tablets.forEach(t => by.set(t.y, (by.get(t.y) ?? 0) + 1)); return [...by.keys()].sort((a, b) => a - b).map(y => by.get(y)!) }
   assert.deepEqual(rowsOf(10), [5, 5]); assert.deepEqual(rowsOf(14), [5, 5, 4]); assert.deepEqual(rowsOf(15), [5, 5, 5])
   assert.deepEqual(rowsOf(20), [5, 5, 5, 5]); assert.deepEqual(rowsOf(40), [5, 5, 5, 5, 5, 5, 5, 5])
-  assert.deepEqual(rowsOf(3), [3]); assert.deepEqual(rowsOf(2), [2])
+  assert.deepEqual(rowsOf(3), [3]); assert.deepEqual(rowsOf(2), [2]); assert.deepEqual(rowsOf(1), [1])
   assert.equal(layoutBlister(40).rows, 8); assert.equal(layoutBlister(40).cols, 5)
   assert.equal(layoutBlister(99).tablets.length, 40)     // clamped, never more than 40
 })
@@ -33,7 +33,7 @@ ok('10-pack: one intact piece, 10 tablets in 2 rows of 5', () => {
   assert.ok(area(piece.rings) > 0.9 * W * H)
   assert.deepEqual(countTablets(piece, tablets, 'round'), { whole: 10, cut: 0 })
 })
-ok('every pack 2..40 lays out exactly `pack` tablets and all are whole', () => {
+ok('every pack 1..40 lays out exactly `pack` tablets and all are whole', () => {
   for (let p = MIN_PACK; p <= MAX_PACK; p++) for (const sh of SHAPE_NAMES) {
     const { tablets, ring } = layoutBlister(p)
     assert.equal(tablets.length, p)
@@ -163,7 +163,7 @@ ok('packaging: Bottle and Tube units → bottle / tube; only a blister can be cu
   assert.equal(canCut('blister'), true); assert.equal(canCut('bottle'), false); assert.equal(canCut('tube'), false)
 })
 ok('packaging: a strip with no valid pack size needs setup (not guessed, not a bottle)', () => {
-  for (const v of [undefined, null, 0, 1, 41, 2.5]) assert.deepEqual(resolvePackaging({ unit: 'Strip', tablets_per_strip: v } as any), { status: 'needs-setup' })
+  for (const v of [undefined, null, 0, -1, 41, 2.5]) assert.deepEqual(resolvePackaging({ unit: 'Strip', tablets_per_strip: v } as any), { status: 'needs-setup' })
 })
 ok('packaging: every Unit in the product form gets its own model', () => {
   const expect: Record<string, string> = { Bottle: 'bottle', Tube: 'tube', Vial: 'vial', Ampoule: 'ampoule', Sachet: 'sachet', Box: 'box', Pcs: 'piece', Kg: 'kg', Ltr: 'ltr' }
@@ -304,4 +304,20 @@ ok('Kg/Ltr: hand-off sends the decimal quantity at the product rate; stock check
   assert.equal(overStock(addUnitToBasket([], glucose, undefined, 10.001)).length, 1)
 })
 
+ok('single-tablet strip (1 per strip) is valid: one tablet, one whole row, billable as 1 tablet', () => {
+  assert.deepEqual(resolvePackaging({ unit: 'Strip', tablets_per_strip: 1 } as any), { status: 'ok', type: 'blister' })
+  const { W, H, cols, rows, tablets, ring } = layoutBlister(1)
+  assert.equal(tablets.length, 1); assert.equal(cols, 1); assert.equal(rows, 1)
+  assert.deepEqual(countTablets({ id: 1, rings: [[ring]], ox: 0, oy: 0 }, tablets, 'round'), { whole: 1, cut: 0 })
+  for (const sh of SHAPE_NAMES) assert.deepEqual(countTablets({ id: 1, rings: [[ring]], ox: 0, oy: 0 }, tablets, sh), { whole: 1, cut: 0 }, sh)
+  assert.ok(W >= 64 && H >= 64)
+  // billing: 1 tablet of a 1-per-strip product is exactly 1 strip
+  const one: any = { id: 'o1', name: 'Single capsule', sales_rate: 15, current_stock: 4, unit: 'Strip' }
+  const [h] = toHandoff(addToBasket([], one, 1, 1))
+  assert.deepEqual([h.qty, h.rate, h.tablets, h.pack], [1, 15, 1, 1])
+  assert.equal(defaultPricePerTablet(one, 1), 15)
+})
+ok('pack sizes outside 1..40 or non-integers are still rejected', () => {
+  for (const v of [0, -3, 41, 2.5, NaN]) assert.equal(resolvePackaging({ unit: 'Strip', tablets_per_strip: v } as any).status, 'needs-setup', String(v))
+})
 console.log(`\n${n} test groups passed`)
