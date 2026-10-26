@@ -48,7 +48,8 @@ export const KERF = 2.2        // half-width of the cut line
 export const PROTECT = 1.25    // protected zone = dome outline × this
 export const PITCH = 48        // distance between neighbouring tablets
 export const MIN_PACK = 2
-export const MAX_PACK = 20
+export const MAX_PACK = 40
+export const PER_ROW = 5       // tablets per row (fewer only when the strip holds fewer than 5)
 
 export function isShape(v: unknown): v is ShapeName {
   return typeof v === 'string' && (SHAPE_NAMES as string[]).includes(v)
@@ -60,14 +61,15 @@ export function parseColors(v?: string | null): string[] {
   return parts.length ? parts : ['#fbf8f0']
 }
 
-/** Two rows; ceil(pack/2) columns. Returns the intact blister geometry. */
-export function layoutBlister(pack: number): { W: number; H: number; tablets: Tablet[]; ring: Ring } {
+/** 5 tablets per row, filled row by row (10 → 2×5, 14 → 5+5+4, 40 → 8×5). Returns the intact blister geometry. */
+export function layoutBlister(pack: number): { W: number; H: number; cols: number; rows: number; tablets: Tablet[]; ring: Ring } {
   const n = Math.min(MAX_PACK, Math.max(MIN_PACK, Math.floor(pack)))
-  const cols = Math.ceil(n / 2)
-  const W = cols * PITCH + 16, H = 112
+  const cols = Math.min(PER_ROW, n)
+  const rows = Math.ceil(n / cols)
+  const W = cols * PITCH + 16, H = rows * PITCH + 16
   const tablets: Tablet[] = []
-  for (let i = 0; i < n; i++) tablets.push({ x: 32 + Math.floor(i / 2) * PITCH, y: i % 2 ? 80 : 32 })
-  return { W, H, tablets, ring: roundedRect(W, H, 10) }
+  for (let i = 0; i < n; i++) tablets.push({ x: 32 + (i % cols) * PITCH, y: 32 + Math.floor(i / cols) * PITCH })
+  return { W, H, cols, rows, tablets, ring: roundedRect(W, H, 10) }
 }
 
 function roundedRect(W: number, H: number, r: number): Ring {

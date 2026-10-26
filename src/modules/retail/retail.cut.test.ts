@@ -76,4 +76,17 @@ ok('no tiny fragments are created', () => {
   const r = cutPieces(f.start, line({ x: 3, y: -10 }, { x: 3, y: f.H + 10 }), f.tablets, f.shape, f.nid)  // shaves a sliver
   for (const p of r.pieces) assert.ok(area(p.rings) >= 90)
 })
+ok('largest strip (40 tablets, 5 × 8): a cut between rows and a cut between columns keep all 40 whole', () => {
+  const f = fresh(40)
+  const r1 = cutPieces(f.start, line({ x: -10, y: 56 }, { x: f.W + 10, y: 56 }), f.tablets, f.shape, f.nid)   // between row 1 and 2
+  assert.ok(r1.changed); assert.equal(r1.pieces.length, 2)
+  const r2 = cutPieces(r1.pieces, line({ x: 56, y: -10 }, { x: 56, y: f.H + 10 }), f.tablets, f.shape, f.nid)
+  assert.ok(r2.changed); assert.ok(r2.pieces.length >= 3)
+  assert.equal(wholeTotal(r2.pieces, f.tablets, f.shape), 40); assert.equal(cutTotal(r2.pieces, f.tablets, f.shape), 0)
+})
+ok('14-tablet strip (5+5+4): diagonal swipe through tablets keeps all 14 whole', () => {
+  const f = fresh(14, 'oval')
+  const r = cutPieces(f.start, line({ x: 10, y: -10 }, { x: f.W - 10, y: f.H + 10 }), f.tablets, 'oval', f.nid)
+  assert.ok(r.changed); assert.equal(cutTotal(r.pieces, f.tablets, 'oval'), 0); assert.equal(wholeTotal(r.pieces, f.tablets, 'oval'), 14)
+})
 console.log(`\n${n} cut tests passed`)

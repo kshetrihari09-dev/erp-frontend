@@ -59,8 +59,8 @@ export default function BlisterWorkbench({ resetKey, packSize, shape, colors, ge
   const idRef = useRef(1)
   const hotRef = useRef(false)
   const view = useRef({ cssW: 0, cssH: 0, dpr: 1, scale: 1 })
-  const props = useRef({ shape, colors, getDropRect, onAddPiece, onMessage, onHotChange })
-  props.current = { shape, colors, getDropRect, onAddPiece, onMessage, onHotChange }
+  const props = useRef({ shape, colors, packSize, getDropRect, onAddPiece, onMessage, onHotChange })
+  props.current = { shape, colors, packSize, getDropRect, onAddPiece, onMessage, onHotChange }
 
   const say = (m: string) => props.current.onMessage?.(m)
 
@@ -128,7 +128,6 @@ export default function BlisterWorkbench({ resetKey, packSize, shape, colors, ge
   const load = useCallback(() => {
     const { W, H, tablets, ring } = layoutBlister(packSize)
     const v = view.current
-    v.scale = Math.min(1, Math.max(0.3, (v.cssW - 16) / W))
     const wW = v.cssW / v.scale, wH = v.cssH / v.scale
     tabletsRef.current = tablets
     // A fresh blister is ALWAYS one intact polygon — never pre-cut.
@@ -141,7 +140,12 @@ export default function BlisterWorkbench({ resetKey, packSize, shape, colors, ge
     const wrap = wrapRef.current, cv = cvRef.current; if (!wrap || !cv) return
     const w = wrap.getBoundingClientRect().width
     const v = view.current
-    v.cssW = w; v.cssH = Math.round(Math.min(300, Math.max(220, w * 0.6))); v.dpr = window.devicePixelRatio || 1
+    // Canvas height follows the strip: tall strips (up to 8 rows) get a taller bench,
+    // and the blister is scaled so BOTH its width and height fit with room to move pieces.
+    const { W, H } = layoutBlister(props.current.packSize)
+    const sw = Math.min(1, (w - 16) / W)
+    v.cssW = w; v.cssH = Math.round(Math.min(480, Math.max(240, H * sw * 1.5 + 40))); v.dpr = window.devicePixelRatio || 1
+    v.scale = Math.max(0.3, Math.min(sw, (v.cssH - 24) / H))
     cv.width = Math.round(v.cssW * v.dpr); cv.height = Math.round(v.cssH * v.dpr); cv.style.height = v.cssH + 'px'
     draw()
   }, [draw])
