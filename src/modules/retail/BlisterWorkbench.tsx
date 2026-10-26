@@ -96,19 +96,28 @@ export default function BlisterWorkbench({ resetKey, packSize, shape, colors, ge
 
       ctx.save(); pathOf(p); ctx.clip('evenodd')
       for (const t of tablets) {
-        poly(outline(sh, t, 0.62, 40)); ctx.fillStyle = cs[0]; ctx.fill()
+        const dome = outline(sh, t, 1, 40)
+        const body = outline(sh, t, 0.8, 40)
+        // clear plastic dome — faint, so the tablet's own colour stays true
+        poly(dome); ctx.fillStyle = 'rgba(236,243,248,.5)'; ctx.fill()
+        // tablet in the product's colour(s), full strength
+        poly(body); ctx.fillStyle = cs[0]; ctx.fill()
         if (cs[1]) {
           // second colour covers the lower half of an upright tablet (capsule cap/body), else the right half
           ctx.save(); ctx.beginPath()
           if (isUpright(sh)) ctx.rect(t.x - 30, t.y, 60, 40); else ctx.rect(t.x, t.y - 30, 40, 60)
           ctx.clip()
-          poly(outline(sh, t, 0.62, 40)); ctx.fillStyle = cs[1]; ctx.fill(); ctx.restore()
+          poly(body); ctx.fillStyle = cs[1]; ctx.fill(); ctx.restore()
         }
-        poly(outline(sh, t, 0.62, 40)); ctx.lineWidth = 0.8; ctx.strokeStyle = 'rgba(0,0,0,.25)'; ctx.stroke()
-        const d = ctx.createRadialGradient(t.x - 5, t.y - 6, 2, t.x, t.y, 22)
-        d.addColorStop(0, 'rgba(255,255,255,.85)'); d.addColorStop(0.55, 'rgba(210,218,225,.3)'); d.addColorStop(1, 'rgba(110,120,130,.6)')
-        poly(outline(sh, t, 1, 40)); ctx.fillStyle = d; ctx.fill()
-        ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(80,90,100,.55)'; ctx.stroke()
+        // soft shading ON the tablet (light top-left, darker bottom-right) — keeps the hue
+        const sd = ctx.createRadialGradient(t.x - 6, t.y - 7, 2, t.x, t.y, 24)
+        sd.addColorStop(0, 'rgba(255,255,255,.35)'); sd.addColorStop(0.5, 'rgba(255,255,255,0)'); sd.addColorStop(1, 'rgba(0,0,0,.2)')
+        poly(body); ctx.fillStyle = sd; ctx.fill()
+        ctx.lineWidth = 0.8; ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.stroke()
+        // dome rim + small glint
+        poly(dome); ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(80,90,100,.55)'; ctx.stroke()
+        ctx.beginPath(); ctx.ellipse(t.x - 8, t.y - 10, 6, 3, -0.6, 0, Math.PI * 2)
+        ctx.fillStyle = 'rgba(255,255,255,.6)'; ctx.fill()
       }
       ctx.restore()
       pathOf(p); ctx.lineWidth = 1.3; ctx.strokeStyle = 'rgba(50,60,70,.75)'; ctx.stroke()
