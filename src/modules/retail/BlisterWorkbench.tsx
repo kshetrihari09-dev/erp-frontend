@@ -15,7 +15,7 @@ import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import { Undo2, RotateCcw, ShoppingBasket } from 'lucide-react'
 import { Button } from '@/components/ui'
 import {
-  bbox, countTablets, cutPieces, deflect, inside, layoutBlister, outline, ownTablets, planStraight,
+  bbox, countTablets, cutPieces, deflect, inside, isUpright, layoutBlister, outline, ownTablets, planStraight,
   MIN_SWIPE, type CutStyle, type Piece, type Pt, type ShapeName, type Tablet,
 } from './blisterGeometry'
 
@@ -98,7 +98,10 @@ export default function BlisterWorkbench({ resetKey, packSize, shape, colors, ge
       for (const t of tablets) {
         poly(outline(sh, t, 0.62, 40)); ctx.fillStyle = cs[0]; ctx.fill()
         if (cs[1]) {
-          ctx.save(); ctx.beginPath(); ctx.rect(t.x, t.y - 30, 40, 60); ctx.clip()
+          // second colour covers the lower half of an upright tablet (capsule cap/body), else the right half
+          ctx.save(); ctx.beginPath()
+          if (isUpright(sh)) ctx.rect(t.x - 30, t.y, 60, 40); else ctx.rect(t.x, t.y - 30, 40, 60)
+          ctx.clip()
           poly(outline(sh, t, 0.62, 40)); ctx.fillStyle = cs[1]; ctx.fill(); ctx.restore()
         }
         poly(outline(sh, t, 0.62, 40)); ctx.lineWidth = 0.8; ctx.strokeStyle = 'rgba(0,0,0,.25)'; ctx.stroke()

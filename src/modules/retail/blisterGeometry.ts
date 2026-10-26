@@ -35,11 +35,14 @@ export const SHAPE_NAMES: ShapeName[] = ['round', 'oval', 'capsule', 'square', '
 export const SHAPES: Record<ShapeName, [number, number, number]> = {
   round:   [17, 17, 2],
   oval:    [18, 14, 2],
-  capsule: [18, 11, 4],
+  capsule: [11, 18, 4],   // upright: long side vertical
   square:  [16, 16, 4],
   oblong:  [18, 10, 6],
   diamond: [18, 15, 1],
 }
+
+/** A tablet whose long side runs top-to-bottom (capsules). Two-tone ones split top/bottom, others left/right. */
+export const isUpright = (s: ShapeName) => SHAPES[s][1] > SHAPES[s][0]
 
 export interface Tablet { x: number; y: number }
 export interface Piece { id: number; rings: MPoly; ox: number; oy: number }

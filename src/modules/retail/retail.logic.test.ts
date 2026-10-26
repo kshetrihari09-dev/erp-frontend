@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import {
-  straightSegment, planStraight, SNAP_DEG, layoutBlister, countTablets, deflect, ownTablets, outline, inside, area, cutPieces, parseColors,
+  isUpright, straightSegment, planStraight, SNAP_DEG, layoutBlister, countTablets, deflect, ownTablets, outline, inside, area, cutPieces, parseColors,
   SHAPE_NAMES, SHAPES, KERF, PROTECT, MIN_PACK, MAX_PACK, type Piece, type Pt,
 } from './blisterGeometry'
 import { resolvePackaging, canCut, isBulk, PACKAGING_INSTRUCTION, PACKAGING_LABEL } from './packaging'
@@ -319,5 +319,26 @@ ok('single-tablet strip (1 per strip) is valid: one tablet, one whole row, billa
 })
 ok('pack sizes outside 1..40 or non-integers are still rejected', () => {
   for (const v of [0, -3, 41, 2.5, NaN]) assert.equal(resolvePackaging({ unit: 'Strip', tablets_per_strip: v } as any).status, 'needs-setup', String(v))
+})
+ok('capsule is upright (taller than wide); no other shape is', () => {
+  assert.equal(isUpright('capsule'), true)
+  for (const sh of SHAPE_NAMES.filter(x => x !== 'capsule')) assert.equal(isUpright(sh), false, sh)
+  const t = { x: 100, y: 100 }
+  const o = outline('capsule', t, 1, 64)
+  const w = Math.max(...o.map(p => p[0])) - Math.min(...o.map(p => p[0])), h = Math.max(...o.map(p => p[1])) - Math.min(...o.map(p => p[1]))
+  assert.ok(h > w * 1.4, `capsule ${w.toFixed(1)}×${h.toFixed(1)}`)          // 22 × 36
+  assert.ok(Math.abs(o.reduce((s2, p) => s2 + p[0], 0) / o.length - 100) < 1e-6)   // centred
+})
+ok('upright capsules: whole in a full strip, and the gap between neighbours stays open both ways', () => {
+  for (const pack of [1, 5, 10, 14, 40]) {
+    const { tablets, ring } = layoutBlister(pack)
+    assert.deepEqual(countTablets({ id: 1, rings: [[ring]], ox: 0, oy: 0 }, tablets, 'capsule'), { whole: pack, cut: 0 }, String(pack))
+  }
+  const { tablets, ring, W, H } = layoutBlister(40)
+  const piece: Piece = { id: 1, rings: [[ring]], ox: 0, oy: 0 }
+  // straight cuts between rows (y = 56, 104 …) and between columns (x = 56, 104 …) must stay clear for capsules
+  for (const y of [56, 104, 152, 200, 248, 296, 344]) assert.equal(planStraight([piece], [{ x: 10, y }, { x: W - 10, y }], tablets, 'capsule')[0].blocked, false, 'row gap ' + y)
+  for (const x of [56, 104, 152, 200]) assert.equal(planStraight([piece], [{ x, y: 10 }, { x, y: H - 10 }], tablets, 'capsule')[0].blocked, false, 'col gap ' + x)
+  assert.equal(planStraight([piece], [{ x: 32, y: 10 }, { x: 32, y: H - 10 }], tablets, 'capsule')[0].blocked, true)   // through a column of capsules
 })
 console.log(`\n${n} test groups passed`)
