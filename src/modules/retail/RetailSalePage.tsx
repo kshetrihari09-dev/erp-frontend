@@ -32,14 +32,16 @@ import type { Product } from '@/types'
 import BlisterWorkbench from './BlisterWorkbench'
 import IntactPackage from './IntactPackage'
 import { isShape, parseColors, MIN_PACK, MAX_PACK, type ShapeName } from './blisterGeometry'
-import { PACKAGING_INSTRUCTION, PACKAGING_LABEL, resolvePackaging, validPack, type PackagingType } from './packaging'
+import { PACKAGING_INSTRUCTION, PACKAGING_LABEL, isBulk, resolvePackaging, validPack, type PackagingType } from './packaging'
 import {
-  RETAIL_HANDOFF_KEY, addToBasket, addUnitToBasket, defaultPricePerTablet, defaultUnitPrice, isValidPrice, kindOf,
-  lineTotal, overStock, toHandoff, totals, type BasketLine,
+  MAX_QTY, RETAIL_HANDOFF_KEY, addToBasket, addUnitToBasket, defaultPricePerTablet, defaultUnitPrice, isValidPrice, kindOf,
+  lineTotal, overStock, parseQuantity, toHandoff, totals, type BasketLine,
 } from './retailBasket'
 
 const card = 'rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4'
-const plural = (n: number, w: string) => `${n} ${w.toLowerCase()}${n === 1 ? '' : 's'}`
+// Whole packages pluralise (2 bottles); measured/abbreviated units do not (2.5 Kg, 3 Pcs).
+const NO_PLURAL = ['kg', 'ltr', 'pcs']
+const qtyLabel = (n: number, unit: string) => `${+n.toFixed(3)} ${NO_PLURAL.includes(unit.toLowerCase()) || n === 1 || !Number.isInteger(n) ? unit : unit.toLowerCase() + 's'}`
 
 interface Loaded {
   product: Product
@@ -65,6 +67,9 @@ export default function RetailSalePage() {
   const [lines, setLines] = useState<BasketLine[]>([])
   const [priceText, setPriceText] = useState<Record<string, string>>({})
   const [hot, setHot] = useState(false)
+  const [bulkQty, setBulkQty] = useState('1')          // quantity to add per drop for Kg / Ltr products
+  const bulkQtyRef = useRef('1')
+  bulkQtyRef.current = bulkQty
   const loadSeq = useRef(0)
   const loadedRef = useRef<Loaded | null>(null)
   loadedRef.current = loaded
@@ -80,7 +85,7 @@ export default function RetailSalePage() {
       shape: isShape(full.tablet_shape) ? full.tablet_shape : 'round',
       colors: parseColors(full.tablet_colors),
     })
-    setHot(false)
+    setHot(false); setBulkQty('1')
     requestAnimationFrame(() => inputRef.current?.focusSilently())
   }, [])
 
@@ -105,9 +110,15 @@ export default function RetailSalePage() {
   }, [])
   const handleAddUnit = useCallback(() => {
     const cur = loadedRef.current; if (!cur || cur.packaging === 'blister') return
-    setLines(prev => addUnitToBasket(prev, cur.product))
-    toastInfo(`Added 1 ${cur.product.unit || PACKAGING_LABEL[cur.packaging]}`.toLowerCase().replace(/^./, c => c.toUpperCase()))
-  }, [toastInfo])
+    let qty = 1
+    if (isBulk(cur.packaging)) {
+      const q = parseQuantity(bulkQtyRef.current)
+      if (q === null) { toastError('Check the quantity', `Enter a quantity above 0 (up to ${MAX_QTY}).`); return }
+      qty = q
+    }
+    setLines(prev => addUnitToBasket(prev, cur.product, undefined, qty))
+    toastInfo(`Added ${qtyLabel(qty, cur.product.unit || PACKAGING_LABEL[cur.packaging])}`)
+  }, [toastInfo, toastError])
 
   const t = useMemo(() => totals(lines), [lines])
   const short = useMemo(() => overStock(lines), [lines])
@@ -167,7 +178,7 @@ export default function RetailSalePage() {
               {canChoose ? (
                 <div className="mt-2">
                   <div className="flex flex-wrap gap-2">
-                    {(['blister', 'bottle', 'tube'] as PackagingType[]).map(ty => (
+                    {(Object.keys(PACKAGING_LABEL) as PackagingType[]).map(ty => (
                       <Button key={ty} variant="secondary" size="sm"
                         disabled={ty === 'blister' && !validPack(Number(ambiguous.product.tablets_per_strip))}
                         onClick={() => openBench(ambiguous.product, ty)}>
@@ -211,17 +222,32 @@ export default function RetailSalePage() {
                     onMessage={m => toastInfo(m)}
                   />
                 ) : (
+                  <>
+                    {isBulk(loaded.packaging) && (
+                      <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
+                        <label className="font-semibold uppercase tracking-wide text-[var(--text-3)]" htmlFor="retail-bulk-qty">Quantity ({unitName})</label>
+                        <input id="retail-bulk-qty" type="text" inputMode="decimal" className="erp-input w-24 !py-1" value={bulkQty}
+                          onChange={e => setBulkQty(e.target.value)} aria-invalid={parseQuantity(bulkQty) === null} />
+                        {['0.25', '0.5', '1', '5'].map(q => (
+                          <button key={q} type="button" onClick={() => setBulkQty(q)} className="px-2 py-1 rounded-md border border-[var(--border)] text-[var(--text-2)]">{q}</button>
+                        ))}
+                        {parseQuantity(bulkQty) === null && <span className="text-red-500">Enter a number above 0</span>}
+                      </div>
+                    )}
                   <IntactPackage
                     key={`${loaded.packaging}-${loaded.key}`}
                     kind={loaded.packaging} name={loaded.product.name} company={loaded.product.company_name} unitLabel={unitName}
+                    chip={isBulk(loaded.packaging) ? `${parseQuantity(bulkQty) ?? '—'} ${unitName}` : undefined}
+                    addLabel={isBulk(loaded.packaging) ? `Add ${parseQuantity(bulkQty) ?? '…'} ${unitName} to basket` : undefined}
                     getDropRect={() => basketRef.current?.getBoundingClientRect() ?? null}
                     onAdd={handleAddUnit} onHotChange={setHot}
                   />
+                  </>
                 )}
               </div>
             </>
           ) : !needsSetup && !ambiguous && (
-            <p className="mt-4 text-sm text-[var(--text-3)]">Scan a medicine to open it. Blisters can be cut; bottles and tubes are billed whole. The basket is kept between scans.</p>
+            <p className="mt-4 text-sm text-[var(--text-3)]">Scan a medicine to open it. Blisters can be cut; every other package (bottle, tube, vial, ampoule, sachet, box, pcs) is billed whole, and Kg / Ltr by quantity. The basket is kept between scans.</p>
           )}
         </section>
 
@@ -241,7 +267,7 @@ export default function RetailSalePage() {
                   <div>
                     <div className="font-semibold text-sm text-[var(--text)]">{l.product.name}</div>
                     <div className="text-xs text-[var(--text-3)]">
-                      {l.product.barcode || l.product.item_code} · {unitLine ? plural(qty, unit) : `${l.pieces} piece${l.pieces > 1 ? 's' : ''} · ${qty} tablet${qty > 1 ? 's' : ''}`}
+                      {l.product.barcode || l.product.item_code} · {unitLine ? qtyLabel(qty, unit) : `${l.pieces} piece${l.pieces > 1 ? 's' : ''} · ${qty} tablet${qty > 1 ? 's' : ''}`}
                     </div>
                   </div>
                   <button type="button" aria-label={`Remove ${l.product.name}`} onClick={() => setLines(p => p.filter(x => lineKey(x) !== lineKey(l)))}
@@ -257,7 +283,7 @@ export default function RetailSalePage() {
                   <b className="tabular-nums text-sm">NPR {fmtN(lineTotal(l))}</b>
                 </div>
                 {short.includes(l) && (
-                  <div className="text-xs text-red-500 flex items-center gap-1"><AlertTriangle size={12} /> Needs {fmtN(unitLine ? qty : l.tablets / l.pack, 2)} {unitLine ? unit.toLowerCase() + 's' : 'strips'}; only {fmtN(l.product.current_stock, 2)} in stock.</div>
+                  <div className="text-xs text-red-500 flex items-center gap-1"><AlertTriangle size={12} /> Needs {fmtN(unitLine ? qty : l.tablets / l.pack, 2)} {unitLine ? unit.toLowerCase() : 'strips'}; only {fmtN(l.product.current_stock, 2)} in stock.</div>
                 )}
               </div>
             )
@@ -266,7 +292,7 @@ export default function RetailSalePage() {
           {!!lines.length && (
             <div className="border-t-2 border-[var(--border)] pt-2 mt-1">
               <div className="text-xs text-[var(--text-3)]">
-                {[t.tablets ? `${t.tablets} tablets · ${t.pieces} piece${t.pieces > 1 ? 's' : ''}` : '', t.units ? plural(t.units, 'package') : '', `${t.items} item${t.items > 1 ? 's' : ''}`].filter(Boolean).join(' · ')}
+                {[t.tablets ? `${t.tablets} tablets · ${t.pieces} piece${t.pieces > 1 ? 's' : ''}` : '', t.units ? `${+t.units.toFixed(3)} unit${t.units === 1 ? '' : 's'}` : '', `${t.items} item${t.items > 1 ? 's' : ''}`].filter(Boolean).join(' · ')}
               </div>
               <div className="flex items-center justify-between mt-1">
                 <span className="text-xs font-semibold uppercase tracking-wide text-[var(--text-3)]">Grand total</span>
@@ -279,7 +305,7 @@ export default function RetailSalePage() {
             <Button variant="primary" size="sm" disabled={!lines.length} iconRight={<ArrowRight size={14} />} onClick={proceed}>Continue to Sales invoice</Button>
             <Button variant="secondary" size="sm" disabled={!lines.length} onClick={() => setLines([])}>Clear basket</Button>
           </div>
-          <p className="mt-2 text-xs text-[var(--text-4)]">Nothing is saved or posted here. Loose tablets are billed as a fraction of a strip; bottles and tubes as whole units at the product’s rate. You pick the batch and confirm on the Sales invoice.</p>
+          <p className="mt-2 text-xs text-[var(--text-4)]">Nothing is saved or posted here. Loose tablets are billed as a fraction of a strip; other packages as whole units (Kg / Ltr by quantity) at the product’s rate. You pick the batch and confirm on the Sales invoice.</p>
         </section>
       </div>
 

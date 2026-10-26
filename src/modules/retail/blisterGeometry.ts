@@ -220,28 +220,107 @@ function makeCutter(path: Pt[]): MPoly | null {
 export const MIN_PIECE_AREA = 90   // smaller fragments are rejected, never created
 export const MIN_SWIPE = 40        // shorter swipes are ignored
 
+export type CutStyle = 'free' | 'straight'
+
 export interface CutResult { pieces: Piece[]; changed: boolean; reason?: string }
 
+// ── straight cutting ─────────────────────────────────────────────────────────
+export const SNAP_DEG = 7   // a straight swipe within this angle of horizontal/vertical snaps to it
+
+/** The straight segment a→b of a swipe, snapped to exactly horizontal/vertical when within SNAP_DEG. */
+export function straightSegment(path: Pt[]): [Pt, Pt] | null {
+  if (path.length < 2) return null
+  const a = path[0], b = path[path.length - 1]
+  const dx = b.x - a.x, dy = b.y - a.y
+  if (Math.hypot(dx, dy) < 1) return null
+  const ang = (Math.atan2(Math.abs(dy), Math.abs(dx)) * 180) / Math.PI   // 0 (flat) … 90 (upright)
+  if (ang <= SNAP_DEG) { const y = (a.y + b.y) / 2; return [{ x: a.x, y }, { x: b.x, y }] }
+  if (ang >= 90 - SNAP_DEG) { const x = (a.x + b.x) / 2; return [{ x, y: a.y }, { x, y: b.y }] }
+  return [a, b]
+}
+
+export interface StraightPlan {
+  piece: Piece
+  /** The full-length straight line across this piece, in the piece's LOCAL coordinates. */
+  line: [Pt, Pt]
+  /** True if that straight line would run into a tablet's protected zone (so it would damage it). */
+  blocked: boolean
+}
+
 /**
- * Apply one swipe (`path`, world coordinates) to every piece it crosses.
- * Pieces it does not separate are returned untouched (same object, same place).
+ * Plan a straight cut. Only pieces the drawn swipe actually passes over are cut; each of those
+ * gets the line extended edge-to-edge, so a swipe that stops just short of the foil edge still
+ * separates the piece. A straight line never bends: if it would hit a tablet it is `blocked`.
+ */
+export function planStraight(pieces: Piece[], path: Pt[], tablets: Tablet[], shape: ShapeName): StraightPlan[] {
+  const seg = straightSegment(path)
+  if (!seg) return []
+  const [a, b] = seg
+  const len = Math.hypot(b.x - a.x, b.y - a.y), dx = (b.x - a.x) / len, dy = (b.y - a.y) / len
+  const plans: StraightPlan[] = []
+  for (const p of pieces) {
+    const la = { x: a.x - p.ox, y: a.y - p.oy }, lb = { x: b.x - p.ox, y: b.y - p.oy }
+    let touched = false
+    const n = Math.max(2, Math.ceil(len / 3))
+    for (let k = 0; k <= n && !touched; k++) touched = inside(p.rings, la.x + ((lb.x - la.x) * k) / n, la.y + ((lb.y - la.y) * k) / n)
+    if (!touched) continue
+    const [x0, y0, x1, y1] = bbox(p)
+    const t0 = ((x0 + x1) / 2 - la.x) * dx + ((y0 + y1) / 2 - la.y) * dy
+    const R = Math.hypot(x1 - x0, y1 - y0) / 2 + 12
+    const line: [Pt, Pt] = [{ x: la.x + dx * (t0 - R), y: la.y + dy * (t0 - R) }, { x: la.x + dx * (t0 + R), y: la.y + dy * (t0 + R) }]
+    const own = ownTablets(p, tablets)
+    let blocked = false
+    const m = Math.ceil(R)
+    for (let k = 0; k <= m && !blocked; k++) {
+      const x = line[0].x + ((line[1].x - line[0].x) * k) / m, y = line[0].y + ((line[1].y - line[0].y) * k) / m
+      blocked = own.some(t => inDome(shape, t, x, y))
+    }
+    plans.push({ piece: p, line, blocked })
+  }
+  return plans
+}
+
+/** Subtract a thickened `localPath` from one piece; returns the parts if it truly separated it, else null. */
+function separate(p: Piece, localPath: Pt[]): MPoly | null {
+  const cutter = makeCutter(localPath)
+  if (!cutter) return null
+  let res: MPoly
+  try { res = (polygonClipping.difference as any)(p.rings, cutter) as MPoly } catch { return null }
+  const parts = res.filter(g => area([g]) >= MIN_PIECE_AREA)
+  return res.length >= 2 && parts.length >= 2 ? parts : null
+}
+
+/**
+ * Apply one swipe (`path`, world coordinates) to the bench.
+ *  - 'free'     : the cut follows the swipe and bends around tablets (see `deflect`).
+ *  - 'straight' : the cut is a straight line (snapped to horizontal/vertical when close), full
+ *                 width of each piece it touches; refused if it would damage a tablet.
+ * Pieces that are not separated are returned untouched (same object, same place).
  */
 export function cutPieces(
-  pieces: Piece[], path: Pt[], tablets: Tablet[], shape: ShapeName, newId: () => number,
+  pieces: Piece[], path: Pt[], tablets: Tablet[], shape: ShapeName, newId: () => number, style: CutStyle = 'free',
 ): CutResult {
   const out: Piece[] = []
   let changed = false
+
+  if (style === 'straight') {
+    const plans = planStraight(pieces, path, tablets, shape)
+    if (!plans.length) return { pieces, changed: false, reason: 'Swipe across the strip to cut it' }
+    if (plans.some(pl => pl.blocked))
+      return { pieces, changed: false, reason: 'A straight cut here would damage tablets. Cut between rows or columns, or switch to Free-form.' }
+    const lineOf = new Map(plans.map(pl => [pl.piece, pl.line] as const))
+    for (const p of pieces) {
+      const line = lineOf.get(p)
+      const parts = line ? separate(p, [line[0], line[1]]) : null
+      if (parts) { changed = true; for (const g of parts) out.push({ id: newId(), rings: [g], ox: p.ox, oy: p.oy }) } else out.push(p)
+    }
+    return changed ? { pieces: out, changed } : { pieces, changed: false, reason: 'Cut must go all the way across a piece' }
+  }
+
   for (const p of pieces) {
     const local = path.map(q => ({ x: q.x - p.ox, y: q.y - p.oy }))
-    const cutter = makeCutter(deflect(local, ownTablets(p, tablets), shape))
-    if (!cutter) { out.push(p); continue }
-    let res: MPoly
-    try { res = (polygonClipping.difference as any)(p.rings, cutter) as MPoly } catch { out.push(p); continue }
-    const parts = res.filter(g => area([g]) >= MIN_PIECE_AREA)
-    if (res.length >= 2 && parts.length >= 2) {
-      changed = true
-      for (const g of parts) out.push({ id: newId(), rings: [g], ox: p.ox, oy: p.oy })
-    } else out.push(p)
+    const parts = separate(p, deflect(local, ownTablets(p, tablets), shape))
+    if (parts) { changed = true; for (const g of parts) out.push({ id: newId(), rings: [g], ox: p.ox, oy: p.oy }) } else out.push(p)
   }
   return changed ? { pieces: out, changed } : { pieces, changed: false, reason: 'Cut must go all the way across a piece' }
 }

@@ -11,12 +11,12 @@
  * This component only knows about geometry and pointers. It reports what the
  * user billed through `onAddPiece(tablets)` and never talks to any API.
  */
-import { useCallback, useEffect, useReducer, useRef } from 'react'
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import { Undo2, RotateCcw, ShoppingBasket } from 'lucide-react'
 import { Button } from '@/components/ui'
 import {
-  bbox, countTablets, cutPieces, deflect, inside, layoutBlister, outline, ownTablets,
-  MIN_SWIPE, type Piece, type Pt, type ShapeName, type Tablet,
+  bbox, countTablets, cutPieces, deflect, inside, layoutBlister, outline, ownTablets, planStraight,
+  MIN_SWIPE, type CutStyle, type Piece, type Pt, type ShapeName, type Tablet,
 } from './blisterGeometry'
 
 export interface BlisterWorkbenchProps {
@@ -48,6 +48,8 @@ export default function BlisterWorkbench({ resetKey, packSize, shape, colors, ge
   const wrapRef = useRef<HTMLDivElement>(null)
   const cvRef = useRef<HTMLCanvasElement>(null)
   const [, force] = useReducer((n: number) => n + 1, 0)
+  // Cut style is a preference (how a swipe becomes a cut), not a mode: swipe always cuts, hold-drag always moves.
+  const [cutStyle, setCutStyle] = useState<CutStyle>(() => { try { return localStorage.getItem('retailCutStyle') === 'straight' ? 'straight' : 'free' } catch { return 'free' } })
 
   // All mutable bench state lives in refs: pointer events fire far faster than
   // React renders, and the canvas is redrawn imperatively.
@@ -59,8 +61,8 @@ export default function BlisterWorkbench({ resetKey, packSize, shape, colors, ge
   const idRef = useRef(1)
   const hotRef = useRef(false)
   const view = useRef({ cssW: 0, cssH: 0, dpr: 1, scale: 1 })
-  const props = useRef({ shape, colors, packSize, getDropRect, onAddPiece, onMessage, onHotChange })
-  props.current = { shape, colors, packSize, getDropRect, onAddPiece, onMessage, onHotChange }
+  const props = useRef({ shape, colors, packSize, cutStyle, getDropRect, onAddPiece, onMessage, onHotChange })
+  props.current = { shape, colors, packSize, cutStyle, getDropRect, onAddPiece, onMessage, onHotChange }
 
   const say = (m: string) => props.current.onMessage?.(m)
 
@@ -111,15 +113,24 @@ export default function BlisterWorkbench({ resetKey, packSize, shape, colors, ge
       ctx.restore()
     }
 
-    // live cut preview — shows the bent path that will really be cut, per piece
+    // live cut preview — shows the line that will really be cut, per piece
     if (g && g.mode === 'cut') {
-      ctx.beginPath(); g.path.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)))
-      ctx.globalAlpha = 0.35; ctx.lineWidth = 1.5; ctx.strokeStyle = '#ff5a4e'; ctx.stroke(); ctx.globalAlpha = 1
-      for (const p of piecesRef.current) {
-        ctx.save(); ctx.translate(p.ox, p.oy); pathOf(p); ctx.clip('evenodd')
-        const lp = deflect(g.path.map(q => ({ x: q.x - p.ox, y: q.y - p.oy })), ownTablets(p, tablets), sh)
-        ctx.beginPath(); lp.forEach((q, i) => (i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)))
-        ctx.setLineDash([7, 5]); ctx.lineWidth = 2.5; ctx.strokeStyle = '#ff5a4e'; ctx.stroke(); ctx.restore()
+      if (props.current.cutStyle === 'straight') {
+        // straight: full-width line per touched piece; green = will cut, red = would damage tablets
+        for (const pl of planStraight(piecesRef.current, g.path, tablets, sh)) {
+          ctx.save(); ctx.translate(pl.piece.ox, pl.piece.oy); pathOf(pl.piece); ctx.clip('evenodd')
+          ctx.beginPath(); ctx.moveTo(pl.line[0].x, pl.line[0].y); ctx.lineTo(pl.line[1].x, pl.line[1].y)
+          ctx.setLineDash(pl.blocked ? [4, 5] : []); ctx.lineWidth = 2.5; ctx.strokeStyle = pl.blocked ? '#ff3b30' : '#34d399'; ctx.stroke(); ctx.restore()
+        }
+      } else {
+        ctx.beginPath(); g.path.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)))
+        ctx.globalAlpha = 0.35; ctx.lineWidth = 1.5; ctx.strokeStyle = '#ff5a4e'; ctx.stroke(); ctx.globalAlpha = 1
+        for (const p of piecesRef.current) {
+          ctx.save(); ctx.translate(p.ox, p.oy); pathOf(p); ctx.clip('evenodd')
+          const lp = deflect(g.path.map(q => ({ x: q.x - p.ox, y: q.y - p.oy })), ownTablets(p, tablets), sh)
+          ctx.beginPath(); lp.forEach((q, i) => (i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)))
+          ctx.setLineDash([7, 5]); ctx.lineWidth = 2.5; ctx.strokeStyle = '#ff5a4e'; ctx.stroke(); ctx.restore()
+        }
       }
     }
   }, [])
@@ -225,7 +236,7 @@ export default function BlisterWorkbench({ resetKey, packSize, shape, colors, ge
         for (let i = 1; i < g.path.length; i++) L += Math.hypot(g.path[i].x - g.path[i - 1].x, g.path[i].y - g.path[i - 1].y)
         if (L * view.current.scale >= MIN_SWIPE) {
           const before = piecesRef.current
-          const res = cutPieces(before, g.path, tabletsRef.current, props.current.shape, () => idRef.current++)
+          const res = cutPieces(before, g.path, tabletsRef.current, props.current.shape, () => idRef.current++, props.current.cutStyle)
           if (res.changed) { historyRef.current.push(before.map(p => ({ ...p }))); piecesRef.current = res.pieces; selRef.current = null }
           else if (res.reason) say(res.reason)
         }
@@ -233,6 +244,11 @@ export default function BlisterWorkbench({ resetKey, packSize, shape, colors, ge
       else if (g.mode === 'hold' && g.piece && g.dragged && overBasket(e)) addPiece(g.piece)
     }
     draw(); force()
+  }
+
+  const chooseStyle = (s: CutStyle) => {
+    setCutStyle(s); props.current.cutStyle = s
+    try { localStorage.setItem('retailCutStyle', s) } catch { /* preference only */ }
   }
 
   const undo = () => {
@@ -246,6 +262,18 @@ export default function BlisterWorkbench({ resetKey, packSize, shape, colors, ge
 
   return (
     <div>
+      <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
+        <span className="font-semibold uppercase tracking-wide text-[var(--text-3)]">Cut style</span>
+        <div role="group" aria-label="Cut style" className="inline-flex overflow-hidden rounded-lg border border-[var(--border)]">
+          {(['straight', 'free'] as CutStyle[]).map(s => (
+            <button key={s} type="button" aria-pressed={cutStyle === s} onClick={() => chooseStyle(s)}
+              className="px-3 py-1.5 font-semibold"
+              style={cutStyle === s ? { background: 'var(--brand, #0b7a75)', color: '#fff' } : { color: 'var(--text-2)' }}>
+              {s === 'straight' ? 'Straight' : 'Free-form'}
+            </button>
+          ))}
+        </div>
+      </div>
       <div ref={wrapRef} className="rounded-xl overflow-hidden" style={{ background: '#3b4a57' }}>
         <canvas
           ref={cvRef}
@@ -271,7 +299,10 @@ export default function BlisterWorkbench({ resetKey, packSize, shape, colors, ge
         <Button variant="secondary" size="sm" icon={<RotateCcw size={15} />} onClick={load}>Reset blister</Button>
       </div>
       <p className="mt-2 text-xs text-[var(--text-4)]">
-        Quick swipe = cut · Tap = select · Press and hold, then drag = move · Drop on the basket to bill. Cuts bend around tablets.
+        Quick swipe = cut · Tap = select · Press and hold, then drag = move · Drop on the basket to bill.{' '}
+        {cutStyle === 'straight'
+          ? 'Straight: the cut is a straight line across the whole piece (snaps to horizontal or vertical) and is refused if it would damage a tablet.'
+          : 'Free-form: the cut follows your swipe and bends around tablets, so none is damaged.'}
       </p>
     </div>
   )

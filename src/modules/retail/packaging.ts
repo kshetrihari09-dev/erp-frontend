@@ -5,8 +5,8 @@
  * (Strip / Bottle / Tube …) plus, for blisters, the Retail Sale profile
  * (`tablets_per_strip`). No new database field is involved.
  *
- *   unit Bottle (and no tablets-per-strip)          → bottle
- *   unit Tube   (and no tablets-per-strip)          → tube
+ *   unit Bottle / Tube / Vial / Ampoule / Sachet / Box / Pcs / Kg / Ltr
+ *        (and no tablets-per-strip)                 → that package, billed whole
  *   unit Strip/Tablet/Capsule + valid pack size     → blister
  *   unit Strip/Tablet/Capsule, no valid pack size   → needs-setup (blister, incomplete)
  *   anything else, or contradictory data            → ambiguous
@@ -17,19 +17,33 @@
 import type { Product } from '@/types'
 import { MAX_PACK, MIN_PACK } from './blisterGeometry'
 
-export type PackagingType = 'blister' | 'bottle' | 'tube'
+export type PackagingType =
+  | 'blister' | 'bottle' | 'tube' | 'vial' | 'ampoule' | 'sachet' | 'box' | 'piece' | 'kg' | 'ltr'
 
-export const PACKAGING_LABEL: Record<PackagingType, string> = { blister: 'Blister pack', bottle: 'Bottle', tube: 'Tube' }
+export const PACKAGING_LABEL: Record<PackagingType, string> = {
+  blister: 'Blister pack', bottle: 'Bottle', tube: 'Tube', vial: 'Vial', ampoule: 'Ampoule',
+  sachet: 'Sachet', box: 'Box', piece: 'Piece', kg: 'Bulk (Kg)', ltr: 'Bulk (Ltr)',
+}
 
 /** Exact instruction line shown for each active packaging. */
 export const PACKAGING_INSTRUCTION: Record<PackagingType, string> = {
   blister: 'Swipe to cut · Drag pieces to basket.',
   bottle:  'Drag bottle to basket.',
   tube:    'Drag tube to basket.',
+  vial:    'Drag vial to basket.',
+  ampoule: 'Drag ampoule to basket.',
+  sachet:  'Drag sachet to basket.',
+  box:     'Drag box to basket.',
+  piece:   'Drag item to basket.',
+  kg:      'Set the quantity · Drag sack to basket.',
+  ltr:     'Set the quantity · Drag container to basket.',
 }
 
 /** Only a blister can be cut. */
 export const canCut = (t: PackagingType) => t === 'blister'
+
+/** Kg / Ltr are sold by measured quantity (e.g. 0.5 Kg); everything else by whole packages. */
+export const isBulk = (t: PackagingType) => t === 'kg' || t === 'ltr'
 
 export type PackagingResult =
   | { status: 'ok'; type: PackagingType }
@@ -41,18 +55,24 @@ export const validPack = (v: unknown): v is number =>
 
 const BLISTER_UNITS = ['strip', 'tablet', 'capsule']
 
+/** The product form's Unit list, mapped to the model each intact unit gets. */
+const INTACT_UNITS: Record<string, PackagingType> = {
+  bottle: 'bottle', tube: 'tube', vial: 'vial', ampoule: 'ampoule', sachet: 'sachet', box: 'box', pcs: 'piece', kg: 'kg', ltr: 'ltr',
+}
+
 export function resolvePackaging(p: Pick<Product, 'unit' | 'tablets_per_strip'>): PackagingResult {
   const unit = String(p.unit ?? '').trim().toLowerCase()
   const rawPack = p.tablets_per_strip
   const hasPackValue = rawPack !== null && rawPack !== undefined
   const pack = hasPackValue ? Number(rawPack) : NaN
 
-  if (unit === 'bottle' || unit === 'tube') {
+  const intact = INTACT_UNITS[unit]
+  if (intact) {
     if (hasPackValue) return { status: 'ambiguous', reason: `The unit is ${p.unit}, but a “tablets per strip” value is also set.` }
-    return { status: 'ok', type: unit as PackagingType }
+    return { status: 'ok', type: intact }
   }
   if (BLISTER_UNITS.includes(unit)) {
     return validPack(pack) ? { status: 'ok', type: 'blister' } : { status: 'needs-setup' }
   }
-  return { status: 'ambiguous', reason: unit ? `The unit “${p.unit}” does not say whether this is a blister, bottle or tube.` : 'This product has no unit.' }
+  return { status: 'ambiguous', reason: unit ? `The unit “${p.unit}” is not one Retail Sale knows.` : 'This product has no unit.' }
 }

@@ -8,7 +8,8 @@
  *               rate = price per tablet × tablets_per_strip  (the strip rate)
  *             so qty × rate = tablets × price-per-tablet.
  *
- *  'unit'     an intact package (bottle / tube). Billed as whole units of the
+ *  'unit'     an intact package (bottle, tube, vial, ampoule, sachet, box, pcs) or a
+ *             measured quantity of Kg / Ltr. Billed as units of the
  *             product's own unit at the product's own rate:
  *               qty = units, rate = product.sales_rate (or the edited price).
  *             Never derived from tablet counts.
@@ -98,9 +99,22 @@ export function addToBasket(lines: BasketLine[], product: Product, pack: number,
   return [...lines, { product, kind: 'tablets', pack, ppt: defaultPpt ?? defaultPricePerTablet(product, pack), pieces: 1, tablets }]
 }
 
-/** Add one intact package (bottle/tube), merging by product. Returns a new array. */
-export function addUnitToBasket(lines: BasketLine[], product: Product, defaultPrice?: number): BasketLine[] {
+/**
+ * Parse a typed quantity (Kg / Ltr). Returns null unless it is a finite number greater than 0
+ * and at most MAX_QTY; rounded to 3 decimals (e.g. 0.25, 1.5, 12.375).
+ */
+export const MAX_QTY = 100000
+export function parseQuantity(text: string): number | null {
+  const t = String(text ?? '').trim()
+  if (!/^\d*\.?\d+$|^\d+\.$/.test(t)) return null
+  const v = Math.round(Number(t) * 1000) / 1000
+  return Number.isFinite(v) && v > 0 && v <= MAX_QTY ? v : null
+}
+
+/** Add intact package(s) (bottle, tube, vial … or `qty` Kg/Ltr), merging by product. Returns a new array. */
+export function addUnitToBasket(lines: BasketLine[], product: Product, defaultPrice?: number, qty = 1): BasketLine[] {
+  if (typeof qty !== 'number' || !Number.isFinite(qty) || qty <= 0) return lines
   const i = lines.findIndex(l => l.product.id === product.id && kindOf(l) === 'unit')
-  if (i >= 0) return lines.map((l, k) => (k === i ? { ...l, units: (l.units ?? 0) + 1, pieces: l.pieces + 1 } : l))
-  return [...lines, { product, kind: 'unit', pack: 1, ppt: defaultPrice ?? defaultUnitPrice(product), pieces: 1, tablets: 0, units: 1 }]
+  if (i >= 0) return lines.map((l, k) => (k === i ? { ...l, units: round4((l.units ?? 0) + qty), pieces: l.pieces + 1 } : l))
+  return [...lines, { product, kind: 'unit', pack: 1, ppt: defaultPrice ?? defaultUnitPrice(product), pieces: 1, tablets: 0, units: round4(qty) }]
 }

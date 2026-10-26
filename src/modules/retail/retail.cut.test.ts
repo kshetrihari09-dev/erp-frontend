@@ -89,4 +89,30 @@ ok('14-tablet strip (5+5+4): diagonal swipe through tablets keeps all 14 whole',
   const r = cutPieces(f.start, line({ x: 10, y: -10 }, { x: f.W - 10, y: f.H + 10 }), f.tablets, 'oval', f.nid)
   assert.ok(r.changed); assert.equal(cutTotal(r.pieces, f.tablets, 'oval'), 0); assert.equal(wholeTotal(r.pieces, f.tablets, 'oval'), 14)
 })
+ok('STRAIGHT: a vertical swipe between columns separates 2 pieces with an exactly straight cut, all tablets whole', () => {
+  const f = fresh()
+  const r = cutPieces(f.start, line({ x: 56, y: 20 }, { x: 56, y: 90 }), f.tablets, f.shape, f.nid, 'straight')   // short swipe, line extends edge to edge
+  assert.ok(r.changed); assert.equal(r.pieces.length, 2)
+  assert.equal(wholeTotal(r.pieces, f.tablets, f.shape), 10); assert.equal(cutTotal(r.pieces, f.tablets, f.shape), 0)
+})
+ok('STRAIGHT: a nearly-horizontal swipe between the rows snaps flat and separates the rows', () => {
+  const f = fresh()
+  const r = cutPieces(f.start, line({ x: 10, y: 54 }, { x: f.W - 10, y: 58 }), f.tablets, f.shape, f.nid, 'straight')
+  assert.ok(r.changed); assert.equal(r.pieces.length, 2)
+  assert.equal(wholeTotal(r.pieces, f.tablets, f.shape), 10)
+})
+ok('STRAIGHT: a line through tablets is refused (no piece created); FREE-FORM on the same swipe bends round and works', () => {
+  const f = fresh()
+  const swipe = line({ x: 32, y: -10 }, { x: 32, y: f.H + 10 })
+  const s = cutPieces(f.start, swipe, f.tablets, f.shape, f.nid, 'straight')
+  assert.equal(s.changed, false); assert.equal(s.pieces, f.start)
+  const fr = cutPieces(f.start, swipe, f.tablets, f.shape, f.nid, 'free')
+  assert.ok(fr.changed); assert.equal(cutTotal(fr.pieces, f.tablets, f.shape), 0); assert.equal(wholeTotal(fr.pieces, f.tablets, f.shape), 10)
+})
+ok('STRAIGHT: a second straight cut across the resulting pieces separates them again, all tablets still whole', () => {
+  const f = fresh()
+  const r1 = cutPieces(f.start, line({ x: 56, y: -10 }, { x: 56, y: f.H + 10 }), f.tablets, f.shape, f.nid, 'straight')
+  const r2 = cutPieces(r1.pieces, line({ x: 10, y: 56 }, { x: f.W - 10, y: 56 }), f.tablets, f.shape, f.nid, 'straight')
+  assert.ok(r2.changed); assert.ok(r2.pieces.length >= 3); assert.equal(wholeTotal(r2.pieces, f.tablets, f.shape), 10)
+})
 console.log(`\n${n} cut tests passed`)

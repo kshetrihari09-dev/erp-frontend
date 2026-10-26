@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict'
 import {
-  layoutBlister, countTablets, deflect, ownTablets, outline, inside, area, cutPieces, parseColors,
+  straightSegment, planStraight, SNAP_DEG, layoutBlister, countTablets, deflect, ownTablets, outline, inside, area, cutPieces, parseColors,
   SHAPE_NAMES, SHAPES, KERF, PROTECT, MIN_PACK, MAX_PACK, type Piece, type Pt,
 } from './blisterGeometry'
-import { resolvePackaging, canCut, PACKAGING_INSTRUCTION } from './packaging'
+import { resolvePackaging, canCut, isBulk, PACKAGING_INSTRUCTION, PACKAGING_LABEL } from './packaging'
+import { parseQuantity } from './retailBasket'
 import { addUnitToBasket, defaultUnitPrice, kindOf } from './retailBasket'
 import { addToBasket, totals, lineTotal, toHandoff, overStock, defaultPricePerTablet, isValidPrice, round2 } from './retailBasket'
 
@@ -164,17 +165,31 @@ ok('packaging: Bottle and Tube units → bottle / tube; only a blister can be cu
 ok('packaging: a strip with no valid pack size needs setup (not guessed, not a bottle)', () => {
   for (const v of [undefined, null, 0, 1, 41, 2.5]) assert.deepEqual(resolvePackaging({ unit: 'Strip', tablets_per_strip: v } as any), { status: 'needs-setup' })
 })
+ok('packaging: every Unit in the product form gets its own model', () => {
+  const expect: Record<string, string> = { Bottle: 'bottle', Tube: 'tube', Vial: 'vial', Ampoule: 'ampoule', Sachet: 'sachet', Box: 'box', Pcs: 'piece', Kg: 'kg', Ltr: 'ltr' }
+  for (const [unit, type] of Object.entries(expect)) {
+    assert.deepEqual(resolvePackaging({ unit } as any), { status: 'ok', type }, unit)
+    assert.deepEqual(resolvePackaging({ unit: unit.toUpperCase(), tablets_per_strip: null } as any), { status: 'ok', type })   // case-insensitive
+    assert.equal(canCut(type as any), false)
+  }
+  for (const unit of ['Strip', 'Tablet', 'Capsule']) assert.deepEqual(resolvePackaging({ unit, tablets_per_strip: 10 } as any), { status: 'ok', type: 'blister' })
+  assert.equal(Object.keys(expect).length + 3, 12)    // the 12 units in the product form
+})
 ok('packaging: unknown units and contradictory data are ambiguous, never guessed', () => {
-  for (const unit of ['Vial', 'Ampoule', 'Sachet', 'Box', 'Pcs', 'Kg', 'Ltr', '', undefined])
-    assert.equal(resolvePackaging({ unit } as any).status, 'ambiguous')
-  assert.equal(resolvePackaging({ unit: 'Bottle', tablets_per_strip: 10 } as any).status, 'ambiguous')
-  assert.equal(resolvePackaging({ unit: 'Tube', tablets_per_strip: 10 } as any).status, 'ambiguous')
-  assert.equal(resolvePackaging({ unit: 'Box', tablets_per_strip: 10 } as any).status, 'ambiguous')
+  for (const unit of ['Dozen', 'Carton', '', undefined]) assert.equal(resolvePackaging({ unit } as any).status, 'ambiguous')
+  for (const unit of ['Bottle', 'Tube', 'Vial', 'Ampoule', 'Sachet', 'Box', 'Pcs', 'Kg', 'Ltr'])
+    assert.equal(resolvePackaging({ unit, tablets_per_strip: 10 } as any).status, 'ambiguous', unit)
 })
 ok('instructions are exactly the required wording', () => {
   assert.equal(PACKAGING_INSTRUCTION.blister, 'Swipe to cut · Drag pieces to basket.')
   assert.equal(PACKAGING_INSTRUCTION.bottle, 'Drag bottle to basket.')
   assert.equal(PACKAGING_INSTRUCTION.tube, 'Drag tube to basket.')
+  assert.equal(PACKAGING_INSTRUCTION.vial, 'Drag vial to basket.'); assert.equal(PACKAGING_INSTRUCTION.ampoule, 'Drag ampoule to basket.')
+  assert.equal(PACKAGING_INSTRUCTION.sachet, 'Drag sachet to basket.'); assert.equal(PACKAGING_INSTRUCTION.box, 'Drag box to basket.')
+  assert.equal(PACKAGING_INSTRUCTION.piece, 'Drag item to basket.')
+  assert.match(PACKAGING_INSTRUCTION.kg, /quantity/); assert.match(PACKAGING_INSTRUCTION.ltr, /quantity/)
+  for (const k of Object.keys(PACKAGING_LABEL)) assert.ok((PACKAGING_INSTRUCTION as any)[k], k)    // none missing
+  assert.deepEqual(Object.keys(PACKAGING_LABEL).filter(k => isBulk(k as any)), ['kg', 'ltr'])
 })
 
 // ── bottle / tube billing (intact units, never tablet counts) ───────────────
@@ -217,6 +232,76 @@ ok('a bottle line and a tablet line for the same product id stay separate lines'
   const same: any = { ...prod }
   const l = addUnitToBasket(addToBasket([], same, 10, 2), same)
   assert.equal(l.length, 2)
+})
+
+// ── straight cut style ──────────────────────────────────────────────────────
+ok('straight: near-horizontal / near-vertical swipes snap exactly; others stay as drawn', () => {
+  const [h0, h1] = straightSegment([{ x: 0, y: 50 }, { x: 200, y: 56 }])!      // ~1.7° → flat
+  assert.equal(h0.y, h1.y); assert.equal(h0.y, 53); assert.equal(h0.x, 0); assert.equal(h1.x, 200)
+  const [v0, v1] = straightSegment([{ x: 40, y: 0 }, { x: 46, y: 150 }])!      // ~2.3° off upright
+  assert.equal(v0.x, v1.x); assert.equal(v0.x, 43)
+  const [d0, d1] = straightSegment([{ x: 0, y: 0 }, { x: 100, y: 100 }])!      // 45°: untouched
+  assert.deepEqual([d0, d1], [{ x: 0, y: 0 }, { x: 100, y: 100 }])
+  assert.equal(SNAP_DEG, 7)
+  assert.equal(straightSegment([{ x: 5, y: 5 }]), null); assert.equal(straightSegment([{ x: 5, y: 5 }, { x: 5, y: 5 }]), null)
+})
+ok('straight: a line between columns / between rows is clear; through tablets is blocked', () => {
+  const { tablets, ring, W, H } = layoutBlister(10)
+  const piece: Piece = { id: 1, rings: [[ring]], ox: 0, oy: 0 }
+  const plan = (a: Pt, b: Pt, sh: any = 'round') => planStraight([piece], [a, b], tablets, sh)
+  const between = plan({ x: 56, y: 10 }, { x: 56, y: H - 10 })           // gap between col 0 and col 1
+  assert.equal(between.length, 1); assert.equal(between[0].blocked, false)
+  const rows = plan({ x: 10, y: 56 }, { x: W - 10, y: 56 })               // gap between the two rows
+  assert.equal(rows[0].blocked, false)
+  assert.equal(plan({ x: 32, y: 10 }, { x: 32, y: H - 10 })[0].blocked, true)          // straight through column 0
+  assert.equal(plan({ x: 10, y: 32 }, { x: W - 10, y: 32 })[0].blocked, true)          // straight through row 0
+  assert.equal(plan({ x: 10, y: 10 }, { x: W - 10, y: H - 10 })[0].blocked, true)      // diagonal through tablets
+})
+ok('straight: the line is extended edge to edge, past where the swipe started and stopped', () => {
+  const { tablets, ring, W, H } = layoutBlister(10)
+  const piece: Piece = { id: 1, rings: [[ring]], ox: 0, oy: 0 }
+  const [pl] = planStraight([piece], [{ x: 56, y: 30 }, { x: 56, y: 80 }], tablets, 'round')   // short swipe inside the strip
+  const ys = pl.line.map(p => p.y).sort((a, b) => a - b)
+  assert.ok(ys[0] < 0 && ys[1] > H)                                      // spans the whole piece
+  assert.ok(pl.line.every(p => Math.abs(p.x - 56) < 1e-9))              // and is exactly vertical
+})
+ok('straight: only pieces the swipe passes over are planned; moved pieces use their own offset', () => {
+  const { tablets, ring } = layoutBlister(10)
+  const a: Piece = { id: 1, rings: [[ring]], ox: 0, oy: 0 }
+  const b: Piece = { id: 2, rings: [[ring]], ox: 0, oy: 400 }           // far below, not touched
+  const plans = planStraight([a, b], [{ x: 56, y: -5 }, { x: 56, y: 120 }], tablets, 'round')
+  assert.equal(plans.length, 1); assert.equal(plans[0].piece, a)
+  const moved: Piece = { id: 3, rings: [[ring]], ox: 200, oy: 50 }
+  const [pm] = planStraight([moved], [{ x: 256, y: 40 }, { x: 256, y: 170 }], tablets, 'round')   // world x = 200 + 56
+  assert.ok(pm.line.every(p => Math.abs(p.x - 56) < 1e-9)); assert.equal(pm.blocked, false)
+})
+ok('straight: cutPieces refuses a line that would damage tablets, and a swipe that touches nothing — nothing changes', () => {
+  const { tablets, ring, H } = layoutBlister(10)
+  const pieces: Piece[] = [{ id: 1, rings: [[ring]], ox: 0, oy: 0 }]
+  const hit = cutPieces(pieces, [{ x: 32, y: -5 }, { x: 32, y: H + 5 }], tablets, 'round', () => 9, 'straight')
+  assert.equal(hit.changed, false); assert.equal(hit.pieces, pieces); assert.match(hit.reason!, /damage tablets/)
+  const miss = cutPieces(pieces, [{ x: 500, y: 0 }, { x: 500, y: 100 }], tablets, 'round', () => 9, 'straight')
+  assert.equal(miss.changed, false); assert.equal(miss.pieces, pieces); assert.ok(miss.reason)
+})
+
+// ── Kg / Ltr quantities ─────────────────────────────────────────────────────
+ok('parseQuantity: positive numbers up to 100000, 3 decimals; everything else rejected', () => {
+  for (const [t, v] of [['1', 1], ['0.5', 0.5], ['.5', 0.5], ['2.', 2], [' 12.375 ', 12.375], ['1.2345', 1.235], ['100000', 100000]] as const) assert.equal(parseQuantity(t), v, t)
+  for (const bad of ['', '  ', '0', '0.0004', '-1', 'abc', '1e3', '1,5', '1.2.3', '100001', 'Infinity', 'NaN']) assert.equal(parseQuantity(bad), null, bad)
+})
+const glucose: any = { id: 'g1', name: 'Glucose', unit: 'Kg', sales_rate: 160, current_stock: 10 }
+ok('Kg/Ltr: a drop adds the typed quantity; repeated drops accumulate; line total = qty × rate', () => {
+  let l = addUnitToBasket([], glucose, undefined, 2.5)
+  assert.equal(l[0].units, 2.5); assert.equal(lineTotal(l[0]), 400)
+  l = addUnitToBasket(l, glucose, undefined, 0.25)
+  assert.equal(l.length, 1); assert.equal(l[0].units, 2.75); assert.equal(lineTotal(l[0]), 440); assert.equal(l[0].pieces, 2)
+  for (const bad of [0, -1, NaN, Infinity]) assert.equal(addUnitToBasket(l, glucose, undefined, bad), l)
+})
+ok('Kg/Ltr: hand-off sends the decimal quantity at the product rate; stock checked in the same unit', () => {
+  const l = addUnitToBasket([], glucose, undefined, 2.75)
+  const [h] = toHandoff(l); assert.deepEqual([h.qty, h.rate, h.tablets, h.pack], [2.75, 160, 0, 1])
+  assert.equal(overStock(addUnitToBasket([], glucose, undefined, 10)).length, 0)
+  assert.equal(overStock(addUnitToBasket([], glucose, undefined, 10.001)).length, 1)
 })
 
 console.log(`\n${n} test groups passed`)
