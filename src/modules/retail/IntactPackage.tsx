@@ -6,6 +6,7 @@
  * It is ONE intact object: there is no cutting code, no cut preview and no split
  * geometry here at all. Gestures:
  *   tap                → select
+ *   double-tap / dbl-click → add ONE package (same as dropping it on the basket)
  *   drag (any distance) → move; release over the basket → add ONE package
  *   "Add to basket"    → same as dropping it
  * After an add the package slides back to its spot, ready for the next one.
@@ -37,6 +38,7 @@ export default function IntactPackage({ kind, name, company, unitLabel, chip, ad
   const [dragging, setDragging] = useState(false)
   const [selected, setSelected] = useState(false)
   const g = useRef<{ id: number; sx: number; sy: number; moved: boolean; hot: boolean } | null>(null)
+  const lastTap = useRef(0)
 
   const over = (e: React.PointerEvent) => {
     const r = getDropRect(); if (!r) return false
@@ -62,7 +64,11 @@ export default function IntactPackage({ kind, name, company, unitLabel, chip, ad
     if (s.hot) onHotChange?.(false)
     setDragging(false); setOff({ x: 0, y: 0 })
     if (cancelled) return
-    if (!s.moved) setSelected(v => !v)
+    if (!s.moved) {
+      const now = performance.now()
+      if (now - lastTap.current <= 350) { lastTap.current = 0; setSelected(false); onAdd() }    // double-tap / double-click
+      else { lastTap.current = now; setSelected(v => !v) }
+    }
     else if (over(e)) { setSelected(false); onAdd() }
   }
 

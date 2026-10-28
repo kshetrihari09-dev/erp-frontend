@@ -27,16 +27,16 @@ export const PACKAGING_LABEL: Record<PackagingType, string> = {
 
 /** Exact instruction line shown for each active packaging. */
 export const PACKAGING_INSTRUCTION: Record<PackagingType, string> = {
-  blister: 'Swipe to cut · Drag pieces to basket.',
-  bottle:  'Drag bottle to basket.',
-  tube:    'Drag tube to basket.',
-  vial:    'Drag vial to basket.',
-  ampoule: 'Drag ampoule to basket.',
-  sachet:  'Drag sachet to basket.',
-  box:     'Drag box to basket.',
-  piece:   'Drag item to basket.',
-  kg:      'Set the quantity · Drag sack to basket.',
-  ltr:     'Set the quantity · Drag container to basket.',
+  blister: 'Swipe to cut · Double-tap or drag a piece to the basket.',
+  bottle:  'Double-tap or drag the bottle to the basket.',
+  tube:    'Double-tap or drag the tube to the basket.',
+  vial:    'Double-tap or drag the vial to the basket.',
+  ampoule: 'Double-tap or drag the ampoule to the basket.',
+  sachet:  'Double-tap or drag the sachet to the basket.',
+  box:     'Double-tap or drag the box to the basket.',
+  piece:   'Double-tap or drag the item to the basket.',
+  kg:      'Set the quantity · Double-tap or drag the sack to the basket.',
+  ltr:     'Set the quantity · Double-tap or drag the container to the basket.',
 }
 
 /** Only a blister can be cut. */

@@ -4,7 +4,7 @@ import {
   SHAPE_NAMES, SHAPES, KERF, PROTECT, MIN_PACK, MAX_PACK, type Piece, type Pt,
 } from './blisterGeometry'
 import { resolvePackaging, canCut, isBulk, PACKAGING_INSTRUCTION, PACKAGING_LABEL } from './packaging'
-import { parseQuantity } from './retailBasket'
+import { parseQuantity, parseUnitQty, setLineQty, isBulkUnit, MAX_WHOLE_QTY } from './retailBasket'
 import { addUnitToBasket, defaultUnitPrice, kindOf } from './retailBasket'
 import { addToBasket, totals, lineTotal, toHandoff, overStock, defaultPricePerTablet, isValidPrice, round2 } from './retailBasket'
 
@@ -183,12 +183,12 @@ ok('packaging: unknown units and contradictory data are ambiguous, never guessed
     assert.equal(resolvePackaging({ unit, tablets_per_strip: 10 } as any).status, 'ambiguous', unit)
 })
 ok('instructions are exactly the required wording', () => {
-  assert.equal(PACKAGING_INSTRUCTION.blister, 'Swipe to cut · Drag pieces to basket.')
-  assert.equal(PACKAGING_INSTRUCTION.bottle, 'Drag bottle to basket.')
-  assert.equal(PACKAGING_INSTRUCTION.tube, 'Drag tube to basket.')
-  assert.equal(PACKAGING_INSTRUCTION.vial, 'Drag vial to basket.'); assert.equal(PACKAGING_INSTRUCTION.ampoule, 'Drag ampoule to basket.')
-  assert.equal(PACKAGING_INSTRUCTION.sachet, 'Drag sachet to basket.'); assert.equal(PACKAGING_INSTRUCTION.box, 'Drag box to basket.')
-  assert.equal(PACKAGING_INSTRUCTION.piece, 'Drag item to basket.')
+  assert.equal(PACKAGING_INSTRUCTION.blister, 'Swipe to cut · Double-tap or drag a piece to the basket.')
+  assert.equal(PACKAGING_INSTRUCTION.bottle, 'Double-tap or drag the bottle to the basket.')
+  assert.equal(PACKAGING_INSTRUCTION.tube, 'Double-tap or drag the tube to the basket.')
+  assert.equal(PACKAGING_INSTRUCTION.vial, 'Double-tap or drag the vial to the basket.'); assert.equal(PACKAGING_INSTRUCTION.ampoule, 'Double-tap or drag the ampoule to the basket.')
+  assert.equal(PACKAGING_INSTRUCTION.sachet, 'Double-tap or drag the sachet to the basket.'); assert.equal(PACKAGING_INSTRUCTION.box, 'Double-tap or drag the box to the basket.')
+  assert.equal(PACKAGING_INSTRUCTION.piece, 'Double-tap or drag the item to the basket.')
   assert.match(PACKAGING_INSTRUCTION.kg, /quantity/); assert.match(PACKAGING_INSTRUCTION.ltr, /quantity/)
   for (const k of Object.keys(PACKAGING_LABEL)) assert.ok((PACKAGING_INSTRUCTION as any)[k], k)    // none missing
   assert.deepEqual(Object.keys(PACKAGING_LABEL).filter(k => isBulk(k as any)), ['kg', 'ltr'])
@@ -397,5 +397,30 @@ ok('previewCut tells the truth before the finger lifts: ok + counts, blocked + h
     const pv = previewCut([pc], [{ x: -10, y: midY }, { x: L.W + 10, y: midY }], L.tablets, sh, 'straight')
     assert.equal(pv.status, 'ok', sh); assert.deepEqual([...pv.counts].sort(), [5, 5], sh)
   }
+})
+ok('typed quantities: whole numbers for counted items, decimals only for Kg / Ltr', () => {
+  assert.equal(parseUnitQty('3', false), 3); assert.equal(parseUnitQty(' 12 ', false), 12); assert.equal(parseUnitQty(String(MAX_WHOLE_QTY), false), MAX_WHOLE_QTY)
+  for (const bad of ['', '0', '-1', '1.5', '2.', 'abc', '1e3', String(MAX_WHOLE_QTY + 1)]) assert.equal(parseUnitQty(bad, false), null, bad)
+  assert.equal(parseUnitQty('1.5', true), 1.5); assert.equal(parseUnitQty('0.25', true), 0.25); assert.equal(parseUnitQty('0', true), null); assert.equal(parseUnitQty('x', true), null)
+  assert.equal(isBulkUnit('Kg'), true); assert.equal(isBulkUnit(' LTR '), true); assert.equal(isBulkUnit('Bottle'), false); assert.equal(isBulkUnit(undefined), false)
+})
+ok('setLineQty: edit tablets / units in the basket; invalid input changes nothing; totals follow', () => {
+  const mk = (id: string, unit: string, rate = 100) => ({ id, name: 'P' + id, unit, sales_rate: rate, current_stock: 1000 }) as any
+  const tab = mk('1', 'Strip', 100), bot = mk('2', 'Bottle', 50), kg = mk('3', 'Kg', 80)
+  let lines = addToBasket([], tab, 10, 4); lines = addToBasket(lines, tab, 10, 6)            // 2 pieces, 10 tablets
+  lines = addUnitToBasket(lines, bot, undefined, 1); lines = addUnitToBasket(lines, kg, undefined, 0.5)
+  assert.equal(totals(lines).tablets, 10)
+  const a = setLineQty(lines, tab, 'tablets', 25)
+  assert.equal(a.find(l => l.product.id === '1')!.tablets, 25); assert.equal(a.find(l => l.product.id === '1')!.edited, true)
+  assert.equal(totals(a).tablets, 25); assert.equal(lineTotal(a.find(l => l.product.id === '1')!), 250)    // 25 × 10/tablet
+  assert.equal(lines.find(l => l.product.id === '1')!.tablets, 10, 'original is not mutated')
+  const b = setLineQty(a, bot, 'unit', 7); assert.equal(b.find(l => l.product.id === '2')!.units, 7); assert.equal(lineTotal(b.find(l => l.product.id === '2')!), 350)
+  const c = setLineQty(b, kg, 'unit', 2.375); assert.equal(c.find(l => l.product.id === '3')!.units, 2.375); assert.equal(lineTotal(c.find(l => l.product.id === '3')!), 190)
+  // invalid → same array back
+  assert.equal(setLineQty(c, tab, 'tablets', 0), c); assert.equal(setLineQty(c, tab, 'tablets', 2.5), c); assert.equal(setLineQty(c, tab, 'tablets', -3), c)
+  assert.equal(setLineQty(c, bot, 'unit', 1.5), c, 'a bottle cannot be 1.5'); assert.equal(setLineQty(c, kg, 'unit', 0), c); assert.equal(setLineQty(c, kg, 'unit', NaN), c)
+  assert.equal(setLineQty(c, mk('99', 'Strip'), 'tablets', 5), c, 'unknown product')
+  // the hand-off follows the edited quantity
+  const h = toHandoff(c).find(x => x.product.id === '1')!; assert.equal(h.tablets, 25); assert.equal(h.qty, 2.5)
 })
 console.log(`\n${n} test groups passed`)

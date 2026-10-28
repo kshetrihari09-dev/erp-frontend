@@ -2,6 +2,7 @@
  * BlisterWorkbench.tsx — interactive blister cutting bench (canvas).
  *
  * Gestures (no mode buttons):
+ *   double-tap / dbl-click → add the piece to the basket (same as dropping it there)
  *   quick swipe          → cut (the cut bends around tablets, see blisterGeometry); while you swipe the bench
  *                          shows the real result live: tinted pieces, a tablet count on each, red rings on any
  *                          tablet a straight cut would damage, and straight cuts snap to the middle of a gap
@@ -38,6 +39,7 @@ export interface BlisterWorkbenchProps {
   onHotChange?: (hot: boolean) => void
 }
 
+const DOUBLE_TAP_MS = 350   // two taps on the same piece this close together add it to the basket
 const HOLD_MS = 260        // press this long without moving → move mode
 const MOVE_SLOP = 10       // px of travel that turns a press into a swipe
 
@@ -66,6 +68,7 @@ export default function BlisterWorkbench({ resetKey, packSize, shape, colors, bl
   const hotRef = useRef(false)
   const liveRef = useRef<CutPreview | null>(null)   // what the swipe in progress would do (updated while swiping)
   const animRef = useRef(0)
+  const lastTapRef = useRef<{ piece: Piece; at: number; x: number; y: number } | null>(null)   // for double-tap / double-click
   const reloadRef = useRef(0)   // pending auto-reload of a fresh strip once the current one is used up
   const view = useRef({ cssW: 0, cssH: 0, dpr: 1, scale: 1 })
   const props = useRef({ shape, colors, blisterColor, packSize, cutStyle, getDropRect, onAddPiece, onMessage, onHotChange })
@@ -193,7 +196,7 @@ export default function BlisterWorkbench({ resetKey, packSize, shape, colors, bl
     tabletsRef.current = tablets
     // A fresh blister is ALWAYS one intact polygon — never pre-cut.
     piecesRef.current = [{ id: idRef.current++, rings: [[ring]], ox: (wW - W) / 2, oy: Math.max(8, (wH - H) / 2) }]
-    cancelAnimationFrame(animRef.current); window.clearTimeout(reloadRef.current); liveRef.current = null
+    cancelAnimationFrame(animRef.current); window.clearTimeout(reloadRef.current); liveRef.current = null; lastTapRef.current = null
     historyRef.current = []; selRef.current = null; gRef.current = null
     draw(); force()
   }, [packSize, draw])
@@ -341,7 +344,13 @@ export default function BlisterWorkbench({ resetKey, packSize, shape, colors, bl
           if (res.changed) { historyRef.current.push(before.map(p => ({ ...p }))); piecesRef.current = res.pieces; selRef.current = null; navigator.vibrate?.(14); nudgeApart(before, res.pieces) }
           else if (res.reason) say(res.reason)
         }
-      } else if (g.mode === 'pending') selRef.current = hit(pt(e))
+      } else if (g.mode === 'pending') {
+        // tap = select; a second tap on the same piece within DOUBLE_TAP_MS (double-tap / double-click) adds it to the basket
+        const p = pt(e), h = hit(p), now = performance.now(), lt = lastTapRef.current
+        selRef.current = h
+        if (h && lt && lt.piece === h && now - lt.at <= DOUBLE_TAP_MS && Math.hypot(p.x - lt.x, p.y - lt.y) * view.current.scale <= 24) { lastTapRef.current = null; addPiece(h) }
+        else lastTapRef.current = h ? { piece: h, at: now, x: p.x, y: p.y } : null
+      }
       else if (g.mode === 'hold' && g.piece && g.dragged && overBasket(e)) addPiece(g.piece)
     }
     draw(); force()
@@ -402,7 +411,7 @@ export default function BlisterWorkbench({ resetKey, packSize, shape, colors, bl
         <Button variant="secondary" size="sm" icon={<RotateCcw size={15} />} onClick={load}>Reset blister</Button>
       </div>
       <p className="mt-2 text-xs text-[var(--text-4)]">
-        Quick swipe = cut · Tap = select · Press and hold, then drag = move · Drop on the basket to bill; when the strip is used up a fresh one loads.{' '}
+        Quick swipe = cut · Tap = select · Double-tap = add to basket · Press and hold, then drag = move · Drop on the basket to bill; when the strip is used up a fresh one loads.{' '}
         {cutStyle === 'straight'
           ? 'Straight: the cut is a straight line across the whole piece. It snaps to horizontal/vertical and to the middle of the gap between rows or columns, and is refused if it would damage a tablet (those tablets are ringed in red as you swipe).'
           : 'Free-form: the cut follows your (smoothed) swipe and bends around tablets, so none is damaged. The preview shows the tablets in each piece before you lift.'}

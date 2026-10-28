@@ -9,6 +9,7 @@
  *  - Packaging comes from the product's own data (unit + Retail Sale profile),
  *    see packaging.ts. It is never guessed: ambiguous products ask an
  *    authorised user (products.update) to pick the type for that scan.
+ *  - Double-tap / double-click a piece or package to add it; type any quantity (per drop for packages, or on a basket line).
  *  - Each scan REPLACES the bench: a bottle or tube never inherits cutting from
  *    a previous blister, because the cutting component is simply not mounted.
  *  - NOTHING is posted from this page. "Continue to Sales invoice" only hands
@@ -34,9 +35,10 @@ import IntactPackage from './IntactPackage'
 import { isShape, parseColors, parseBlisterColor, MIN_PACK, MAX_PACK, type ShapeName } from './blisterGeometry'
 import { PACKAGING_INSTRUCTION, PACKAGING_LABEL, isBulk, resolvePackaging, validPack, type PackagingType } from './packaging'
 import {
-  MAX_QTY, RETAIL_HANDOFF_KEY, addToBasket, addUnitToBasket, defaultPricePerTablet, defaultUnitPrice, isValidPrice, kindOf,
-  lineTotal, overStock, parseQuantity, toHandoff, totals, type BasketLine,
+  MAX_QTY, MAX_WHOLE_QTY, RETAIL_HANDOFF_KEY, addToBasket, addUnitToBasket, defaultPricePerTablet, defaultUnitPrice, isBulkUnit, isValidPrice, kindOf,
+  lineTotal, overStock, parseUnitQty, setLineQty, toHandoff, totals, type BasketLine,
 } from './retailBasket'
+import QtyEditor from './QtyEditor'
 
 const card = 'rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4'
 // Whole packages pluralise (2 bottles); measured/abbreviated units do not (2.5 Kg, 3 Pcs).
@@ -68,9 +70,9 @@ export default function RetailSalePage() {
   const [lines, setLines] = useState<BasketLine[]>([])
   const [priceText, setPriceText] = useState<Record<string, string>>({})
   const [hot, setHot] = useState(false)
-  const [bulkQty, setBulkQty] = useState('1')          // quantity to add per drop for Kg / Ltr products
-  const bulkQtyRef = useRef('1')
-  bulkQtyRef.current = bulkQty
+  const [dropQty, setDropQty] = useState('1')          // how many packages (or Kg / Ltr) one drop / double-tap adds
+  const dropQtyRef = useRef('1')
+  dropQtyRef.current = dropQty
   const loadSeq = useRef(0)
   const loadedRef = useRef<Loaded | null>(null)
   loadedRef.current = loaded
@@ -87,7 +89,7 @@ export default function RetailSalePage() {
       colors: parseColors(full.tablet_colors),
       blisterColor: parseBlisterColor(full.blister_color),
     })
-    setHot(false); setBulkQty('1')
+    setHot(false); setDropQty('1')
     requestAnimationFrame(() => inputRef.current?.focusSilently())
   }, [])
 
@@ -112,12 +114,9 @@ export default function RetailSalePage() {
   }, [])
   const handleAddUnit = useCallback(() => {
     const cur = loadedRef.current; if (!cur || cur.packaging === 'blister') return
-    let qty = 1
-    if (isBulk(cur.packaging)) {
-      const q = parseQuantity(bulkQtyRef.current)
-      if (q === null) { toastError('Check the quantity', `Enter a quantity above 0 (up to ${MAX_QTY}).`); return }
-      qty = q
-    }
+    const bulk = isBulk(cur.packaging)
+    const qty = parseUnitQty(dropQtyRef.current, bulk)
+    if (qty === null) { toastError('Check the quantity', bulk ? `Enter a quantity above 0 (up to ${MAX_QTY}).` : `Enter a whole number from 1 to ${MAX_WHOLE_QTY}.`); return }
     setLines(prev => addUnitToBasket(prev, cur.product, undefined, qty))
     toastInfo(`Added ${qtyLabel(qty, cur.product.unit || PACKAGING_LABEL[cur.packaging])}`)
   }, [toastInfo, toastError])
@@ -144,6 +143,7 @@ export default function RetailSalePage() {
   }
 
   const unitName = loaded ? (loaded.product.unit || PACKAGING_LABEL[loaded.packaging]) : ''
+  const dropN = loaded && loaded.packaging !== 'blister' ? parseUnitQty(dropQty, isBulk(loaded.packaging)) : null
 
   return (
     <div className="p-4 md:p-6 max-w-[1100px] mx-auto">
@@ -225,22 +225,20 @@ export default function RetailSalePage() {
                   />
                 ) : (
                   <>
-                    {isBulk(loaded.packaging) && (
-                      <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
-                        <label className="font-semibold uppercase tracking-wide text-[var(--text-3)]" htmlFor="retail-bulk-qty">Quantity ({unitName})</label>
-                        <input id="retail-bulk-qty" type="text" inputMode="decimal" className="erp-input w-24 !py-1" value={bulkQty}
-                          onChange={e => setBulkQty(e.target.value)} aria-invalid={parseQuantity(bulkQty) === null} />
-                        {['0.25', '0.5', '1', '5'].map(q => (
-                          <button key={q} type="button" onClick={() => setBulkQty(q)} className="px-2 py-1 rounded-md border border-[var(--border)] text-[var(--text-2)]">{q}</button>
-                        ))}
-                        {parseQuantity(bulkQty) === null && <span className="text-red-500">Enter a number above 0</span>}
-                      </div>
-                    )}
+                    <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
+                      <label className="font-semibold uppercase tracking-wide text-[var(--text-3)]" htmlFor="retail-drop-qty">Quantity ({unitName})</label>
+                      <input id="retail-drop-qty" type="text" inputMode={isBulk(loaded.packaging) ? 'decimal' : 'numeric'} className="erp-input w-24 !py-1" value={dropQty}
+                        onChange={e => setDropQty(e.target.value)} onFocus={e => e.currentTarget.select()} aria-invalid={dropN === null} />
+                      {(isBulk(loaded.packaging) ? ['0.25', '0.5', '1', '5'] : ['1', '2', '5', '10']).map(q => (
+                        <button key={q} type="button" onClick={() => setDropQty(q)} className="px-2 py-1 rounded-md border border-[var(--border)] text-[var(--text-2)]">{q}</button>
+                      ))}
+                      {dropN === null && <span className="text-red-500">{isBulk(loaded.packaging) ? 'Enter a number above 0' : 'Enter a whole number, 1 or more'}</span>}
+                    </div>
                   <IntactPackage
                     key={`${loaded.packaging}-${loaded.key}`}
                     kind={loaded.packaging} name={loaded.product.name} company={loaded.product.company_name} unitLabel={unitName}
-                    chip={isBulk(loaded.packaging) ? `${parseQuantity(bulkQty) ?? '—'} ${unitName}` : undefined}
-                    addLabel={isBulk(loaded.packaging) ? `Add ${parseQuantity(bulkQty) ?? '…'} ${unitName} to basket` : undefined}
+                    chip={dropN === null ? `— ${unitName}` : isBulk(loaded.packaging) || dropN > 1 ? qtyLabel(dropN, unitName) : undefined}
+                    addLabel={dropN === null ? `Add … ${unitName} to basket` : isBulk(loaded.packaging) || dropN > 1 ? `Add ${qtyLabel(dropN, unitName)} to basket` : undefined}
                     getDropRect={() => basketRef.current?.getBoundingClientRect() ?? null}
                     onAdd={handleAddUnit} onHotChange={setHot}
                   />
@@ -257,7 +255,7 @@ export default function RetailSalePage() {
         <section ref={basketRef} className={card}
           style={hot ? { borderColor: 'var(--brand)', background: 'color-mix(in srgb, var(--brand) 10%, var(--surface))' } : { borderStyle: 'dashed', borderWidth: 2 }}>
           <div className="text-sm font-bold text-[var(--text)] mb-2">Billing basket</div>
-          {!lines.length && <p className="text-sm text-[var(--text-3)]">Drag a cut piece, bottle or tube here, or select it and press “Add to basket”.</p>}
+          {!lines.length && <p className="text-sm text-[var(--text-3)]">Double-tap or drag a cut piece, bottle or tube here, or select it and press “Add to basket”. You can change any quantity in the basket by typing.</p>}
 
           {lines.map(l => {
             const unitLine = kindOf(l) === 'unit'
@@ -269,11 +267,18 @@ export default function RetailSalePage() {
                   <div>
                     <div className="font-semibold text-sm text-[var(--text)]">{l.product.name}</div>
                     <div className="text-xs text-[var(--text-3)]">
-                      {l.product.barcode || l.product.item_code} · {unitLine ? qtyLabel(qty, unit) : `${l.pieces} piece${l.pieces > 1 ? 's' : ''} · ${qty} tablet${qty > 1 ? 's' : ''}`}
+                      {l.product.barcode || l.product.item_code} · {unitLine ? qtyLabel(qty, unit) : l.edited ? `${qty} tablet${qty > 1 ? 's' : ''}` : `${l.pieces} piece${l.pieces > 1 ? 's' : ''} · ${qty} tablet${qty > 1 ? 's' : ''}`}
                     </div>
                   </div>
                   <button type="button" aria-label={`Remove ${l.product.name}`} onClick={() => setLines(p => p.filter(x => lineKey(x) !== lineKey(l)))}
                     className="p-1.5 rounded-md text-[var(--text-3)] hover:bg-[var(--surface-3)]"><Trash2 size={15} /></button>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--text-3)]">
+                  <span>Qty</span>
+                  <QtyEditor value={qty} bulk={unitLine && isBulkUnit(unit)} label={`Quantity of ${l.product.name} (${unitLine ? unit.toLowerCase() : 'tablets'})`}
+                    onCommit={v => setLines(prev => setLineQty(prev, l.product, kindOf(l), v))}
+                    onInvalid={() => toastError('Invalid quantity', unitLine && isBulkUnit(unit) ? `Enter a number above 0 (up to ${MAX_QTY}).` : `Enter a whole number from 1 to ${MAX_WHOLE_QTY}.`)} />
+                  <span>{unitLine ? unit.toLowerCase() : 'tablets'}</span>
                 </div>
                 <div className="flex items-center justify-between gap-2">
                   <label className="text-xs text-[var(--text-3)] flex items-center gap-1.5">NPR / {unitLine ? unit.toLowerCase() : 'tablet'}

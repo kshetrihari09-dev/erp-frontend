@@ -34,6 +34,7 @@ export interface BasketLine {
   pieces: number          // pieces dropped in ('tablets') or units added ('unit')
   tablets: number         // tablets billed ('tablets'); 0 for unit lines
   units?: number          // whole packages billed ('unit')
+  edited?: boolean        // quantity typed/stepped by hand (so "N pieces" no longer describes the tablets)
 }
 
 export const kindOf = (l: BasketLine): LineKind => l.kind ?? 'tablets'
@@ -117,4 +118,38 @@ export function addUnitToBasket(lines: BasketLine[], product: Product, defaultPr
   const i = lines.findIndex(l => l.product.id === product.id && kindOf(l) === 'unit')
   if (i >= 0) return lines.map((l, k) => (k === i ? { ...l, units: round4((l.units ?? 0) + qty), pieces: l.pieces + 1 } : l))
   return [...lines, { product, kind: 'unit', pack: 1, ppt: defaultPrice ?? defaultUnitPrice(product), pieces: 1, tablets: 0, units: round4(qty) }]
+}
+
+/** Kg / Ltr are measured (decimals allowed); every other unit is counted in whole packages. */
+export const isBulkUnit = (unit?: string | null) => /^(kg|ltr)$/i.test(String(unit ?? '').trim())
+
+/** Largest whole quantity accepted for counted items (tablets, bottles, tubes …). */
+export const MAX_WHOLE_QTY = 99999
+
+/**
+ * Parse a typed quantity. Kg / Ltr (`bulk`): up to 3 decimals, > 0 (see parseQuantity).
+ * Everything else: a whole number from 1 to MAX_WHOLE_QTY. Anything else → null.
+ */
+export function parseUnitQty(text: string, bulk: boolean): number | null {
+  if (bulk) return parseQuantity(text)
+  const t = String(text ?? '').trim()
+  if (!/^\d+$/.test(t)) return null
+  const v = Number(t)
+  return v >= 1 && v <= MAX_WHOLE_QTY ? v : null
+}
+
+/**
+ * Set the quantity of one basket line: tablets for a 'tablets' line, packages (or Kg / Ltr) for a 'unit' line.
+ * An invalid quantity leaves the basket unchanged. Returns a new array.
+ */
+export function setLineQty(lines: BasketLine[], product: Product, kind: LineKind, qty: number): BasketLine[] {
+  if (typeof qty !== 'number' || !Number.isFinite(qty) || qty <= 0) return lines
+  const i = lines.findIndex(l => l.product.id === product.id && kindOf(l) === kind)
+  if (i < 0) return lines
+  if (kind === 'tablets') {
+    if (!Number.isInteger(qty) || qty > MAX_WHOLE_QTY) return lines
+    return lines.map((l, k) => (k === i ? { ...l, tablets: qty, edited: true } : l))
+  }
+  if (qty > MAX_QTY || (!isBulkUnit(product.unit) && !Number.isInteger(qty))) return lines
+  return lines.map((l, k) => (k === i ? { ...l, units: round4(qty), edited: true } : l))
 }
