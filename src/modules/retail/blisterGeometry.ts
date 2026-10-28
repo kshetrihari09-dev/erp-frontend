@@ -35,13 +35,13 @@ export const SHAPE_NAMES: ShapeName[] = ['round', 'oval', 'capsule', 'square', '
 export const SHAPES: Record<ShapeName, [number, number, number]> = {
   round:   [17, 17, 2],
   oval:    [18, 14, 2],
-  capsule: [11, 18, 4],   // upright: long side vertical
+  capsule: [9.5, 20, 2],  // upright stadium (full semicircle ends); exponent unused
   square:  [16, 16, 4],
-  oblong:  [18, 10, 6],
+  oblong:  [10, 18, 6],   // upright, like a capsule: long side vertical
   diamond: [18, 15, 1],
 }
 
-/** A tablet whose long side runs top-to-bottom (capsules). Two-tone ones split top/bottom, others left/right. */
+/** A tablet whose long side runs top-to-bottom (capsules and oblongs). Two-tone ones split top/bottom, others left/right. */
 export const isUpright = (s: ShapeName) => SHAPES[s][1] > SHAPES[s][0]
 
 export interface Tablet { x: number; y: number }
@@ -64,14 +64,33 @@ export function parseColors(v?: string | null): string[] {
   return parts.length ? parts : ['#fbf8f0']
 }
 
+/** Optional blister (foil/pack) colour: "#rrggbb" → itself, anything else → null (default silver foil). */
+export function parseBlisterColor(v?: string | null): string | null {
+  const s = String(v ?? '').trim()
+  return /^#[0-9a-fA-F]{6}$/.test(s) ? s.toLowerCase() : null
+}
+
+/** Mix a "#rrggbb" colour toward white (amt > 0) or black (amt < 0), amt in -1..1. */
+export function shadeHex(hex: string, amt: number): string {
+  const t = amt >= 0 ? 255 : 0, a = Math.abs(amt)
+  const ch = [1, 3, 5].map(i => Math.round(parseInt(hex.slice(i, i + 2), 16) * (1 - a) + t * a))
+  return '#' + ch.map(c => c.toString(16).padStart(2, '0')).join('')
+}
+
+/** Upright tablets (capsule, oblong) stand in a slightly taller, narrower strip than flat ones. */
+export const PITCH_X_UP = 42
+export const PITCH_Y_UP = 56
+export const pitchOf = (shape: ShapeName): [number, number] => (isUpright(shape) ? [PITCH_X_UP, PITCH_Y_UP] : [PITCH, PITCH])
+
 /** 5 tablets per row, filled row by row (10 → 2×5, 14 → 5+5+4, 40 → 8×5). Returns the intact blister geometry. */
-export function layoutBlister(pack: number): { W: number; H: number; cols: number; rows: number; tablets: Tablet[]; ring: Ring } {
+export function layoutBlister(pack: number, shape: ShapeName = 'round'): { W: number; H: number; cols: number; rows: number; tablets: Tablet[]; ring: Ring } {
   const n = Math.min(MAX_PACK, Math.max(MIN_PACK, Math.floor(pack)))
   const cols = Math.min(PER_ROW, n)
   const rows = Math.ceil(n / cols)
-  const W = cols * PITCH + 16, H = rows * PITCH + 16
+  const [px, py] = pitchOf(shape)
+  const W = cols * px + 16, H = rows * py + 16
   const tablets: Tablet[] = []
-  for (let i = 0; i < n; i++) tablets.push({ x: 32 + (i % cols) * PITCH, y: 32 + Math.floor(i / cols) * PITCH })
+  for (let i = 0; i < n; i++) tablets.push({ x: px / 2 + 8 + (i % cols) * px, y: py / 2 + 8 + Math.floor(i / cols) * py })
   return { W, H, cols, rows, tablets, ring: roundedRect(W, H, 10) }
 }
 
@@ -123,6 +142,15 @@ export function bbox(p: Piece): [number, number, number, number] {
 export function outline(shape: ShapeName, t: Tablet, s: number, n: number): Ring {
   const [a, b, k] = SHAPES[shape]
   const o: Ring = []
+  if (shape === 'capsule') {
+    // stadium: two semicircles of radius `a`, joined by straight sides
+    const d = (b - a) * s
+    for (let i = 0; i < n; i++) {
+      const th = (i * 2 * Math.PI) / n, sn = Math.sin(th)
+      o.push([t.x + s * a * Math.cos(th), t.y + (sn >= 0 ? d : -d) + s * a * sn])
+    }
+    return o
+  }
   for (let i = 0; i < n; i++) {
     const th = (i * 2 * Math.PI) / n, c = Math.cos(th), sn = Math.sin(th)
     o.push([t.x + s * a * Math.sign(c) * Math.abs(c) ** (2 / k), t.y + s * b * Math.sign(sn) * Math.abs(sn) ** (2 / k)])
@@ -146,16 +174,20 @@ export function countTablets(piece: Piece, tablets: Tablet[], shape: ShapeName):
 // ── cut bends around tablets ─────────────────────────────────────────────────
 export const ownTablets = (p: Piece, tablets: Tablet[]) => tablets.filter(t => inside(p.rings, t.x, t.y))
 
+/** Superellipse used for the protected (no-cut) zone. The capsule is drawn as a stadium, so its zone uses a boxier
+ *  exponent (4) that always contains the real outline — cuts bend round it with a little extra room at the ends. */
+export const zoneOf = (shape: ShapeName): [number, number, number] => (shape === 'capsule' ? [SHAPES.capsule[0], SHAPES.capsule[1], 4] : SHAPES[shape])
+
 function inDome(shape: ShapeName, t: Tablet, x: number, y: number): boolean {
-  const [a, b, k] = SHAPES[shape]
+  const [a, b, k] = zoneOf(shape)
   return Math.abs((x - t.x) / (a * PROTECT)) ** k + Math.abs((y - t.y) / (b * PROTECT)) ** k < 1
 }
 function edgePt(shape: ShapeName, t: Tablet, th: number): Pt {
-  const [a, b, k] = SHAPES[shape], c = Math.cos(th), s = Math.sin(th)
+  const [a, b, k] = zoneOf(shape), c = Math.cos(th), s = Math.sin(th)
   return { x: t.x + PROTECT * a * Math.sign(c) * Math.abs(c) ** (2 / k), y: t.y + PROTECT * b * Math.sign(s) * Math.abs(s) ** (2 / k) }
 }
 function angOf(shape: ShapeName, t: Tablet, x: number, y: number): number {
-  const [a, b] = SHAPES[shape]
+  const [a, b] = zoneOf(shape)
   return Math.atan2((y - t.y) / b, (x - t.x) / a)
 }
 
@@ -242,12 +274,44 @@ export function straightSegment(path: Pt[]): [Pt, Pt] | null {
   return [a, b]
 }
 
+/** A straight cut within this many px of the middle of the gap between two rows/columns snaps to it. */
+export const SNAP_GAP = 10
+
+/** Smooth a hand-drawn swipe (moving average); the first and last points are kept exactly. */
+export function smoothPath(path: Pt[], half = 3): Pt[] {
+  if (path.length < 4) return path
+  const out: Pt[] = [path[0]]
+  for (let i = 1; i < path.length - 1; i++) {
+    const h = Math.min(half, i, path.length - 1 - i)
+    let sx = 0, sy = 0
+    for (let k = -h; k <= h; k++) { sx += path[i + k].x; sy += path[i + k].y }
+    out.push({ x: sx / (2 * h + 1), y: sy / (2 * h + 1) })
+  }
+  out.push(path[path.length - 1])
+  return out
+}
+
+/** Middle of the gap between two neighbouring rows (axis 'y') or columns ('x') of tablets, if within SNAP_GAP of `v`. */
+function gapCentre(own: Tablet[], axis: 'x' | 'y', v: number): number | null {
+  const vals = [...new Set(own.map(t => Math.round(t[axis] * 2) / 2))].sort((m, n) => m - n)
+  let best: number | null = null, bd = SNAP_GAP
+  for (let i = 1; i < vals.length; i++) {
+    const m = (vals[i - 1] + vals[i]) / 2, d = Math.abs(m - v)
+    if (d <= bd) { bd = d; best = m }
+  }
+  return best
+}
+
 export interface StraightPlan {
   piece: Piece
   /** The full-length straight line across this piece, in the piece's LOCAL coordinates. */
   line: [Pt, Pt]
   /** True if that straight line would run into a tablet's protected zone (so it would damage it). */
   blocked: boolean
+  /** True if the line was pulled to the middle of a gap between rows/columns. */
+  snapped: boolean
+  /** The tablets (piece-local) the line would damage. */
+  hits: Tablet[]
 }
 
 /**
@@ -267,18 +331,27 @@ export function planStraight(pieces: Piece[], path: Pt[], tablets: Tablet[], sha
     const n = Math.max(2, Math.ceil(len / 3))
     for (let k = 0; k <= n && !touched; k++) touched = inside(p.rings, la.x + ((lb.x - la.x) * k) / n, la.y + ((lb.y - la.y) * k) / n)
     if (!touched) continue
+    const own = ownTablets(p, tablets)
+    // magnet: an (almost) horizontal/vertical line settles in the middle of the gap between rows/columns
+    let snapped = false
+    const horiz = a.y === b.y, vert = a.x === b.x
+    if (horiz || vert) {
+      const c = gapCentre(own, horiz ? 'y' : 'x', horiz ? la.y : la.x)
+      if (c !== null) { snapped = true; if (horiz) { la.y = c; lb.y = c } else { la.x = c; lb.x = c } }
+    }
     const [x0, y0, x1, y1] = bbox(p)
     const t0 = ((x0 + x1) / 2 - la.x) * dx + ((y0 + y1) / 2 - la.y) * dy
     const R = Math.hypot(x1 - x0, y1 - y0) / 2 + 12
     const line: [Pt, Pt] = [{ x: la.x + dx * (t0 - R), y: la.y + dy * (t0 - R) }, { x: la.x + dx * (t0 + R), y: la.y + dy * (t0 + R) }]
-    const own = ownTablets(p, tablets)
-    let blocked = false
     const m = Math.ceil(R)
-    for (let k = 0; k <= m && !blocked; k++) {
-      const x = line[0].x + ((line[1].x - line[0].x) * k) / m, y = line[0].y + ((line[1].y - line[0].y) * k) / m
-      blocked = own.some(t => inDome(shape, t, x, y))
-    }
-    plans.push({ piece: p, line, blocked })
+    const hits = own.filter(t => {
+      for (let k = 0; k <= m; k++) {
+        const x = line[0].x + ((line[1].x - line[0].x) * k) / m, y = line[0].y + ((line[1].y - line[0].y) * k) / m
+        if (inDome(shape, t, x, y)) return true
+      }
+      return false
+    })
+    plans.push({ piece: p, line, blocked: hits.length > 0, snapped, hits })
   }
   return plans
 }
@@ -326,4 +399,35 @@ export function cutPieces(
     if (parts) { changed = true; for (const g of parts) out.push({ id: newId(), rings: [g], ox: p.ox, oy: p.oy }) } else out.push(p)
   }
   return changed ? { pieces: out, changed } : { pieces, changed: false, reason: 'Cut must go all the way across a piece' }
+}
+
+// ── live preview of a cut in progress ────────────────────────────────────────
+export interface CutPreview {
+  status: 'ok' | 'blocked' | 'short' | 'none'
+  /** One-line summary for the status bar. */
+  text: string
+  /** The pieces this swipe would create (same offsets as the piece they came from). */
+  parts: Piece[]
+  /** Billable (whole) tablets in each of `parts`. */
+  counts: number[]
+}
+
+/** What would happen if the swipe ended now — computed with the real cutting code, nothing is changed. */
+export function previewCut(pieces: Piece[], path: Pt[], tablets: Tablet[], shape: ShapeName, style: CutStyle): CutPreview {
+  let n = 0
+  const res = cutPieces(pieces, path, tablets, shape, () => --n, style)
+  if (res.changed) {
+    const parts = res.pieces.filter(p => !pieces.includes(p))
+    const counts = parts.map(p => countTablets(p, tablets, shape).whole)
+    const snapped = style === 'straight' && planStraight(pieces, path, tablets, shape).some(pl => pl.snapped)
+    const total = counts.reduce((a, b) => a + b, 0)
+    return { status: 'ok', parts, counts, text: `Cut → ${counts.join(' + ')} tablet${total === 1 ? '' : 's'}${snapped ? ' · snapped to the gap' : ''}` }
+  }
+  if (style === 'straight') {
+    const plans = planStraight(pieces, path, tablets, shape)
+    if (!plans.length) return { status: 'none', parts: [], counts: [], text: 'Swipe across the strip to cut it' }
+    const hit = plans.reduce((a, pl) => a + pl.hits.length, 0)
+    if (hit) return { status: 'blocked', parts: [], counts: [], text: `Would damage ${hit} tablet${hit === 1 ? '' : 's'} — cut between rows or columns` }
+  }
+  return { status: 'short', parts: [], counts: [], text: 'Keep going — swipe all the way across the piece' }
 }

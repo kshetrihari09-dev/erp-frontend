@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import {
-  isUpright, straightSegment, planStraight, SNAP_DEG, layoutBlister, countTablets, deflect, ownTablets, outline, inside, area, cutPieces, parseColors,
+  isUpright, straightSegment, planStraight, SNAP_DEG, layoutBlister, countTablets, deflect, ownTablets, outline, inside, area, cutPieces, parseColors, parseBlisterColor, shadeHex, PITCH_Y_UP, PITCH_X_UP, zoneOf, previewCut, smoothPath, SNAP_GAP,
   SHAPE_NAMES, SHAPES, KERF, PROTECT, MIN_PACK, MAX_PACK, type Piece, type Pt,
 } from './blisterGeometry'
 import { resolvePackaging, canCut, isBulk, PACKAGING_INSTRUCTION, PACKAGING_LABEL } from './packaging'
@@ -35,36 +35,32 @@ ok('10-pack: one intact piece, 10 tablets in 2 rows of 5', () => {
 })
 ok('every pack 1..40 lays out exactly `pack` tablets and all are whole', () => {
   for (let p = MIN_PACK; p <= MAX_PACK; p++) for (const sh of SHAPE_NAMES) {
-    const { tablets, ring } = layoutBlister(p)
+    const { tablets, ring } = layoutBlister(p, sh)
     assert.equal(tablets.length, p)
     assert.deepEqual(countTablets({ id: 1, rings: [[ring]], ox: 0, oy: 0 }, tablets, sh), { whole: p, cut: 0 })
   }
 })
 ok('protected zones of neighbouring tablets never overlap (a cut can always pass between)', () => {
   for (const sh of SHAPE_NAMES) {
-    const { tablets } = layoutBlister(40)
+    const { tablets } = layoutBlister(40, sh)
     for (const a of tablets) for (const b of tablets) {
       if (a === b) continue
-      for (const [x, y] of outline(sh, a, PROTECT, 64)) {
-        // a point on A's protected boundary must not be strictly inside B's protected zone
-        const [bw, bh, k] = SHAPES[sh]
-        const v = Math.abs((x - b.x) / (bw * PROTECT)) ** k + Math.abs((y - b.y) / (bh * PROTECT)) ** k
-        assert.ok(v >= 1 - 1e-9, `${sh}: zones overlap`)
-      }
+      const zoneB = [[outline(sh, b, PROTECT, 64)]]
+      // a point on A's protected boundary must not be strictly inside B's protected zone
+      for (const [x, y] of outline(sh, a, PROTECT, 64)) assert.ok(!inside(zoneB, x, y), `${sh}: zones overlap`)
     }
   }
 })
-// 5. cut through a tablet region: path bends round, never enters any dome
 ok('deflect: swipes through the middle of tablets never touch a dome (all shapes, 400 random swipes)', () => {
   let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647
   for (const sh of SHAPE_NAMES) {
-    const { W, H, tablets } = layoutBlister(10)
+    const { W, H, tablets } = layoutBlister(10, sh)
     for (let i = 0; i < 400; i++) {
       const a: Pt = { x: rnd() * W, y: rnd() * H }, b: Pt = { x: rnd() * W, y: rnd() * H }
       const path: Pt[] = Array.from({ length: 30 }, (_, k) => ({ x: a.x + ((b.x - a.x) * k) / 29, y: a.y + ((b.y - a.y) * k) / 29 }))
       const out = deflect(path, tablets, sh)
       for (const q of out) for (const t of tablets) {
-        const [bw, bh, kk] = SHAPES[sh]
+        const [bw, bh, kk] = zoneOf(sh)
         // on or outside the protected zone, i.e. at least the margin away from the real dome
         const v = Math.abs((q.x - t.x) / (bw * PROTECT)) ** kk + Math.abs((q.y - t.y) / (bh * PROTECT)) ** kk
         assert.ok(v >= 1 - 1e-6, `${sh}: cut point inside protected zone`)
@@ -106,6 +102,12 @@ ok('inside() honours piece offset semantics (point-in-polygon + hole)', () => {
   const donut = [[ [[0,0],[10,0],[10,10],[0,10],[0,0]], [[3,3],[7,3],[7,7],[3,7],[3,3]] ]] as any
   assert.ok(inside(donut, 1, 1)); assert.ok(!inside(donut, 5, 5)); assert.ok(!inside(donut, 11, 5))
   assert.equal(area(donut), 100 - 16)
+})
+ok('blister colour: valid hex or null; shading stays valid hex', () => {
+  assert.equal(parseBlisterColor('#1E90FF'), '#1e90ff'); assert.equal(parseBlisterColor(''), null)
+  assert.equal(parseBlisterColor(null), null); assert.equal(parseBlisterColor('blue'), null); assert.equal(parseBlisterColor('#12345'), null)
+  assert.equal(shadeHex('#808080', 1), '#ffffff'); assert.equal(shadeHex('#808080', -1), '#000000'); assert.equal(shadeHex('#808080', 0), '#808080')
+  for (const a of [-0.2, 0.3, 0.45]) assert.match(shadeHex('#1e90ff', a), /^#[0-9a-f]{6}$/)
 })
 ok('parseColors: valid, two-tone, invalid → white', () => {
   assert.deepEqual(parseColors('#d9534f,#f5d76e'), ['#d9534f', '#f5d76e'])
@@ -320,25 +322,80 @@ ok('single-tablet strip (1 per strip) is valid: one tablet, one whole row, billa
 ok('pack sizes outside 1..40 or non-integers are still rejected', () => {
   for (const v of [0, -3, 41, 2.5, NaN]) assert.equal(resolvePackaging({ unit: 'Strip', tablets_per_strip: v } as any).status, 'needs-setup', String(v))
 })
-ok('capsule is upright (taller than wide); no other shape is', () => {
-  assert.equal(isUpright('capsule'), true)
-  for (const sh of SHAPE_NAMES.filter(x => x !== 'capsule')) assert.equal(isUpright(sh), false, sh)
+ok('capsule and oblong are upright (taller than wide); no other shape is', () => {
+  assert.equal(isUpright('capsule'), true); assert.equal(isUpright('oblong'), true)
+  for (const sh of SHAPE_NAMES.filter(x => x !== 'capsule' && x !== 'oblong')) assert.equal(isUpright(sh), false, sh)
+  const ob = outline('oblong', { x: 0, y: 0 }, 1, 64), ox = ob.map(p => p[0]), oy = ob.map(p => p[1])
+  assert.ok(Math.max(...oy) - Math.min(...oy) > 1.4 * (Math.max(...ox) - Math.min(...ox)))
   const t = { x: 100, y: 100 }
   const o = outline('capsule', t, 1, 64)
   const w = Math.max(...o.map(p => p[0])) - Math.min(...o.map(p => p[0])), h = Math.max(...o.map(p => p[1])) - Math.min(...o.map(p => p[1]))
   assert.ok(h > w * 1.4, `capsule ${w.toFixed(1)}×${h.toFixed(1)}`)          // 22 × 36
   assert.ok(Math.abs(o.reduce((s2, p) => s2 + p[0], 0) / o.length - 100) < 1e-6)   // centred
 })
-ok('upright capsules: whole in a full strip, and the gap between neighbours stays open both ways', () => {
-  for (const pack of [1, 5, 10, 14, 40]) {
-    const { tablets, ring } = layoutBlister(pack)
-    assert.deepEqual(countTablets({ id: 1, rings: [[ring]], ox: 0, oy: 0 }, tablets, 'capsule'), { whole: pack, cut: 0 }, String(pack))
+ok('upright tablets (capsule, oblong): strip is a little taller and narrower; every tablet whole; gaps stay open both ways', () => {
+  const flat = layoutBlister(10, 'round')
+  for (const shape of ['capsule', 'oblong'] as const) {
+    const up = layoutBlister(10, shape)
+    assert.ok(up.H > flat.H, 'taller'); assert.ok(up.W < flat.W, 'narrower')
+    assert.ok(up.H - flat.H <= 24 && flat.W - up.W <= 40, 'only a little')
+    for (const pack of [1, 5, 10, 14, 40]) {
+      const { tablets, ring } = layoutBlister(pack, shape)
+      assert.deepEqual(countTablets({ id: 1, rings: [[ring]], ox: 0, oy: 0 }, tablets, shape), { whole: pack, cut: 0 }, shape + pack)
+    }
+    const { tablets, ring, W, H } = layoutBlister(40, shape)
+    const piece: Piece = { id: 1, rings: [[ring]], ox: 0, oy: 0 }
+    // straight cuts midway between rows and between columns must stay clear
+    for (let r = 1; r < 8; r++) { const y = 8 + PITCH_Y_UP * r; assert.equal(planStraight([piece], [{ x: 10, y }, { x: W - 10, y }], tablets, shape)[0].blocked, false, shape + ' row gap ' + y) }
+    for (let c = 1; c < 5; c++) { const x = 8 + PITCH_X_UP * c; assert.equal(planStraight([piece], [{ x, y: 10 }, { x, y: H - 10 }], tablets, shape)[0].blocked, false, shape + ' col gap ' + x) }
+    assert.equal(planStraight([piece], [{ x: tablets[0].x, y: 10 }, { x: tablets[0].x, y: H - 10 }], tablets, shape)[0].blocked, true)   // through a column of tablets
   }
-  const { tablets, ring, W, H } = layoutBlister(40)
+})
+ok('straight cut snaps to the middle of the gap between rows/columns — only when close to it', () => {
+  const { tablets, ring, W, H } = layoutBlister(10, 'round')            // rows at y=32/80 → gap middle 56; columns 32,80,… → 56
   const piece: Piece = { id: 1, rings: [[ring]], ox: 0, oy: 0 }
-  // straight cuts between rows (y = 56, 104 …) and between columns (x = 56, 104 …) must stay clear for capsules
-  for (const y of [56, 104, 152, 200, 248, 296, 344]) assert.equal(planStraight([piece], [{ x: 10, y }, { x: W - 10, y }], tablets, 'capsule')[0].blocked, false, 'row gap ' + y)
-  for (const x of [56, 104, 152, 200]) assert.equal(planStraight([piece], [{ x, y: 10 }, { x, y: H - 10 }], tablets, 'capsule')[0].blocked, false, 'col gap ' + x)
-  assert.equal(planStraight([piece], [{ x: 32, y: 10 }, { x: 32, y: H - 10 }], tablets, 'capsule')[0].blocked, true)   // through a column of capsules
+  const h = planStraight([piece], [{ x: -10, y: 62 }, { x: W + 10, y: 62 }], tablets, 'round')[0]
+  assert.equal(h.snapped, true); assert.equal(h.blocked, false); assert.equal(h.line[0].y, 56); assert.equal(h.line[1].y, 56)
+  const v = planStraight([piece], [{ x: 60, y: -10 }, { x: 60, y: H + 10 }], tablets, 'round')[0]
+  assert.equal(v.snapped, true); assert.equal(v.line[0].x, 56)
+  assert.ok(Math.abs(62 - 56) <= SNAP_GAP)
+  const far = planStraight([piece], [{ x: -10, y: 100 }, { x: W + 10, y: 100 }], tablets, 'round')[0]
+  assert.equal(far.snapped, false); assert.equal(far.blocked, true); assert.ok(far.hits.length >= 1)
+  const diag = planStraight([piece], [{ x: 0, y: 0 }, { x: 100, y: 60 }], tablets, 'round')[0]
+  assert.equal(diag.snapped, false)
+  let id = 1
+  const r = cutPieces([piece], [{ x: -10, y: 62 }, { x: W + 10, y: 62 }], tablets, 'round', () => ++id, 'straight')
+  assert.equal(r.changed, true); assert.equal(r.pieces.length, 2)
+  assert.deepEqual(r.pieces.map(p => countTablets(p, tablets, 'round').whole).sort(), [5, 5])
+})
+ok('smoothPath keeps the end points and calms a shaky swipe', () => {
+  const raw: Pt[] = Array.from({ length: 21 }, (_, i) => ({ x: i * 5, y: 50 + (i % 2 ? 4 : -4) }))
+  const sm = smoothPath(raw)
+  assert.deepEqual(sm[0], raw[0]); assert.deepEqual(sm[sm.length - 1], raw[raw.length - 1]); assert.equal(sm.length, raw.length)
+  for (const p of sm.slice(2, -2)) assert.ok(Math.abs(p.y - 50) < 2.5, 'jitter reduced')
+  assert.deepEqual(smoothPath(raw.slice(0, 3)), raw.slice(0, 3))
+})
+ok('previewCut tells the truth before the finger lifts: ok + counts, blocked + hits, short, none', () => {
+  const { tablets, ring, W, H } = layoutBlister(10, 'round')
+  const piece: Piece = { id: 1, rings: [[ring]], ox: 0, oy: 0 }
+  const across = (y: number): Pt[] => [{ x: -10, y }, { x: W + 10, y }]
+  const ok1 = previewCut([piece], across(62), tablets, 'round', 'straight')
+  assert.equal(ok1.status, 'ok'); assert.deepEqual([...ok1.counts].sort(), [5, 5]); assert.match(ok1.text, /snapped/)
+  const bl = previewCut([piece], across(32), tablets, 'round', 'straight')
+  assert.equal(bl.status, 'blocked'); assert.match(bl.text, /damage/)
+  const none = previewCut([piece], [{ x: 900, y: 900 }, { x: 950, y: 900 }], tablets, 'round', 'straight')
+  assert.equal(none.status, 'none')
+  const short = previewCut([piece], [{ x: 10, y: 56 }, { x: 60, y: 56 }], tablets, 'round', 'free')
+  assert.equal(short.status, 'short')
+  const free = previewCut([piece], across(56), tablets, 'round', 'free')
+  assert.equal(free.status, 'ok'); assert.deepEqual([...free.counts].sort(), [5, 5])
+  // previewing never changes the bench
+  assert.equal(piece.rings[0][0], ring); assert.equal(ok1.parts.every(p => p !== piece), true)
+  for (const sh of SHAPE_NAMES) {
+    const L = layoutBlister(10, sh), pc: Piece = { id: 1, rings: [[L.ring]], ox: 0, oy: 0 }
+    const midY = (L.tablets[0].y + L.tablets[5].y) / 2
+    const pv = previewCut([pc], [{ x: -10, y: midY }, { x: L.W + 10, y: midY }], L.tablets, sh, 'straight')
+    assert.equal(pv.status, 'ok', sh); assert.deepEqual([...pv.counts].sort(), [5, 5], sh)
+  }
 })
 console.log(`\n${n} test groups passed`)

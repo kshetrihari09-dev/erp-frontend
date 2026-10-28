@@ -201,6 +201,7 @@ export interface Product {
   tablets_per_strip?: number | null
   tablet_shape?:      'round' | 'oval' | 'capsule' | 'square' | 'oblong' | 'diamond' | null
   tablet_colors?:     string | null   // "#rrggbb" or "#rrggbb,#rrggbb" (two-tone)
+  blister_color?:     string | null   // "#rrggbb" — colour of the blister foil itself (null = default silver)
 }
 
 // ─── Smart Purchase Suggestions ────────────────────────────────────────────────

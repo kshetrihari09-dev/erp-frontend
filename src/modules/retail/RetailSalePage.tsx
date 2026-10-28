@@ -31,7 +31,7 @@ import { fmtN } from '@/utils'
 import type { Product } from '@/types'
 import BlisterWorkbench from './BlisterWorkbench'
 import IntactPackage from './IntactPackage'
-import { isShape, parseColors, MIN_PACK, MAX_PACK, type ShapeName } from './blisterGeometry'
+import { isShape, parseColors, parseBlisterColor, MIN_PACK, MAX_PACK, type ShapeName } from './blisterGeometry'
 import { PACKAGING_INSTRUCTION, PACKAGING_LABEL, isBulk, resolvePackaging, validPack, type PackagingType } from './packaging'
 import {
   MAX_QTY, RETAIL_HANDOFF_KEY, addToBasket, addUnitToBasket, defaultPricePerTablet, defaultUnitPrice, isValidPrice, kindOf,
@@ -50,6 +50,7 @@ interface Loaded {
   pack: number            // tablets per strip (blister only; 1 otherwise)
   shape: ShapeName
   colors: string[]
+  blisterColor: string | null
 }
 
 export default function RetailSalePage() {
@@ -84,6 +85,7 @@ export default function RetailSalePage() {
       pack: type === 'blister' ? pack : 1,
       shape: isShape(full.tablet_shape) ? full.tablet_shape : 'round',
       colors: parseColors(full.tablet_colors),
+      blisterColor: parseBlisterColor(full.blister_color),
     })
     setHot(false); setBulkQty('1')
     requestAnimationFrame(() => inputRef.current?.focusSilently())
@@ -216,7 +218,7 @@ export default function RetailSalePage() {
                 {loaded.packaging === 'blister' ? (
                   <BlisterWorkbench
                     key={`b-${loaded.key}`}
-                    resetKey={loaded.key} packSize={loaded.pack} shape={loaded.shape} colors={loaded.colors}
+                    resetKey={loaded.key} packSize={loaded.pack} shape={loaded.shape} colors={loaded.colors} blisterColor={loaded.blisterColor}
                     getDropRect={() => basketRef.current?.getBoundingClientRect() ?? null}
                     onAddPiece={handleAddPiece} onHotChange={setHot}
                     onMessage={m => toastInfo(m)}

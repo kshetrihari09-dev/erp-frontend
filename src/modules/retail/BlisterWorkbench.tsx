@@ -2,7 +2,9 @@
  * BlisterWorkbench.tsx — interactive blister cutting bench (canvas).
  *
  * Gestures (no mode buttons):
- *   quick swipe          → cut (the cut bends around tablets, see blisterGeometry)
+ *   quick swipe          → cut (the cut bends around tablets, see blisterGeometry); while you swipe the bench
+ *                          shows the real result live: tinted pieces, a tablet count on each, red rings on any
+ *                          tablet a straight cut would damage, and straight cuts snap to the middle of a gap
  *   tap                  → select a piece
  *   press & hold + drag  → move the piece
  *   drop on the basket   → bill the piece (once; the piece then leaves the bench)
@@ -15,8 +17,8 @@ import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import { Undo2, RotateCcw, ShoppingBasket } from 'lucide-react'
 import { Button } from '@/components/ui'
 import {
-  bbox, countTablets, cutPieces, deflect, inside, isUpright, layoutBlister, outline, ownTablets, planStraight,
-  MIN_SWIPE, type CutStyle, type Piece, type Pt, type ShapeName, type Tablet,
+  bbox, countTablets, cutPieces, deflect, inside, isUpright, layoutBlister, outline, ownTablets, planStraight, previewCut, shadeHex, smoothPath, SHAPES,
+  MIN_SWIPE, type CutPreview, type CutStyle, type Piece, type Pt, type ShapeName, type Tablet,
 } from './blisterGeometry'
 
 export interface BlisterWorkbenchProps {
@@ -25,6 +27,8 @@ export interface BlisterWorkbenchProps {
   packSize: number
   shape: ShapeName
   colors: string[]
+  /** Colour of the blister foil itself ("#rrggbb"); null/undefined = default silver. */
+  blisterColor?: string | null
   /** Returns the basket's on-screen rectangle (for drag-and-drop), or null. */
   getDropRect: () => DOMRect | null
   /** Called exactly once per successful add. `tablets` = billable tablets in the piece. */
@@ -40,11 +44,11 @@ const MOVE_SLOP = 10       // px of travel that turns a press into a swipe
 interface Gesture {
   id: number; start: Pt; last: Pt; path: Pt[]
   mode: 'pending' | 'cut' | 'hold'
-  piece: Piece | null; dragged: boolean
+  piece: Piece | null; dragged: boolean; prevAt: number
   timer: ReturnType<typeof setTimeout> | null
 }
 
-export default function BlisterWorkbench({ resetKey, packSize, shape, colors, getDropRect, onAddPiece, onMessage, onHotChange }: BlisterWorkbenchProps) {
+export default function BlisterWorkbench({ resetKey, packSize, shape, colors, blisterColor, getDropRect, onAddPiece, onMessage, onHotChange }: BlisterWorkbenchProps) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const cvRef = useRef<HTMLCanvasElement>(null)
   const [, force] = useReducer((n: number) => n + 1, 0)
@@ -60,9 +64,11 @@ export default function BlisterWorkbench({ resetKey, packSize, shape, colors, ge
   const gRef = useRef<Gesture | null>(null)
   const idRef = useRef(1)
   const hotRef = useRef(false)
+  const liveRef = useRef<CutPreview | null>(null)   // what the swipe in progress would do (updated while swiping)
+  const animRef = useRef(0)
   const view = useRef({ cssW: 0, cssH: 0, dpr: 1, scale: 1 })
-  const props = useRef({ shape, colors, packSize, cutStyle, getDropRect, onAddPiece, onMessage, onHotChange })
-  props.current = { shape, colors, packSize, cutStyle, getDropRect, onAddPiece, onMessage, onHotChange }
+  const props = useRef({ shape, colors, blisterColor, packSize, cutStyle, getDropRect, onAddPiece, onMessage, onHotChange })
+  props.current = { shape, colors, blisterColor, packSize, cutStyle, getDropRect, onAddPiece, onMessage, onHotChange }
 
   const say = (m: string) => props.current.onMessage?.(m)
 
@@ -73,7 +79,7 @@ export default function BlisterWorkbench({ resetKey, packSize, shape, colors, ge
     const { cssW, cssH, dpr, scale } = view.current
     ctx.setTransform(dpr * scale, 0, 0, dpr * scale, 0, 0)
     ctx.clearRect(0, 0, cssW / scale, cssH / scale)
-    const { shape: sh, colors: cs } = props.current
+    const { shape: sh, colors: cs, blisterColor: bc } = props.current
     const tablets = tabletsRef.current
     const g = gRef.current
 
@@ -90,7 +96,10 @@ export default function BlisterWorkbench({ resetKey, packSize, shape, colors, ge
       ctx.save(); ctx.translate(p.ox, p.oy)
       const [x0, y0, x1, y1] = bbox(p)
       const f = ctx.createLinearGradient(x0, y0, x1, y1)
-      ;([[0, '#f4f6f8'], [0.35, '#c3c9cf'], [0.6, '#eef1f3'], [1, '#aab1b8']] as const).forEach(([o, c]) => f.addColorStop(o, c))
+      const foil: readonly (readonly [number, string])[] = bc
+        ? [[0, shadeHex(bc, 0.45)], [0.35, bc], [0.6, shadeHex(bc, 0.3)], [1, shadeHex(bc, -0.2)]]
+        : [[0, '#f4f6f8'], [0.35, '#c3c9cf'], [0.6, '#eef1f3'], [1, '#aab1b8']]
+      foil.forEach(([o, c]) => f.addColorStop(o, c))
       ctx.shadowColor = 'rgba(0,0,0,.4)'; ctx.shadowBlur = lift ? 18 : 8; ctx.shadowOffsetY = lift ? 9 : 3
       pathOf(p); ctx.fillStyle = f; ctx.fill('evenodd'); ctx.shadowColor = 'transparent'
 
@@ -98,6 +107,18 @@ export default function BlisterWorkbench({ resetKey, packSize, shape, colors, ge
       for (const t of tablets) {
         const dome = outline(sh, t, 1, 40)
         const body = outline(sh, t, 0.8, 40)
+        if (sh === 'capsule') {
+          // flat capsule pocket: white ring with a dark outline, two-tone capsule, divider line, curved glint
+          const ink = '#262b3a', hw = SHAPES.capsule[0] * 0.8
+          poly(dome); ctx.fillStyle = '#fff'; ctx.fill(); ctx.lineWidth = 1.3; ctx.strokeStyle = ink; ctx.stroke()
+          poly(body); ctx.fillStyle = cs[0]; ctx.fill()
+          if (cs[1]) { ctx.save(); ctx.beginPath(); ctx.rect(t.x - 30, t.y, 60, 40); ctx.clip(); poly(body); ctx.fillStyle = cs[1]; ctx.fill(); ctx.restore() }
+          poly(body); ctx.lineWidth = 1.2; ctx.strokeStyle = ink; ctx.stroke()
+          if (cs[1]) { ctx.beginPath(); ctx.moveTo(t.x - hw, t.y); ctx.lineTo(t.x + hw, t.y); ctx.stroke() }
+          ctx.beginPath(); ctx.moveTo(t.x - 4.2, t.y - 3); ctx.lineTo(t.x - 4.2, t.y - 9); ctx.quadraticCurveTo(t.x - 4.2, t.y - 12.2, t.x - 2.4, t.y - 13.4)
+          ctx.lineWidth = 1.3; ctx.lineCap = 'round'; ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.stroke(); ctx.lineCap = 'butt'
+          continue
+        }
         // clear plastic dome — faint, so the tablet's own colour stays true
         poly(dome); ctx.fillStyle = 'rgba(236,243,248,.5)'; ctx.fill()
         // tablet in the product's colour(s), full strength
@@ -127,19 +148,35 @@ export default function BlisterWorkbench({ resetKey, packSize, shape, colors, ge
 
     // live cut preview — shows the line that will really be cut, per piece
     if (g && g.mode === 'cut') {
+      const sp = smoothPath(g.path)
+      const lv = liveRef.current
+      // the pieces this swipe would create: tinted, each with its billable tablet count
+      if (lv && lv.status === 'ok') {
+        lv.parts.forEach((pc, i) => {
+          ctx.save(); ctx.translate(pc.ox, pc.oy); pathOf(pc)
+          ctx.fillStyle = i % 2 ? 'rgba(59,130,246,.26)' : 'rgba(52,211,153,.26)'; ctx.fill('evenodd')
+          const [, by0, bx1] = bbox(pc), cx = bx1 - 5, cy = by0 + 5   // badge on the piece's top-right corner, clear of the tablets
+          ctx.beginPath(); ctx.arc(cx, cy, 10, 0, Math.PI * 2); ctx.fillStyle = 'rgba(16,24,32,.9)'; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = '#fff'; ctx.stroke()
+          ctx.fillStyle = '#fff'; ctx.font = 'bold 12px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+          ctx.fillText(String(lv.counts[i]), cx, cy + 0.5); ctx.restore()
+        })
+      }
       if (props.current.cutStyle === 'straight') {
         // straight: full-width line per touched piece; green = will cut, red = would damage tablets
         for (const pl of planStraight(piecesRef.current, g.path, tablets, sh)) {
           ctx.save(); ctx.translate(pl.piece.ox, pl.piece.oy); pathOf(pl.piece); ctx.clip('evenodd')
           ctx.beginPath(); ctx.moveTo(pl.line[0].x, pl.line[0].y); ctx.lineTo(pl.line[1].x, pl.line[1].y)
-          ctx.setLineDash(pl.blocked ? [4, 5] : []); ctx.lineWidth = 2.5; ctx.strokeStyle = pl.blocked ? '#ff3b30' : '#34d399'; ctx.stroke(); ctx.restore()
+          if (pl.snapped && !pl.blocked) { ctx.lineWidth = 7; ctx.strokeStyle = 'rgba(52,211,153,.3)'; ctx.stroke() }   // magnet glow
+          ctx.setLineDash(pl.blocked ? [4, 5] : []); ctx.lineWidth = pl.snapped ? 3.2 : 2.5; ctx.strokeStyle = pl.blocked ? '#ff3b30' : '#34d399'; ctx.stroke(); ctx.restore()
+          // red rings on every tablet this line would damage
+          for (const t of pl.hits) { poly(outline(sh, { x: t.x + pl.piece.ox, y: t.y + pl.piece.oy }, 1.2, 40)); ctx.lineWidth = 2.2; ctx.strokeStyle = '#ff3b30'; ctx.stroke() }
         }
       } else {
-        ctx.beginPath(); g.path.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)))
+        ctx.beginPath(); sp.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)))
         ctx.globalAlpha = 0.35; ctx.lineWidth = 1.5; ctx.strokeStyle = '#ff5a4e'; ctx.stroke(); ctx.globalAlpha = 1
         for (const p of piecesRef.current) {
           ctx.save(); ctx.translate(p.ox, p.oy); pathOf(p); ctx.clip('evenodd')
-          const lp = deflect(g.path.map(q => ({ x: q.x - p.ox, y: q.y - p.oy })), ownTablets(p, tablets), sh)
+          const lp = deflect(sp.map(q => ({ x: q.x - p.ox, y: q.y - p.oy })), ownTablets(p, tablets), sh)
           ctx.beginPath(); lp.forEach((q, i) => (i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)))
           ctx.setLineDash([7, 5]); ctx.lineWidth = 2.5; ctx.strokeStyle = '#ff5a4e'; ctx.stroke(); ctx.restore()
         }
@@ -149,12 +186,13 @@ export default function BlisterWorkbench({ resetKey, packSize, shape, colors, ge
 
   // ── load / reset ───────────────────────────────────────────────────────────
   const load = useCallback(() => {
-    const { W, H, tablets, ring } = layoutBlister(packSize)
+    const { W, H, tablets, ring } = layoutBlister(packSize, props.current.shape)
     const v = view.current
     const wW = v.cssW / v.scale, wH = v.cssH / v.scale
     tabletsRef.current = tablets
     // A fresh blister is ALWAYS one intact polygon — never pre-cut.
     piecesRef.current = [{ id: idRef.current++, rings: [[ring]], ox: (wW - W) / 2, oy: Math.max(8, (wH - H) / 2) }]
+    cancelAnimationFrame(animRef.current); liveRef.current = null
     historyRef.current = []; selRef.current = null; gRef.current = null
     draw(); force()
   }, [packSize, draw])
@@ -165,7 +203,7 @@ export default function BlisterWorkbench({ resetKey, packSize, shape, colors, ge
     const v = view.current
     // Canvas height follows the strip: tall strips (up to 8 rows) get a taller bench,
     // and the blister is scaled so BOTH its width and height fit with room to move pieces.
-    const { W, H } = layoutBlister(props.current.packSize)
+    const { W, H } = layoutBlister(props.current.packSize, props.current.shape)
     const sw = Math.min(1, (w - 16) / W)
     v.cssW = w; v.cssH = Math.round(Math.min(480, Math.max(240, H * sw * 1.5 + 40))); v.dpr = window.devicePixelRatio || 1
     v.scale = Math.max(0.3, Math.min(sw, (v.cssH - 24) / H))
@@ -178,7 +216,7 @@ export default function BlisterWorkbench({ resetKey, packSize, shape, colors, ge
     const ro = new ResizeObserver(() => resize()); if (wrapRef.current) ro.observe(wrapRef.current)
     return () => ro.disconnect()
   }, [resize])
-  useEffect(() => { draw() }, [shape, colors, draw])
+  useEffect(() => { draw() }, [shape, colors, blisterColor, draw])
 
   // ── pointer gestures ───────────────────────────────────────────────────────
   const pt = (e: React.PointerEvent): Pt => {
@@ -206,11 +244,47 @@ export default function BlisterWorkbench({ resetKey, packSize, shape, colors, ge
     if (c.cut) say(`${c.cut} cut tablet${c.cut > 1 ? 's' : ''} not billed.`)
   }
 
+  // Runs the real cutting code on the swipe so far (≈20×/s) and keeps the result for drawing + the status line.
+  const updateLive = (g: Gesture) => {
+    let len = 0
+    for (let i = 1; i < g.path.length; i++) len += Math.hypot(g.path[i].x - g.path[i - 1].x, g.path[i].y - g.path[i - 1].y)
+    const prev = liveRef.current
+    if (len * view.current.scale < MIN_SWIPE * 0.5) { if (prev) { liveRef.current = null; force() } return }
+    const pv = previewCut(piecesRef.current, smoothPath(g.path), tabletsRef.current, props.current.shape, props.current.cutStyle)
+    liveRef.current = pv
+    if (!prev || prev.text !== pv.text) {
+      force()
+      if ((!prev || prev.status !== pv.status) && pv.status !== 'short' && pv.status !== 'none')
+        navigator.vibrate?.(pv.status === 'ok' ? 8 : [6, 40, 6])   // a tick when the cut becomes valid, a double tick when it would damage
+    }
+  }
+
+  // After a cut the new pieces slide a few px apart so the split is plain to see.
+  const nudgeApart = (before: Piece[], after: Piece[]) => {
+    const fresh = after.filter(p => !before.includes(p)), gone = before.filter(p => !after.includes(p))
+    const mid = (p: Piece) => { const [x0, y0, x1, y1] = bbox(p); return { x: p.ox + (x0 + x1) / 2, y: p.oy + (y0 + y1) / 2 } }
+    const moves = fresh.map(p => {
+      const par = gone.find(q => q.ox === p.ox && q.oy === p.oy), c = mid(p), o = par ? mid(par) : c
+      const dx = c.x - o.x, dy = c.y - o.y, l = Math.hypot(dx, dy) || 1
+      return { p, x: p.ox, y: p.oy, dx: (dx / l) * 7, dy: (dy / l) * 7 }
+    })
+    if (moves.length < 2) return
+    const t0 = performance.now()
+    cancelAnimationFrame(animRef.current)
+    const step = (now: number) => {
+      const k = Math.min(1, (now - t0) / 160), e = 1 - (1 - k) ** 3
+      for (const m of moves) { m.p.ox = m.x + m.dx * e; m.p.oy = m.y + m.dy * e }
+      draw()
+      if (k < 1) animRef.current = requestAnimationFrame(step)
+    }
+    animRef.current = requestAnimationFrame(step)
+  }
+
   const onDown = (e: React.PointerEvent) => {
     if (gRef.current) return
     cvRef.current!.setPointerCapture(e.pointerId)
     const p = pt(e)
-    const g: Gesture = { id: e.pointerId, start: p, last: p, path: [p], mode: 'pending', piece: hit(p), dragged: false, timer: null }
+    const g: Gesture = { id: e.pointerId, start: p, last: p, path: [p], mode: 'pending', piece: hit(p), dragged: false, prevAt: 0, timer: null }
     g.timer = setTimeout(() => {
       if (gRef.current === g && g.mode === 'pending') {
         g.mode = 'hold'
@@ -229,7 +303,13 @@ export default function BlisterWorkbench({ resetKey, packSize, shape, colors, ge
     if (g.mode === 'pending' && Math.hypot(p.x - g.start.x, p.y - g.start.y) * view.current.scale > MOVE_SLOP) {
       g.mode = 'cut'; if (g.timer) clearTimeout(g.timer)
     }
-    if (g.mode === 'cut') { g.path.push(p); draw() }
+    if (g.mode === 'cut') {
+      const l = g.path[g.path.length - 1]
+      if (Math.hypot(p.x - l.x, p.y - l.y) >= 2.5) g.path.push(p)   // drop jitter: keeps the path light and smooth
+      const now = performance.now()
+      if (now - g.prevAt >= 50) { g.prevAt = now; updateLive(g) }
+      draw()
+    }
     else if (g.mode === 'hold' && g.piece) {
       g.piece.ox += p.x - g.last.x; g.piece.oy += p.y - g.last.y; g.dragged = true
       const hot = overBasket(e); if (hot !== hotRef.current) { hotRef.current = hot; props.current.onHotChange?.(hot); force() }
@@ -241,6 +321,7 @@ export default function BlisterWorkbench({ resetKey, packSize, shape, colors, ge
     const g = gRef.current; if (!g || e.pointerId !== g.id) return
     if (g.timer) clearTimeout(g.timer)
     gRef.current = null
+    liveRef.current = null
     if (hotRef.current) { hotRef.current = false; props.current.onHotChange?.(false) }
     if (!cancelled) {
       if (g.mode === 'cut') {
@@ -248,8 +329,8 @@ export default function BlisterWorkbench({ resetKey, packSize, shape, colors, ge
         for (let i = 1; i < g.path.length; i++) L += Math.hypot(g.path[i].x - g.path[i - 1].x, g.path[i].y - g.path[i - 1].y)
         if (L * view.current.scale >= MIN_SWIPE) {
           const before = piecesRef.current
-          const res = cutPieces(before, g.path, tabletsRef.current, props.current.shape, () => idRef.current++, props.current.cutStyle)
-          if (res.changed) { historyRef.current.push(before.map(p => ({ ...p }))); piecesRef.current = res.pieces; selRef.current = null }
+          const res = cutPieces(before, smoothPath(g.path), tabletsRef.current, props.current.shape, () => idRef.current++, props.current.cutStyle)
+          if (res.changed) { historyRef.current.push(before.map(p => ({ ...p }))); piecesRef.current = res.pieces; selRef.current = null; navigator.vibrate?.(14); nudgeApart(before, res.pieces) }
           else if (res.reason) say(res.reason)
         }
       } else if (g.mode === 'pending') selRef.current = hit(pt(e))
@@ -270,6 +351,7 @@ export default function BlisterWorkbench({ resetKey, packSize, shape, colors, ge
   }
 
   const sel = selRef.current
+  const live = gRef.current?.mode === 'cut' ? liveRef.current : null
   const counts = sel ? countTablets(sel, tabletsRef.current, shape) : null
 
   return (
@@ -295,8 +377,9 @@ export default function BlisterWorkbench({ resetKey, packSize, shape, colors, ge
           onContextMenu={e => e.preventDefault()}
         />
       </div>
-      <div className="mt-2 min-h-[20px] text-xs text-[var(--text-3)]">
-        {counts
+      <div className="mt-2 min-h-[20px] text-xs text-[var(--text-3)]" aria-live="polite"
+        style={live ? { fontWeight: 600, color: live.status === 'blocked' ? '#ff3b30' : live.status === 'ok' ? '#10b981' : undefined } : undefined}>
+        {live ? live.text : counts
           ? `Selected: ${counts.whole} billable tablet${counts.whole !== 1 ? 's' : ''}${counts.cut ? ` (${counts.cut} cut, not billed)` : ''}`
           : `${piecesRef.current.length} piece${piecesRef.current.length !== 1 ? 's' : ''} on the bench. Tap one to see its tablet count.`}
       </div>
@@ -313,8 +396,8 @@ export default function BlisterWorkbench({ resetKey, packSize, shape, colors, ge
       <p className="mt-2 text-xs text-[var(--text-4)]">
         Quick swipe = cut · Tap = select · Press and hold, then drag = move · Drop on the basket to bill.{' '}
         {cutStyle === 'straight'
-          ? 'Straight: the cut is a straight line across the whole piece (snaps to horizontal or vertical) and is refused if it would damage a tablet.'
-          : 'Free-form: the cut follows your swipe and bends around tablets, so none is damaged.'}
+          ? 'Straight: the cut is a straight line across the whole piece. It snaps to horizontal/vertical and to the middle of the gap between rows or columns, and is refused if it would damage a tablet (those tablets are ringed in red as you swipe).'
+          : 'Free-form: the cut follows your (smoothed) swipe and bends around tablets, so none is damaged. The preview shows the tablets in each piece before you lift.'}
       </p>
     </div>
   )

@@ -11,7 +11,7 @@ import { layoutBlister, cutPieces, countTablets, area, type Piece, type Pt } fro
 let n = 0; const ok = (name: string, f: () => void) => { f(); n++; console.log('ok  ', name) }
 const line = (a: Pt, b: Pt, k = 20): Pt[] => Array.from({ length: k }, (_, i) => ({ x: a.x + ((b.x - a.x) * i) / (k - 1), y: a.y + ((b.y - a.y) * i) / (k - 1) }))
 const fresh = (pack = 10, shape: any = 'round') => {
-  const { tablets, ring, W, H } = layoutBlister(pack)
+  const { tablets, ring, W, H } = layoutBlister(pack, shape)
   let id = 1
   const start: Piece[] = [{ id: id++, rings: [[ring]], ox: 0, oy: 0 }]
   return { tablets, start, W, H, shape, nid: () => id++ }

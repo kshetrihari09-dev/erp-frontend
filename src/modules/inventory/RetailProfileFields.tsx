@@ -1,6 +1,6 @@
 /**
  * RetailProfileFields.tsx — the optional "Retail Sale (blister)" section of the
- * product form: tablets per strip, tablet shape, tablet colour(s).
+ * product form: tablets per strip, tablet shape, tablet colour(s), blister colour.
  *
  * Mirrors the Inventory Planning section's pattern: its own small state, its own
  * payload builder, saved through the normal product create/update endpoints.
@@ -9,7 +9,7 @@
 import type { Product } from '@/types'
 import { SHAPE_NAMES, MIN_PACK, MAX_PACK } from '../retail/blisterGeometry'
 
-export interface RetailProfileState { pack: string; shape: string; two: boolean; c1: string; c2: string }
+export interface RetailProfileState { pack: string; shape: string; two: boolean; c1: string; c2: string; blister: string }
 
 export function emptyRetailProfile(p?: Product | null): RetailProfileState {
   const cols = String(p?.tablet_colors ?? '').split(',').map(s => s.trim()).filter(Boolean)
@@ -19,6 +19,7 @@ export function emptyRetailProfile(p?: Product | null): RetailProfileState {
     two:   cols.length > 1,
     c1:    cols[0] || '#ffffff',
     c2:    cols[1] || '#d9534f',
+    blister: /^#[0-9a-fA-F]{6}$/.test(String(p?.blister_color ?? '')) ? String(p!.blister_color) : '',   // '' = default silver
   }
 }
 
@@ -36,6 +37,7 @@ export function retailProfileToPayload(s: RetailProfileState) {
     tablets_per_strip: hasPack ? Number(s.pack) : null,
     tablet_shape:      hasPack ? (s.shape || 'round') : null,
     tablet_colors:     hasPack ? (s.two ? `${s.c1},${s.c2}` : s.c1) : null,
+    blister_color:     hasPack && s.blister ? s.blister : null,
   }
 }
 
@@ -70,6 +72,14 @@ export function RetailProfileSection({ value, onChange }: { value: RetailProfile
             <label className="text-xs text-[var(--text-3)] flex items-center gap-1.5">
               <input type="checkbox" checked={value.two} onChange={e => set('two', e.target.checked)} disabled={!value.pack.trim()} /> Two-tone
             </label>
+          </div>
+        </div>
+        <div>
+          <label className={label}>Blister colour</label>
+          <div className="flex items-center gap-2">
+            <input type="color" aria-label="Blister colour" value={value.blister || '#c3c9cf'} onChange={e => set('blister', e.target.value)} disabled={!value.pack.trim()} style={{ width: 38, height: 34, padding: 0 }} />
+            <span className="text-xs text-[var(--text-3)]">{value.blister ? value.blister : 'Default (silver foil)'}</span>
+            {value.blister && <button type="button" className="text-xs underline text-[var(--text-3)]" onClick={() => set('blister', '')}>Reset</button>}
           </div>
         </div>
       </div>
