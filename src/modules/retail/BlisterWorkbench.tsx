@@ -66,6 +66,7 @@ export default function BlisterWorkbench({ resetKey, packSize, shape, colors, bl
   const hotRef = useRef(false)
   const liveRef = useRef<CutPreview | null>(null)   // what the swipe in progress would do (updated while swiping)
   const animRef = useRef(0)
+  const reloadRef = useRef(0)   // pending auto-reload of a fresh strip once the current one is used up
   const view = useRef({ cssW: 0, cssH: 0, dpr: 1, scale: 1 })
   const props = useRef({ shape, colors, blisterColor, packSize, cutStyle, getDropRect, onAddPiece, onMessage, onHotChange })
   props.current = { shape, colors, blisterColor, packSize, cutStyle, getDropRect, onAddPiece, onMessage, onHotChange }
@@ -192,7 +193,7 @@ export default function BlisterWorkbench({ resetKey, packSize, shape, colors, bl
     tabletsRef.current = tablets
     // A fresh blister is ALWAYS one intact polygon — never pre-cut.
     piecesRef.current = [{ id: idRef.current++, rings: [[ring]], ox: (wW - W) / 2, oy: Math.max(8, (wH - H) / 2) }]
-    cancelAnimationFrame(animRef.current); liveRef.current = null
+    cancelAnimationFrame(animRef.current); window.clearTimeout(reloadRef.current); liveRef.current = null
     historyRef.current = []; selRef.current = null; gRef.current = null
     draw(); force()
   }, [packSize, draw])
@@ -217,6 +218,7 @@ export default function BlisterWorkbench({ resetKey, packSize, shape, colors, bl
     return () => ro.disconnect()
   }, [resize])
   useEffect(() => { draw() }, [shape, colors, blisterColor, draw])
+  useEffect(() => () => { window.clearTimeout(reloadRef.current); cancelAnimationFrame(animRef.current) }, [])
 
   // ── pointer gestures ───────────────────────────────────────────────────────
   const pt = (e: React.PointerEvent): Pt => {
@@ -242,6 +244,12 @@ export default function BlisterWorkbench({ resetKey, packSize, shape, colors, bl
     if (selRef.current === piece) selRef.current = null
     props.current.onAddPiece(c.whole)
     if (c.cut) say(`${c.cut} cut tablet${c.cut > 1 ? 's' : ''} not billed.`)
+    // Strip used up (every piece is in the basket, or only scrap with no whole tablet is left): load a fresh
+    // blister so the next sale can start straight away. The short pause lets the last piece visibly land first.
+    if (!piecesRef.current.some(p => countTablets(p, tabletsRef.current, props.current.shape).whole > 0)) {
+      window.clearTimeout(reloadRef.current)
+      reloadRef.current = window.setTimeout(() => { load(); say('Strip finished — a new blister is loaded.') }, 450)
+    }
   }
 
   // Runs the real cutting code on the swipe so far (≈20×/s) and keeps the result for drawing + the status line.
@@ -394,7 +402,7 @@ export default function BlisterWorkbench({ resetKey, packSize, shape, colors, bl
         <Button variant="secondary" size="sm" icon={<RotateCcw size={15} />} onClick={load}>Reset blister</Button>
       </div>
       <p className="mt-2 text-xs text-[var(--text-4)]">
-        Quick swipe = cut · Tap = select · Press and hold, then drag = move · Drop on the basket to bill.{' '}
+        Quick swipe = cut · Tap = select · Press and hold, then drag = move · Drop on the basket to bill; when the strip is used up a fresh one loads.{' '}
         {cutStyle === 'straight'
           ? 'Straight: the cut is a straight line across the whole piece. It snaps to horizontal/vertical and to the middle of the gap between rows or columns, and is refused if it would damage a tablet (those tablets are ringed in red as you swipe).'
           : 'Free-form: the cut follows your (smoothed) swipe and bends around tablets, so none is damaged. The preview shows the tablets in each piece before you lift.'}
