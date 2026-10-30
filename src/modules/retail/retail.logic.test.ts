@@ -5,6 +5,7 @@ import {
 } from './blisterGeometry'
 import { resolvePackaging, canCut, isBulk, PACKAGING_INSTRUCTION, PACKAGING_LABEL } from './packaging'
 import { parseQuantity, parseUnitQty, setLineQty, isBulkUnit, MAX_WHOLE_QTY } from './retailBasket'
+import { basketReducer, emptyBasket, lineId, hasCustomPrice, stockNeeded, serializeBasket, parseBasket, UNDO_LIMIT, STORE_MAX_AGE_MS, type BasketState, type BasketLine } from './retailBasket'
 import { addUnitToBasket, defaultUnitPrice, kindOf } from './retailBasket'
 import { addToBasket, totals, lineTotal, toHandoff, overStock, defaultPricePerTablet, isValidPrice, round2 } from './retailBasket'
 
@@ -422,5 +423,72 @@ ok('setLineQty: edit tablets / units in the basket; invalid input changes nothin
   assert.equal(setLineQty(c, mk('99', 'Strip'), 'tablets', 5), c, 'unknown product')
   // the hand-off follows the edited quantity
   const h = toHandoff(c).find(x => x.product.id === '1')!; assert.equal(h.tablets, 25); assert.equal(h.qty, 2.5)
+})
+const P = (id: string, unit = 'Strip', rate = 100, stock = 1000) => ({ id, name: 'P' + id, unit, sales_rate: rate, current_stock: stock, barcode: 'B' + id }) as any
+const run = (st: BasketState, ...acts: Parameters<typeof basketReducer>[1][]) => acts.reduce(basketReducer, st)
+
+ok('basket model: pieces are logged, lines have a stable id and remember their default price', () => {
+  const p = P('1')
+  let st = run(emptyBasket, { type: 'addTablets', product: p, pack: 10, tablets: 4 }, { type: 'addTablets', product: p, pack: 10, tablets: 6 })
+  const l = st.lines[0]
+  assert.equal(st.lines.length, 1); assert.equal(l.tablets, 10); assert.equal(l.pieces, 2); assert.deepEqual(l.log, [4, 6])
+  assert.equal(lineId(l), '1:tablets'); assert.equal(l.basePpt, 10); assert.equal(hasCustomPrice(l), false)
+  st = run(st, { type: 'addUnit', product: P('2', 'Bottle', 50), qty: 2 })
+  assert.equal(lineId(st.lines[1]), '2:unit'); assert.equal(st.lines[1].basePpt, 50)
+})
+ok('basket reducer: every real change is one undo step; no-ops are not', () => {
+  const p = P('1'), bot = P('2', 'Bottle', 50)
+  let st = run(emptyBasket, { type: 'addTablets', product: p, pack: 10, tablets: 5 }, { type: 'addUnit', product: bot, qty: 1 })
+  assert.equal(st.past.length, 2)
+  const noops = [
+    { type: 'setQty', id: '1:tablets', qty: 2.5 }, { type: 'setQty', id: 'nope', qty: 3 }, { type: 'setPrice', id: '1:tablets', ppt: -1 },
+    { type: 'setPrice', id: '1:tablets', ppt: 10 }, { type: 'resetPrice', id: '1:tablets' }, { type: 'remove', id: 'nope' }, { type: 'addTablets', product: p, pack: 10, tablets: 0 },
+  ] as const
+  for (const a of noops) assert.equal(basketReducer(st, a), st, JSON.stringify(a))
+  assert.equal(basketReducer(emptyBasket, { type: 'clear' }), emptyBasket); assert.equal(basketReducer(emptyBasket, { type: 'undo' }), emptyBasket)
+  const before = st.lines
+  st = run(st, { type: 'setQty', id: '1:tablets', qty: 8 }, { type: 'setPrice', id: '1:tablets', ppt: 12 })
+  assert.equal(st.lines[0].tablets, 8); assert.equal(st.lines[0].ppt, 12); assert.equal(hasCustomPrice(st.lines[0]), true)
+  st = run(st, { type: 'resetPrice', id: '1:tablets' }); assert.equal(st.lines[0].ppt, 10); assert.equal(hasCustomPrice(st.lines[0]), false)
+  st = run(st, { type: 'undo' }, { type: 'undo' }, { type: 'undo' }); assert.equal(st.lines, before, 'undo restores the exact earlier lines')
+  st = run(st, { type: 'remove', id: '2:unit' }); assert.deepEqual(st.lines.map(lineId), ['1:tablets'])
+  st = run(st, { type: 'undo' }); assert.deepEqual(st.lines.map(lineId), ['1:tablets', '2:unit'], 'a removed line comes back')
+  st = run(st, { type: 'clear' }); assert.equal(st.lines.length, 0)
+  st = run(st, { type: 'undo' }); assert.equal(st.lines.length, 2, 'a cleared basket comes back')
+})
+ok('basket reducer: undo history is capped; restore starts a clean history', () => {
+  let st = emptyBasket
+  for (let i = 0; i < UNDO_LIMIT + 15; i++) st = run(st, { type: 'addTablets', product: P('1'), pack: 10, tablets: 1 })
+  assert.equal(st.past.length, UNDO_LIMIT); assert.equal(st.lines[0].tablets, UNDO_LIMIT + 15)
+  const r = run(st, { type: 'restore', lines: st.lines }); assert.equal(r.past.length, 0)
+})
+ok('stock check adds up a product across its lines', () => {
+  const p = P('1', 'Strip', 100, 3)                      // 3 strips in stock, pack of 10 → 30 tablets
+  let lines: BasketLine[] = basketReducer(emptyBasket, { type: 'addTablets', product: p, pack: 10, tablets: 20 }).lines    // 2 strips
+  assert.equal(overStock(lines).length, 0); assert.equal(stockNeeded(lines, '1'), 2)
+  lines = basketReducer({ lines, past: [] }, { type: 'addUnit', product: p, qty: 2 }).lines                                   // + 2 whole strips = 4 > 3
+  assert.equal(stockNeeded(lines, '1'), 4); assert.equal(overStock(lines).length, 2, 'both lines of that product are flagged')
+  assert.equal(overStock([...lines, ...basketReducer(emptyBasket, { type: 'addUnit', product: P('9', 'Bottle', 5, 100), qty: 1 }).lines]).length, 2, 'other products unaffected')
+})
+ok('saved basket: round-trips, and anything wrong is dropped instead of crashing the page', () => {
+  const now = 1_700_000_000_000
+  let st = run(emptyBasket, { type: 'addTablets', product: P('1'), pack: 10, tablets: 4 }, { type: 'addTablets', product: P('1'), pack: 10, tablets: 6 }, { type: 'addUnit', product: P('3', 'Kg', 80), qty: 2.5 }, { type: 'setPrice', id: '1:tablets', ppt: 11 })
+  const back = parseBasket(serializeBasket(st.lines, now), now + 1000)
+  assert.deepEqual(back, st.lines)
+  // old format, corrupt, expired, from the future
+  assert.deepEqual(parseBasket(null), []); assert.deepEqual(parseBasket(''), []); assert.deepEqual(parseBasket('{not json'), []); assert.deepEqual(parseBasket('[]'), [])
+  assert.deepEqual(parseBasket(JSON.stringify({ v: 1, at: now, lines: st.lines }), now), [])
+  assert.deepEqual(parseBasket(serializeBasket(st.lines, now), now + STORE_MAX_AGE_MS + 1), [])
+  assert.deepEqual(parseBasket(serializeBasket(st.lines, now + 3_600_000), now), [])
+  // bad lines are skipped, good ones kept; duplicates and absurd values rejected
+  const good = st.lines[0] as any
+  const mess = JSON.stringify({ v: 2, at: now, lines: [
+    good, null, 5, { ...good, product: null }, { ...good, kind: 'x' }, { ...good, ppt: -3 }, { ...good, pack: 0 }, { ...good, tablets: 2.5 }, { ...good, tablets: 0 },
+    { ...good, product: { ...good.product, id: '7' }, kind: 'unit', units: 0 }, { ...good, product: { ...good.product, id: '8' }, kind: 'unit', units: 1e9 }, good,
+    { ...good, product: { ...good.product, id: '9' }, log: [1, 'x'] },
+  ] })
+  const kept = parseBasket(mess, now)
+  assert.deepEqual(kept.map(lineId), ['1:tablets', '9:tablets']); assert.equal(kept[1].log, undefined, 'a bad log is ignored, the line is kept')
+  assert.equal(parseBasket(JSON.stringify({ v: 2, at: now, lines: Array.from({ length: 500 }, (_, i) => ({ ...good, product: { ...good.product, id: 'x' + i } })) }), now).length, 200)
 })
 console.log(`\n${n} test groups passed`)
