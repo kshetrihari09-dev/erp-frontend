@@ -23,7 +23,7 @@ import {
   CalendarDays, CreditCard, User, MapPin, Hash, Home,
   Phone as PhoneIcon, ChevronDown, AlertCircle,
   CheckCircle2, RotateCcw, Save, Plus, UserPlus,
-  ArrowLeft, HelpCircle, Trash2, XCircle,
+  ArrowLeft, HelpCircle, Trash2, XCircle, Lock,
 } from 'lucide-react'
 import { salesAPI, partiesAPI, productsAPI } from '@/services/api'
 import { useOffline } from '@/offline/OfflineProvider'
@@ -59,6 +59,7 @@ import type { Product, Party, Sale } from '@/types'
 import PostingStatusBadge from '@/components/PostingStatusBadge'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 import { DATE_RANGE_ATTR, DATE_RANGE_KEY_LABEL, pickTrigger } from '@/utils/dateRangeShortcut'
+import { getSaleLock, friendlyProtectionError } from './salesProtection'
 import { useSensitiveConfirm } from '@/modules/settings/hooks/useSensitiveConfirm'
 import UpdatePartyModal from './UpdatePartyModal'
 
@@ -681,13 +682,13 @@ export default function SalesPage() {
       }
     } catch (e: any) {
       if (e?.cancelled) return // step-up dialog dismissed — no error toast
-      error('Could not update party', e.message)
+      error('Could not update party', friendlyProtectionError(e))
     }
   }
 
   async function cancelSale(id: string) {
     try { await salesAPI.cancel(id); success('Sale cancelled'); loadList() }
-    catch (e: any) { error('Cannot cancel', e.message) }
+    catch (e: any) { error('Cannot cancel', friendlyProtectionError(e)) }
   }
 
   // "Next (F12)" — validates the invoice itself (same checks onSubmit used
@@ -1705,13 +1706,17 @@ export default function SalesPage() {
                                   } catch (e: any) { error('Print failed', e.message) }
                                 }}
                               >Print</Button>
-                              {s.status === 'active' && canUpdateParty && (
+                              {s.status === 'active' && canUpdateParty && getSaleLock(s).canEditParty && (
                                 <Button variant="secondary" size="sm" icon={<User size={13}/>} style={{ marginLeft: 4 }}
                                   onClick={() => setUpdatePartySale(s)}
                                 >Update Party</Button>
                               )}
-                              {s.status === 'active' && (
+                              {s.status === 'active' && getSaleLock(s).canCancel && (
                                 <Button variant="danger" size="sm" style={{ marginLeft: 4 }} onClick={() => setConfirmCancel(s.id)}>Cancel</Button>
+                              )}
+                              {s.status === 'active' && getSaleLock(s).locked && (
+                                <span className="sil-chip" style={{ marginLeft: 6, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                                  title={getSaleLock(s).reasons.join(' ')}><Lock size={12}/> {getSaleLock(s).label}</span>
                               )}
                             </td>
                           </tr>
@@ -1795,11 +1800,15 @@ export default function SalesPage() {
                         } catch (e: any) { error('Print failed', e.message) }
                       }}
                     >Print</Button>
-                    {s.status === 'active' && canUpdateParty && (
+                    {s.status === 'active' && canUpdateParty && getSaleLock(s).canEditParty && (
                       <Button variant="secondary" size="sm" icon={<User size={13}/>} onClick={() => setUpdatePartySale(s)}>Update Party</Button>
                     )}
-                    {s.status === 'active' && (
+                    {s.status === 'active' && getSaleLock(s).canCancel && (
                       <Button variant="danger" size="sm" icon={<XCircle size={13}/>} onClick={() => setConfirmCancel(s.id)}>Cancel</Button>
+                    )}
+                    {s.status === 'active' && getSaleLock(s).locked && (
+                      <span className="sil-chip" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                        title={getSaleLock(s).reasons.join(' ')}><Lock size={12}/> {getSaleLock(s).label}</span>
                     )}
                   </div>
                 </div>
@@ -1930,7 +1939,13 @@ export default function SalesPage() {
       <ConfirmDialog
         open={!!confirmCancel} onClose={() => setConfirmCancel(null)}
         onConfirm={() => confirmCancel && cancelSale(confirmCancel)}
-        title="Cancel Sale" message="Are you sure you want to cancel this sale? This action cannot be undone." danger
+        title="Cancel Sale"
+        message={(() => {
+          const t = sales.find(x => x.id === confirmCancel)
+          const lock = t ? getSaleLock(t) : null
+          return `Cancel ${t ? `invoice ${t.invoice_no} (${fmt(t.net_total)})` : 'this sale'}? Stock and the customer's account are reversed, and this cannot be undone.` +
+            (lock?.hoursLeft != null ? ` After about ${lock.hoursLeft} more hour${lock.hoursLeft === 1 ? '' : 's'} the invoice locks and can only be reversed with a Sales Return.` : '')
+        })()} danger
       />
       <PrintPreviewModal
         data={printData} open={!!printData}
