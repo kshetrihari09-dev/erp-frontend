@@ -58,7 +58,7 @@ import { PAYMENT_MODES } from '@/constants'
 import type { Product, Party, Sale } from '@/types'
 import PostingStatusBadge from '@/components/PostingStatusBadge'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
-import { DATE_RANGE_KEY_LABEL, DATE_RANGE_SHORTCUT, createDateRangeKeyHandler, openDateRange } from './dateRangeShortcut'
+import { DATE_RANGE_ATTR, DATE_RANGE_KEY_LABEL, pickTrigger } from '@/utils/dateRangeShortcut'
 import { useSensitiveConfirm } from '@/modules/settings/hooks/useSensitiveConfirm'
 import UpdatePartyModal from './UpdatePartyModal'
 
@@ -802,20 +802,13 @@ export default function SalesPage() {
     { combo: 'ctrl+enter',   description: 'Add new row',       handler: () => tableRef.current?.addRow() },
   ], { enabled: tab === 'new' })
 
-  /* ── Keyboard shortcuts (All Invoices tab only): Shift+D and F4 → date-range popup ─── */
+  /* ── Keyboard shortcuts for the date-range popup ───────────────────────────
+     Shift+D works on every page (one global handler in AppLayout finds the filter via its data-date-range marker).
+     F4 is an extra here: it also works while the search box has focus (All Invoices tab only). */
   const rangeRef = useRef<HTMLDivElement>(null)
-  // F4 goes through the shared manager (it works even while the search box has focus)…
   useKeyboardShortcuts([
-    { combo: DATE_RANGE_SHORTCUT, description: 'Date range', handler: () => { openDateRange(rangeRef.current) } },
+    { combo: 'f4', description: 'Date range', handler: () => { pickTrigger(rangeRef.current)?.click() } },
   ], { enabled: tab === 'list' })
-  // …Shift+D is a letter, so it has its own guarded handler: it never fires while you are typing (a capital “D” in the
-  // search box still types), nor while another dialog is open.
-  useEffect(() => {
-    if (tab !== 'list') return
-    const onKey = createDateRangeKeyHandler(() => rangeRef.current)
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [tab])
 
   const tabList = [
     { id: 'new',  label: 'New Invoice',  icon: <FilePlus size={14}/> },
@@ -1647,7 +1640,7 @@ export default function SalesPage() {
           {/* Search bar — full width on mobile */}
           <div className="sil-search-bar">
             <SearchInput value={search} onChange={v => { setSearch(v); setPage(1) }} className="sil-search-input"/>
-            <div className="sil-range" ref={rangeRef} title={`Date range (${DATE_RANGE_KEY_LABEL} or F4)`}>
+            <div className="sil-range" ref={rangeRef} {...{ [DATE_RANGE_ATTR]: '' }} title={`Date range (${DATE_RANGE_KEY_LABEL} or F4)`}>
               <DateRangeFilter fromAD={dFrom} toAD={dTo} emptyLabel="All dates"
                 onApply={r => { setDFrom(r.fromAD); setDTo(r.toAD); setPage(1) }}
                 onClear={() => { setDFrom(''); setDTo(''); setPage(1) }} />

@@ -20,6 +20,7 @@ import { useReminderCounts, useDashboard } from '@/hooks/useQuery'
 import ToastContainer from '@/components/shared/ToastContainer'
 import ReminderAlarmWatcher from '@/components/reminders/ReminderAlarmWatcher'
 import CompanySwitcher from '@/modules/company/CompanySwitcher'
+import { useGlobalDateRangeShortcut } from '@/hooks/useGlobalDateRangeShortcut'
 
 const SIDEBAR_W       = 260
 const SIDEBAR_W_COLL  = 72
@@ -114,6 +115,10 @@ export default function AppLayout() {
 
   const unreadCount = alerts.lowStock + alerts.expiry
   const { data: reminderCounts } = useReminderCounts()
+
+  // Shift+D → open the date-range popup of the page that is showing (any page that has one)
+  const contentRef = useRef<HTMLElement>(null)
+  useGlobalDateRangeShortcut(contentRef)
 
   // Close search/notification dropdowns on outside click
   useEffect(() => {
@@ -635,7 +640,7 @@ export default function AppLayout() {
         </header>
 
         {/* Page content */}
-        <main className="page-content">
+        <main className="page-content" ref={contentRef}>
           <Outlet />
         </main>
       </div>
