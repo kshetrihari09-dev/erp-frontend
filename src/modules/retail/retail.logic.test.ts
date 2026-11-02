@@ -5,7 +5,7 @@ import {
 } from './blisterGeometry'
 import { resolvePackaging, canCut, isBulk, PACKAGING_INSTRUCTION, PACKAGING_LABEL } from './packaging'
 import { parseQuantity, parseUnitQty, setLineQty, isBulkUnit, MAX_WHOLE_QTY } from './retailBasket'
-import { basketReducer, emptyBasket, lineId, hasCustomPrice, stockNeeded, serializeBasket, parseBasket, UNDO_LIMIT, STORE_MAX_AGE_MS, type BasketState, type BasketLine } from './retailBasket'
+import { basketReducer, emptyBasket, lineId, hasCustomPrice, stockNeeded, serializeBasket, parseBasket, UNDO_LIMIT, STORE_MAX_AGE_MS, slimProduct, parseHandoff, HANDOFF_MAX_AGE_MS, MAX_PRICE, type BasketState, type BasketLine } from './retailBasket'
 import { addUnitToBasket, defaultUnitPrice, kindOf } from './retailBasket'
 import { addToBasket, totals, lineTotal, toHandoff, overStock, defaultPricePerTablet, isValidPrice, round2 } from './retailBasket'
 
@@ -490,5 +490,58 @@ ok('saved basket: round-trips, and anything wrong is dropped instead of crashing
   const kept = parseBasket(mess, now)
   assert.deepEqual(kept.map(lineId), ['1:tablets', '9:tablets']); assert.equal(kept[1].log, undefined, 'a bad log is ignored, the line is kept')
   assert.equal(parseBasket(JSON.stringify({ v: 2, at: now, lines: Array.from({ length: 500 }, (_, i) => ({ ...good, product: { ...good.product, id: 'x' + i } })) }), now).length, 200)
+})
+ok('slimProduct: only needed fields, only plain safe values — cost and supplier never leave the page', () => {
+  const full = { id: 'p1', name: 'Amoxicillin', unit: 'Strip', sales_rate: 100, mrp: 120, purchase_rate: 61, preferred_supplier_id: 's9', supplier_lead_time_days: 4, safety_stock_qty: 9, batches: [{ unit_cost: 1 }],
+    company_id: 'c1', created_at: 'x', cc_pct: 5, tax_rate: 13, current_stock: 7, tablets_per_strip: 10, barcode: '8801', extra: { a: 1 } } as any
+  const s1 = slimProduct(full) as any
+  assert.deepEqual(Object.keys(s1).sort(), ['barcode', 'cc_pct', 'current_stock', 'id', 'mrp', 'name', 'sales_rate', 'tablets_per_strip', 'tax_rate', 'unit'])
+  for (const k of ['purchase_rate', 'preferred_supplier_id', 'supplier_lead_time_days', 'safety_stock_qty', 'batches', 'company_id', 'created_at', 'extra']) assert.equal(k in s1, false, k)
+  assert.equal(slimProduct({ id: 1, name: 'n' })!.id, 1, 'numeric ids are fine')
+  for (const bad of [null, undefined, 'x', 5, [], {}, { id: '', name: 'n' }, { id: 'a' }, { id: 'a', name: '   ' }, { id: 'a', name: 'x'.repeat(256) }, { id: { o: 1 }, name: 'n' }, { id: 'i'.repeat(65), name: 'n' }])
+    assert.equal(slimProduct(bad), null, JSON.stringify(bad))
+  const t1 = slimProduct({ id: 'a', name: 'n', sales_rate: -5, mrp: NaN, cc_pct: 250, tax_rate: -3, unit: { evil: 1 }, category: 'c'.repeat(300), generic_name: 'ok', current_stock: -2, min_stock: Infinity, is_active: true }) as any
+  assert.equal('sales_rate' in t1, false); assert.equal('mrp' in t1, false); assert.equal(t1.cc_pct, 100); assert.equal(t1.tax_rate, 0)
+  assert.equal('unit' in t1, false); assert.equal('category' in t1, false); assert.equal(t1.generic_name, 'ok'); assert.equal(t1.current_stock, -2); assert.equal('min_stock' in t1, false); assert.equal(t1.is_active, true)
+  assert.equal('sales_rate' in (slimProduct({ id: 'a', name: 'n', sales_rate: MAX_PRICE + 1 }) as any), false)
+})
+ok('what is stored in the browser and handed to Sales carries no purchase cost', () => {
+  const p = { id: '1', name: 'A', unit: 'Strip', sales_rate: 100, purchase_rate: 61, current_stock: 9, preferred_supplier_id: 'S' } as any
+  const st = run(emptyBasket, { type: 'addTablets', product: p, pack: 10, tablets: 4 })
+  const stored = serializeBasket(st.lines), handed = JSON.stringify(toHandoff(st.lines))
+  for (const blob of [stored, handed]) { assert.doesNotMatch(blob, /purchase_rate|preferred_supplier|61/); assert.match(blob, /"sales_rate":100/) }
+  assert.equal(parseBasket(stored)[0].product.id, '1')
+})
+ok('a tampered saved basket is cleaned or dropped (objects, huge strings, negative prices, bad ids)', () => {
+  const now = 1_700_000_000_000
+  const good = run(emptyBasket, { type: 'addTablets', product: P('1'), pack: 10, tablets: 4 }).lines[0] as any
+  const evil = JSON.stringify({ v: 2, at: now, lines: [
+    { ...good, product: { ...good.product, id: 'a', name: 'ok', sales_rate: -50, unit: { x: 1 }, notes: 'x'.repeat(100000) } },
+    { ...good, product: { id: { a: 1 }, name: 'n' } }, { ...good, product: { id: 'b', name: ['arr'] } }, { ...good, product: { id: 'c', name: '<img src=x onerror=alert(1)>' } },
+  ] })
+  const kept = parseBasket(evil, now)
+  assert.deepEqual(kept.map(l => l.product.id), ['a', 'c'])
+  assert.equal('sales_rate' in (kept[0].product as any), false); assert.equal('unit' in (kept[0].product as any), false); assert.equal('notes' in (kept[0].product as any), false)
+  assert.ok(JSON.stringify(kept).length < 2000, 'the 100 000-character field did not survive')
+  assert.equal(kept[1].product.name, '<img src=x onerror=alert(1)>', 'text is kept as text (React shows it as plain text, never as markup)')
+})
+ok('parseHandoff: fresh, small, clean — and nothing else gets onto the invoice', () => {
+  const now = 1_700_000_000_000
+  const lines = run(emptyBasket, { type: 'addTablets', product: P('1'), pack: 10, tablets: 5 }, { type: 'addUnit', product: P('2', 'Bottle', 50), qty: 3 }).lines
+  const ok1 = JSON.stringify({ at: now, items: toHandoff(lines) })
+  const items = parseHandoff(ok1, now + 1000)
+  assert.equal(items.length, 2); assert.deepEqual(items.map(i => [i.qty, i.rate, i.tablets, i.pack]), [[0.5, 100, 5, 10], [3, 50, 0, 1]])
+  assert.deepEqual(parseHandoff(ok1, now + HANDOFF_MAX_AGE_MS + 1), [], 'too old'); assert.deepEqual(parseHandoff(ok1, now - 3_600_000), [], 'from the future')
+  for (const raw of [null, '', '{bad', '[]', '{"at":1}', JSON.stringify({ at: now, items: 'x' }), JSON.stringify({ at: 'now', items: [] })]) assert.deepEqual(parseHandoff(raw as any, now), [], String(raw))
+  const it = (o: any) => ({ product: { id: 'p', name: 'N' }, qty: 1, rate: 10, tablets: 0, pack: 1, ...o })
+  const mess = JSON.stringify({ at: now, items: [
+    it({}), it({ qty: 0 }), it({ qty: -1 }), it({ qty: 1e9 }), it({ qty: '5' }), it({ qty: null }), it({ rate: -1 }), it({ rate: MAX_PRICE + 1 }), it({ rate: 'free' }),
+    it({ product: null }), it({ product: { id: 'x' } }), it({ product: { id: 'q', name: 'ok' }, rate: 0 }),
+    it({ tablets: 2.5, pack: 0 }), it({ tablets: -3, pack: 5000 }),
+  ] })
+  const kept = parseHandoff(mess, now)
+  assert.deepEqual(kept.map(i => [i.product.id, i.qty, i.rate]), [['p', 1, 10], ['q', 1, 0], ['p', 1, 10], ['p', 1, 10]])
+  assert.deepEqual([kept[2].tablets, kept[2].pack, kept[3].tablets, kept[3].pack], [0, 1, 0, 1], 'odd tablets / pack values fall back to safe ones')
+  assert.equal(parseHandoff(JSON.stringify({ at: now, items: Array.from({ length: 1000 }, () => it({})) }), now).length, 200, 'capped at 200 items')
 })
 console.log(`\n${n} test groups passed`)

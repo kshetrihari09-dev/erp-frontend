@@ -60,6 +60,7 @@ import PostingStatusBadge from '@/components/PostingStatusBadge'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 import { DATE_RANGE_ATTR, DATE_RANGE_KEY_LABEL, pickTrigger } from '@/utils/dateRangeShortcut'
 import { getSaleLock, friendlyProtectionError } from './salesProtection'
+import { parseHandoff } from '../retail/retailBasket'
 import { useSensitiveConfirm } from '@/modules/settings/hooks/useSensitiveConfirm'
 import UpdatePartyModal from './UpdatePartyModal'
 
@@ -260,10 +261,10 @@ export default function SalesPage() {
     } catch { return }
     if (!raw) return
     try {
-      const { at, items } = JSON.parse(raw) as { at: number; items: Array<{ product: Product; qty: number; rate: number; tablets: number; pack: number }> }
-      if (!Array.isArray(items) || Date.now() - Number(at) > 10 * 60 * 1000) return
+      // nothing in browser storage is trusted: parseHandoff checks age, size, every product and every number
+      const items = parseHandoff(raw)
+      if (!items.length) return
       const built: InvoiceRow[] = items
-        .filter(it => it?.product?.id && Number.isFinite(it.qty) && it.qty > 0 && Number.isFinite(it.rate) && it.rate >= 0)
         .map(it => {
           const row: InvoiceRow = { ...newRow(), _scanned: true }
           row.product_id   = it.product.id

@@ -57,6 +57,41 @@ export function defaultUnitPrice(p: Product): number {
 
 export const isValidPrice = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0
 
+/** Largest price accepted from anything read back out of browser storage. */
+export const MAX_PRICE = 100_000_000
+
+// What the screens downstream really need of a product. Everything else — purchase cost, supplier, planning
+// fields, batches, internal ids — is dropped before the basket is kept in the browser or handed to the Sales page.
+const PRODUCT_KEEP = ['id', 'item_code', 'barcode', 'name', 'generic_name', 'company_name', 'category', 'unit',
+  'sales_rate', 'mrp', 'cc_pct', 'tax_rate', 'tablets_per_strip', 'current_stock', 'min_stock', 'is_active'] as const
+const PRODUCT_PCT = new Set(['cc_pct', 'tax_rate'])
+
+/**
+ * A trimmed-down, safe copy of a product: only the fields listed above, only plain strings (≤255 chars), finite numbers
+ * (prices never negative, percentages clamped to 0–100) and booleans — never nested objects. Returns null when it is not
+ * a usable product (no id, no name). Used so that nothing read back from browser storage can inject an object, a
+ * megabyte string or a negative price, and so that purchase cost is not left lying in the browser.
+ */
+export function slimProduct(p: unknown): Product | null {
+  if (!p || typeof p !== 'object' || Array.isArray(p)) return null
+  const o = p as Record<string, unknown>
+  const id = o.id
+  if ((typeof id !== 'string' && typeof id !== 'number') || String(id).length === 0 || String(id).length > 64) return null
+  if (typeof o.name !== 'string' || !o.name.trim() || o.name.length > 255) return null
+  const out: Record<string, unknown> = {}
+  for (const k of PRODUCT_KEEP) {
+    const v = o[k]
+    if (typeof v === 'string') { if (v.length <= 255) out[k] = v }
+    else if (typeof v === 'number') {
+      if (!Number.isFinite(v)) continue
+      if (PRODUCT_PCT.has(k)) out[k] = Math.min(100, Math.max(0, v))
+      else if (k === 'current_stock') out[k] = v
+      else if (v >= 0 && v <= MAX_PRICE) out[k] = v
+    } else if (typeof v === 'boolean') out[k] = v
+  }
+  return out as unknown as Product
+}
+
 export const lineTotal = (l: BasketLine) => round2((kindOf(l) === 'unit' ? (l.units ?? 0) : l.tablets) * l.ppt)
 
 export function totals(lines: BasketLine[]) {
@@ -94,11 +129,41 @@ export interface HandoffItem {
 
 /** What the Sales page receives. Nothing is posted by building this. */
 export function toHandoff(lines: BasketLine[]): HandoffItem[] {
+  const slim = (p: Product): Product => slimProduct(p) ?? ({ id: p.id, name: String(p.name ?? '').slice(0, 255) } as Product)
   return lines.map(l =>
     kindOf(l) === 'unit'
-      ? { product: l.product, qty: l.units ?? 0, rate: round4(l.ppt), tablets: 0, pack: 1 }
-      : { product: l.product, qty: round4(l.tablets / l.pack), rate: round4(l.ppt * l.pack), tablets: l.tablets, pack: l.pack },
+      ? { product: slim(l.product), qty: l.units ?? 0, rate: round4(l.ppt), tablets: 0, pack: 1 }
+      : { product: slim(l.product), qty: round4(l.tablets / l.pack), rate: round4(l.ppt * l.pack), tablets: l.tablets, pack: l.pack },
   )
+}
+
+export const HANDOFF_MAX_AGE_MS = 10 * 60 * 1000
+const HANDOFF_MAX_ITEMS = 200
+
+/**
+ * Read the hand-off the Sales page receives. Browser storage can be edited by the person at the keyboard (or by a script
+ * that got into the page), so nothing in it is trusted: it must be fresh (≤10 min, not from the future), at most 200
+ * items, every product a clean slim product, every quantity a finite number above 0 (≤ MAX_QTY) and every rate a
+ * finite number from 0 to MAX_PRICE. Items that fail are dropped. The server must still re-check prices — this only
+ * keeps garbage out of the screen.
+ */
+export function parseHandoff(raw: string | null | undefined, now: number = Date.now()): HandoffItem[] {
+  if (!raw) return []
+  try {
+    const d = JSON.parse(raw)
+    if (!d || !num(d.at) || now - d.at > HANDOFF_MAX_AGE_MS || d.at - now > 60_000 || !Array.isArray(d.items)) return []
+    const out: HandoffItem[] = []
+    for (const it of d.items.slice(0, HANDOFF_MAX_ITEMS)) {
+      const product = slimProduct(it?.product)
+      if (!product || !num(it?.qty) || it.qty <= 0 || it.qty > MAX_QTY || !num(it?.rate) || it.rate < 0 || it.rate > MAX_PRICE) continue
+      out.push({
+        product, qty: it.qty, rate: it.rate,
+        tablets: Number.isInteger(it.tablets) && it.tablets >= 0 && it.tablets <= MAX_WHOLE_QTY ? it.tablets : 0,
+        pack: Number.isInteger(it.pack) && it.pack >= 1 && it.pack <= 1000 ? it.pack : 1,
+      })
+    }
+    return out
+  } catch { return [] }
 }
 
 /** Add one dropped blister piece, merging by product. Returns a new array. */
@@ -223,7 +288,7 @@ export const STORE_MAX_AGE_MS = 12 * 60 * 60 * 1000     // a shift
 const STORE_MAX_LINES = 200
 
 export function serializeBasket(lines: BasketLine[], now = Date.now()): string {
-  return JSON.stringify({ v: STORE_VERSION, at: now, lines })
+  return JSON.stringify({ v: STORE_VERSION, at: now, lines: lines.map(l => ({ ...l, product: slimProduct(l.product) ?? l.product })) })
 }
 
 const num = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v)
@@ -236,14 +301,15 @@ export function parseBasket(raw: string | null | undefined, now = Date.now()): B
     if (!d || d.v !== STORE_VERSION || !num(d.at) || now - d.at > STORE_MAX_AGE_MS || now < d.at - 60_000 || !Array.isArray(d.lines)) return []
     const out: BasketLine[] = []
     for (const x of d.lines.slice(0, STORE_MAX_LINES)) {
-      if (!x || typeof x !== 'object' || !x.product || typeof x.product !== 'object' || x.product.id === undefined || x.product.id === null || typeof x.product.name !== 'string') continue
+      const product = slimProduct(x?.product)
+      if (!x || typeof x !== 'object' || !product) continue
       const kind: LineKind | null = x.kind === 'unit' ? 'unit' : x.kind === 'tablets' ? 'tablets' : null
       if (!kind || !isValidPrice(x.ppt) || !Number.isInteger(x.pack) || x.pack < 1 || !Number.isInteger(x.pieces) || x.pieces < 0) continue
       if (kind === 'tablets' && !(Number.isInteger(x.tablets) && x.tablets > 0 && x.tablets <= MAX_WHOLE_QTY)) continue
       if (kind === 'unit' && !(num(x.units) && x.units > 0 && x.units <= MAX_QTY)) continue
-      if (out.some(o => o.product.id === x.product.id && kindOf(o) === kind)) continue      // one line per product per kind
+      if (out.some(o => o.product.id === product.id && kindOf(o) === kind)) continue      // one line per product per kind
       out.push({
-        product: x.product as Product, kind, pack: x.pack, ppt: x.ppt, pieces: x.pieces,
+        product, kind, pack: x.pack, ppt: x.ppt, pieces: x.pieces,
         tablets: kind === 'tablets' ? x.tablets : 0, ...(kind === 'unit' ? { units: round4(x.units) } : {}),
         ...(x.edited === true ? { edited: true } : {}),
         ...(isValidPrice(x.basePpt) ? { basePpt: x.basePpt } : {}),
