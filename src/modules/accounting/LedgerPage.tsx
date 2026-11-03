@@ -101,12 +101,14 @@ const LEDGER_PRINT_CSS = `
 
   .ldg-pp table { width: 100%; border-collapse: collapse; margin-top: 4px; }
   .ldg-pp thead { display: table-header-group; }
-  .ldg-pp tfoot { display: table-footer-group; }
   .ldg-pp tr { break-inside: avoid; page-break-inside: avoid; }
   .ldg-pp th, .ldg-pp td { border: 1px solid #999; padding: 4px 6px; font-size: 9pt; text-align: left; vertical-align: top; }
   .ldg-pp th { background: #eaeaea !important; font-weight: 700; text-transform: uppercase; font-size: 7.5pt; letter-spacing: .03em; }
   .ldg-pp td.num, .ldg-pp th.num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
-  .ldg-pp tfoot td { font-weight: 700; border-top: 2px solid #000; background: #f2f2f2 !important; }
+  /* Totals is the LAST body row (not a <tfoot>): a table-footer-group is
+     repeated by the browser at the bottom of every printed page, so the
+     totals must live in the body to print once, on the final page only. */
+  .ldg-pp tr.ldg-pp-total td { font-weight: 700; border-top: 2px solid #000; background: #f2f2f2 !important; }
 }
 `
 
@@ -177,15 +179,15 @@ function buildLedgerPrintHTML(p: LedgerPrintProps): string {
             <th class="num">Debit</th><th class="num">Credit</th><th class="num">Balance</th>
           </tr>
         </thead>
-        <tbody>${rowsHtml}</tbody>
-        <tfoot>
-          <tr>
+        <tbody>
+          ${rowsHtml}
+          <tr class="ldg-pp-total">
             <td colspan="4" style="text-align:right;text-transform:uppercase;font-size:7.5pt;">Totals</td>
             <td class="num">${fmtN(p.totalDr, 2)}</td>
             <td class="num">${fmtN(p.totalCr, 2)}</td>
             <td class="num">Closing: ${fmtN(p.closingBal, 2)}</td>
           </tr>
-        </tfoot>
+        </tbody>
       </table>
     </div>
   `
