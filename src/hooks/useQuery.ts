@@ -14,6 +14,7 @@ import type { ManufacturerInput } from '@/services/manufacturers'
 import { createProductWithOpeningStock } from '@/services/productCreation'
 import useUIStore from '@/store/uiStore'
 import useAuthStore from '@/store/authStore'
+import type { DashboardRange, LowStockItem } from '@/types'
 
 // ─── Helper: extract .data.data from Axios response ──────────────────────────
 const unwrap = <T>(res: { data: { data: T } }) => res.data.data
@@ -839,6 +840,25 @@ export function useDashboard() {
     queryFn:  () => reportsAPI.dashboard().then(unwrap),
     staleTime: 1000 * 60, // 1 min
     refetchOnWindowFocus: true,
+  })
+}
+
+/** Sales vs purchases buckets for the dashboard chart / sparklines. Keyed under QK.DASHBOARD so a dashboard refresh also refreshes it. */
+export function useDashboardTrend(range: DashboardRange) {
+  return useQuery({
+    queryKey: [QK.DASHBOARD, 'trend', range],
+    queryFn:  () => reportsAPI.dashboardTrend(range).then(unwrap),
+    staleTime: 1000 * 60,
+    placeholderData: keepPreviousData,
+  })
+}
+
+/** Products under their minimum stock, most short first (GET /reports/low-stock). */
+export function useLowStockItems() {
+  return useQuery({
+    queryKey: [QK.DASHBOARD, 'low-stock'],
+    queryFn:  () => reportsAPI.lowStock().then(r => (r.data as { data: { data: LowStockItem[] } }).data.data ?? []),
+    staleTime: 1000 * 60,
   })
 }
 

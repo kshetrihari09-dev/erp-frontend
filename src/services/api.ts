@@ -1,7 +1,7 @@
 import http, { REFRESH_TOKEN_KEY } from '@/services/http'
 import type { ApiResponse, Company, User, Sale, SaleItem, Purchase, PurchaseItem,
   Product, Party, Account, AccountDefault, Voucher, VoucherLine,
-  VoucherPosting, PostingStatus, DashboardStats, PnLReport,
+  VoucherPosting, PostingStatus, DashboardStats, DashboardTrend, PnLReport,
   TrialBalanceRow, LedgerEntry, StockBatch, OpeningInventoryBatch, InvoiceTemplate, FiscalYear, AccountingPeriod, AuditLog,
   CompanyPreferences, Backup, AccountLedgerResponse, UserCompany,
   PurchaseSuggestion, PurchaseSuggestionSummary, PurchaseSuggestionSettings,
@@ -548,6 +548,7 @@ export const reportsAPI = {
   stockLedger: (params?: Params) => http.get('/reports/stock-ledger', { params }),
   expiry:      (params?: Params) => http.get('/reports/expiry',       { params }),
   lowStock:    ()                => http.get('/reports/low-stock'),
+  dashboardTrend: (range: string) => http.get<ApiResponse<DashboardTrend>>('/reports/dashboard-trend', { params: { range } }),
   partyBalance:(params?: Params) => http.get('/reports/party-balance',{ params }),
 }
 

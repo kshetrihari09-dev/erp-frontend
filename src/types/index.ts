@@ -580,6 +580,26 @@ export interface DashboardStats {
   cash_balance?:      number
   bank_balance?:      number
   payment_modes?:     Array<{ name: string; total: number; count: number; percent: number }>
+  /** Comparison figures behind the KPI trend badges (yesterday; last month up to the same day-of-month). */
+  compare?:           { yesterday_sales: number; last_month_revenue: number }
+}
+
+export type DashboardRange = '7d' | '30d' | '12m'
+/** GET /reports/dashboard-trend — sales vs purchases per day (7d, 30d) or calendar month (12m). */
+export interface DashboardTrend {
+  range:       DashboardRange
+  granularity: 'day' | 'month'
+  date_from:   string
+  date_to:     string
+  /** key: 'YYYY-MM-DD' (day) or 'YYYY-MM' (month) */
+  buckets:     Array<{ key: string; sales: number; purchases: number }>
+  totals:      { sales: number; purchases: number }
+  previous:    { sales: number; purchases: number }
+}
+
+export interface LowStockItem {
+  id: string; item_code?: string; name: string; unit?: string
+  min_stock: number; current_stock: number
 }
 
 export interface PnLReport {
