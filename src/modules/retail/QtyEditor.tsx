@@ -37,11 +37,11 @@ export default function QtyEditor({ value, bulk, label, onCommit, onInvalid, id 
     setText(null); onCommit(next)
   }
   const bad = text !== null && parseUnitQty(text, bulk) === null
-  const btn = 'h-7 w-7 rounded-md border border-[var(--border)] text-[var(--text-2)] text-base leading-none'
+  const btn = 'h-9 w-9 rounded-lg border border-[var(--border-2)] bg-[var(--surface-3)] text-[var(--text-2)] text-base leading-none transition-colors hover:border-[var(--brand)] hover:text-[var(--text)] disabled:pointer-events-none disabled:opacity-35'
   return (
     <span className="inline-flex items-center gap-1" role="group" aria-label={label}>
       <button type="button" className={btn} aria-label="Decrease quantity" disabled={r3(value - step) <= 0 || (!bulk && value - step < 1)} onClick={() => bump(-1)}>−</button>
-      <input id={id} type="text" inputMode={bulk ? 'decimal' : 'numeric'} className="erp-input w-16 !py-1 text-center" value={shown} aria-label={label} aria-invalid={bad}
+      <input id={id} type="text" inputMode={bulk ? 'decimal' : 'numeric'} className="erp-input !h-9 !w-16 !py-1 text-center font-semibold tabular-nums" value={shown} aria-label={label} aria-invalid={bad}
         onFocus={e => e.currentTarget.select()}
         onChange={e => setText(e.target.value)} onBlur={commit}
         onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commit() } else if (e.key === 'Escape') setText(null) }} />

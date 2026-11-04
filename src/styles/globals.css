@@ -7682,3 +7682,17 @@ canvas{
 .pos-theme.sales-two-step .pmic-row2-extra .pmic-field input {
   width: 100%; min-width: 0;
 }
+
+/* ── Retail Sale: compact search + scan controls (scoped; shared component untouched) ── */
+.retail-pos .upi-search { height: 44px; border-radius: 12px; }
+.retail-pos .upi-search input { font-size: 14px; align-self: stretch; }
+.retail-pos .upi-scan-btn { height: 44px; border-radius: 12px; }
+.retail-pos .upi-scan-btn .text-slate-400 { display: none; }
+.retail-pos .upi-scan-btn > span:first-child { width: 28px; height: 28px; border-radius: 8px; }
+.retail-pos .upi-dropdown { margin-top: 6px; border-radius: 12px; max-height: 320px; box-shadow: var(--shadow-lg); }
+.retail-pos .upi-dropdown li { padding: 10px 14px; border-bottom: 1px solid var(--border); }
+.retail-pos .upi-dropdown li:last-child { border-bottom: 0; }
+@media (max-width: 640px) {
+  .retail-pos .upi-scan-buttons { width: 100%; }
+  .retail-pos .upi-scan-btn { flex: 1 1 0; justify-content: center; }
+}

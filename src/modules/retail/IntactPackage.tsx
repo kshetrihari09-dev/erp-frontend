@@ -320,7 +320,9 @@ export default function IntactPackage({ kind, name, company, unitLabel, chip, ad
 
   return (
     <div>
-      <div className="rounded-xl flex items-center justify-center select-none" style={{ background: '#3b4a57', height: 280, overflow: 'hidden' }}>
+      <div className="rounded-2xl flex items-center justify-center select-none" style={{
+        background: 'radial-gradient(rgba(148,163,184,.10) 1px, transparent 1px) 0 0 / 18px 18px, radial-gradient(120% 95% at 50% 0%, #1a2a52 0%, #0e1832 58%, #0a1226 100%)',
+        border: '1px solid rgba(96,165,250,.2)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,.04), 0 8px 24px -12px rgba(0,0,0,.6)', height: 280, overflow: 'hidden' }}>
         <div
           role="button" aria-label={`${kind} — drag to the basket`} tabIndex={0}
           onPointerDown={down} onPointerMove={move}
@@ -330,7 +332,7 @@ export default function IntactPackage({ kind, name, company, unitLabel, chip, ad
           style={{
             touchAction: 'none', cursor: dragging ? 'grabbing' : 'grab', userSelect: 'none', WebkitUserSelect: 'none',
             transform: `translate(${off.x}px, ${off.y}px) scale(${dragging ? 1.05 : 1})`,
-            transition: dragging ? 'none' : 'transform .25s ease', outline: selected ? '2px dashed #ffd24a' : 'none', outlineOffset: 6, borderRadius: 12,
+            transition: dragging ? 'none' : 'transform .25s ease', outline: dragging ? '2px solid rgba(52,211,153,.6)' : selected ? '2px dashed #60a5fa' : 'none', outlineOffset: 6, borderRadius: 12,
             filter: dragging ? 'drop-shadow(0 14px 14px rgba(0,0,0,.45))' : 'drop-shadow(0 6px 6px rgba(0,0,0,.35))',
           }}
         >
@@ -368,7 +370,7 @@ export default function IntactPackage({ kind, name, company, unitLabel, chip, ad
       </div>
       {selected && (
         <div className="mt-2">
-          <Button variant="primary" size="sm" icon={<ShoppingBasket size={15} />} onClick={() => { setSelected(false); onAdd() }}>
+          <Button variant="primary" size="md" icon={<ShoppingBasket size={15} />} onClick={() => { setSelected(false); onAdd() }}>
             {addLabel ?? `Add 1 ${unitLabel.toLowerCase()} to basket`}
           </Button>
         </div>

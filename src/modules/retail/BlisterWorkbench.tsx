@@ -15,7 +15,7 @@
  * user billed through `onAddPiece(tablets)` and never talks to any API.
  */
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
-import { Undo2, RotateCcw, ShoppingBasket } from 'lucide-react'
+import { Undo2, RotateCcw, ShoppingBasket, Ruler, Spline } from 'lucide-react'
 import { Button } from '@/components/ui'
 import {
   bbox, countTablets, cutPieces, deflect, inside, isUpright, layoutBlister, outline, ownTablets, planStraight, previewCut, shadeHex, smoothPath, SHAPES,
@@ -76,6 +76,15 @@ export default function BlisterWorkbench({ resetKey, packSize, shape, colors, bl
 
   const say = (m: string) => props.current.onMessage?.(m)
 
+  // Whole-tablet count per piece, cached by the piece's (immutable) ring data — only used for the on-piece badges.
+  const ghostRef = useRef<{ x: number; y: number; n: number } | null>(null)   // chip that follows the pointer once a dragged piece leaves the canvas
+  const countCache = useRef(new WeakMap<object, number>())
+  const wholeOf = (p: Piece) => {
+    let v = countCache.current.get(p.rings)
+    if (v === undefined) { v = countTablets(p, tabletsRef.current, props.current.shape).whole; countCache.current.set(p.rings, v) }
+    return v
+  }
+
   // ── drawing ────────────────────────────────────────────────────────────────
   const draw = useCallback(() => {
     const cv = cvRef.current; if (!cv) return
@@ -97,7 +106,10 @@ export default function BlisterWorkbench({ resetKey, packSize, shape, colors, bl
 
     for (const p of piecesRef.current) {
       const lift = !!g && g.mode === 'hold' && g.piece === p
-      ctx.save(); ctx.translate(p.ox, p.oy)
+      const isSel = p === selRef.current
+      const dim = !!selRef.current && !isSel && !(g && g.mode === 'cut')   // selected piece stands out, the rest recede
+      const isHot = lift && hotRef.current                                  // being dragged over the basket
+      ctx.save(); ctx.translate(p.ox, p.oy); ctx.globalAlpha = dim ? 0.5 : 1
       const [x0, y0, x1, y1] = bbox(p)
       const f = ctx.createLinearGradient(x0, y0, x1, y1)
       const foil: readonly (readonly [number, string])[] = bc
@@ -123,6 +135,8 @@ export default function BlisterWorkbench({ resetKey, packSize, shape, colors, bl
           ctx.lineWidth = 1.3; ctx.lineCap = 'round'; ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.stroke(); ctx.lineCap = 'butt'
           continue
         }
+        // pocket depth: a soft dark rim just below/right of the dome
+        poly(dome); ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.18)'; ctx.save(); ctx.translate(1, 1.6); ctx.stroke(); ctx.restore()
         // clear plastic dome — faint, so the tablet's own colour stays true
         poly(dome); ctx.fillStyle = 'rgba(236,243,248,.5)'; ctx.fill()
         // tablet in the product's colour(s), full strength
@@ -146,7 +160,22 @@ export default function BlisterWorkbench({ resetKey, packSize, shape, colors, bl
       }
       ctx.restore()
       pathOf(p); ctx.lineWidth = 1.3; ctx.strokeStyle = 'rgba(50,60,70,.75)'; ctx.stroke()
-      if (p === selRef.current) { ctx.setLineDash([6, 4]); ctx.lineWidth = 2.5; ctx.strokeStyle = '#ffd24a'; ctx.stroke() }
+      if (isSel) {
+        ctx.lineJoin = 'round'
+        ctx.lineWidth = 8; ctx.strokeStyle = isHot ? 'rgba(52,211,153,.35)' : 'rgba(96,165,250,.38)'; ctx.stroke()       // soft glow
+        ctx.setLineDash(isHot ? [] : [7, 4]); ctx.lineWidth = 2.6; ctx.strokeStyle = isHot ? '#34d399' : '#60a5fa'; ctx.stroke()
+        ctx.setLineDash([])
+      }
+      // tablet count on each piece (when there is more than one piece, or this one is selected)
+      if (!(g && g.mode === 'cut') && (piecesRef.current.length > 1 || isSel)) {
+        const n = wholeOf(p), [, by0, bx1] = bbox(p), cx = bx1 - 6, cy = by0 + 6
+        ctx.globalAlpha = 1
+        ctx.beginPath(); ctx.arc(cx, cy, 10.5, 0, Math.PI * 2)
+        ctx.fillStyle = n === 0 ? '#7f1d1d' : isSel ? (isHot ? '#059669' : '#2563eb') : 'rgba(15,23,42,.92)'; ctx.fill()
+        ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.stroke()
+        ctx.fillStyle = '#fff'; ctx.font = 'bold 12px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+        ctx.fillText(String(n), cx, cy + 0.5)
+      }
       ctx.restore()
     }
 
@@ -158,7 +187,7 @@ export default function BlisterWorkbench({ resetKey, packSize, shape, colors, bl
       if (lv && lv.status === 'ok') {
         lv.parts.forEach((pc, i) => {
           ctx.save(); ctx.translate(pc.ox, pc.oy); pathOf(pc)
-          ctx.fillStyle = i % 2 ? 'rgba(59,130,246,.26)' : 'rgba(52,211,153,.26)'; ctx.fill('evenodd')
+          ctx.fillStyle = i % 2 ? 'rgba(59,130,246,.32)' : 'rgba(52,211,153,.32)'; ctx.fill('evenodd')
           const [, by0, bx1] = bbox(pc), cx = bx1 - 5, cy = by0 + 5   // badge on the piece's top-right corner, clear of the tablets
           ctx.beginPath(); ctx.arc(cx, cy, 10, 0, Math.PI * 2); ctx.fillStyle = 'rgba(16,24,32,.9)'; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = '#fff'; ctx.stroke()
           ctx.fillStyle = '#fff'; ctx.font = 'bold 12px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
@@ -170,19 +199,21 @@ export default function BlisterWorkbench({ resetKey, packSize, shape, colors, bl
         for (const pl of planStraight(piecesRef.current, g.path, tablets, sh)) {
           ctx.save(); ctx.translate(pl.piece.ox, pl.piece.oy); pathOf(pl.piece); ctx.clip('evenodd')
           ctx.beginPath(); ctx.moveTo(pl.line[0].x, pl.line[0].y); ctx.lineTo(pl.line[1].x, pl.line[1].y)
+          ctx.lineWidth = 9; ctx.strokeStyle = pl.blocked ? 'rgba(255,59,48,.22)' : 'rgba(52,211,153,.22)'; ctx.stroke()   // line glow
           if (pl.snapped && !pl.blocked) { ctx.lineWidth = 7; ctx.strokeStyle = 'rgba(52,211,153,.3)'; ctx.stroke() }   // magnet glow
-          ctx.setLineDash(pl.blocked ? [4, 5] : []); ctx.lineWidth = pl.snapped ? 3.2 : 2.5; ctx.strokeStyle = pl.blocked ? '#ff3b30' : '#34d399'; ctx.stroke(); ctx.restore()
+          ctx.setLineDash(pl.blocked ? [4, 5] : []); ctx.lineWidth = pl.snapped ? 3.8 : 3; ctx.strokeStyle = pl.blocked ? '#ff3b30' : '#34d399'; ctx.stroke(); ctx.restore()
           // red rings on every tablet this line would damage
           for (const t of pl.hits) { poly(outline(sh, { x: t.x + pl.piece.ox, y: t.y + pl.piece.oy }, 1.2, 40)); ctx.lineWidth = 2.2; ctx.strokeStyle = '#ff3b30'; ctx.stroke() }
         }
       } else {
         ctx.beginPath(); sp.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)))
-        ctx.globalAlpha = 0.35; ctx.lineWidth = 1.5; ctx.strokeStyle = '#ff5a4e'; ctx.stroke(); ctx.globalAlpha = 1
+        ctx.globalAlpha = 0.5; ctx.lineWidth = 2; ctx.strokeStyle = '#ff5a4e'; ctx.stroke(); ctx.globalAlpha = 1
         for (const p of piecesRef.current) {
           ctx.save(); ctx.translate(p.ox, p.oy); pathOf(p); ctx.clip('evenodd')
           const lp = deflect(sp.map(q => ({ x: q.x - p.ox, y: q.y - p.oy })), ownTablets(p, tablets), sh)
           ctx.beginPath(); lp.forEach((q, i) => (i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)))
-          ctx.setLineDash([7, 5]); ctx.lineWidth = 2.5; ctx.strokeStyle = '#ff5a4e'; ctx.stroke(); ctx.restore()
+          ctx.lineWidth = 8; ctx.strokeStyle = 'rgba(255,90,78,.2)'; ctx.stroke()   // glow
+          ctx.setLineDash([8, 5]); ctx.lineWidth = 3; ctx.strokeStyle = '#ff5a4e'; ctx.stroke(); ctx.restore()
         }
       }
     }
@@ -208,8 +239,8 @@ export default function BlisterWorkbench({ resetKey, packSize, shape, colors, bl
     // Canvas height follows the strip: tall strips (up to 8 rows) get a taller bench,
     // and the blister is scaled so BOTH its width and height fit with room to move pieces.
     const { W, H } = layoutBlister(props.current.packSize, props.current.shape)
-    const sw = Math.min(1, (w - 16) / W)
-    v.cssW = w; v.cssH = Math.round(Math.min(480, Math.max(240, H * sw * 1.5 + 40))); v.dpr = window.devicePixelRatio || 1
+    const sw = Math.min(2.2, (w - 24) / W)   // may enlarge a small strip to fill the bench
+    v.cssW = w; v.cssH = Math.round(Math.min(600, Math.max(300, H * sw * 1.6 + 48))); v.dpr = window.devicePixelRatio || 1
     v.scale = Math.max(0.3, Math.min(sw, (v.cssH - 24) / H))
     cv.width = Math.round(v.cssW * v.dpr); cv.height = Math.round(v.cssH * v.dpr); cv.style.height = v.cssH + 'px'
     draw()
@@ -324,6 +355,9 @@ export default function BlisterWorkbench({ resetKey, packSize, shape, colors, bl
     else if (g.mode === 'hold' && g.piece) {
       g.piece.ox += p.x - g.last.x; g.piece.oy += p.y - g.last.y; g.dragged = true
       const hot = overBasket(e); if (hot !== hotRef.current) { hotRef.current = hot; props.current.onHotChange?.(hot); force() }
+      const cr = cvRef.current!.getBoundingClientRect()
+      const out = e.clientX < cr.left || e.clientX > cr.right || e.clientY < cr.top || e.clientY > cr.bottom
+      if (out || ghostRef.current) { ghostRef.current = out ? { x: e.clientX, y: e.clientY, n: wholeOf(g.piece) } : null; force() }
       draw()
     }
     g.last = p
@@ -334,6 +368,7 @@ export default function BlisterWorkbench({ resetKey, packSize, shape, colors, bl
     gRef.current = null
     liveRef.current = null
     if (hotRef.current) { hotRef.current = false; props.current.onHotChange?.(false) }
+    ghostRef.current = null
     if (!cancelled) {
       if (g.mode === 'cut') {
         let L = 0
@@ -370,22 +405,41 @@ export default function BlisterWorkbench({ resetKey, packSize, shape, colors, bl
   const sel = selRef.current
   const live = gRef.current?.mode === 'cut' ? liveRef.current : null
   const counts = sel ? countTablets(sel, tabletsRef.current, shape) : null
+  const canUndo = historyRef.current.length > 0
+  const hot = hotRef.current
+  const pieceN = piecesRef.current.length
+  const totalWhole = piecesRef.current.reduce((n, p) => n + wholeOf(p), 0)
+
+  const ctl = 'inline-flex items-center justify-center gap-1.5 h-9 px-3 rounded-lg text-xs font-semibold border border-[var(--border-2)] bg-[var(--surface-3)] text-[var(--text-2)] transition-colors hover:border-[var(--brand)] hover:text-[var(--text)] disabled:opacity-40 disabled:pointer-events-none'
+  const STYLE_META: Record<CutStyle, { label: string; icon: React.ReactNode; tip: string }> = {
+    straight: { label: 'Straight', icon: <Ruler size={14} />, tip: 'Straight line across the whole piece. Snaps to the gap between rows/columns; refused if it would damage a tablet.' },
+    free:     { label: 'Free-form', icon: <Spline size={14} />, tip: 'Follows your swipe and bends around tablets so none is damaged.' },
+  }
 
   return (
     <div>
-      <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
-        <span className="font-semibold uppercase tracking-wide text-[var(--text-3)]">Cut style</span>
-        <div role="group" aria-label="Cut style" className="inline-flex overflow-hidden rounded-lg border border-[var(--border)]">
+      <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
+        <div role="group" aria-label="Cut style" className="inline-flex rounded-lg border border-[var(--border-2)] bg-[var(--surface-2)] p-0.5">
           {(['straight', 'free'] as CutStyle[]).map(s => (
-            <button key={s} type="button" aria-pressed={cutStyle === s} onClick={() => chooseStyle(s)}
-              className="px-3 py-1.5 font-semibold"
-              style={cutStyle === s ? { background: 'var(--brand, #0b7a75)', color: '#fff' } : { color: 'var(--text-2)' }}>
-              {s === 'straight' ? 'Straight' : 'Free-form'}
+            <button key={s} type="button" aria-pressed={cutStyle === s} onClick={() => chooseStyle(s)} title={STYLE_META[s].tip}
+              className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-xs font-semibold transition-colors ${cutStyle === s ? 'bg-[var(--brand)] text-white shadow-sm' : 'text-[var(--text-3)] hover:text-[var(--text)]'}`}>
+              {STYLE_META[s].icon}{STYLE_META[s].label}
             </button>
           ))}
         </div>
+        <div className="flex items-center gap-1.5">
+          <button type="button" className={ctl} onClick={undo} disabled={!canUndo}><Undo2 size={14} />Undo cut</button>
+          <button type="button" className={ctl} onClick={load}><RotateCcw size={14} />Reset blister</button>
+        </div>
       </div>
-      <div ref={wrapRef} className="rounded-xl overflow-hidden" style={{ background: '#3b4a57' }}>
+
+      <div ref={wrapRef} className="overflow-hidden rounded-2xl"
+        style={{
+          background: 'radial-gradient(rgba(148,163,184,.10) 1px, transparent 1px) 0 0 / 18px 18px, radial-gradient(120% 95% at 50% 0%, #1a2a52 0%, #0e1832 58%, #0a1226 100%)',
+          border: `1px solid ${hot ? 'rgba(52,211,153,.55)' : 'rgba(96,165,250,.2)'}`,
+          boxShadow: hot ? '0 0 0 3px rgba(52,211,153,.14), inset 0 1px 0 rgba(255,255,255,.04)' : 'inset 0 1px 0 rgba(255,255,255,.04), 0 8px 24px -12px rgba(0,0,0,.6)',
+          transition: 'border-color .15s, box-shadow .15s',
+        }}>
         <canvas
           ref={cvRef}
           style={{ display: 'block', width: '100%', touchAction: 'none', userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none' }}
@@ -394,27 +448,30 @@ export default function BlisterWorkbench({ resetKey, packSize, shape, colors, bl
           onContextMenu={e => e.preventDefault()}
         />
       </div>
-      <div className="mt-2 min-h-[20px] text-xs text-[var(--text-3)]" aria-live="polite"
-        style={live ? { fontWeight: 600, color: live.status === 'blocked' ? '#ff3b30' : live.status === 'ok' ? '#10b981' : undefined } : undefined}>
-        {live ? live.text : counts
-          ? `Selected: ${counts.whole} billable tablet${counts.whole !== 1 ? 's' : ''}${counts.cut ? ` (${counts.cut} cut, not billed)` : ''}`
-          : `${piecesRef.current.length} piece${piecesRef.current.length !== 1 ? 's' : ''} on the bench. Tap one to see its tablet count.`}
-      </div>
-      <div className="mt-2 flex flex-wrap gap-2">
+
+      {ghostRef.current && (
+        <div aria-hidden className="pointer-events-none fixed z-50 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold text-white shadow-lg"
+          style={{ left: ghostRef.current.x, top: ghostRef.current.y, transform: 'translate(-50%, -140%)', background: hot ? '#059669' : '#2563eb', border: '1.5px solid rgba(255,255,255,.85)' }}>
+          <ShoppingBasket size={13} /> {ghostRef.current.n} tablet{ghostRef.current.n !== 1 ? 's' : ''}
+        </div>
+      )}
+
+      <div className="mt-2.5 flex min-h-[40px] flex-wrap items-center justify-between gap-2">
+        <div className="text-xs text-[var(--text-3)]" aria-live="polite"
+          style={live ? { fontWeight: 600, color: live.status === 'blocked' ? '#ff6b61' : live.status === 'ok' ? '#34d399' : undefined } : undefined}>
+          {live ? live.text : counts
+            ? <><b className="text-[var(--text)]">{counts.whole}</b> billable tablet{counts.whole !== 1 ? 's' : ''}{counts.cut ? <span className="text-amber-400"> · {counts.cut} cut, not billed</span> : null}</>
+            : <><b className="text-[var(--text-2)]">{pieceN}</b> piece{pieceN !== 1 ? 's' : ''} · <b className="text-[var(--text-2)]">{totalWhole}</b> tablets</>}
+        </div>
         {sel && counts && (
-          <Button variant="primary" size="sm" disabled={!counts.whole} icon={<ShoppingBasket size={15} />}
+          <Button variant="primary" size="md" disabled={!counts.whole} icon={<ShoppingBasket size={15} />}
             onClick={() => { if (sel) { addPiece(sel); draw(); force() } }}>
-            Add {counts.whole} tablet{counts.whole !== 1 ? 's' : ''} to basket
+            Add {counts.whole} tablet{counts.whole !== 1 ? 's' : ''}
           </Button>
         )}
-        <Button variant="secondary" size="sm" icon={<Undo2 size={15} />} onClick={undo}>Undo cut</Button>
-        <Button variant="secondary" size="sm" icon={<RotateCcw size={15} />} onClick={load}>Reset blister</Button>
       </div>
-      <p className="mt-2 text-xs text-[var(--text-4)]">
-        Quick swipe = cut · Tap = select · Double-tap = add to basket · Press and hold, then drag = move · Drop on the basket to bill; when the strip is used up a fresh one loads.{' '}
-        {cutStyle === 'straight'
-          ? 'Straight: the cut is a straight line across the whole piece. It snaps to horizontal/vertical and to the middle of the gap between rows or columns, and is refused if it would damage a tablet (those tablets are ringed in red as you swipe).'
-          : 'Free-form: the cut follows your (smoothed) swipe and bends around tablets, so none is damaged. The preview shows the tablets in each piece before you lift.'}
+      <p className="mt-1 text-[11px] leading-snug text-[var(--text-3)]">
+        Swipe to cut · Tap to select · Double-tap to add · Hold &amp; drag to the basket
       </p>
     </div>
   )
