@@ -15,7 +15,7 @@
  * user billed through `onAddPiece(tablets)` and never talks to any API.
  */
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
-import { Undo2, RotateCcw, ShoppingBasket, Ruler, Spline } from 'lucide-react'
+import { Undo2, RotateCcw, ShoppingBasket, Ruler } from 'lucide-react'
 import { Button } from '@/components/ui'
 import {
   bbox, countTablets, cutPieces, deflect, inside, isUpright, layoutBlister, outline, ownTablets, planStraight, previewCut, shadeHex, smoothPath, SHAPES,
@@ -55,7 +55,7 @@ export default function BlisterWorkbench({ resetKey, packSize, shape, colors, bl
   const cvRef = useRef<HTMLCanvasElement>(null)
   const [, force] = useReducer((n: number) => n + 1, 0)
   // Cut style is a preference (how a swipe becomes a cut), not a mode: swipe always cuts, hold-drag always moves.
-  const [cutStyle, setCutStyle] = useState<CutStyle>(() => { try { return localStorage.getItem('retailCutStyle') === 'straight' ? 'straight' : 'free' } catch { return 'free' } })
+  const cutStyle: CutStyle = 'straight'   // straight cuts only — free-form cutting has been removed
 
   // All mutable bench state lives in refs: pointer events fire far faster than
   // React renders, and the canvas is redrawn imperatively.
@@ -239,8 +239,8 @@ export default function BlisterWorkbench({ resetKey, packSize, shape, colors, bl
     // Canvas height follows the strip: tall strips (up to 8 rows) get a taller bench,
     // and the blister is scaled so BOTH its width and height fit with room to move pieces.
     const { W, H } = layoutBlister(props.current.packSize, props.current.shape)
-    const sw = Math.min(2.2, (w - 24) / W)   // may enlarge a small strip to fill the bench
-    v.cssW = w; v.cssH = Math.round(Math.min(600, Math.max(300, H * sw * 1.6 + 48))); v.dpr = window.devicePixelRatio || 1
+    const sw = Math.min(1.6, (w - 24) / W)   // may enlarge a small strip to fill the bench
+    v.cssW = w; v.cssH = Math.round(Math.min(480, Math.max(260, H * sw * 1.5 + 40))); v.dpr = window.devicePixelRatio || 1
     v.scale = Math.max(0.3, Math.min(sw, (v.cssH - 24) / H))
     cv.width = Math.round(v.cssW * v.dpr); cv.height = Math.round(v.cssH * v.dpr); cv.style.height = v.cssH + 'px'
     draw()
@@ -391,10 +391,6 @@ export default function BlisterWorkbench({ resetKey, packSize, shape, colors, bl
     draw(); force()
   }
 
-  const chooseStyle = (s: CutStyle) => {
-    setCutStyle(s); props.current.cutStyle = s
-    try { localStorage.setItem('retailCutStyle', s) } catch { /* preference only */ }
-  }
 
   const undo = () => {
     const prev = historyRef.current.pop()
@@ -411,21 +407,13 @@ export default function BlisterWorkbench({ resetKey, packSize, shape, colors, bl
   const totalWhole = piecesRef.current.reduce((n, p) => n + wholeOf(p), 0)
 
   const ctl = 'inline-flex items-center justify-center gap-1.5 h-9 px-3 rounded-lg text-xs font-semibold border border-[var(--border-2)] bg-[var(--surface-3)] text-[var(--text-2)] transition-colors hover:border-[var(--brand)] hover:text-[var(--text)] disabled:opacity-40 disabled:pointer-events-none'
-  const STYLE_META: Record<CutStyle, { label: string; icon: React.ReactNode; tip: string }> = {
-    straight: { label: 'Straight', icon: <Ruler size={14} />, tip: 'Straight line across the whole piece. Snaps to the gap between rows/columns; refused if it would damage a tablet.' },
-    free:     { label: 'Free-form', icon: <Spline size={14} />, tip: 'Follows your swipe and bends around tablets so none is damaged.' },
-  }
 
   return (
     <div>
       <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
-        <div role="group" aria-label="Cut style" className="inline-flex rounded-lg border border-[var(--border-2)] bg-[var(--surface-2)] p-0.5">
-          {(['straight', 'free'] as CutStyle[]).map(s => (
-            <button key={s} type="button" aria-pressed={cutStyle === s} onClick={() => chooseStyle(s)} title={STYLE_META[s].tip}
-              className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-xs font-semibold transition-colors ${cutStyle === s ? 'bg-[var(--brand)] text-white shadow-sm' : 'text-[var(--text-3)] hover:text-[var(--text)]'}`}>
-              {STYLE_META[s].icon}{STYLE_META[s].label}
-            </button>
-          ))}
+        <div className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[var(--border-2)] bg-[var(--surface-2)] px-3 text-xs font-semibold text-[var(--text-2)]"
+          title="Straight line across the whole piece. Snaps to the gap between rows/columns; refused if it would damage a tablet.">
+          <Ruler size={14} className="text-[#93c5fd]" /> Straight cut
         </div>
         <div className="flex items-center gap-1.5">
           <button type="button" className={ctl} onClick={undo} disabled={!canUndo}><Undo2 size={14} />Undo cut</button>
