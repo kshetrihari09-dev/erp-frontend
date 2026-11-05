@@ -12,7 +12,7 @@ export default function PaymentModes({ modes, loading }: Props) {
   const invoices = rows.reduce((n, r) => n + (r.count || 0), 0)
   return (
     <section className="flex h-full flex-col rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--shadow-sm)] md:p-5" aria-label="Payment modes">
-      <h2 className="flex items-center gap-2 text-[15px] font-bold text-[var(--text)]"><PieIcon size={16} className="text-[#34d399]" aria-hidden />Payment modes</h2>
+      <h2 className="flex items-center gap-2 text-[15px] font-bold text-[var(--text)]"><PieIcon size={16} className="text-[#10b981]" aria-hidden />Payment modes</h2>
       <p className="mt-0.5 text-xs text-[var(--text-3)]">{rows.length ? `Today · ${invoices} invoice${invoices === 1 ? '' : 's'}` : 'Today'}</p>
 
       {loading ? (
@@ -37,7 +37,7 @@ export default function PaymentModes({ modes, loading }: Props) {
                   {rows.map(r => <Cell key={r.name} fill={r.color} />)}
                 </Pie>
                 <Tooltip formatter={(v: any, _n: any, p: any) => [`${fmt(v)} (${p.payload.percent}%)`, p.payload.label]}
-                  contentStyle={{ background: '#0f1a2e', border: '1px solid rgba(255,255,255,.12)', borderRadius: 10, fontSize: 12 }} itemStyle={{ color: '#F8FAFC' }} />
+                  contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border-2)', borderRadius: 10, fontSize: 12 }} itemStyle={{ color: 'var(--text)' }} />
               </PieChart>
             </ResponsiveContainer>
             <div className="pointer-events-none absolute inset-0 grid place-items-center text-center">

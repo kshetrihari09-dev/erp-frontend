@@ -48,10 +48,10 @@ export function paymentName(raw: string | null | undefined): string {
 }
 
 const MODE_COLORS: Record<string, string> = {
-  cash: '#34d399', credit: '#fbbf24', bank: '#60a5fa', bank_transfer: '#60a5fa',
-  online: '#818cf8', card: '#a78bfa', cheque: '#2dd4bf', upi: '#f472b6',
+  cash: '#10b981', credit: '#f59e0b', bank: '#3b82f6', bank_transfer: '#3b82f6',
+  online: '#818cf8', card: '#8b5cf6', cheque: '#14b8a6', upi: '#f472b6',
 }
-const FALLBACK = ['#34d399', '#fbbf24', '#60a5fa', '#a78bfa', '#2dd4bf', '#f472b6']
+const FALLBACK = ['#10b981', '#f59e0b', '#3b82f6', '#8b5cf6', '#14b8a6', '#f472b6']
 export function paymentColor(name: string, index: number): string {
   return MODE_COLORS[String(name).toLowerCase().replace(/\s+/g, '_')] ?? FALLBACK[index % FALLBACK.length]
 }

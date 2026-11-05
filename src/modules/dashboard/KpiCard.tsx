@@ -27,7 +27,7 @@ function Spark({ values, color }: { values: number[]; color: string }) {
 
 export function TrendPill({ pct }: { pct: number }) {
   const up = pct > 0.05, down = pct < -0.05
-  const tone = up ? 'bg-emerald-500/12 text-emerald-300' : down ? 'bg-rose-500/12 text-rose-300' : 'bg-white/5 text-[var(--text-3)]'
+  const tone = up ? 'bg-emerald-100 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-300' : down ? 'bg-rose-100 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300' : 'bg-[var(--surface-3)] text-[var(--text-3)]'
   const Icon = up ? ArrowUpRight : down ? ArrowDownRight : Minus
   return (
     <span className={`inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[11px] font-semibold tabular-nums ${tone}`}>

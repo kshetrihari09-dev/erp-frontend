@@ -9,18 +9,18 @@ import { stockSeverity, type StockSeverity } from './dashboardUtils'
 const card = 'rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--shadow-sm)] md:p-5'
 
 const ACTIONS: Array<{ label: string; path: string; color: string; icon: ReactNode }> = [
-  { label: 'Invoice',  path: PATHS.SALES,     color: '#60a5fa', icon: <FileText size={18} strokeWidth={1.8} /> },
-  { label: 'Purchase', path: PATHS.PURCHASE,  color: '#a78bfa', icon: <ShoppingBag size={18} strokeWidth={1.8} /> },
-  { label: 'Customer', path: PATHS.CUSTOMERS, color: '#2dd4bf', icon: <Users size={18} strokeWidth={1.8} /> },
-  { label: 'Product',  path: PATHS.PRODUCTS,  color: '#34d399', icon: <Package size={18} strokeWidth={1.8} /> },
-  { label: 'Reports',  path: PATHS.REPORTS,   color: '#fbbf24', icon: <BarChart2 size={18} strokeWidth={1.8} /> },
+  { label: 'Invoice',  path: PATHS.SALES,     color: '#3b82f6', icon: <FileText size={18} strokeWidth={1.8} /> },
+  { label: 'Purchase', path: PATHS.PURCHASE,  color: '#8b5cf6', icon: <ShoppingBag size={18} strokeWidth={1.8} /> },
+  { label: 'Customer', path: PATHS.CUSTOMERS, color: '#14b8a6', icon: <Users size={18} strokeWidth={1.8} /> },
+  { label: 'Product',  path: PATHS.PRODUCTS,  color: '#10b981', icon: <Package size={18} strokeWidth={1.8} /> },
+  { label: 'Reports',  path: PATHS.REPORTS,   color: '#f59e0b', icon: <BarChart2 size={18} strokeWidth={1.8} /> },
 ]
 
 export function QuickActions() {
   const navigate = useNavigate()
   return (
     <section className={card} aria-label="Quick actions">
-      <h2 className="flex items-center gap-2 text-[15px] font-bold text-[var(--text)]"><Zap size={16} className="text-[#fbbf24]" aria-hidden />Quick actions</h2>
+      <h2 className="flex items-center gap-2 text-[15px] font-bold text-[var(--text)]"><Zap size={16} className="text-[#f59e0b]" aria-hidden />Quick actions</h2>
       <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-5 xl:grid-cols-3">
         {ACTIONS.map((a, i) => (
           <button key={a.label} type="button" onClick={() => navigate(a.path)}
@@ -35,9 +35,9 @@ export function QuickActions() {
 }
 
 const SEV: Record<StockSeverity, { label: string; chip: string; dot: string }> = {
-  out:      { label: 'Out',      chip: 'bg-rose-500/12 text-rose-300',   dot: '#fb7185' },
-  critical: { label: 'Critical', chip: 'bg-rose-500/12 text-rose-300',   dot: '#fb7185' },
-  low:      { label: 'Low',      chip: 'bg-amber-500/12 text-amber-300', dot: '#fbbf24' },
+  out:      { label: 'Out',      chip: 'bg-rose-100 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300',   dot: '#f43f5e' },
+  critical: { label: 'Critical', chip: 'bg-rose-100 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300',   dot: '#f43f5e' },
+  low:      { label: 'Low',      chip: 'bg-amber-100 dark:bg-amber-500/10 text-amber-800 dark:text-amber-300', dot: '#f59e0b' },
 }
 
 export function LowStockPanel({ count }: { count: number }) {
@@ -48,8 +48,8 @@ export function LowStockPanel({ count }: { count: number }) {
   return (
     <section className={card} aria-label="Low stock">
       <div className="flex items-center justify-between gap-2">
-        <h2 className="flex items-center gap-2 text-[15px] font-bold text-[var(--text)]"><AlertTriangle size={16} className="text-[#fbbf24]" aria-hidden />Low stock</h2>
-        {total > 0 && <span className="rounded-md bg-amber-500/12 px-2 py-0.5 text-[11px] font-bold tabular-nums text-amber-300">{total}</span>}
+        <h2 className="flex items-center gap-2 text-[15px] font-bold text-[var(--text)]"><AlertTriangle size={16} className="text-[#f59e0b]" aria-hidden />Low stock</h2>
+        {total > 0 && <span className="rounded-md bg-amber-100 dark:bg-amber-500/10 px-2 py-0.5 text-[11px] font-bold tabular-nums text-amber-800 dark:text-amber-300">{total}</span>}
       </div>
 
       {isLoading ? (
@@ -69,7 +69,7 @@ export function LowStockPanel({ count }: { count: number }) {
               const sev = stockSeverity(it.current_stock, it.min_stock), s = SEV[sev]
               return (
                 <li key={it.id}>
-                  <button type="button" onClick={() => navigate(PATHS.PRODUCTS)} className="flex w-full items-center gap-3 py-2.5 text-left transition-colors hover:bg-white/[.03]">
+                  <button type="button" onClick={() => navigate(PATHS.PRODUCTS)} className="flex w-full items-center gap-3 py-2.5 text-left transition-colors hover:bg-[var(--surface-2)]">
                     <i className="h-2 w-2 shrink-0 rounded-full" style={{ background: s.dot }} aria-hidden />
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-[13px] font-semibold text-[var(--text)]">{it.name}</div>
@@ -96,12 +96,12 @@ export function ExpiryAlert({ count }: { count: number }) {
   return (
     <button type="button" onClick={() => navigate(PATHS.STOCK)}
       className="flex w-full items-center gap-3 rounded-2xl border border-rose-500/25 bg-rose-500/[.07] p-3.5 text-left transition-colors hover:bg-rose-500/[.11]">
-      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-rose-500/15 text-rose-300"><Clock size={17} aria-hidden /></span>
+      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-rose-500/15 text-rose-700 dark:text-rose-300"><Clock size={17} aria-hidden /></span>
       <span className="min-w-0 flex-1">
-        <span className="block text-[13px] font-semibold text-rose-200">{count} batch{count === 1 ? '' : 'es'} expiring within 30 days</span>
-        <span className="block text-[11px] text-rose-200/70">Review stock</span>
+        <span className="block text-[13px] font-semibold text-rose-800 dark:text-rose-200">{count} batch{count === 1 ? '' : 'es'} expiring within 30 days</span>
+        <span className="block text-[11px] text-rose-900/80 dark:text-rose-200/70">Review stock</span>
       </span>
-      <ArrowUpRight size={15} className="shrink-0 text-rose-300/70" aria-hidden />
+      <ArrowUpRight size={15} className="shrink-0 text-rose-600/70 dark:text-rose-300/70" aria-hidden />
     </button>
   )
 }

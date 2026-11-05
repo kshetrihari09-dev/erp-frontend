@@ -5,7 +5,7 @@ import { fmt, fmtCompact } from '@/utils'
 import { bucketLabel, pctChange } from './dashboardUtils'
 import { TrendPill } from './KpiCard'
 
-const SALES = '#60a5fa', PURCHASES = '#a78bfa'
+const SALES = '#3b82f6', PURCHASES = '#8b5cf6'
 const RANGES: Array<{ id: DashboardRange; label: string; prev: string }> = [
   { id: '7d', label: '7D', prev: 'previous 7 days' }, { id: '30d', label: '30D', prev: 'previous 30 days' }, { id: '12m', label: '12M', prev: 'previous 12 months' },
 ]
@@ -13,7 +13,7 @@ const RANGES: Array<{ id: DashboardRange; label: string; prev: string }> = [
 function Tip({ active, payload, label, gran }: any) {
   if (!active || !payload?.length) return null
   return (
-    <div className="rounded-xl border border-[var(--border-2)] bg-[#0f1a2e] px-3 py-2.5 shadow-[var(--shadow-md)]">
+    <div className="rounded-xl border border-[var(--border-2)] bg-[var(--surface)] px-3 py-2.5 shadow-[var(--shadow-md)]">
       <div className="mb-1.5 text-[11px] font-medium text-[var(--text-3)]">{bucketLabel(String(label), gran, true)}</div>
       {payload.map((p: any) => (
         <div key={p.dataKey} className="flex items-center justify-between gap-5 text-[13px]">
@@ -48,7 +48,7 @@ export default function RevenueChart({ range, onRange, trend, loading, error }: 
     <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--shadow-sm)] md:p-5" aria-label="Revenue overview">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="flex items-center gap-2 text-[15px] font-bold text-[var(--text)]"><Activity size={16} className="text-[#60a5fa]" aria-hidden />Revenue overview</h2>
+          <h2 className="flex items-center gap-2 text-[15px] font-bold text-[var(--text)]"><Activity size={16} className="text-[#3b82f6]" aria-hidden />Revenue overview</h2>
           <p className="mt-0.5 text-xs text-[var(--text-3)]">Sales vs purchases</p>
         </div>
         <div role="tablist" aria-label="Chart period" className="inline-flex rounded-lg bg-[var(--surface-2)] p-0.5">
@@ -84,9 +84,9 @@ export default function RevenueChart({ range, onRange, trend, loading, error }: 
                 <linearGradient id="dgS" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={SALES} stopOpacity={.34} /><stop offset="100%" stopColor={SALES} stopOpacity={0} /></linearGradient>
                 <linearGradient id="dgP" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={PURCHASES} stopOpacity={.24} /><stop offset="100%" stopColor={PURCHASES} stopOpacity={0} /></linearGradient>
               </defs>
-              <CartesianGrid stroke="rgba(148,163,184,.12)" strokeDasharray="3 5" vertical={false} />
-              <XAxis dataKey="key" tickFormatter={(k: string) => bucketLabel(k, gran)} tick={{ fontSize: 11, fill: '#94A3B8' }} axisLine={false} tickLine={false} minTickGap={18} tickMargin={8} />
-              <YAxis tickFormatter={(v: number) => (v === 0 ? '0' : fmtCompact(v))} tick={{ fontSize: 11, fill: '#94A3B8' }} axisLine={false} tickLine={false} width={46} />
+              <CartesianGrid stroke="var(--border-2)" strokeDasharray="3 5" vertical={false} />
+              <XAxis dataKey="key" tickFormatter={(k: string) => bucketLabel(k, gran)} tick={{ fontSize: 11, fill: 'var(--text-3)' }} axisLine={false} tickLine={false} minTickGap={18} tickMargin={8} />
+              <YAxis tickFormatter={(v: number) => (v === 0 ? '0' : fmtCompact(v))} tick={{ fontSize: 11, fill: 'var(--text-3)' }} axisLine={false} tickLine={false} width={46} />
               <Tooltip content={<Tip gran={gran} />} cursor={{ stroke: 'rgba(148,163,184,.35)', strokeDasharray: '3 3' }} />
               <Area type="monotone" dataKey="purchases" name="Purchases" stroke={PURCHASES} strokeWidth={2} fill="url(#dgP)" dot={false} activeDot={{ r: 4, strokeWidth: 0 }} animationDuration={650} />
               <Area type="monotone" dataKey="sales" name="Sales" stroke={SALES} strokeWidth={2.2} fill="url(#dgS)" dot={false} activeDot={{ r: 4, strokeWidth: 0 }} animationDuration={650} />
