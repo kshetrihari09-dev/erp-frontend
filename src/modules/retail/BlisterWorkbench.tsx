@@ -413,7 +413,7 @@ export default function BlisterWorkbench({ resetKey, packSize, shape, colors, bl
       <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
         <div className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[var(--border-2)] bg-[var(--surface-2)] px-3 text-xs font-semibold text-[var(--text-2)]"
           title="Straight line across the whole piece. Snaps to the gap between rows/columns; refused if it would damage a tablet.">
-          <Ruler size={14} className="text-[#93c5fd]" /> Straight cut
+          <Ruler size={14} className="text-[var(--rs-link)]" /> Straight cut
         </div>
         <div className="flex items-center gap-1.5">
           <button type="button" className={ctl} onClick={undo} disabled={!canUndo}><Undo2 size={14} />Undo cut</button>
@@ -423,9 +423,9 @@ export default function BlisterWorkbench({ resetKey, packSize, shape, colors, bl
 
       <div ref={wrapRef} className="overflow-hidden rounded-2xl"
         style={{
-          background: 'radial-gradient(rgba(148,163,184,.10) 1px, transparent 1px) 0 0 / 18px 18px, radial-gradient(120% 95% at 50% 0%, #1a2a52 0%, #0e1832 58%, #0a1226 100%)',
-          border: `1px solid ${hot ? 'rgba(52,211,153,.55)' : 'rgba(96,165,250,.2)'}`,
-          boxShadow: hot ? '0 0 0 3px rgba(52,211,153,.14), inset 0 1px 0 rgba(255,255,255,.04)' : 'inset 0 1px 0 rgba(255,255,255,.04), 0 8px 24px -12px rgba(0,0,0,.6)',
+          background: 'radial-gradient(var(--rs-dot) 1px, transparent 1px) 0 0 / 18px 18px, var(--rs-bg)',
+          border: `1px solid ${hot ? 'rgba(52,211,153,.55)' : 'var(--rs-border)'}`,
+          boxShadow: hot ? '0 0 0 3px rgba(52,211,153,.14), inset 0 1px 0 rgba(255,255,255,.04)' : 'var(--rs-shadow)',
           transition: 'border-color .15s, box-shadow .15s',
         }}>
         <canvas
@@ -445,10 +445,10 @@ export default function BlisterWorkbench({ resetKey, packSize, shape, colors, bl
       )}
 
       <div className="mt-2.5 flex min-h-[40px] flex-wrap items-center justify-between gap-2">
-        <div className="text-xs text-[var(--text-3)]" aria-live="polite"
-          style={live ? { fontWeight: 600, color: live.status === 'blocked' ? '#ff6b61' : live.status === 'ok' ? '#34d399' : undefined } : undefined}>
+        <div aria-live="polite"
+          className={`text-xs ${live ? `font-semibold ${live.status === 'blocked' ? 'text-red-600 dark:text-red-400' : live.status === 'ok' ? 'text-emerald-700 dark:text-emerald-400' : 'text-[var(--text-3)]'}` : 'text-[var(--text-3)]'}`}>
           {live ? live.text : counts
-            ? <><b className="text-[var(--text)]">{counts.whole}</b> billable tablet{counts.whole !== 1 ? 's' : ''}{counts.cut ? <span className="text-amber-400"> · {counts.cut} cut, not billed</span> : null}</>
+            ? <><b className="text-[var(--text)]">{counts.whole}</b> billable tablet{counts.whole !== 1 ? 's' : ''}{counts.cut ? <span className="text-amber-700 dark:text-amber-400"> · {counts.cut} cut, not billed</span> : null}</>
             : <><b className="text-[var(--text-2)]">{pieceN}</b> piece{pieceN !== 1 ? 's' : ''} · <b className="text-[var(--text-2)]">{totalWhole}</b> tablets</>}
         </div>
         {sel && counts && (

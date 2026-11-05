@@ -321,8 +321,8 @@ export default function IntactPackage({ kind, name, company, unitLabel, chip, ad
   return (
     <div>
       <div className="rounded-2xl flex items-center justify-center select-none" style={{
-        background: 'radial-gradient(rgba(148,163,184,.10) 1px, transparent 1px) 0 0 / 18px 18px, radial-gradient(120% 95% at 50% 0%, #1a2a52 0%, #0e1832 58%, #0a1226 100%)',
-        border: '1px solid rgba(96,165,250,.2)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,.04), 0 8px 24px -12px rgba(0,0,0,.6)', height: 280, overflow: 'hidden' }}>
+        background: 'radial-gradient(var(--rs-dot) 1px, transparent 1px) 0 0 / 18px 18px, var(--rs-bg)',
+        border: '1px solid var(--rs-border)', boxShadow: 'var(--rs-shadow)', height: 280, overflow: 'hidden' }}>
         <div
           role="button" aria-label={`${kind} — drag to the basket`} tabIndex={0}
           onPointerDown={down} onPointerMove={move}

@@ -7696,3 +7696,19 @@ canvas{
   .retail-pos .upi-scan-buttons { width: 100%; }
   .retail-pos .upi-scan-btn { flex: 1 1 0; justify-content: center; }
 }
+
+/* ── Retail Sale: theme variables (light by default, navy in dark) ── */
+.retail-pos {
+  --rs-bg: radial-gradient(120% 95% at 50% 0%, #f1f5fc 0%, #e4ecf8 58%, #d8e3f3 100%);
+  --rs-dot: rgba(51, 65, 85, .11);
+  --rs-border: rgba(37, 99, 235, .24);
+  --rs-shadow: inset 0 1px 0 rgba(255, 255, 255, .85), 0 6px 18px -12px rgba(30, 64, 175, .4);
+  --rs-link: var(--brand);
+}
+.dark .retail-pos {
+  --rs-bg: radial-gradient(120% 95% at 50% 0%, #1a2a52 0%, #0e1832 58%, #0a1226 100%);
+  --rs-dot: rgba(148, 163, 184, .10);
+  --rs-border: rgba(96, 165, 250, .2);
+  --rs-shadow: inset 0 1px 0 rgba(255, 255, 255, .04), 0 8px 24px -12px rgba(0, 0, 0, .6);
+  --rs-link: #93c5fd;
+}

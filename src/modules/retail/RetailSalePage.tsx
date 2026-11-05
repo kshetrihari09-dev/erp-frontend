@@ -46,9 +46,9 @@ const chipBtn = 'inline-flex h-8 min-w-[2.25rem] items-center justify-center rou
 
 type StockTone = 'ok' | 'low' | 'out'
 const STOCK_STYLE: Record<StockTone, { dot: string; text: string; label: string }> = {
-  ok:  { dot: '#10b981', text: '#6ee7b7', label: 'In stock' },
-  low: { dot: '#f59e0b', text: '#fcd34d', label: 'Low stock' },
-  out: { dot: '#ef4444', text: '#fca5a5', label: 'Out of stock' },
+  ok:  { dot: '#10b981', text: 'text-emerald-700 dark:text-emerald-300', label: 'In stock' },
+  low: { dot: '#f59e0b', text: 'text-amber-700 dark:text-amber-300', label: 'Low stock' },
+  out: { dot: '#ef4444', text: 'text-red-700 dark:text-red-300', label: 'Out of stock' },
 }
 function stockTone(p: Product): StockTone | null {
   const n = Number(p.current_stock); if (!Number.isFinite(n)) return null
@@ -201,10 +201,10 @@ export default function RetailSalePage() {
   const canContinue = lines.length > 0
 
   return (
-    <div className="dark retail-pos mx-auto max-w-[1280px] rounded-2xl bg-[var(--bg)] p-3 text-[var(--text)] md:p-5">
+    <div className="retail-pos mx-auto max-w-[1280px] rounded-2xl bg-[var(--bg)] p-3 text-[var(--text)] md:p-5">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
-          <span className="grid h-9 w-9 place-items-center rounded-xl bg-[var(--brand-light)] text-[#93c5fd]"><Scissors size={17} /></span>
+          <span className="grid h-9 w-9 place-items-center rounded-xl bg-[var(--brand-light)] text-[var(--rs-link)]"><Scissors size={17} /></span>
           <h1 className="text-lg font-bold tracking-tight">Retail Sale</h1>
         </div>
         {canContinue && (
@@ -236,9 +236,9 @@ export default function RetailSalePage() {
           )}
 
           {ambiguous && (
-            <div className="mt-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-100">
+            <div className="mt-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-900 dark:text-amber-100">
               <div className="flex items-center gap-1.5 font-semibold"><AlertTriangle size={14} /> Packaging unclear for {ambiguous.product.name}</div>
-              <p className="mt-1 text-amber-100/80">{ambiguous.reason}</p>
+              <p className="mt-1 text-amber-900/80 dark:text-amber-100/80">{ambiguous.reason}</p>
               {canChoose ? (
                 <div className="mt-2">
                   <div className="flex flex-wrap gap-2">
@@ -250,13 +250,13 @@ export default function RetailSalePage() {
                       </Button>
                     ))}
                   </div>
-                  <p className="mt-2 text-xs text-amber-100/70">
+                  <p className="mt-2 text-xs text-amber-900/70 dark:text-amber-100/70">
                     Applies to this scan only. {!validPack(Number(ambiguous.product.tablets_per_strip)) && `Blister needs “Tablets per strip” (${MIN_PACK}–${MAX_PACK}). `}
                     Fix it permanently via the product’s Unit in <Link to={PATHS.PRODUCTS} className="underline font-semibold">Products</Link>.
                   </p>
                 </div>
               ) : (
-                <p className="mt-2 text-xs text-amber-100/70">Ask a manager or admin to confirm the packaging type.</p>
+                <p className="mt-2 text-xs text-amber-900/70 dark:text-amber-100/70">Ask a manager or admin to confirm the packaging type.</p>
               )}
             </div>
           )}
@@ -269,7 +269,7 @@ export default function RetailSalePage() {
                   <div className="truncate text-[15px] font-bold leading-tight" title={loaded.product.name}>{loaded.product.name}</div>
                   <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--text-3)]">
                     <span className="font-mono">{loaded.product.barcode || loaded.product.item_code}</span>
-                    <span className="rounded-md border border-[rgba(96,165,250,.3)] bg-[rgba(37,99,235,.14)] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#93c5fd]">{PACKAGING_LABEL[loaded.packaging]}</span>
+                    <span className="rounded-md border border-[rgba(96,165,250,.3)] bg-[rgba(37,99,235,.14)] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-blue-800 dark:text-[#93c5fd]">{PACKAGING_LABEL[loaded.packaging]}</span>
                   </div>
                 </div>
                 {loaded.packaging === 'blister' ? (
@@ -284,7 +284,7 @@ export default function RetailSalePage() {
                   <Stat label="Stock">
                     <span className="inline-flex items-center gap-1.5">
                       <span aria-hidden className="h-2 w-2 rounded-full" style={{ background: STOCK_STYLE[tone].dot, boxShadow: `0 0 0 3px ${STOCK_STYLE[tone].dot}33` }} />
-                      {fmtN(loaded.product.current_stock, 0)} <span className="text-xs font-semibold" style={{ color: STOCK_STYLE[tone].text }}>{loaded.product.unit} · {STOCK_STYLE[tone].label}</span>
+                      {fmtN(loaded.product.current_stock, 0)} <span className={`text-xs font-semibold ${STOCK_STYLE[tone].text}`}>{loaded.product.unit} · {STOCK_STYLE[tone].label}</span>
                     </span>
                   </Stat>
                 )}
@@ -307,9 +307,9 @@ export default function RetailSalePage() {
                         onChange={e => setDropQty(e.target.value)} onFocus={e => e.currentTarget.select()} aria-invalid={dropN === null} />
                       {(isBulk(loaded.packaging) ? ['0.25', '0.5', '1', '5'] : ['1', '2', '5', '10']).map(q => (
                         <button key={q} type="button" onClick={() => setDropQty(q)}
-                          className={`${chipBtn} ${dropQty.trim() === q ? 'border-[var(--brand)] bg-[rgba(37,99,235,.2)] text-[#bfdbfe]' : 'border-[var(--border-2)] text-[var(--text-2)] hover:border-[var(--brand)]'}`}>{q}</button>
+                          className={`${chipBtn} ${dropQty.trim() === q ? 'border-[var(--brand)] bg-[rgba(37,99,235,.2)] text-[var(--rs-link)]' : 'border-[var(--border-2)] text-[var(--text-2)] hover:border-[var(--brand)]'}`}>{q}</button>
                       ))}
-                      {dropN === null && <span className="text-red-400">{isBulk(loaded.packaging) ? 'Enter a number above 0' : 'Enter a whole number, 1 or more'}</span>}
+                      {dropN === null && <span className="text-red-600 dark:text-red-400">{isBulk(loaded.packaging) ? 'Enter a number above 0' : 'Enter a whole number, 1 or more'}</span>}
                     </div>
                     <IntactPackage
                       key={`${loaded.packaging}-${loaded.key}`}
@@ -338,15 +338,15 @@ export default function RetailSalePage() {
           style={hot ? { borderColor: 'var(--brand)', background: 'color-mix(in srgb, var(--brand) 10%, var(--surface))', boxShadow: '0 0 0 3px rgba(37,99,235,.25), var(--shadow-md)', transition: 'all .15s' } : { transition: 'all .15s' }}>
           <div className="mb-2.5 flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <ShoppingBasket size={16} className="text-[#93c5fd]" />
+              <ShoppingBasket size={16} className="text-[var(--rs-link)]" />
               <span className="text-sm font-bold">Basket</span>
-              {canContinue && <span className="rounded-full bg-[var(--brand-light)] px-2 py-0.5 text-[11px] font-bold text-[#93c5fd]">{t.items}</span>}
+              {canContinue && <span className="rounded-full bg-[var(--brand-light)] px-2 py-0.5 text-[11px] font-bold text-[var(--rs-link)]">{t.items}</span>}
             </div>
             <div className="flex items-center gap-1">
               <button type="button" aria-label="Undo" title="Undo (Ctrl+Z)" disabled={!bs.past.length} onClick={() => dispatch({ type: 'undo' })}
                 className="grid h-9 w-9 place-items-center rounded-lg text-[var(--text-3)] hover:bg-[var(--surface-3)] hover:text-[var(--text)] disabled:pointer-events-none disabled:opacity-35"><Undo2 size={15} /></button>
               <button type="button" aria-label="Clear basket" disabled={!lines.length} onClick={() => dispatch({ type: 'clear' })}
-                className="h-9 rounded-lg px-2.5 text-xs font-semibold text-[var(--text-3)] hover:bg-[var(--surface-3)] hover:text-red-300 disabled:pointer-events-none disabled:opacity-35">Clear</button>
+                className="h-9 rounded-lg px-2.5 text-xs font-semibold text-[var(--text-3)] hover:bg-[var(--surface-3)] hover:text-red-600 dark:hover:text-red-300 disabled:pointer-events-none disabled:opacity-35">Clear</button>
             </div>
           </div>
 
@@ -371,7 +371,7 @@ export default function RetailSalePage() {
                         </div>
                       </div>
                       <button type="button" aria-label={`Remove ${l.product.name}`} onClick={() => dispatch({ type: 'remove', id: lineKey(l) })}
-                        className="-mr-1 -mt-1 grid h-9 w-9 shrink-0 place-items-center rounded-lg text-[var(--text-3)] hover:bg-[rgba(239,68,68,.12)] hover:text-red-300"><Trash2 size={15} /></button>
+                        className="-mr-1 -mt-1 grid h-9 w-9 shrink-0 place-items-center rounded-lg text-[var(--text-3)] hover:bg-[rgba(239,68,68,.12)] hover:text-red-600 dark:hover:text-red-300"><Trash2 size={15} /></button>
                     </div>
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex items-center gap-1.5 text-xs text-[var(--text-3)]">
@@ -391,7 +391,7 @@ export default function RetailSalePage() {
                       {hasCustomPrice(l) && <button type="button" className="underline hover:text-[var(--text)]" onClick={() => dispatch({ type: 'resetPrice', id: lineKey(l) })}>Reset to {fmtN(l.basePpt as number, unitLine ? 2 : 4)}</button>}
                     </label>
                     {short.includes(l) && (
-                      <div className="flex items-center gap-1 text-xs text-red-400"><AlertTriangle size={12} /> Needs {fmtN(stockNeeded(lines, l.product.id), 2)} {unitLine ? unit.toLowerCase() : 'strips'}; only {fmtN(l.product.current_stock, 2)} in stock.</div>
+                      <div className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400"><AlertTriangle size={12} /> Needs {fmtN(stockNeeded(lines, l.product.id), 2)} {unitLine ? unit.toLowerCase() : 'strips'}; only {fmtN(l.product.current_stock, 2)} in stock.</div>
                     )}
                   </li>
                 )
@@ -407,7 +407,7 @@ export default function RetailSalePage() {
                 </div>
                 <div className="mt-1 flex items-baseline justify-between">
                   <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-3)]">Total</span>
-                  <span className="text-2xl font-bold tabular-nums text-[#93c5fd]">NPR {fmtN(t.grand)}</span>
+                  <span className="text-2xl font-bold tabular-nums text-[var(--rs-link)]">NPR {fmtN(t.grand)}</span>
                 </div>
               </div>
             )}
@@ -427,7 +427,7 @@ export default function RetailSalePage() {
       {canContinue && (
         <div className="sticky bottom-3 z-20 mt-4 flex items-center gap-3 rounded-2xl border border-[var(--border-2)] bg-[var(--surface)] p-2.5 shadow-[var(--shadow-lg)] lg:hidden">
           <button type="button" onClick={scrollToBasket} className="flex min-w-0 flex-1 items-center gap-2.5 text-left">
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--brand-light)] text-[#93c5fd]"><ShoppingBasket size={18} /></span>
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--brand-light)] text-[var(--rs-link)]"><ShoppingBasket size={18} /></span>
             <span className="min-w-0">
               <span className="block text-[11px] text-[var(--text-3)]">{t.items} item{t.items > 1 ? 's' : ''} · view basket</span>
               <span className="block truncate text-base font-bold tabular-nums">NPR {fmtN(t.grand)}</span>
