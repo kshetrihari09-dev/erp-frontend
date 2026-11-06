@@ -123,7 +123,7 @@ export default function PeriodsTab({ onCount }: { onCount?: (count: number) => v
 
       <div className="table-card">
         <div className="overflow-x-auto">
-          <table className="erp-table">
+          <table className="erp-table acc-rt">
             <thead>
               <tr>
                 <th>Period Name</th>
@@ -144,8 +144,8 @@ export default function PeriodsTab({ onCount }: { onCount?: (count: number) => v
                   : periods.length
                     ? periods.map((p) => (
                         <tr key={p.id}>
-                          <td className="font-semibold">{p.name}</td>
-                          <td>
+                          <td className="acc-rt-head font-semibold">{p.name}</td>
+                          <td data-label="Fiscal year" className="acc-rt-full">
                             {p.fiscal_year_id
                               ? <>
                                   <span className="font-medium">{p.fiscal_year_name}</span>
@@ -156,10 +156,10 @@ export default function PeriodsTab({ onCount }: { onCount?: (count: number) => v
                                 </>
                               : <span className="badge badge-amber" title="Not linked to a fiscal year — create the matching fiscal year in Settings → Fiscal Years">Not linked</span>}
                           </td>
-                          <td className="td-mono">{fmtDate(p.start_date)}</td>
-                          <td className="td-mono">{fmtDate(p.end_date)}</td>
-                          <td><StatusBadge p={p} /></td>
-                          <td>
+                          <td data-label="Start" className="td-mono">{fmtDate(p.start_date)}</td>
+                          <td data-label="End" className="td-mono">{fmtDate(p.end_date)}</td>
+                          <td data-label="Status"><StatusBadge p={p} /></td>
+                          <td className="acc-rt-actions">
                             <Button
                               variant={p.is_locked ? 'success' : 'danger'}
                               size="sm"

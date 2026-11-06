@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, memo } from 'react'
+import { useState, useEffect, useRef, memo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -107,17 +107,17 @@ const KpiCard = memo(({ icon, accentColor, glowColor, label, value, delta, delta
         </div>
       ) : (
         <>
-          <div style={{ width: 44, height: 44, borderRadius: 12, background: `${accentColor}18`, border: `1px solid ${accentColor}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14, color: accentColor }}>
+          <div className="acc-kpi-icon" style={{ width: 44, height: 44, borderRadius: 12, background: `${accentColor}18`, border: `1px solid ${accentColor}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14, color: accentColor }}>
             {icon}
           </div>
-          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: tk.textMuted, marginBottom: 4, fontFamily: 'var(--font-mono)' }}>
+          <div className="acc-kpi-label" style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: tk.textMuted, marginBottom: 4, fontFamily: 'var(--font-mono)' }}>
             {label}
           </div>
-          <div style={{ fontSize: 'clamp(16px, 5vw, 22px)', fontWeight: 800, color: tk.text, letterSpacing: '-0.04em', fontFamily: 'var(--font-mono)', marginBottom: 6, overflowWrap: 'anywhere' }}>
+          <div className="acc-kpi-value" style={{ fontSize: 'clamp(16px, 5vw, 22px)', fontWeight: 800, color: tk.text, letterSpacing: '-0.04em', fontFamily: 'var(--font-mono)', marginBottom: 6, overflowWrap: 'anywhere' }}>
             {value}
           </div>
           {delta && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, color: deltaUp ? '#10b981' : '#ef4444' }}>
+            <div className="acc-kpi-delta" style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, color: deltaUp ? '#10b981' : '#ef4444' }}>
               {deltaUp ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
               <span>{delta} vs last period</span>
             </div>
@@ -139,6 +139,11 @@ export default function AccountingPage() {
   const [kpiData, setKpiData]   = useState<any>(null)
   const [kpiLoading, setKpiLoading] = useState(true)
   const tk = useThemeTokens()
+  const tabbarRef = useRef<HTMLDivElement>(null)
+  // a deep link such as ?tab=periods must not leave the active tab off-screen on a phone
+  useEffect(() => {
+    tabbarRef.current?.querySelector<HTMLElement>('[aria-selected="true"]')?.scrollIntoView({ inline: 'center', block: 'nearest' })
+  }, [tab])
 
   useEffect(() => {
     async function loadKpi() {
@@ -197,11 +202,64 @@ export default function AccountingPage() {
           .acc-tb-filter-actions { grid-column: span 2; }
         }
         @media (max-width: 560px) {
-          .acc-kpi-grid { grid-template-columns: 1fr !important; gap: 10px !important; margin-bottom: 14px !important; }
+          .acc-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 10px !important; margin-bottom: 14px !important; }
+          .acc-kpi-card { padding: 12px !important; border-radius: 14px !important; }
+          .acc-kpi-card .acc-kpi-icon { width: 32px !important; height: 32px !important; border-radius: 9px !important; margin-bottom: 10px !important; }
+          .acc-kpi-card .acc-kpi-label { font-size: 9.5px !important; letter-spacing: .08em !important; }
+          .acc-kpi-card .acc-kpi-value { font-size: clamp(14px, 4.6vw, 19px) !important; }
+          .acc-kpi-card .acc-kpi-delta { font-size: 10px !important; flex-wrap: wrap; row-gap: 0; }
         }
         @media (max-width: 480px) {
-          .acc-kpi-card { padding: 14px 16px !important; }
           .acc-tb-kpi-grid { grid-template-columns: 1fr !important; gap: 8px !important; }
+        }
+        @media (max-width: 320px) {
+          .acc-kpi-grid { grid-template-columns: 1fr !important; }
+        }
+
+        /* ── Touch-sized controls up to tablet width (previously phones only) ── */
+        @media (max-width: 1024px) {
+          .acc-page .h-7, .acc-page .h-8 { min-height: 40px !important; height: auto !important; padding-top: 6px !important; padding-bottom: 6px !important; }
+          .acc-page .erp-input { min-height: 40px !important; }
+          .acc-page .acc-tab-btn { min-height: 44px !important; }
+          .acc-page .acc-tbtn { min-height: 40px; }
+        }
+
+        /* ── Responsive tables: rows become cards when THEIR container is narrow ──
+           Container query on the table card (not the viewport), so it adapts to the
+           sidebar being open/closed. Tables opt in with class "acc-rt"; cells carry
+           data-label. Markup, handlers and data are unchanged. The global
+           ".erp-table { min-width: 900px }" is what forced sideways scrolling. */
+        .acc-page .table-card { container-type: inline-size; container-name: acctbl; }
+        @container acctbl (max-width: 1040px) {
+          .acc-page .acc-rt { display: block; min-width: 0 !important; width: 100% !important; }
+          .acc-page .acc-rt thead { display: none; }
+          .acc-page .acc-rt tbody { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 10px; padding: 12px; }
+          .acc-page .acc-rt tbody tr { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px 14px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); align-content: start; }
+          .acc-page .acc-rt tbody tr:hover td { background: transparent; }
+          .acc-page .acc-rt td { display: block; min-width: 0; padding: 0 !important; border: 0 !important; max-width: none !important; width: auto !important; white-space: normal !important; overflow: visible !important; text-overflow: clip !important; overflow-wrap: anywhere; text-align: left !important; font-size: 13px; }
+          .acc-page .acc-rt td[data-label]::before { content: attr(data-label); display: block; margin-bottom: 2px; font: 700 10px/1.2 var(--font); letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); }
+          .acc-page .acc-rt td[colspan], .acc-page .acc-rt td.acc-rt-full, .acc-page .acc-rt td.acc-rt-head, .acc-page .acc-rt td.acc-rt-actions { grid-column: 1 / -1; }
+          .acc-page .acc-rt td.acc-rt-head { font-size: 14px; font-weight: 700; }
+          .acc-page .acc-rt td.acc-rt-hide { display: none; }
+          .acc-page .acc-rt td.td-right { font-weight: 700; }
+          .acc-page .acc-rt td.acc-rt-actions { padding-top: 10px !important; border-top: 1px solid var(--border) !important; }
+          .acc-page .acc-rt td.acc-rt-actions > div { justify-content: flex-start !important; }
+          .acc-page .acc-rt td.acc-rt-actions button { min-height: 40px; min-width: 40px; }
+        }
+
+        /* Trial Balance report: when narrow, collapse the redundant Type and period-change
+           columns and fold the account code into the name cell so Name, Debit and Credit
+           (the figures that matter) stay on screen without sideways scrolling. */
+        .acc-page .tb-wrap { container-type: inline-size; container-name: tbwrap; }
+        .acc-page .tb-code-inline { display: none; }
+        @container tbwrap (max-width: 700px) {
+          .acc-page .tb-rt col.tb-col-code, .acc-page .tb-rt col.tb-col-type, .acc-page .tb-rt col.tb-col-delta { visibility: collapse; }
+          .acc-page .tb-rt th, .acc-page .tb-rt td { padding-left: 8px !important; padding-right: 8px !important; }
+          .acc-page .tb-rt td[colspan] > div { flex-wrap: wrap; row-gap: 2px; }
+          .acc-page .tb-code-inline { display: block; margin-bottom: 2px; font: 600 11px/1.2 var(--font-mono); color: var(--text-3); }
+        }
+        @container tbwrap (max-width: 340px) {
+          .acc-page .tb-rt th, .acc-page .tb-rt td { padding-left: 5px !important; padding-right: 5px !important; font-size: 12px !important; }
         }
         @media (max-width: 640px) {
           .acc-tab-content { padding: 12px 8px !important; }
@@ -227,7 +285,7 @@ export default function AccountingPage() {
         style={{ ...tk.card, borderRadius: 16, overflow: 'hidden' }}
       >
         {/* Tab bar */}
-        <div className="acc-tabbar" style={{ borderBottom: `1px solid ${tk.divider}`, overflowX: 'auto', scrollbarWidth: 'none' }}>
+        <div ref={tabbarRef} role="tablist" aria-label="Accounting sections" className="acc-tabbar" style={{ borderBottom: `1px solid ${tk.divider}`, overflowX: 'auto', scrollbarWidth: 'none' }}>
           <div style={{ display: 'flex', minWidth: 'max-content' }}>
             {TABS.map(t => {
               const Icon = t.icon
@@ -236,6 +294,8 @@ export default function AccountingPage() {
                 <button
                   key={t.id}
                   className="acc-tab-btn"
+                  role="tab"
+                  aria-selected={isActive}
                   onClick={() => setTab(t.id)}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 7,

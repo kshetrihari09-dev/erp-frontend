@@ -87,7 +87,7 @@ export default function VoucherPostingsTab({ onCount }: { onCount?: (count: numb
       {/* ── Table ─────────────────────────────────────────────────────────── */}
       <div className="table-card">
         <div className="overflow-x-auto">
-          <table className="erp-table">
+          <table className="erp-table acc-rt">
             <thead>
               <tr>
                 <th>Posted At</th>
@@ -117,31 +117,31 @@ export default function VoucherPostingsTab({ onCount }: { onCount?: (count: numb
                   : postings.map(p => (
                       <tr key={p.id}>
                         {/* Date */}
-                        <td className="text-xs text-[var(--text-2)] whitespace-nowrap">
+                        <td data-label="Posted at" className="text-xs text-[var(--text-2)] whitespace-nowrap">
                           {p.posted_at ? fmtDate(p.posted_at) : <span className="text-[var(--text-3)]">—</span>}
                         </td>
 
                         {/* Source type badge */}
-                        <td>
+                        <td data-label="Source">
                           <span className={`badge ${SOURCE_BADGE[p.source_type] ?? 'badge-muted'} text-[10px]`}>
                             {p.source_type.replace('_', ' ')}
                           </span>
                         </td>
 
                         {/* Reference */}
-                        <td>
+                        <td data-label="Reference" className="acc-rt-full">
                           <code className="text-xs font-mono text-[var(--brand)]">
                             {p.source_ref ?? '—'}
                           </code>
                         </td>
 
                         {/* Voucher number */}
-                        <td>
+                        <td data-label="Voucher no">
                           <code className="text-xs font-mono">{p.voucher_no}</code>
                         </td>
 
                         {/* Voucher status */}
-                        <td>
+                        <td data-label="Status">
                           <span className="flex items-center gap-1.5">
                             <VoucherStatusIcon status={p.voucher_status} />
                             <span className="text-xs capitalize">{p.voucher_status}</span>
@@ -149,12 +149,12 @@ export default function VoucherPostingsTab({ onCount }: { onCount?: (count: numb
                         </td>
 
                         {/* Amount */}
-                        <td className="td-right font-mono text-sm">
+                        <td data-label="Amount" className="td-right font-mono text-sm">
                           {p.total_amount != null ? fmt(p.total_amount) : '—'}
                         </td>
 
                         {/* Journal entry link */}
-                        <td>
+                        <td data-label="Journal entry">
                           {p.journal_entry_id
                             ? (
                                 <span className="flex items-center gap-1 text-xs text-[var(--brand)]">

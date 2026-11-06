@@ -182,14 +182,14 @@ function GroupHeaderRow({ type, rows, expanded, onToggle, density, tk }: {
           <span style={{ fontSize: 11, fontWeight: 600, color: tk.textFaint }}>{rows.length} account{rows.length !== 1 ? 's' : ''}</span>
         </div>
       </td>
-      <td style={{ padding: `${py} 16px` }} />
+      <td className="tb-c-type" style={{ padding: `${py} 16px` }} />
       <td style={{ padding: `${py} 16px`, textAlign: 'right', fontSize: 12, fontWeight: 700, fontFamily: 'var(--font-mono)', color: tk.debitColor }}>
         {dr > 0 ? `₹${fmt(dr)}` : '—'}
       </td>
       <td style={{ padding: `${py} 16px`, textAlign: 'right', fontSize: 12, fontWeight: 700, fontFamily: 'var(--font-mono)', color: tk.creditColor }}>
         {cr > 0 ? `₹${fmt(cr)}` : '—'}
       </td>
-      <td style={{ padding: `${py} 16px` }} />
+      <td className="tb-c-delta" style={{ padding: `${py} 16px` }} />
     </tr>
   )
 }
@@ -210,10 +210,11 @@ const AccountRow = memo(({ row: r, i, density, tk }: { row: TrialBalanceRow; i: 
       onMouseEnter={e => { (e.currentTarget as HTMLTableRowElement).style.background = hoverBg }}
       onMouseLeave={e => { (e.currentTarget as HTMLTableRowElement).style.background = baseBg }}
     >
-      <td style={{ padding: `${py} 16px`, fontFamily: 'var(--font-mono)', fontSize: 12, color: tk.codeColor, fontWeight: 600, whiteSpace: 'nowrap' }}>
+      <td className="tb-c-code" style={{ padding: `${py} 16px`, fontFamily: 'var(--font-mono)', fontSize: 12, color: tk.codeColor, fontWeight: 600, whiteSpace: 'nowrap' }}>
         {r.account_code}
       </td>
       <td style={{ padding: `${py} 16px` }}>
+        <span className="tb-code-inline">{r.account_code}</span>
         <span style={{ fontWeight: 500, color: isAbnormal ? '#f59e0b' : tk.text2, fontSize: 13 }}>
           {r.name}
         </span>
@@ -223,7 +224,7 @@ const AccountRow = memo(({ row: r, i, density, tk }: { row: TrialBalanceRow; i: 
           </span>
         )}
       </td>
-      <td style={{ padding: `${py} 16px` }}>
+      <td className="tb-c-type" style={{ padding: `${py} 16px` }}>
         <span style={{ display: 'inline-flex', alignItems: 'center', padding: '2px 8px', borderRadius: 99, fontSize: 10, fontWeight: 700, background: t.bg, color: t.color, border: `1px solid ${t.border}`, fontFamily: 'var(--font-mono)' }}>
           {r.account_type}
         </span>
@@ -234,7 +235,7 @@ const AccountRow = memo(({ row: r, i, density, tk }: { row: TrialBalanceRow; i: 
       <td style={{ padding: `${py} 16px`, textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 13, color: r.closing_credit > 0 ? tk.creditColor : tk.textFaint, fontWeight: r.closing_credit > 0 ? 700 : 400 }}>
         {r.closing_credit > 0 ? `₹${fmt(r.closing_credit)}` : '—'}
       </td>
-      <td style={{ padding: `${py} 16px`, textAlign: 'right' }}>
+      <td className="tb-c-delta" style={{ padding: `${py} 16px`, textAlign: 'right' }}>
         {(r.period_debit > 0 || r.period_credit > 0) && (
           <span style={{ fontSize: 10, color: tk.textFaint, fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
             Δ {r.period_debit > r.period_credit ? `+Dr ${fmt(r.period_debit)}` : `+Cr ${fmt(r.period_credit)}`}
@@ -251,6 +252,7 @@ function TBtn({ active, onClick, children, title }: { active?: boolean; onClick:
   const tk = useTokens()
   return (
     <button
+      className="acc-tbtn"
       onClick={onClick}
       title={title}
       style={{
@@ -499,8 +501,10 @@ export default function TrialBalTab() {
               </div>
 
               {/* Table */}
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <div className="tb-wrap" style={{ overflowX: 'auto' }}>
+                <table className="tb-rt" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                  {/* column slots, so narrow screens can collapse Code / Type / change without breaking the colSpan rows */}
+                  <colgroup><col className="tb-col-code" /><col /><col className="tb-col-type" /><col /><col /><col className="tb-col-delta" /></colgroup>
                   <thead>
                     <tr style={{ background: tk.theadBg, borderBottom: `1px solid ${tk.theadBorder}` }}>
                       {[
@@ -511,7 +515,7 @@ export default function TrialBalTab() {
                         { key: 'closing_credit' as SortKey, label: 'Credit (₹)',   align: 'right' },
                         { key: null,                         label: '',             align: 'right' },
                       ].map((col, i) => (
-                        <th key={i} onClick={col.key ? () => handleSort(col.key!) : undefined}
+                        <th key={i} className={['tb-c-code', '', 'tb-c-type', '', '', 'tb-c-delta'][i]} onClick={col.key ? () => handleSort(col.key!) : undefined}
                           style={{ padding: density === 'compact' ? '8px 16px' : '11px 16px', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: tk.textMuted, textAlign: col.align === 'right' ? 'right' : 'left', cursor: col.key ? 'pointer' : 'default', userSelect: 'none', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)' }}
                         >
                           {col.label}{col.key && <SortIcon col={col.key} />}
@@ -558,7 +562,7 @@ export default function TrialBalTab() {
                         <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 800, fontFamily: 'var(--font-mono)', fontSize: 14, color: balanced ? tk.creditColor : tk.debitColor }}>
                           ₹{fmt(totalCr)}
                         </td>
-                        <td style={{ padding: '12px 16px', textAlign: 'right', fontSize: 11, fontWeight: 700, color: balanced ? tk.creditColor : tk.debitColor }}>
+                        <td className="tb-c-delta" style={{ padding: '12px 16px', textAlign: 'right', fontSize: 11, fontWeight: 700, color: balanced ? tk.creditColor : tk.debitColor }}>
                           {balanced
                             ? <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}><CheckCircle2 size={13} />Balanced</span>
                             : <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}><AlertTriangle size={13} />Off by ₹{fmt(diff)}</span>

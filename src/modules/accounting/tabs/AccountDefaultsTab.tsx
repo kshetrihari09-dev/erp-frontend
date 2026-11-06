@@ -196,7 +196,7 @@ export default function AccountDefaultsTab() {
     <div>
       {/* ── Status Banner ─────────────────────────────────────────────────── */}
       <div className={[
-        'flex items-start gap-3 mb-5 p-4 rounded-xl border',
+        'flex flex-wrap items-start gap-3 mb-5 p-4 rounded-xl border',
         allRequiredDone
           ? 'bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-800'
           : 'bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-800',
@@ -205,7 +205,7 @@ export default function AccountDefaultsTab() {
           ? <CheckCircle size={18} className="text-green-600 dark:text-green-400 shrink-0 mt-0.5" />
           : <AlertCircle size={18} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
         }
-        <div className="flex-1">
+        <div className="flex-1 min-w-[min(100%,240px)]">
           <p className={[
             'text-sm font-semibold',
             allRequiredDone ? 'text-green-800 dark:text-green-300' : 'text-amber-800 dark:text-amber-300',
@@ -240,7 +240,7 @@ export default function AccountDefaultsTab() {
       {/* ── Role Table ────────────────────────────────────────────────────── */}
       <div className="table-card">
         <div className="overflow-x-auto">
-          <table className="erp-table">
+          <table className="erp-table acc-rt">
             <thead>
               <tr>
                 <th style={{ width: 18 }}></th>
@@ -261,7 +261,7 @@ export default function AccountDefaultsTab() {
                     return (
                       <tr key={role} className={mapped ? '' : required ? 'bg-red-50/40 dark:bg-red-950/10' : ''}>
                         {/* Status indicator */}
-                        <td>
+                        <td className="acc-rt-hide">
                           {mapped
                             ? <CheckCircle size={14} className="text-green-500" />
                             : required
@@ -271,7 +271,7 @@ export default function AccountDefaultsTab() {
                         </td>
 
                         {/* Role */}
-                        <td>
+                        <td className="acc-rt-head">
                           <div className="flex items-center gap-1.5">
                             <code className="text-[11px] font-mono text-[var(--text-2)]">{role}</code>
                             {required && (
@@ -284,12 +284,12 @@ export default function AccountDefaultsTab() {
                         </td>
 
                         {/* Description */}
-                        <td className="text-xs text-[var(--text-3)]">
+                        <td data-label="Description" className="acc-rt-full text-xs text-[var(--text-3)]">
                           {mapped?.description || '—'}
                         </td>
 
                         {/* Mapped account */}
-                        <td>
+                        <td data-label="Mapped account" className="acc-rt-full">
                           {mapped
                             ? (
                                 <span className="flex items-center gap-1.5 flex-wrap">
@@ -314,7 +314,7 @@ export default function AccountDefaultsTab() {
                         </td>
 
                         {/* Account type */}
-                        <td>
+                        <td data-label="Type">
                           {mapped
                             ? <span className="badge badge-blue capitalize">{mapped.account_type}</span>
                             : null
@@ -322,8 +322,8 @@ export default function AccountDefaultsTab() {
                         </td>
 
                         {/* Actions */}
-                        <td className="text-right">
-                          <div className="flex items-center justify-end gap-1">
+                        <td className="text-right acc-rt-actions">
+                          <div className="flex items-center justify-end gap-1 flex-wrap">
                             {mapped && !mapped.is_default && mapped.default_account_id && (
                               <button
                                 onClick={() => resetDefault.mutate(role)}

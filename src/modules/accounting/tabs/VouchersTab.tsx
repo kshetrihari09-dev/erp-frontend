@@ -96,7 +96,7 @@ export default function VouchersTab({ onCount, openSignal }: VouchersTabProps = 
 
       <div className="table-card">
         <div className="overflow-x-auto">
-          <table className="erp-table">
+          <table className="erp-table acc-rt">
             <thead>
               <tr><th>Voucher No</th><th>Type</th><th>Date</th><th>Party</th><th>Narration</th><th className="td-right">Amount</th><th>Status</th><th></th></tr>
             </thead>
@@ -107,20 +107,20 @@ export default function VouchersTab({ onCount, openSignal }: VouchersTabProps = 
                   ? vouchers.map(v => (
                       <tr key={v.id} className="clickable"
                         onClick={() => accountingAPI.voucher(v.id).then(r => setDetail(r.data.data)).catch(() => {})}>
-                        <td className="td-mono text-brand">
+                        <td className="td-mono text-brand acc-rt-head">
                           {v.voucher_no}
                           {v.is_edited && (
                             <span className="badge badge-amber ml-1.5" style={{ fontSize: 9, padding: '1px 6px' }} title="This voucher has been edited since it was posted">Edited</span>
                           )}
                         </td>
-                        <td><span className="badge badge-blue">{v.voucher_type}</span></td>
-                        <td className="td-mono">{formatDisplayDate(v.voucher_date, dateMode)}</td>
-                        <td>{v.party_name || '—'}</td>
-                        <td className="max-w-[180px] truncate text-[var(--text-3)]">{v.narration || '—'}</td>
-                        <td className="td-right">{fmt(v.total_amount)}</td>
-                        <td><Badge status={v.status}/></td>
-                        <td onClick={e => e.stopPropagation()}>
-                          <div className="flex gap-1">
+                        <td data-label="Type"><span className="badge badge-blue">{v.voucher_type}</span></td>
+                        <td data-label="Date" className="td-mono">{formatDisplayDate(v.voucher_date, dateMode)}</td>
+                        <td data-label="Party">{v.party_name || '—'}</td>
+                        <td data-label="Narration" className="acc-rt-full max-w-[180px] truncate text-[var(--text-3)]">{v.narration || '—'}</td>
+                        <td data-label="Amount" className="td-right">{fmt(v.total_amount)}</td>
+                        <td data-label="Status"><Badge status={v.status}/></td>
+                        <td className="acc-rt-actions" onClick={e => e.stopPropagation()}>
+                          <div className="flex gap-1 flex-wrap">
                             <Button variant="secondary" size="sm" icon={<Printer size={12}/>}
                               onClick={() => setPrintData({
                                 voucherNo:  v.voucher_no,

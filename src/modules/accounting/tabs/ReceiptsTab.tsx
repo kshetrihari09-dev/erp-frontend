@@ -358,7 +358,7 @@ function VoucherListTab({ apiCall, type, title, onCount }: {
       </div>
       <div className="table-card">
         <div className="overflow-x-auto">
-          <table className="erp-table">
+          <table className="erp-table acc-rt">
             <thead>
               <tr><th>Voucher No</th><th>Date</th><th>Party</th><th>Narration</th><th className="td-right">Amount</th><th>Status</th><th></th></tr>
             </thead>
@@ -368,19 +368,19 @@ function VoucherListTab({ apiCall, type, title, onCount }: {
                 : rows.length
                   ? rows.map((v: any) => (
                       <tr key={v.id}>
-                        <td className="td-mono text-brand">
+                        <td className="td-mono text-brand acc-rt-head">
                           {v.voucher_no || '—'}
                           {v.is_edited && (
                             <span className="badge badge-amber ml-1.5" style={{ fontSize: 9, padding: '1px 6px' }} title="This voucher has been edited since it was posted">Edited</span>
                           )}
                         </td>
-                        <td className="td-mono">{formatDisplayDate(v.voucher_date || v.date, dateMode)}</td>
-                        <td>{v.party_name || '—'}</td>
-                        <td className="text-[var(--text-3)] truncate" style={{ maxWidth: 180 }}>{v.narration || '—'}</td>
-                        <td className="td-right">{fmt(v.total_amount ?? v.amount ?? 0)}</td>
-                        <td><Badge status={(v.status || 'posted').toLowerCase()}/></td>
-                        <td onClick={e => e.stopPropagation()}>
-                          <div className="flex gap-1">
+                        <td data-label="Date" className="td-mono">{formatDisplayDate(v.voucher_date || v.date, dateMode)}</td>
+                        <td data-label="Party">{v.party_name || '—'}</td>
+                        <td data-label="Narration" className="acc-rt-full text-[var(--text-3)] truncate" style={{ maxWidth: 180 }}>{v.narration || '—'}</td>
+                        <td data-label="Amount" className="td-right">{fmt(v.total_amount ?? v.amount ?? 0)}</td>
+                        <td data-label="Status"><Badge status={(v.status || 'posted').toLowerCase()}/></td>
+                        <td className="acc-rt-actions" onClick={e => e.stopPropagation()}>
+                          <div className="flex gap-1 flex-wrap">
                           <Button variant="secondary" size="sm" icon={<Printer size={12}/>}
                             onClick={() => setListPrintData({
                               voucherNo:  v.voucher_no || '—',
