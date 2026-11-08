@@ -91,9 +91,9 @@ export default function CompanyFormModal({
       size="lg"
       footer={
         <>
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button variant="primary" loading={isSubmitting} onClick={onSubmit}>
-            {isEdit ? 'Save Changes' : 'Create Company'}
+          <Button variant="ghost" onClick={onClose} className="whitespace-nowrap">Cancel</Button>
+          <Button variant="primary" loading={isSubmitting} onClick={onSubmit} className="whitespace-nowrap" aria-label={isEdit ? 'Save Changes' : 'Create Company'}>
+            {isEdit ? 'Save Changes' : <>Create<span className="max-[360px]:hidden">&nbsp;Company</span></>}
           </Button>
         </>
       }

@@ -96,15 +96,15 @@ export default function CompaniesSection() {
 
   return (
     <div className="max-w-3xl">
-      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-5 shadow-card">
-        <div className="flex items-center justify-between mb-4">
-          <div>
+      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-4 sm:p-5 shadow-card">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <div className="min-w-0 flex-1 basis-[220px]">
             <div className="font-bold text-sm">Your Companies</div>
-            <div className="text-xs text-[var(--text-4)] mt-0.5">
+            <div className="text-xs text-[var(--text-3)] mt-0.5">
               Each company keeps fully separate accounting data, numbering, and settings.
             </div>
           </div>
-          <Button variant="primary" icon={<Plus size={14} />} onClick={openCreate}>
+          <Button variant="primary" icon={<Plus size={14} />} onClick={openCreate} className="max-sm:w-full max-sm:justify-center">
             Add Company
           </Button>
         </div>
@@ -114,13 +114,13 @@ export default function CompaniesSection() {
         ) : (companies?.length ?? 0) === 0 ? (
           <div className="p-8 text-center text-[var(--text-4)]">No companies yet</div>
         ) : (
-          <div className="flex flex-col gap-2">
+          <div className="stp-co-list">
             {companies!.map((c) => {
               const isDeleted = c.is_active === false
               return (
               <div
                 key={c.id}
-                className="flex items-center gap-3 p-3 rounded-lg border"
+                className="stp-co-row"
                 style={{
                   borderColor: c.is_current ? 'var(--brand)' : 'var(--border)',
                   background: c.is_current ? 'var(--brand-50, rgba(37,99,235,.05))' : 'transparent',
@@ -133,27 +133,29 @@ export default function CompaniesSection() {
                 >
                   <Building2 size={16} />
                 </span>
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-semibold truncate flex items-center gap-1.5">
-                    {c.name}
-                    {c.is_default && !isDeleted && (
-                      <span className="badge badge-blue" style={{ fontSize: 10 }}>
-                        <Star size={10} fill="currentColor" /> Default
-                      </span>
-                    )}
-                    {c.is_current && !isDeleted && (
-                      <span className="badge badge-green" style={{ fontSize: 10 }}>Current</span>
-                    )}
-                    {isDeleted && (
-                      <span className="badge badge-red" style={{ fontSize: 10 }}>Deleted</span>
-                    )}
-                  </div>
-                  <div className="text-xs text-[var(--text-4)] truncate">
+                <div className="stp-co-main">
+                  <div className="stp-co-name" title={c.name}>{c.name}</div>
+                  <div className="stp-co-sub">
                     {c.pan_no ? `PAN: ${c.pan_no}` : c.address || '—'}
                   </div>
+                  {(isDeleted || c.is_default || c.is_current) && (
+                    <div className="stp-co-chips">
+                      {c.is_default && !isDeleted && (
+                        <span className="badge badge-blue" style={{ fontSize: 10 }}>
+                          <Star size={10} fill="currentColor" /> Default
+                        </span>
+                      )}
+                      {c.is_current && !isDeleted && (
+                        <span className="badge badge-green" style={{ fontSize: 10 }}>Current</span>
+                      )}
+                      {isDeleted && (
+                        <span className="badge badge-red" style={{ fontSize: 10 }}>Deleted</span>
+                      )}
+                    </div>
+                  )}
                 </div>
 
-                <div className="flex items-center gap-1.5 flex-shrink-0">
+                <div className="stp-co-actions">
                   {isDeleted ? (
                     <Button
                       variant="secondary"
@@ -195,8 +197,8 @@ export default function CompaniesSection() {
                         onClick={() => openDelete(c)}
                         disabled={!!busyId}
                         title="Delete company"
-                        className="inline-flex items-center p-1.5 rounded-md
-                          text-[var(--text-3)] hover:text-red-500 hover:bg-red-50
+                        aria-label={`Delete ${c.name}`}
+                        className="stp-co-del text-[var(--text-3)] hover:text-red-500 hover:bg-red-50
                           dark:hover:bg-red-950/20 transition-colors disabled:opacity-40"
                       >
                         <Trash2 size={14} />
