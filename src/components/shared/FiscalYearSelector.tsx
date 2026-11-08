@@ -30,11 +30,11 @@ export default function FiscalYearSelector() {
   }
 
   return (
-    <label className="flex items-center gap-1.5" title={current ? `${current.start_date_ad} → ${current.end_date_ad}` : 'Select fiscal year'} data-testid="fy-selector">
+    <label className="fy-selector flex items-center gap-1.5" title={current ? `${current.start_date_ad} → ${current.end_date_ad}` : 'Select fiscal year'} data-testid="fy-selector">
       {closed ? <Lock size={14} className="text-[var(--text-3)]" /> : <CalendarRange size={14} className="text-[var(--text-3)]" />}
       <select
-        className="input !py-1 !text-xs"
-        style={{ minWidth: 150 }}
+        className="erp-input"
+        style={{ minWidth: 150, width: 'auto', padding: '4px 8px', fontSize: 12 }}
         value={current?.id ?? ''}
         disabled={busy}
         onChange={(e) => change(e.target.value)}

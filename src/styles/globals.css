@@ -4286,6 +4286,26 @@ bsp-row--disabled { cursor: not-allowed; opacity: .55; }
 .fy-hint { margin-top: 4px; font-size: 11px; line-height: 1.35; }
 .fy-hint-ok  { color: var(--text-4); }
 .fy-hint-bad { color: var(--red, #dc2626); font-weight: 600; }
+
+/* ── Fiscal year UI — light + dark ──────────────────────────────────────────────
+   The app keeps its pastel status tokens (--red-50 etc.) fixed in dark mode, so the fiscal-year pieces carry their own
+   dark treatment (scoped: .fy-*) instead of changing those tokens for every screen. */
+.fy-selector select { cursor: pointer; }
+.fy-selector select:disabled { opacity: .55; cursor: wait; }
+.fy-confirm { border-left: 3px solid var(--brand); }
+.dark .fy-selector select { color-scheme: dark; }              /* native dropdown list follows the theme */
+.dark .fy-hint-ok  { color: var(--text-3); }                   /* --text-4 is too faint on the dark surface */
+.dark .fy-hint-bad { color: #F87171; }                         /* lighter red: readable on #111827 */
+.dark .fy-confirm  { border-left-color: #60A5FA; }
+.dark .fy-section textarea.erp-input { color-scheme: dark; }
+.dark .fy-status .badge-green { background: rgba(16,185,129,.16); color: #34D399; border-color: rgba(16,185,129,.32); }
+.dark .fy-status .badge-red   { background: rgba(239,68,68,.16);  color: #F87171; border-color: rgba(239,68,68,.34); }
+.dark .fy-status .badge-blue  { background: rgba(59,130,246,.18); color: #93C5FD; border-color: rgba(59,130,246,.34); }
+.dark .fy-status .badge-muted { background: rgba(148,163,184,.14); color: #CBD5E1; border-color: rgba(148,163,184,.28); }
+.dark .fy-btn-danger  { background: rgba(239,68,68,.16);  color: #FCA5A5; border-color: rgba(239,68,68,.38); }
+.dark .fy-btn-danger:hover:not(:disabled)  { background: rgba(239,68,68,.26); }
+.dark .fy-btn-success { background: rgba(16,185,129,.16); color: #6EE7B7; border-color: rgba(16,185,129,.38); }
+.dark .fy-btn-success:hover:not(:disabled) { background: rgba(16,185,129,.26); }
 .sil-search-input { width: 260px; }
 @media (max-width: 768px) {
   .sil-search-input { width: 100% !important; }

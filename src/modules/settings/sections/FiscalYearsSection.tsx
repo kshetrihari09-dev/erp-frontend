@@ -12,12 +12,12 @@ const EMPTY_FORM = { name: '', start_date_ad: '', end_date_ad: '', start_date_bs
 function StatusBadges({ y }: { y: any }) {
   const closed = y.status ? y.status === 'CLOSED' : y.is_locked
   return (
-    <>
+    <span className="fy-status">
       {closed ? <span className="badge badge-red">Closed</span> : <span className="badge badge-green">Open</span>}
       {y.is_default && <span className="badge badge-blue ml-1.5">Default</span>}
-      {closed && y.year_end_closed && <span className="badge badge-gray ml-1.5" title="Closing entry posted and balances carried forward">Year-end done</span>}
+      {closed && y.year_end_closed && <span className="badge badge-muted ml-1.5" title="Closing entry posted and balances carried forward">Year-end done</span>}
       {closed && y.closed_date && <div className="text-[10px] text-[var(--text-3)] mt-0.5">Closed {fmtDate(String(y.closed_date).slice(0, 10))}</div>}
-    </>
+    </span>
   )
 }
 
@@ -118,9 +118,9 @@ export default function FiscalYearsSection() {
           onClick={() => run(y, () => settingsAPI.activateFiscalYear(y.id), `${y.name} is now the current fiscal year`)}>Set current</Button>
       )}
       {y.is_locked
-        ? (canReopen && <Button size="sm" variant="success" icon={<Unlock size={12}/>} loading={busyId === y.id}
+        ? (canReopen && <Button size="sm" variant="success" className="fy-btn-success" icon={<Unlock size={12}/>} loading={busyId === y.id}
             onClick={() => { setReason(''); setConfirm({ kind: 'reopen', y }) }}>Reopen</Button>)
-        : (canClose && <Button size="sm" variant="danger" icon={<Lock size={12}/>} loading={busyId === y.id}
+        : (canClose && <Button size="sm" variant="danger" className="fy-btn-danger" icon={<Lock size={12}/>} loading={busyId === y.id}
             onClick={() => setConfirm({ kind: 'close', y })}>Close year</Button>)}
     </div>
   )
@@ -129,7 +129,7 @@ export default function FiscalYearsSection() {
   const set = (k: keyof typeof EMPTY_FORM) => (e: React.ChangeEvent<HTMLInputElement>) => setForm(f => ({ ...f, [k]: e.target.value }))
 
   return (
-    <div>
+    <div className="fy-section">
       {canManage && (
         <div className="flex justify-end mb-3">
           <Button variant="primary" size="sm" icon={showForm ? <X size={14}/> : <Plus size={14}/>}
@@ -170,7 +170,7 @@ export default function FiscalYearsSection() {
       )}
 
       {confirm && (
-        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-4 mb-4 shadow-card" role="dialog" aria-modal="true" data-testid="fy-confirm">
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-4 mb-4 shadow-card fy-confirm" role="dialog" aria-modal="true" data-testid="fy-confirm">
           <p className="font-semibold mb-1">{confirm.kind === 'close' ? `Close ${confirm.y.name}?` : `Reopen ${confirm.y.name}?`}</p>
           {confirm.kind === 'close' ? (
             <ul className="text-sm text-[var(--text-2)] list-disc pl-5 space-y-0.5 mb-3">
@@ -188,7 +188,7 @@ export default function FiscalYearsSection() {
           )}
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => { setConfirm(null); setReason('') }} disabled={busyId === confirm.y.id}>Cancel</Button>
-            <Button variant={confirm.kind === 'close' ? 'danger' : 'success'} loading={busyId === confirm.y.id} onClick={submitConfirm}
+            <Button variant={confirm.kind === 'close' ? 'danger' : 'success'} className={confirm.kind === 'close' ? 'fy-btn-danger' : 'fy-btn-success'} loading={busyId === confirm.y.id} onClick={submitConfirm}
               disabled={confirm.kind === 'reopen' && reason.trim().length < 10}>
               {confirm.kind === 'close' ? 'Close fiscal year' : 'Reopen fiscal year'}
             </Button>
