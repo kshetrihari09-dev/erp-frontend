@@ -20,6 +20,7 @@ import { useReminderCounts, useDashboard } from '@/hooks/useQuery'
 import ToastContainer from '@/components/shared/ToastContainer'
 import ReminderAlarmWatcher from '@/components/reminders/ReminderAlarmWatcher'
 import CompanySwitcher from '@/modules/company/CompanySwitcher'
+import FiscalYearSelector from '@/components/shared/FiscalYearSelector'
 import { useGlobalDateRangeShortcut } from '@/hooks/useGlobalDateRangeShortcut'
 
 const SIDEBAR_W       = 260
@@ -437,6 +438,9 @@ export default function AppLayout() {
 
           {/* Company selector */}
           {!isMobile && <div style={{ marginLeft: 10 }}><CompanySwitcher /></div>}
+
+          {/* Fiscal year — the user's explicit working year (never derived from a date) */}
+          <div style={{ marginLeft: 10 }}><FiscalYearSelector /></div>
 
           {/* AD / BS date toggler */}
           {(todayAD || todayBS) && (

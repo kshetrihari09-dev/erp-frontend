@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { settingsAPI } from '@/services/api'
 import { QK } from '@/constants'
 import { fmtDate } from '@/utils'
+import { useSelectedFiscalYear } from '@/hooks/useSelectedFiscalYear'
 import type { FiscalYear } from '@/types'
 
 /**
@@ -17,7 +18,7 @@ import type { FiscalYear } from '@/types'
  *
  * A company with NO fiscal years configured is not restricted (matches the server): status 'not-configured'.
  */
-export type FiscalYearCheckStatus = 'loading' | 'not-configured' | 'no-date' | 'ok' | 'outside' | 'closed'
+export type FiscalYearCheckStatus = 'loading' | 'not-configured' | 'no-date' | 'ok' | 'outside' | 'closed' | 'other-year'
 
 export interface FiscalYearCheck {
   status:  FiscalYearCheckStatus
@@ -40,6 +41,7 @@ export function checkFiscalYear(
   years: FiscalYear[] | null | undefined,
   dateAD: string | null | undefined,
   loading = false,
+  selectedId: string | null = null,
 ): FiscalYearCheck {
   const none = (status: FiscalYearCheckStatus): FiscalYearCheck => ({ status, fy: null, message: null, blocked: false })
   const list = (years ?? []).filter(y => y.start_date_ad && y.end_date_ad)
@@ -47,6 +49,13 @@ export function checkFiscalYear(
   const d = String(dateAD ?? '').slice(0, 10)
   if (!ISO.test(d)) return none('no-date')           // empty/invalid dates are the form's own validation
   const fy = list.find(y => y.start_date_ad <= d && d <= y.end_date_ad) ?? null
+  // A year the user SELECTED wins: the date must belong to it. We never move the user to the year the date falls in —
+  // we tell them which year it is and let them switch (top bar) themselves.
+  const sel = selectedId ? list.find(y => y.id === selectedId) ?? null : null
+  if (sel && !(sel.start_date_ad <= d && d <= sel.end_date_ad)) {
+    const where = fy ? `It belongs to FY ${fy.name.replace(/^FY\s*/i, '')}${fy.is_locked ? ' (closed)' : ''} — switch the fiscal year in the top bar to post there.` : 'No fiscal year covers this date.'
+    return { status: 'other-year', fy: sel, message: `Date is outside the selected fiscal year (FY ${sel.name.replace(/^FY\s*/i, '')}, ${sel.start_date_ad} – ${sel.end_date_ad}). ${where}`, blocked: true }
+  }
   if (!fy) return { status: 'outside', fy: null, message: FY_MESSAGES.outside, blocked: true }
   if (fy.is_locked) return { status: 'closed', fy, message: FY_MESSAGES.closed, blocked: true }
   return { status: 'ok', fy, message: null, blocked: false }
@@ -57,7 +66,8 @@ export function useFiscalYearCheck(dateAD: string | null | undefined): FiscalYea
   // or created there is reflected here immediately.
   const { data, isLoading } = useQuery({ queryKey: [QK.FISCAL_YEARS], queryFn: () => settingsAPI.fiscalYears().then((r: any) => r.data.data as FiscalYear[]) })
   const years: FiscalYear[] = useMemo(() => (Array.isArray(data) ? data : []), [data])
-  return useMemo(() => checkFiscalYear(years, dateAD, isLoading), [years, dateAD, isLoading])
+  const { selectedId } = useSelectedFiscalYear()
+  return useMemo(() => checkFiscalYear(years, dateAD, isLoading, selectedId), [years, dateAD, isLoading, selectedId])
 }
 
 /** Shows the fiscal year the entered date falls in, or why it can't be used. Renders nothing when there is nothing to say. */

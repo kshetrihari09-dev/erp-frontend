@@ -695,6 +695,16 @@ export interface FiscalYear {
   is_locked:        boolean
   period_count?:    number
   locked_period_count?: number
+  /** OPEN | CLOSED — mirrors is_locked (generated in the database, cannot drift). */
+  status?:          'OPEN' | 'CLOSED'
+  /** The year new forms start on. Does NOT decide which years accept postings. */
+  is_default?:      boolean
+  created_date?:    string | null
+  closed_date?:     string | null
+  closed_by?:       string | null
+  /** Closed WITH year-end entries and carried-forward balances (vs. a plain lock). */
+  year_end_closed?: boolean
+  closing_net_profit?: number | null
 }
 
 /** Accounting period — always belongs to a fiscal year (Settings → Fiscal Years is authoritative). */

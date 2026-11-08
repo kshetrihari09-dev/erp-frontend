@@ -632,6 +632,10 @@ export const settingsAPI = {
   activateFiscalYear: (id: string) => http.post(`/settings/fiscal-years/${id}/activate`, {}),
   lockFiscalYear:   (id: string) => http.post(`/settings/fiscal-years/${id}/lock`, {}),
   unlockFiscalYear: (id: string) => http.post(`/settings/fiscal-years/${id}/unlock`, {}),
+  selectedFiscalYear:    () => http.get<ApiResponse<{ fiscal_year: FiscalYear | null; source: 'user' | 'default' | 'none' }>>('/settings/fiscal-years/selected'),
+  setSelectedFiscalYear: (fiscal_year_id: string) => http.put('/settings/fiscal-years/selected', { fiscal_year_id }),
+  closeFiscalYear:       (id: string) => http.post(`/settings/fiscal-years/${id}/close`, {}),
+  reopenFiscalYear:      (id: string, reason: string) => http.post(`/settings/fiscal-years/${id}/reopen`, { reason }),
   auditLog:         (params?: Params) => http.get<ApiResponse<AuditLog[]>>('/settings/audit-log', { params }),
 
   // ── Preferences (General / Sales & Purchase / Accounting & Vouchers /

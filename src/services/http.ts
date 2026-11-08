@@ -11,6 +11,7 @@ import axios, {
   type AxiosResponse,
 } from 'axios'
 import { config }      from '@/config/env'
+import { getSelectedFiscalYearId } from './fiscalYearSelection'
 import { getEffectiveApiBaseUrl } from '@/config/serverConnection'
 import { RAW_TOKEN_KEY, REFRESH_TOKEN_KEY as AUTH_REFRESH_KEY } from '@/store/authStore'
 import { getValidStepUpToken, clearStepUpToken } from './stepUpToken'
@@ -105,6 +106,13 @@ http.interceptors.request.use(
     const stepUpToken = getValidStepUpToken()
     if (stepUpToken) {
       config_.headers['X-Step-Up-Token'] = stepUpToken
+    }
+
+    // The fiscal year the user selected (server validates it; never derived from a date). Not sent when the call is
+    // the selection endpoint itself, so choosing a year can't be rejected because of the previous choice.
+    const fyId = getSelectedFiscalYearId()
+    if (fyId && !String(config_.url || '').includes('/fiscal-years/selected')) {
+      config_.headers['X-Fiscal-Year-Id'] = fyId
     }
 
     if (config.enableApiLogs) {

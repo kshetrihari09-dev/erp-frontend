@@ -10,10 +10,13 @@ import { fmtDate } from '@/utils'
 const EMPTY_FORM = { name: '', start_date_ad: '', end_date_ad: '', start_date_bs: '', end_date_bs: '' }
 
 function StatusBadges({ y }: { y: any }) {
+  const closed = y.status ? y.status === 'CLOSED' : y.is_locked
   return (
     <>
-      {y.is_locked ? <span className="badge badge-red">Closed</span> : <span className="badge badge-green">Open</span>}
-      {y.is_current && <span className="badge badge-blue ml-1.5">Current</span>}
+      {closed ? <span className="badge badge-red">Closed</span> : <span className="badge badge-green">Open</span>}
+      {y.is_default && <span className="badge badge-blue ml-1.5">Default</span>}
+      {closed && y.year_end_closed && <span className="badge badge-gray ml-1.5" title="Closing entry posted and balances carried forward">Year-end done</span>}
+      {closed && y.closed_date && <div className="text-[10px] text-[var(--text-3)] mt-0.5">Closed {fmtDate(String(y.closed_date).slice(0, 10))}</div>}
     </>
   )
 }
@@ -36,6 +39,9 @@ export default function FiscalYearsSection() {
   const [saving,    setSaving]    = useState(false)
   const [busyId,    setBusyId]    = useState<string | null>(null)
   const [form, setForm] = useState(EMPTY_FORM)
+  // close / reopen are deliberate: a confirmation (and, for reopen, a written reason) comes first
+  const [confirm, setConfirm] = useState<{ kind: 'close' | 'reopen'; y: any } | null>(null)
+  const [reason, setReason] = useState('')
 
   function closeForm() { setShowForm(false); setEditingId(null); setForm(EMPTY_FORM) }
 
@@ -83,6 +89,25 @@ export default function FiscalYearsSection() {
     finally { setBusyId(null) }
   }
 
+  async function submitConfirm() {
+    if (!confirm) return
+    const { kind, y } = confirm
+    if (kind === 'reopen' && reason.trim().length < 10) { toastErr('A reason of at least 10 characters is required'); return }
+    setBusyId(y.id)
+    try {
+      if (kind === 'close') {
+        const r: any = await settingsAPI.closeFiscalYear(y.id)
+        const d = r?.data?.data
+        toastOk(`${y.name} closed`, d ? `Net ${d.net_profit >= 0 ? 'profit' : 'loss'} ${Math.abs(d.net_profit).toLocaleString()} moved to Retained Earnings; ${d.opening_balances?.accounts ?? 0} balances carried into ${d.next_fiscal_year?.name}.` : undefined)
+      } else {
+        await settingsAPI.reopenFiscalYear(y.id, reason.trim())
+        toastOk(`${y.name} reopened`)
+      }
+      setConfirm(null); setReason(''); refreshAll()
+    } catch (e: any) { toastErr('Failed', e?.response?.data?.message || e.message) }
+    finally { setBusyId(null) }
+  }
+
   const Actions = ({ y }: { y: any }) => (
     <div className="flex flex-wrap gap-1.5">
       {canManage && <Button size="sm" variant="ghost" icon={<Pencil size={12}/>} disabled={y.is_locked || busyId === y.id}
@@ -94,9 +119,9 @@ export default function FiscalYearsSection() {
       )}
       {y.is_locked
         ? (canReopen && <Button size="sm" variant="success" icon={<Unlock size={12}/>} loading={busyId === y.id}
-            onClick={() => run(y, () => settingsAPI.unlockFiscalYear(y.id), 'Fiscal year reopened')}>Reopen</Button>)
+            onClick={() => { setReason(''); setConfirm({ kind: 'reopen', y }) }}>Reopen</Button>)
         : (canClose && <Button size="sm" variant="danger" icon={<Lock size={12}/>} loading={busyId === y.id}
-            onClick={() => run(y, () => settingsAPI.lockFiscalYear(y.id), 'Fiscal year closed')}>Close</Button>)}
+            onClick={() => setConfirm({ kind: 'close', y })}>Close year</Button>)}
     </div>
   )
 
@@ -140,6 +165,33 @@ export default function FiscalYearsSection() {
           </div>
           <div className="flex justify-end mt-3">
             <Button variant="primary" loading={saving} onClick={handleSave}>{editingId ? 'Save Changes' : 'Save Fiscal Year'}</Button>
+          </div>
+        </div>
+      )}
+
+      {confirm && (
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-4 mb-4 shadow-card" role="dialog" aria-modal="true" data-testid="fy-confirm">
+          <p className="font-semibold mb-1">{confirm.kind === 'close' ? `Close ${confirm.y.name}?` : `Reopen ${confirm.y.name}?`}</p>
+          {confirm.kind === 'close' ? (
+            <ul className="text-sm text-[var(--text-2)] list-disc pl-5 space-y-0.5 mb-3">
+              <li>Income and expenses are moved to Retained Earnings with one closing entry dated {fmtDate(confirm.y.end_date_ad || confirm.y.end_date)}.</li>
+              <li>Asset, liability and equity balances are carried into the next fiscal year (which must already exist).</li>
+              <li>No new vouchers can be posted, edited or deleted in this year. Existing vouchers and reports stay unchanged.</li>
+              <li>Draft vouchers in this year must be posted or cancelled first.</li>
+            </ul>
+          ) : (
+            <div className="mb-3">
+              <p className="text-sm text-[var(--text-2)] mb-2">The closing entry is reversed and the carried-forward balances are removed. This is recorded in the audit log with your reason. Years must be reopened newest first.</p>
+              <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">Reason (required)</label>
+              <textarea className="erp-input" rows={2} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Auditor adjustment: missed Ashadh purchase invoice" />
+            </div>
+          )}
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => { setConfirm(null); setReason('') }} disabled={busyId === confirm.y.id}>Cancel</Button>
+            <Button variant={confirm.kind === 'close' ? 'danger' : 'success'} loading={busyId === confirm.y.id} onClick={submitConfirm}
+              disabled={confirm.kind === 'reopen' && reason.trim().length < 10}>
+              {confirm.kind === 'close' ? 'Close fiscal year' : 'Reopen fiscal year'}
+            </Button>
           </div>
         </div>
       )}
