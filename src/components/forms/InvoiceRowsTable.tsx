@@ -16,6 +16,7 @@ import type { Product } from '@/types'
 import ProductSearchCell, { type ProductSearchCellHandle } from './ProductSearchCell'
 import BatchSelect from './BatchSelect'
 import QtyGate from './QtyGate'
+import { resolveEnterNav } from './invoiceRowKeyNav'
 
 /* ── Public types ─────────────────────────────────────────────────────────── */
 
@@ -258,9 +259,29 @@ const InvoiceRowsTable = forwardRef<InvoiceRowsTableHandle, Props>(function Invo
     }
 
     if (inProductField) return
-    if (e.key === 'Enter' && idx === rows.length - 1) {
-      e.preventDefault()
+
+    // Enter behaves like Tab (Shift+Enter like Shift+Tab) between the row's fields; after the last field it moves to the
+    // next row's Product field, adding a row first when this is the last one. Rules + exclusions: invoiceRowKeyNav.ts.
+    const nav = resolveEnterNav(
+      { key: e.key, shiftKey: e.shiftKey, ctrlKey: e.ctrlKey, metaKey: e.metaKey, altKey: e.altKey,
+        defaultPrevented: e.defaultPrevented, isComposing: e.nativeEvent.isComposing },
+      target, rowElsRef.current.get(idx) ?? null,
+      { isLastRow: idx === rows.length - 1, rowHasProduct: !!rows[idx]?.product_id },
+    )
+    if (!nav) return
+    e.preventDefault()                                    // Enter must never submit the surrounding form from a cell
+    if (nav.to === 'input') { nav.el.focus(); nav.el.select?.(); return }
+    if (nav.to === 'stay') return
+    if (nav.to === 'product') {
+      if (nav.row === 'self') { pscRefsRef.current.get(idx)?.focus(); return }
+      if (nav.row === 'next') { pscRefsRef.current.get(idx + 1)?.focus(); return }
+      const newIdx = rows.length                          // 'new': append, then focus its Product field once it mounts
       onChange([...rows, newRow()])
+      const focusNew = (tries = 10) => {
+        const h = pscRefsRef.current.get(newIdx)
+        if (h) h.focus(); else if (tries > 0) setTimeout(() => focusNew(tries - 1), 20)
+      }
+      requestAnimationFrame(() => focusNew())
     }
   }
 
