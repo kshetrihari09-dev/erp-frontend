@@ -1,7 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { User, Company, UserRole } from '@/types'
-import { ROLE_PERMISSIONS } from '@/constants'
 import { clearStepUpToken } from '@/services/stepUpToken'
 
 // ── Raw token key — exported so http.ts can read the JWT directly ─────────────
@@ -20,6 +19,7 @@ interface AuthState {
   updateUser:  (user: Partial<User>) => void
   logout:      () => void
   can:         (permission: string) => boolean
+  canAny:      (...permissions: string[]) => boolean
   hasRole:     (role: UserRole | UserRole[]) => boolean
 }
 
@@ -49,16 +49,13 @@ const useAuthStore = create<AuthState>()(
         set({ token: null, user: null, company: null, isAuthenticated: false })
       },
 
-      can: (permission: string) => {
-        const role  = get().user?.role
-        if (!role) return false
-        const perms = ROLE_PERMISSIONS[role] || []
-        if (perms.includes('*')) return true
-        return perms.some((p) => {
-          if (p === permission) return true
-          const [module] = p.split('.')
-          return p.endsWith('.*') && permission.startsWith(module + '.')
-        })
+      // The signed-in user's effective permissions come from the SERVER (/auth/me, login): role defaults + per-user switches,
+      // computed from the database. Exact match only — there is no local role table and no wildcard matching. A session
+      // persisted by an older app version has no list → nothing is allowed until /auth/me refreshes it (fails closed).
+      can: (permission: string) => !!get().user?.permissions?.includes(permission),
+      canAny: (...permissions: string[]) => {
+        const list = get().user?.permissions
+        return !!list && permissions.some((p) => list.includes(p))
       },
 
       hasRole: (role) => {

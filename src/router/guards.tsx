@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
-import { ShieldAlert } from 'lucide-react'
 import useAuthStore, { RAW_TOKEN_KEY } from '@/store/authStore'
 import { authAPI } from '@/services/api'
 import { PATHS } from '@/constants'
+import { canOpenPath, landingPathFor } from '@/constants/permissions'
+import AccessDenied from '@/components/shared/AccessDenied'
 import { isNetworkError } from '@/offline/syncEngine'
 
 // ─── Auth guard — validates session on mount via /auth/me ─────────────────────
@@ -66,6 +67,21 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
       .finally(() => setChecking(false))
   }, [])
 
+  // A request was refused as "permission denied": the role may have changed on the server since this page loaded.
+  // Re-read /auth/me so the menu and routes follow the database immediately (not at the next login).
+  useEffect(() => {
+    let busy = false
+    const resync = () => {
+      if (busy) return; busy = true
+      authAPI.me().then((res) => { updateUser(res.data.data.user) }).catch((err) => {
+        const st = err?.response?.status
+        if (st === 401 || st === 403) { logout() }            // disabled / removed from company → signed out
+      }).finally(() => { busy = false })
+    }
+    window.addEventListener('auth:permissions-stale', resync)
+    return () => window.removeEventListener('auth:permissions-stale', resync)
+  }, [])
+
   if (checking) {
     return (
       <div className="page-loader">
@@ -94,37 +110,42 @@ export function RequireGuest({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
+// ─── Permission guard ─────────────────────────────────────────────────────────
+// Opens when the signed-in user's server-provided permission list contains ANY of `permissions` (or ALL, with all).
+// This is UX protection only — the API enforces the same permissions independently.
+export function RequirePermission({
+  children, permissions, all = false, fallback,
+}: { children: React.ReactNode; permissions: string[]; all?: boolean; fallback?: React.ReactNode }) {
+  const list = useAuthStore((s) => s.user?.permissions)
+  const ok = !!list && (all ? permissions.every((p) => list.includes(p)) : permissions.some((p) => list.includes(p)))
+  if (!ok) return <>{fallback ?? <AccessDenied homeTo={landingPathFor(list)} />}</>
+  return <>{children}</>
+}
+
+// ─── Route guard ──────────────────────────────────────────────────────────────
+// Looks the module's required permission up in ROUTE_PERMISSIONS (the same table the sidebar uses). A route that is not in
+// the table is DENIED — a new page cannot go live unprotected by accident.
+export function RequireRoute({ to, children }: { to: string; children: React.ReactNode }) {
+  const list = useAuthStore((s) => s.user?.permissions)
+  if (!canOpenPath(list, to)) return <AccessDenied homeTo={landingPathFor(list)} />
+  return <>{children}</>
+}
+
+// "/" → the first module this user may open (a cashier does not have a dashboard-only world, a viewer lands on what they can read)
+export function HomeRedirect() {
+  const list = useAuthStore((s) => s.user?.permissions)
+  const to = landingPathFor(list)
+  if (!to) return <AccessDenied title="No modules assigned" message="Your account has no permissions yet. Ask an administrator to assign you a role." />
+  return <Navigate to={to} replace />
+}
+
 // ─── Role guard ───────────────────────────────────────────────────────────────
+// For the few operations that are defined by ROLE rather than permission. Exact match against the user's role from the
+// server: no implicit owner/admin pass, and never "has an unrelated permission with the same name" (both were bugs).
 export function RequireRole({
   children, roles, fallback,
-}: {
-  children: React.ReactNode
-  roles: string[]
-  fallback?: React.ReactNode
-}) {
+}: { children: React.ReactNode; roles: string[]; fallback?: React.ReactNode }) {
   const role = useAuthStore((s) => s.user?.role)
-  const can  = useAuthStore((s) => s.can)
-
-  const allowed = role === 'owner' || role === 'admin' || roles.some((r) => {
-    if (r.endsWith('.*')) return can(r.replace('.*', '.view'))
-    return role === r || can(r)
-  })
-
-  if (!allowed) {
-    return fallback ? <>{fallback}</> : (
-      <div className="flex items-center justify-center h-64 text-[var(--text-3)]">
-        <div className="text-center">
-          <div
-            className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-3"
-            style={{ background: 'var(--red-50)', color: 'var(--red)' }}
-          >
-            <ShieldAlert size={22}/>
-          </div>
-          <p className="font-semibold text-[var(--text-2)]">Access denied</p>
-          <p className="text-sm mt-1">You don't have permission to view this page.</p>
-        </div>
-      </div>
-    )
-  }
+  if (!role || !roles.includes(role)) return <>{fallback ?? <AccessDenied />}</>
   return <>{children}</>
 }

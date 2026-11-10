@@ -12,6 +12,7 @@
  */
 
 import FiscalYearHint, { useFiscalYearCheck } from '@/components/forms/FiscalYearHint'
+import { usePermission } from '@/hooks/usePermission'
 import { DateRangeFilter } from '@/components/ui/DateRangePopup'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import UnifiedProductInput, { type UnifiedProductInputHandle } from '@/components/forms/UnifiedProductInput'
@@ -195,6 +196,7 @@ export default function SalesPage() {
   const [mobileStep, setMobileStep] = useState<1 | 2>(1)
 
   const [confirmCancel, setConfirmCancel] = useState<string | null>(null)
+  const { can } = usePermission()   // hides controls the user may not use; the API enforces the same permissions
   // Sale currently open in the "Update Party" modal — null means closed.
   const [updatePartySale, setUpdatePartySale] = useState<Sale | null>(null)
 
@@ -1712,7 +1714,7 @@ export default function SalesPage() {
                                   onClick={() => setUpdatePartySale(s)}
                                 >Update Party</Button>
                               )}
-                              {s.status === 'active' && getSaleLock(s).canCancel && (
+                              {s.status === 'active' && getSaleLock(s).canCancel && can('sales.cancel') && (
                                 <Button variant="danger" size="sm" style={{ marginLeft: 4 }} onClick={() => setConfirmCancel(s.id)}>Cancel</Button>
                               )}
                               {s.status === 'active' && getSaleLock(s).locked && (
@@ -1804,7 +1806,7 @@ export default function SalesPage() {
                     {s.status === 'active' && canUpdateParty && getSaleLock(s).canEditParty && (
                       <Button variant="secondary" size="sm" icon={<User size={13}/>} onClick={() => setUpdatePartySale(s)}>Update Party</Button>
                     )}
-                    {s.status === 'active' && getSaleLock(s).canCancel && (
+                    {s.status === 'active' && getSaleLock(s).canCancel && can('sales.cancel') && (
                       <Button variant="danger" size="sm" icon={<XCircle size={13}/>} onClick={() => setConfirmCancel(s.id)}>Cancel</Button>
                     )}
                     {s.status === 'active' && getSaleLock(s).locked && (

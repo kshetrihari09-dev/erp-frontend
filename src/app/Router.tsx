@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { RequireAuth, RequireGuest } from '@/router/guards'
+import { RequireAuth, RequireGuest, RequireRoute, HomeRedirect } from '@/router/guards'
 import AppLayout from '@/layouts/AppLayout'
 import { PATHS } from '@/constants'
 import { Spinner } from '@/components/ui'
@@ -55,50 +55,50 @@ export default function Router() {
 
           {/* Protected */}
           <Route path="/" element={<RequireAuth><AppLayout /></RequireAuth>}>
-            <Route index element={<Navigate to={PATHS.DASHBOARD} replace />} />
+            <Route index element={<HomeRedirect />} />
 
-            <Route path="dashboard"    element={<Dashboard />} />
+            <Route path="dashboard"    element={<RequireRoute to="/dashboard"><Dashboard /></RequireRoute>} />
 
             {/* Transactions */}
-            <Route path="sales"        element={<SalesPage />} />
-            <Route path="retail-sale"  element={<RetailSalePage />} />
-            <Route path="purchase"     element={<PurchasePage />} />
-            <Route path="purchases"    element={<PurchasePage />} />
-            <Route path="returns"          element={<ReturnsPage />} />
-            <Route path="sales-returns"    element={<SalesReturnPage />} />
-            <Route path="purchase-return"  element={<PurchaseReturnPage />} />
-            <Route path="purchase-returns" element={<PurchaseReturnPage />} />
+            <Route path="sales"        element={<RequireRoute to="/sales"><SalesPage /></RequireRoute>} />
+            <Route path="retail-sale"  element={<RequireRoute to="/retail-sale"><RetailSalePage /></RequireRoute>} />
+            <Route path="purchase"     element={<RequireRoute to="/purchase"><PurchasePage /></RequireRoute>} />
+            <Route path="purchases"    element={<RequireRoute to="/purchases"><PurchasePage /></RequireRoute>} />
+            <Route path="returns"          element={<RequireRoute to="/returns"><ReturnsPage /></RequireRoute>} />
+            <Route path="sales-returns"    element={<RequireRoute to="/sales-returns"><SalesReturnPage /></RequireRoute>} />
+            <Route path="purchase-return"  element={<RequireRoute to="/purchase-return"><PurchaseReturnPage /></RequireRoute>} />
+            <Route path="purchase-returns" element={<RequireRoute to="/purchase-returns"><PurchaseReturnPage /></RequireRoute>} />
 
             {/* Inventory */}
-            <Route path="products"     element={<ProductsPage />} />
-            <Route path="barcode-print" element={<BarcodePrintPage />} />
-            <Route path="qrcode-print" element={<QRCodePrintPage />} />
-            <Route path="manufacturers" element={<ManufacturersPage />} />
-            <Route path="stock"        element={<StockPage />} />
-            <Route path="stock-report" element={<StockPage />} />
-            <Route path="stock-register" element={<StockRegisterPage />} />
-            <Route path="stock-summary" element={<StockSummaryPage />} />
-            <Route path="purchase-suggestions" element={<PurchaseSuggestionsPage />} />
-            <Route path="credit-risk" element={<CreditRiskDashboardPage />} />
-            <Route path="reminders" element={<RemindersPage />} />
+            <Route path="products"     element={<RequireRoute to="/products"><ProductsPage /></RequireRoute>} />
+            <Route path="barcode-print" element={<RequireRoute to="/barcode-print"><BarcodePrintPage /></RequireRoute>} />
+            <Route path="qrcode-print" element={<RequireRoute to="/qrcode-print"><QRCodePrintPage /></RequireRoute>} />
+            <Route path="manufacturers" element={<RequireRoute to="/manufacturers"><ManufacturersPage /></RequireRoute>} />
+            <Route path="stock"        element={<RequireRoute to="/stock"><StockPage /></RequireRoute>} />
+            <Route path="stock-report" element={<RequireRoute to="/stock-report"><StockPage /></RequireRoute>} />
+            <Route path="stock-register" element={<RequireRoute to="/stock-register"><StockRegisterPage /></RequireRoute>} />
+            <Route path="stock-summary" element={<RequireRoute to="/stock-summary"><StockSummaryPage /></RequireRoute>} />
+            <Route path="purchase-suggestions" element={<RequireRoute to="/purchase-suggestions"><PurchaseSuggestionsPage /></RequireRoute>} />
+            <Route path="credit-risk" element={<RequireRoute to="/credit-risk"><CreditRiskDashboardPage /></RequireRoute>} />
+            <Route path="reminders" element={<RequireRoute to="/reminders"><RemindersPage /></RequireRoute>} />
 
             {/* Parties */}
-            <Route path="customers"    element={<CustomersPage />} />
-            <Route path="suppliers"    element={<SuppliersPage />} />
+            <Route path="customers"    element={<RequireRoute to="/customers"><CustomersPage /></RequireRoute>} />
+            <Route path="suppliers"    element={<RequireRoute to="/suppliers"><SuppliersPage /></RequireRoute>} />
 
             {/* Finance */}
-            <Route path="accounting"     element={<AccountingPage />} />
+            <Route path="accounting"     element={<RequireRoute to="/accounting"><AccountingPage /></RequireRoute>} />
             {/* Account Setup page removed — merged into Accounting → Engine Setup tab */}
             <Route path="account-setup"  element={<Navigate to="/accounting?tab=account-defaults" replace />} />
-            <Route path="ledger"           element={<LedgerPage />} />
+            <Route path="ledger"           element={<RequireRoute to="/ledger"><LedgerPage /></RequireRoute>} />
 
             {/* Analytics */}
-            <Route path="reports"      element={<ReportsPage />} />
-            <Route path="company-vs-customer" element={<CompanyCustomerReportPage />} />
-            <Route path="customer-vs-company" element={<CustomerCompanyReportPage />} />
+            <Route path="reports"      element={<RequireRoute to="/reports"><ReportsPage /></RequireRoute>} />
+            <Route path="company-vs-customer" element={<RequireRoute to="/company-vs-customer"><CompanyCustomerReportPage /></RequireRoute>} />
+            <Route path="customer-vs-company" element={<RequireRoute to="/customer-vs-company"><CustomerCompanyReportPage /></RequireRoute>} />
 
             {/* System */}
-            <Route path="settings"     element={<SettingsPage />} />
+            <Route path="settings"     element={<RequireRoute to="/settings"><SettingsPage /></RequireRoute>} />
           </Route>
 
           {/* 404 */}

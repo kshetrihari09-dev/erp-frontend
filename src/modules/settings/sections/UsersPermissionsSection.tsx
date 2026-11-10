@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus, ShieldCheck } from 'lucide-react'
 import { useUsers } from '@/hooks/useQuery'
 import { settingsAPI } from '@/services/api'
 import useUIStore from '@/store/uiStore'
 import { Button, Modal, SkeletonRows, Empty, ToggleSwitch } from '@/components/ui'
 import { fmtDateTime } from '@/utils'
-import { USER_ROLES, ROLE_PERMISSIONS, QK } from '@/constants'
+import { USER_ROLES, QK } from '@/constants'
 import type { User } from '@/types'
 
 // ─── Create user form ──────────────────────────────────────────────────────────
@@ -113,11 +113,25 @@ function PermissionsModal({ user, onClose }: { user: User; onClose: () => void }
   )
 }
 
-// ─── Read-only role capability reference (based on ROLE_PERMISSIONS) ──────────
+// Read-only role capability reference — read from the SERVER's authoritative matrix
+// (GET /settings/roles-matrix -> backend src/rbac/permissions.js). This screen carries no role table of its own.
+type Matrix = { roles: string[]; permissions: string[]; grants: Record<string, string[]>; flagBacked: Record<string, string> }
+
 function RoleMatrix() {
-  const modules = ['sales', 'purchases', 'accounting', 'reports', 'settings']
-  const covers = (perms: string[], mod: string) =>
-    perms.includes('*') || perms.some(p => p === `${mod}.*` || p === `${mod}.view` || p.startsWith(`${mod}.`))
+  const { data } = useQuery({
+    queryKey: ['roles-matrix'],
+    queryFn: () => settingsAPI.rolesMatrix().then((r: any) => r.data.data as Matrix),
+    staleTime: 5 * 60_000,
+  })
+  const modules = ['sales', 'purchases', 'products', 'stock', 'parties', 'accounting', 'reports', 'settings']
+  // per module: "Edit" = holds at least one non-view permission, "View" = only *.view, "--" = none
+  const level = (perms: string[], mod: string) => {
+    const own = perms.filter((p) => p.startsWith(`${mod}.`))
+    if (!own.length) return 'none'
+    return own.some((p) => !p.endsWith('.view')) ? 'edit' : 'view'
+  }
+  const roles = data?.roles ?? []
+  const label = (r: string) => USER_ROLES.find((x) => x.value === r)?.label ?? r.charAt(0).toUpperCase() + r.slice(1)
 
   return (
     <div className="table-card mt-4">
@@ -126,22 +140,22 @@ function RoleMatrix() {
         <table className="erp-table">
           <thead><tr><th>Role</th>{modules.map(m => <th key={m} className="capitalize">{m}</th>)}</tr></thead>
           <tbody>
-            {USER_ROLES.map(r => {
-              const perms = ROLE_PERMISSIONS[r.value] || []
-              return (
-                <tr key={r.value}>
-                  <td className="font-semibold capitalize">{r.label}</td>
-                  {modules.map(m => (
-                    <td key={m}>{covers(perms, m) ? <span className="badge badge-green">✓</span> : <span className="badge badge-red">—</span>}</td>
-                  ))}
-                </tr>
-              )
-            })}
+            {roles.map(r => (
+              <tr key={r}>
+                <td className="font-semibold">{label(r)}</td>
+                {modules.map(m => {
+                  const lv = level(data!.grants[r] || [], m)
+                  return <td key={m}>{lv === 'edit' ? <span className="badge badge-green">Edit</span> : lv === 'view' ? <span className="badge badge-blue">View</span> : <span className="badge badge-red">--</span>}</td>
+                })}
+              </tr>
+            ))}
+            {!data && <tr><td colSpan={modules.length + 1} className="text-center text-[var(--text-3)] py-4">Loading...</td></tr>}
           </tbody>
         </table>
       </div>
       <p className="text-[11px] text-[var(--text-4)] px-4 py-2">
-        Role capabilities are fixed by the app; per-user flags above (post/approve/lock/reverse) layer on top of them for accounting actions.
+        Roles are fixed by the app and enforced by the server. The per-user switches above (post / approve / reverse / lock) refine accounting actions
+        within a role; read-only roles (Viewer, Auditor) can never hold them.
       </p>
     </div>
   )

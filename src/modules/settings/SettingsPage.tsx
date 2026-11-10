@@ -10,7 +10,9 @@
  */
 import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import SettingsNav, { SETTINGS_SECTIONS } from './SettingsNav'
+import SettingsNav, { SETTINGS_SECTIONS, sectionAllowed } from './SettingsNav'
+import useAuthStore from '@/store/authStore'
+import AccessDenied from '@/components/shared/AccessDenied'
 
 import GeneralSection         from './sections/GeneralSection'
 import CompanySection         from './sections/CompanySection'
@@ -42,10 +44,14 @@ const SECTION_COMPONENTS: Record<string, React.ComponentType> = {
 
 export default function SettingsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const initial = SETTINGS_SECTIONS.some(s => s.id === searchParams.get('section'))
-    ? (searchParams.get('section') as string)
-    : 'general'
+  // Only the sections this user's permissions cover. A ?section= in the URL that is not one of them is ignored, so a
+  // hidden section cannot be reached by editing the address bar (its API is separately protected by the server).
+  const permissions = useAuthStore((s) => s.user?.permissions)
+  const sections = SETTINGS_SECTIONS.filter((sec) => sectionAllowed(sec, permissions))
+  const wanted = searchParams.get('section')
+  const initial = sections.some(s => s.id === wanted) ? (wanted as string) : (sections[0]?.id ?? 'general')
   const [active, setActive] = useState(initial)
+  const activeAllowed = sections.some(s => s.id === active)
 
   function handleChange(id: string) {
     setActive(id)
@@ -56,8 +62,10 @@ export default function SettingsPage() {
     }, { replace: true })
   }
 
-  const ActiveSection = SECTION_COMPONENTS[active] || GeneralSection
-  const activeLabel = SETTINGS_SECTIONS.find(s => s.id === active)?.label || 'General'
+  if (!sections.length) return <AccessDenied />
+  const shown = activeAllowed ? active : sections[0].id
+  const ActiveSection = SECTION_COMPONENTS[shown] || GeneralSection
+  const activeLabel = sections.find(s => s.id === shown)?.label || 'General'
 
   return (
     <div>
@@ -69,10 +77,10 @@ export default function SettingsPage() {
       </div>
 
       <div className="stp-shell">
-        <SettingsNav active={active} onChange={handleChange} />
+        <SettingsNav active={shown} sections={sections} onChange={handleChange} />
         <div className="stp-content">
           <div className="font-bold text-[15px] mb-3">{activeLabel}</div>
-          <div key={active}>
+          <div key={shown}>
             <ActiveSection />
           </div>
         </div>

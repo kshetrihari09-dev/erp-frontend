@@ -16,7 +16,7 @@ export interface Pagination {
 
 // ─── Auth ──────────────────────────────────────────────────────────────────────
 // 'auditor' exists in the backend's role constraint (utils/roles.js).
-// 'manager' is kept because ROLE_PERMISSIONS below still references it,
+// 'manager' is a real role (backend migration 056),
 // even though users.role has never actually accepted it.
 export type UserRole = 'owner' | 'admin' | 'manager' | 'accountant' | 'cashier' | 'auditor' | 'viewer'
 
@@ -41,6 +41,9 @@ export interface User {
   /** Whether a Security PIN is set for step-up verification (never the
    *  hash itself — that's never sent to the frontend). */
   hasPin?: boolean
+  /** Effective permissions computed by the SERVER (role defaults + per-user switches). The only source for can(). */
+  permissions?: string[]
+  can_backdate_entries?: boolean
 }
 
 export interface Company {

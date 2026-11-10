@@ -5,6 +5,7 @@ import type { UseFormRegister, FieldErrors } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Plus, Package, ScanLine, Boxes, Download, Upload, Printer, QrCode, Filter, Pencil, Trash2 } from 'lucide-react'
 import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct, useProductOpeningBatches, useAddOpeningInventory, useNextBarcode, useSuppliers } from '@/hooks/useQuery'
+import { usePermission } from '@/hooks/usePermission'
 import { RetailProfileSection, emptyRetailProfile, retailProfileToPayload, retailProfileError } from './RetailProfileFields'
 import { Button, Modal, Badge, Pagination, SkeletonRows, Empty, SearchInput, ConfirmDialog, Select, ToggleSwitch } from '@/components/ui'
 import ManufacturerSelect from '@/components/forms/ManufacturerSelect'
@@ -514,6 +515,7 @@ export default function ProductsPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
   const [filterOpen, setFilterOpen] = useState(false)
   const del = useDeleteProduct()
+  const { can } = usePermission()   // controls are hidden by permission; the API enforces the same permissions independently
 
   const { data, isLoading } = useProducts({ page, limit: 20, search: search || undefined })
   const rows  = (data?.data  as Product[]) || []
@@ -541,13 +543,16 @@ export default function ProductsPage() {
           <Button variant="secondary" icon={<QrCode size={14}/>} onClick={() => navigate('/qrcode-print')}>
             Print QR Codes
           </Button>
-          <Button variant="primary" icon={<Plus size={14}/>} onClick={() => { setEditing(null); setModal(true) }}>
-            New Product
-          </Button>
+          {can('products.create') && (
+            <Button variant="primary" icon={<Plus size={14}/>} onClick={() => { setEditing(null); setModal(true) }}>
+              New Product
+            </Button>
+          )}
         </div>
         {/* Mobile: header keeps only the title + a prominent New Product
             button — Import/Export/Print move to their own wrapping
             toolbar below so the header itself stays compact. */}
+        {can('products.create') && (
         <button
           className="prod-new-btn-mobile"
           onClick={() => { setEditing(null); setModal(true) }}
@@ -555,6 +560,7 @@ export default function ProductsPage() {
         >
           <Plus size={18} strokeWidth={2.5} />
         </button>
+        )}
       </div>
 
       {/* Mobile-only secondary action toolbar — same handlers as the
@@ -644,8 +650,8 @@ export default function ProductsPage() {
                               onClick={() => navigate(`/barcode-print?productId=${p.id}`)}>Print</Button>
                             <Button variant="ghost" size="sm" icon={<QrCode size={12}/>}
                               onClick={() => navigate(`/qrcode-print?productId=${p.id}`)}>QR</Button>
-                            <Button variant="ghost" size="sm" onClick={() => { setEditing(p); setModal(true) }}>Edit</Button>
-                            <Button variant="danger" size="sm" onClick={() => setDelId(p.id)}>Del</Button>
+                            {can('products.edit') && <Button variant="ghost" size="sm" onClick={() => { setEditing(p); setModal(true) }}>Edit</Button>}
+                            {can('products.delete') && <Button variant="danger" size="sm" onClick={() => setDelId(p.id)}>Del</Button>}
                           </div>
                         </td>
                       </tr>
@@ -669,9 +675,11 @@ export default function ProductsPage() {
               <p className="prod-empty-sub">
                 {statusFilter !== 'all' ? 'Try a different filter, or add a new product.' : 'Get started by adding your first product.'}
               </p>
-              <Button variant="primary" icon={<Plus size={14}/>} onClick={() => { setEditing(null); setModal(true) }}>
-                New Product
-              </Button>
+              {can('products.create') && (
+                <Button variant="primary" icon={<Plus size={14}/>} onClick={() => { setEditing(null); setModal(true) }}>
+                  New Product
+                </Button>
+              )}
             </div>
           ) : (
             mobileRows.map(p => (
@@ -728,12 +736,16 @@ export default function ProductsPage() {
                     <button className="prod-mc-btn" onClick={() => navigate(`/qrcode-print?productId=${p.id}`)}>
                       <QrCode size={13}/><span>QR</span>
                     </button>
-                    <button className="prod-mc-btn" onClick={() => { setEditing(p); setModal(true) }}>
-                      <Pencil size={13}/><span>Edit</span>
-                    </button>
-                    <button className="prod-mc-btn prod-mc-btn-danger" onClick={() => setDelId(p.id)}>
-                      <Trash2 size={13}/><span>Delete</span>
-                    </button>
+                    {can('products.edit') && (
+                      <button className="prod-mc-btn" onClick={() => { setEditing(p); setModal(true) }}>
+                        <Pencil size={13}/><span>Edit</span>
+                      </button>
+                    )}
+                    {can('products.delete') && (
+                      <button className="prod-mc-btn prod-mc-btn-danger" onClick={() => setDelId(p.id)}>
+                        <Trash2 size={13}/><span>Delete</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>

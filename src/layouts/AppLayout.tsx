@@ -11,6 +11,7 @@ import {
   Scissors,
 } from 'lucide-react'
 import useAuthStore from '@/store/authStore'
+import { filterNavByPermission } from '@/constants/permissions'
 import useUIStore from '@/store/uiStore'
 import { PATHS } from '@/constants'
 import { initials, cn } from '@/utils'
@@ -77,9 +78,6 @@ const NAV_TYPED = NAV as unknown as NavEntry[]
 // Flattened, searchable version of NAV (section headers excluded) — used by
 // the topbar quick-search. Purely a client-side filter over existing routes;
 // it does not call any new API or change any existing nav/route behavior.
-const SEARCHABLE_NAV = NAV_TYPED.filter(
-  (item): item is { to: string; label: string; icon: React.ReactNode; alertKey?: string } => 'to' in item
-)
 
 // ─── Main layout ──────────────────────────────────────────────────────────────
 export default function AppLayout() {
@@ -108,11 +106,20 @@ export default function AppLayout() {
   const [profileOpen, setProfileOpen] = useState(false)
   const profileBoxRef = useRef<HTMLDivElement>(null)
 
+  // Navigation follows the user's permissions from the server. The same ROUTE_PERMISSIONS table guards the routes, so a
+  // visible item always opens and a hidden one is also refused by the router (and, independently, by the API).
+  const permissions = user?.permissions
+  const visibleNav = useMemo<NavEntry[]>(() => filterNavByPermission(NAV_TYPED as any[], permissions) as NavEntry[], [permissions])
+  const visibleSearchable = useMemo(
+    () => visibleNav.filter((item): item is { to: string; label: string; icon: React.ReactNode; alertKey?: string } => 'to' in item),
+    [visibleNav],
+  )
+
   const searchResults = useMemo(() => {
     const q = searchQuery.trim().toLowerCase()
     if (!q) return []
-    return SEARCHABLE_NAV.filter((item) => item.label.toLowerCase().includes(q)).slice(0, 6)
-  }, [searchQuery])
+    return visibleSearchable.filter((item) => item.label.toLowerCase().includes(q)).slice(0, 6)
+  }, [searchQuery, visibleSearchable])
 
   const unreadCount = alerts.lowStock + alerts.expiry
   const { data: reminderCounts } = useReminderCounts()
@@ -217,7 +224,7 @@ export default function AppLayout() {
   // purely derived from the existing NAV structure for breadcrumb display.
   const currentSection = (() => {
     let section = ''
-    for (const item of NAV_TYPED) {
+    for (const item of visibleNav) {
       if ('section' in item) { section = item.section; continue }
       if (location.pathname.startsWith(item.to)) return section
     }
@@ -298,7 +305,7 @@ export default function AppLayout() {
 
         {/* Nav */}
         <nav className="sidebar-nav flex-1">
-          {NAV_TYPED.map((item, i) => {
+          {visibleNav.map((item, i) => {
             if ('section' in item) {
               // Section header — collapsed to a thin divider when the
               // sidebar is collapsed, since the uppercase label has no

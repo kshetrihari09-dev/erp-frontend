@@ -22,21 +22,17 @@ export const PAGE_SIZE_OPTIONS = [10, 20, 50, 100]
 
 // ─── Roles & permissions ──────────────────────────────────────────────────────
 export const ROLES = {
+  OWNER:      'owner',
   ADMIN:      'admin',
   MANAGER:    'manager',
   ACCOUNTANT: 'accountant',
   CASHIER:    'cashier',
+  AUDITOR:    'auditor',
   VIEWER:     'viewer',
 } as const
 
-export const ROLE_PERMISSIONS: Record<string, string[]> = {
-  admin:      ['*'],
-  manager:    ['sales.*', 'purchases.*', 'products.*', 'parties.*', 'reports.*', 'accounting.view', 'settings.view'],
-  accountant: ['accounting.*', 'reports.*', 'sales.view', 'purchases.view', 'parties.view'],
-  cashier:    ['sales.*', 'products.view', 'parties.view', 'stock.view'],
-  viewer:     ['*.view'],
-  auditor:    ['*.view'],
-}
+// ROLE_PERMISSIONS was removed: roles/permissions are defined ONCE, on the server (backend src/rbac/permissions.js). The
+// signed-in user's list arrives with /auth/me and login; the Settings screen reads the matrix from GET /settings/roles-matrix.
 
 // ─── Payment modes ────────────────────────────────────────────────────────────
 export const PAYMENT_MODES = [
@@ -77,6 +73,7 @@ export const USER_ROLES = [
   { value: 'manager',    label: 'Manager'    },
   { value: 'accountant', label: 'Accountant' },
   { value: 'cashier',    label: 'Cashier'    },
+  { value: 'auditor',    label: 'Auditor'    },
   { value: 'viewer',     label: 'Viewer'     },
 ] as const
 

@@ -156,6 +156,13 @@ http.interceptors.response.use(
       console.error(`[API ✗] ${status || 'NET'}:`, rawMessage, error.config?.url)
     }
 
+    // 403 "permission denied" / disabled / membership revoked: the user's role or access may have changed on the
+    // server since this page loaded. Ask the session guard (router/guards.tsx) to re-read /auth/me so menus and routes
+    // follow the database immediately. (It signs the user out if the account is now disabled / removed.)
+    if (status === 403 && ['PERMISSION_DENIED', 'ROLE_FORBIDDEN', 'ACCOUNT_DISABLED', 'COMPANY_ACCESS_REVOKED'].includes(String(code))) {
+      window.dispatchEvent(new CustomEvent('auth:permissions-stale'))
+    }
+
     // ── 429: classify WHO said it (rateLimitState.ts), then react accordingly ───
     //  - traffic limiter / nginx / unknown infra  → remember Retry-After so pollers and reads wait it out
     //  - application rule (PIN lockout, OTP quota) → NOT traffic: no cooldown, the caller shows its message
