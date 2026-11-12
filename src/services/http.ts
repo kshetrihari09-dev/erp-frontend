@@ -182,7 +182,10 @@ http.interceptors.response.use(
     }
 
     // ── 401: attempt silent token refresh ──────────────────────────────────
-    if (status === 401 && !originalRequest._retry) {
+    // Credential endpoints answer 401 for "wrong credentials" (e.g. a wrong Role Password in the second login window).
+    // That is an ordinary form error, never a dead session: no silent refresh, no redirect that would wipe the pending login.
+    const isCredentialCall = /\/auth\/(login|verify-role|pending-session)\/?$/.test(String(originalRequest?.url || ''))
+    if (status === 401 && !originalRequest._retry && !isCredentialCall) {
       const refreshToken = localStorage.getItem(AUTH_REFRESH_KEY)
 
       if (!refreshToken) {

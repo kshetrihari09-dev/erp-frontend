@@ -15,11 +15,12 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   Eye, EyeOff, LogIn, ShieldCheck, MessageCircle,
   Mail, Phone, RefreshCw, ArrowLeft, CheckCircle2,
-  BarChart3, Lock, Zap, Shield,
+  BarChart3, Lock, Zap, Shield, KeyRound, BadgeCheck,
 } from 'lucide-react'
 import { authAPI } from '@/services/api'
 import useAuthStore from '@/store/authStore'
 import { PATHS } from '@/constants'
+import { landingPathFor } from '@/constants/permissions'
 import { Spinner } from '@/components/ui'
 
 type LoginMode  = 'password' | 'otp'
@@ -245,6 +246,110 @@ function ModeTab({ active, label, icon, onClick }: { active:boolean; label:strin
   )
 }
 
+
+/* ── Second window: role verification ────────────────────────────────────────
+ * Shown after the account password (or login OTP) succeeded for a user enrolled in role verification.
+ * Only the Role ID + Role Password are sent: the server knows who this is from the pending token, so the e-mail below is
+ * display-only (and readOnly) — editing it would change nothing server-side. The pending token lives in React state
+ * only (never localStorage), so a reload or "Back" discards it. */
+interface PendingLogin { token: string; email: string; expiresIn: number }
+function RoleVerificationCard({ pending, onBack, onExpired, onVerified }: {
+  pending: PendingLogin
+  onBack: () => void
+  onExpired: (msg: string) => void
+  onVerified: (body: { token: string; refresh_token?: string; user: any; company: any }) => void
+}) {
+  const [roleId, setRoleId]     = useState('')
+  const [rolePw, setRolePw]     = useState('')
+  const [showPw, setShowPw]     = useState(false)
+  const [err, setErr]           = useState('')
+  const [busy, setBusy]         = useState(false)
+  const [left, setLeft]         = useState(pending.expiresIn)
+
+  useEffect(() => {
+    const id = setInterval(() => setLeft(t => t - 1), 1000)
+    return () => clearInterval(id)
+  }, [])
+  useEffect(() => { if (left <= 0) onExpired('Your verification window expired. Please sign in again.') }, [left]) // eslint-disable-line
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault(); setErr('')
+    if (!roleId.trim()) { setErr('Enter your Role ID'); return }
+    if (!rolePw)        { setErr('Enter your Role Password'); return }
+    setBusy(true)
+    try {
+      const res = await authAPI.verifyRole({ auth_session_token: pending.token, role_id: roleId.trim(), role_password: rolePw })
+      onVerified(res.data.data as any)
+    } catch (ex: any) {
+      const data = ex?.original?.response?.data
+      const code = ex?.code || data?.code
+      setRolePw('')
+      if (data?.session_ended || code === 'PENDING_SESSION_EXPIRED' || code === 'PENDING_SESSION_INVALID' || code === 'ACCOUNT_DISABLED') {
+        onExpired(code === 'ACCOUNT_DISABLED' ? 'This account has been disabled.' : 'Verification session ended. Please sign in again.')
+        return
+      }
+      // Deliberately the server's generic wording — never says which of Role ID / Role Password was wrong.
+      setErr(ex?.message || 'Verification failed')
+    } finally { setBusy(false) }
+  }
+
+  const mm = Math.max(0, Math.floor(left / 60)), ss = String(Math.max(0, left % 60)).padStart(2, '0')
+  return (
+    <div style={{ borderRadius:24, overflow:'hidden', background:'rgba(255,255,255,0.03)', border:'1.5px solid rgba(255,255,255,0.08)', backdropFilter:'blur(24px)', boxShadow:'0 24px 64px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05)' }}>
+      <div style={{ height:3, background:'linear-gradient(90deg,#4f46e5,#7c3aed,#ec4899)' }}/>
+      <form onSubmit={submit} style={{ padding:'24px 24px 20px', display:'flex', flexDirection:'column', gap:16 }} autoComplete="off">
+        <div>
+          <p style={{ color:'#a5b4fc', fontSize:11, fontWeight:700, letterSpacing:'0.8px', textTransform:'uppercase', marginBottom:6 }}>Step 2 of 2</p>
+          <h2 style={{ color:'#fff', fontSize:18, fontWeight:700, marginBottom:4 }}>Verify your role</h2>
+          <p style={{ color:'rgba(255,255,255,0.32)', fontSize:13 }}>Enter the Role ID and Role Password assigned to you.</p>
+        </div>
+
+        {err && <Err msg={err}/>}
+
+        <div>
+          <FL>Registered email</FL>
+          <div style={{ position:'relative' }}>
+            <span style={{ position:'absolute', left:14, top:'50%', transform:'translateY(-50%)', color:'rgba(165,180,252,0.45)', display:'flex', pointerEvents:'none' }}><Mail size={15}/></span>
+            <input type="email" value={pending.email} readOnly tabIndex={-1} aria-readonly="true"
+              style={{ ...IS, paddingLeft:42, paddingRight:42, opacity:0.7, cursor:'not-allowed', background:'rgba(255,255,255,0.03)' }}/>
+            <span style={{ position:'absolute', right:14, top:'50%', transform:'translateY(-50%)', color:'#34d399', display:'flex' }}><BadgeCheck size={16}/></span>
+          </div>
+        </div>
+
+        <div>
+          <FL>Role ID</FL>
+          <div style={{ position:'relative' }}>
+            <span style={{ position:'absolute', left:14, top:'50%', transform:'translateY(-50%)', color:'rgba(165,180,252,0.45)', display:'flex', pointerEvents:'none' }}><KeyRound size={15}/></span>
+            <input type="text" autoFocus autoCapitalize="characters" autoCorrect="off" spellCheck={false} autoComplete="off" placeholder="e.g. MGR-7K2QXA" className="gi"
+              value={roleId} onChange={e => setRoleId(e.target.value)} maxLength={40} style={{ ...IS, paddingLeft:42, paddingRight:16 }}/>
+          </div>
+        </div>
+
+        <div>
+          <FL>Role Password</FL>
+          <div style={{ position:'relative' }}>
+            <span style={{ position:'absolute', left:14, top:'50%', transform:'translateY(-50%)', color:'rgba(165,180,252,0.45)', display:'flex', pointerEvents:'none' }}><Lock size={15}/></span>
+            <input type={showPw ? 'text' : 'password'} autoComplete="new-password" placeholder="••••••••" className="gi"
+              value={rolePw} onChange={e => setRolePw(e.target.value)} maxLength={128} style={{ ...IS, paddingLeft:42, paddingRight:48 }}/>
+            <button type="button" onClick={() => setShowPw(v => !v)} aria-label={showPw ? 'Hide role password' : 'Show role password'}
+              style={{ position:'absolute', right:14, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', color:'rgba(255,255,255,0.32)', display:'flex', padding:0 }}>
+              {showPw ? <EyeOff size={15}/> : <Eye size={15}/>}
+            </button>
+          </div>
+        </div>
+
+        <GlowBtn type="submit" loading={busy}>{!busy && <><ShieldCheck size={16}/> Verify Role</>}</GlowBtn>
+
+        <button type="button" onClick={onBack} disabled={busy}
+          style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:6, height:44, borderRadius:12, background:'rgba(255,255,255,0.04)', border:'1.5px solid rgba(255,255,255,0.1)', color:'rgba(255,255,255,0.6)', fontSize:13, fontWeight:600, cursor:busy?'not-allowed':'pointer' }}>
+          <ArrowLeft size={14}/> Back
+        </button>
+        <p style={{ textAlign:'center', color:'rgba(255,255,255,0.22)', fontSize:11 }}>Session expires in <span style={{ fontVariantNumeric:'tabular-nums' }}>{mm}:{ss}</span></p>
+      </form>
+    </div>
+  )
+}
+
 /* ═══════════════════════════════════════ MAIN ═══════════════════════════════ */
 export default function LoginPage() {
   const navigate = useNavigate()
@@ -264,6 +369,21 @@ export default function LoginPage() {
   const [timer, setTimer]           = useState(0)
   const [toast, setToast]           = useState('')
   const [rememberMe, setRememberMe] = useState(true)
+  const [pending, setPending]       = useState<PendingLogin | null>(null)
+
+  // One place that turns a FULL session response into a signed-in app (password, OTP and role-verified logins).
+  const finishLogin = (body: { token: string; refresh_token?: string; user: any; company: any }) => {
+    if (body.refresh_token) localStorage.setItem('erp_refresh_token', body.refresh_token)
+    setAuth({ token: body.token, user: body.user, company: body.company })
+    const perms: string[] = body.user?.permissions || []
+    const from = (location.state as any)?.from?.pathname
+    // Each verified role lands on a screen it may open (Admin/Manager → dashboard, Cashier → billing, …).
+    const home = perms.includes('dashboard.view') ? PATHS.DASHBOARD : (landingPathFor(perms) || PATHS.DASHBOARD)
+    navigate(from || home, { replace:true })
+  }
+  const enterRoleStep = (b: { auth_session_token?: string; email?: string; expires_in?: number }) =>
+    setPending({ token: b.auth_session_token!, email: b.email || '', expiresIn: b.expires_in || 300 })
+  useEffect(() => () => setPending(null), [])
   const timerRef = useRef<ReturnType<typeof setInterval>|null>(null)
 
   const { register, handleSubmit, setValue, formState: { errors, isSubmitting } } = useForm<PwForm>({
@@ -299,14 +419,13 @@ export default function LoginPage() {
     try {
       const res  = await authAPI.login(data)
       const body = res.data.data
-      const tok  = body.token || (body as any).access_token
-      if (!tok) throw new Error('No token received')
-      if (body.refresh_token) localStorage.setItem('erp_refresh_token', body.refresh_token)
       if (rememberMe) localStorage.setItem('erp_remembered_email', data.email)
       else localStorage.removeItem('erp_remembered_email')
-      setAuth({ token:tok, user:body.user, company:body.company })
-      const from = (location.state as any)?.from?.pathname || PATHS.DASHBOARD
-      navigate(from, { replace:true })
+      // Stage 1 passed but the account requires role verification → open the second window. No session exists yet.
+      if (body.requires_role_verification && body.auth_session_token) { enterRoleStep(body); return }
+      const tok  = body.token || (body as any).access_token
+      if (!tok) throw new Error('No token received')
+      finishLogin({ token: tok, refresh_token: body.refresh_token, user: body.user, company: body.company })
     } catch (e: any) { setPwErr(e.message||'Login failed') }
   }
 
@@ -332,11 +451,9 @@ export default function LoginPage() {
     try {
       const res  = await authAPI.verifyOTP({ method:otpChannel, destination, otp, purpose:'login' })
       const body = res.data.data
+      if (body.requires_role_verification && body.auth_session_token) { enterRoleStep(body); return }
       if (!body.token) throw new Error('No token received')
-      if (body.refresh_token) localStorage.setItem('erp_refresh_token', body.refresh_token)
-      setAuth({ token:body.token, user:body.user!, company:body.company! })
-      const from = (location.state as any)?.from?.pathname || PATHS.DASHBOARD
-      navigate(from, { replace:true })
+      finishLogin({ token: body.token, refresh_token: body.refresh_token, user: body.user!, company: body.company! })
     } catch (e: any) { setOtpErr(e.message||'Invalid OTP') }
     finally { setOtpLoad(false) }
   }
@@ -398,7 +515,17 @@ export default function LoginPage() {
             )}
           </AnimatePresence>
 
-          {/* Card */}
+          {/* Card — stage 1 (account) ⇄ stage 2 (role), cross-fading in place */}
+          <AnimatePresence mode="wait" initial={false}>
+          {pending ? (
+            <motion.div key="role-step" initial={{ opacity:0, x:24 }} animate={{ opacity:1, x:0 }} exit={{ opacity:0, x:-24 }} transition={{ duration:0.22 }}>
+              <RoleVerificationCard pending={pending}
+                onBack={() => { setPending(null); setPwErr(''); setOtp(''); setOtpStep('select') }}
+                onExpired={(msg) => { setPending(null); setOtp(''); setOtpStep('select'); setPwErr(msg); setMode('password') }}
+                onVerified={finishLogin} />
+            </motion.div>
+          ) : (
+          <motion.div key="account-step" initial={{ opacity:0, x:-24 }} animate={{ opacity:1, x:0 }} exit={{ opacity:0, x:24 }} transition={{ duration:0.22 }}>
           <div style={{ borderRadius:24, overflow:'hidden', background:'rgba(255,255,255,0.03)', border:'1.5px solid rgba(255,255,255,0.08)', backdropFilter:'blur(24px)', boxShadow:'0 24px 64px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05)' }}>
             {/* Gradient top stripe */}
             <div style={{ height:3, background:'linear-gradient(90deg,#4f46e5,#7c3aed,#ec4899)' }}/>
@@ -591,6 +718,9 @@ export default function LoginPage() {
               </p>
             </div>
           </div>
+          </motion.div>
+          )}
+          </AnimatePresence>
         </motion.div>
       </div>
     </div>

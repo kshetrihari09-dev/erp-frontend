@@ -6,10 +6,10 @@
  * Shows a live preview of InvoiceTemplate on the right.
  */
 
-import { useRef } from 'react'
+import { useRef, useState, useLayoutEffect } from 'react'
 import {
   Eye, RotateCcw, Download, Printer,
-  ToggleLeft, ToggleRight,
+  ToggleLeft, ToggleRight, SlidersHorizontal,
 } from 'lucide-react'
 import useTemplateStore, { DEFAULT_TPL, type TemplateConfig } from '@/store/templateStore'
 import InvoiceTemplate, { type PrintData } from '@/components/print/InvoiceTemplate'
@@ -40,6 +40,43 @@ const DEMO_DATA: PrintData = {
   netTotal:   504,
   paidAmount: 504,
   dueAmount:    0,
+}
+
+
+/* ── Fit-to-width preview ──────────────────────────────────────────────────
+ * The invoice is laid out at a fixed "paper" width and then scaled to the width the preview area actually has, using a CSS
+ * transform (never scaled UP). `widths` = [comfortable, compact]: the comfortable width is used when it fits; otherwise the
+ * paper is laid out at the compact width (the narrowest the invoice table can be without wrapping) and scaled down from
+ * there, so a phone gets the largest legible text. MIN_SCALE is a safety floor for very narrow containers — below it the
+ * preview scrolls sideways rather than shrinking to unreadable.
+ * The transform sits on a wrapper ABOVE the invoice node, so usePrint (which clones only the invoice element) is unaffected.
+ * `boxH` keeps the layout height in step with the scaled paper, since transforms do not affect layout. */
+const MIN_SCALE = 0.5
+function useFitScale(widths: readonly [number, number]) {
+  const hostRef  = useRef<HTMLDivElement>(null)
+  const paperRef = useRef<HTMLDivElement>(null)
+  const [fit, setFit] = useState({ scale: 1, naturalW: widths[0] })
+  const [boxH, setBoxH] = useState<number | null>(null)
+
+  useLayoutEffect(() => {
+    const host = hostRef.current, paper = paperRef.current
+    if (!host || !paper || typeof ResizeObserver === 'undefined') return
+    const measure = () => {
+      const cs = getComputedStyle(host)
+      const avail = host.clientWidth - parseFloat(cs.paddingLeft || '0') - parseFloat(cs.paddingRight || '0')
+      if (avail > 0) {
+        const naturalW = avail >= widths[0] ? widths[0] : widths[1]
+        setFit({ naturalW, scale: Math.max(MIN_SCALE, Math.min(1, avail / naturalW)) })
+      }
+      setBoxH(paper.offsetHeight)
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(host); ro.observe(paper)
+    return () => ro.disconnect()
+  }, [widths[0], widths[1]]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  return { hostRef, paperRef, scale: fit.scale, naturalW: fit.naturalW, boxH }
 }
 
 /* ── Toggle row ─────────────────────────────────────────────────────────── */
@@ -83,6 +120,10 @@ export default function TemplateTab() {
   const { activeTemplate: tpl, setTemplate, resetTemplate } = useTemplateStore()
   const printRef = useRef<HTMLDivElement>(null)
   const { print } = usePrint()
+  // Narrow layouts show ONE pane at a time (Settings | Preview); wide layouts show both and ignore this.
+  const [view, setView] = useState<'settings' | 'preview'>('settings')
+  const isThermal = tpl.paperSize === 'thermal'
+  const { hostRef, paperRef, scale, naturalW, boxH } = useFitScale(isThermal ? [340, 340] : [640, 520])
 
   function set<K extends keyof TemplateConfig>(key: K, val: TemplateConfig[K]) {
     setTemplate({ [key]: val })
@@ -103,6 +144,7 @@ export default function TemplateTab() {
   }
 
   return (
+    <div className="tpl-host" data-view={view}>
     <div className="tpl-layout">
 
       {/* ── Left panel: controls ─────────────────────────────────────── */}
@@ -119,6 +161,18 @@ export default function TemplateTab() {
               <Printer size={13} /> Test Print
             </button>
           </div>
+        </div>
+
+        {/* Only visible when the layout is stacked (see globals.css, .tpl-host container query) */}
+        <div className="tpl-tabs" role="tablist" aria-label="Template editor view">
+          <button type="button" role="tab" aria-selected={view === 'settings'}
+            className={`tpl-tab ${view === 'settings' ? 'tpl-tab--active' : ''}`} onClick={() => setView('settings')}>
+            <SlidersHorizontal size={14} /> Settings
+          </button>
+          <button type="button" role="tab" aria-selected={view === 'preview'}
+            className={`tpl-tab ${view === 'preview' ? 'tpl-tab--active' : ''}`} onClick={() => setView('preview')}>
+            <Eye size={14} /> Preview
+          </button>
         </div>
 
         <div className="tpl-scroll">
@@ -298,18 +352,23 @@ export default function TemplateTab() {
           Live Preview
           <span className="tpl-preview-badge">Updates instantly</span>
         </div>
-        <div className="tpl-preview-scroll">
-          <div className="tpl-preview-paper">
-            <InvoiceTemplate
-              ref={printRef}
-              data={DEMO_DATA}
-              size={tpl.paperSize === 'thermal' ? 'thermal-80' : 'a4'}
-              tpl={tpl}
-            />
+        <div className="tpl-preview-scroll" ref={hostRef}>
+          <div className="tpl-preview-sizer"
+            style={{ width: naturalW * scale, height: boxH != null ? boxH * scale : undefined }}>
+            <div className="tpl-preview-paper" ref={paperRef}
+              style={{ width: naturalW, transform: `scale(${scale})` }}>
+              <InvoiceTemplate
+                ref={printRef}
+                data={DEMO_DATA}
+                size={tpl.paperSize === 'thermal' ? 'thermal-80' : 'a4'}
+                tpl={tpl}
+              />
+            </div>
           </div>
         </div>
       </div>
 
+    </div>
     </div>
   )
 }

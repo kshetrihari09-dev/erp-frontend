@@ -2316,14 +2316,22 @@ bsp-row--disabled { cursor: not-allowed; opacity: .55; }
 .tpl-preview-scroll::-webkit-scrollbar       { width: 4px; }
 .tpl-preview-scroll::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 4px; }
 
+/* The sizer reserves the SCALED footprint of the paper (width/height set inline by TemplateTab's fit-to-width hook);
+   the paper inside is laid out at its natural width and scaled with a transform. */
+.tpl-preview-sizer { margin: 0 auto; position: relative; flex: none; }
 .tpl-preview-paper {
   background:    #fff;
   border-radius: 6px;
   box-shadow:    0 4px 24px rgba(0,0,0,.1), 0 1px 4px rgba(0,0,0,.06);
   padding:       24px 28px;
-  max-width:     680px;
-  margin:        0 auto;
+  box-sizing:    border-box;
+  transform-origin: top left;
 }
+
+/* The template editor adapts to the width ITS CONTAINER gets (viewport minus app sidebar, Settings nav and page padding),
+   not to the viewport — see the @container rules near the end of this file. */
+.tpl-host { container-type: inline-size; container-name: tpl; min-width: 0; width: 100%; }
+.tpl-tabs { display: none; }
 
 /* ══════════════════════════════════════════════════════════════════════════════
    DASHBOARD — Single consolidated section (no duplicates)
@@ -5908,7 +5916,11 @@ bsp-row--disabled { cursor: not-allowed; opacity: .55; }
   display: none;
 }
 @media (max-width: 900px) {
-  .stp-shell { flex-direction: column; gap: 14px; }
+  /* `align-items: flex-start` (desktop row layout) must not survive into the column layout: in a column it makes the
+     content shrink-to-fit its widest child instead of the screen width, so wide sections (e.g. Printing) overflowed and
+     were clipped by .page-content { overflow-x: hidden } — toggles and buttons were cut off on phones. */
+  .stp-shell { flex-direction: column; align-items: stretch; gap: 14px; }
+  .stp-content { width: 100%; }
   .stp-nav { display: none; }
   .stp-nav-mobile {
     display: block;
@@ -5919,31 +5931,86 @@ bsp-row--disabled { cursor: not-allowed; opacity: .55; }
   }
 }
 
-/* ── TemplateTab: split-pane stacks earlier now that it's nested inside
-   Settings' left-nav layout (~244px less available width than a full-page
-   view) ───────────────────────────────────────────────────────────────── */
-@media (max-width: 1180px) {
+/* ── TemplateTab responsiveness ──────────────────────────────────────────────
+   Side-by-side (340px controls + live preview) needs ≥ 860px of CONTAINER width. Below that the panes stack and a
+   Settings | Preview switch shows one at a time, so there is no nested scroll area and no clipped content on phones.
+   Everything is driven by the container (not the viewport) because the editor sits inside the app sidebar + Settings nav:
+   a 1280px-wide window leaves it only ~720px. */
+@container tpl (max-width: 859px) {
   .tpl-layout {
-    flex-direction: column !important;
-    height:         auto !important;
-    min-height:     0 !important;
+    flex-direction: column;
+    height:         auto;
+    min-height:     0;
+    overflow:       visible;
   }
   .tpl-controls {
-    width:          100% !important;
-    border-right:   none !important;
-    border-bottom:  1px solid var(--border);
-    max-height:     60vh;
-    overflow-y:     auto;
+    width:          100%;
+    border-right:   none;
+    overflow:       visible;
   }
-  .tpl-preview-panel { min-height: 400px; }
-  .tpl-toolbar       { flex-wrap: wrap; gap: 8px; }
-  .tpl-toolbar-actions { flex: 1; }
+  .tpl-scroll { overflow: visible; padding: 8px 12px 20px; }
+  .tpl-toolbar { flex-wrap: wrap; gap: 10px; }
+  .tpl-toolbar-actions { flex: 1 1 220px; }
   .tpl-toolbar-actions button { flex: 1; justify-content: center; min-height: 40px; }
+
+  .tpl-tabs {
+    display: flex; gap: 6px; padding: 8px 12px;
+    border-bottom: 1px solid var(--border); background: var(--surface-2);
+  }
+  .tpl-tab {
+    flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    min-height: 40px; border-radius: 9px; border: 1.5px solid var(--border);
+    background: var(--surface); color: var(--text-3); font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  .tpl-tab--active { background: var(--brand-light); border-color: var(--brand); color: var(--brand); }
+
+  /* one pane at a time */
+  .tpl-host[data-view="settings"] .tpl-preview-panel { display: none; }
+  .tpl-host[data-view="preview"]  .tpl-scroll        { display: none; }
+  .tpl-controls { border-bottom: 1px solid var(--border); }
+  .tpl-host[data-view="settings"] .tpl-controls { border-bottom: none; }
+
+  .tpl-preview-panel  { min-height: 0; }
+  .tpl-preview-scroll { overflow-y: visible; }
 }
-@media (max-width: 480px) {
-  .tpl-heading           { font-size: 14px !important; }
-  .tpl-btn               { font-size: 12px !important; padding: 7px 10px !important; }
-  .tpl-preview-scroll    { padding: 12px !important; }
+
+@container tpl (max-width: 520px) {
+  .tpl-toolbar { padding: 12px 12px 10px; }
+  .tpl-heading { flex: 1 0 100%; }                 /* title on its own row; Reset / Test Print share the next one */
+  .tpl-toolbar-actions { flex: 1 1 100%; }
+  .tpl-preview-scroll { padding: 12px 8px; }
+  .tpl-preview-header { padding: 10px 12px; }
+  .tpl-preview-badge  { display: none; }
+  .tpl-toggle-info    { min-width: 0; flex: 1; padding-right: 10px; }
+  .tpl-toggle-icon    { flex: none; }
+  .tpl-radio-group    { gap: 8px; }
+  .tpl-radio-btn      { flex: 1 1 auto; text-align: center; }
+  .tpl-color-row      { gap: 8px; }
+}
+
+/* Touch devices: comfortable tap targets; 16px inputs so iOS Safari does not zoom the page on focus. */
+@media (pointer: coarse) {
+  .tpl-toggle-row  { min-height: 46px; }
+  .tpl-radio-btn   { min-height: 40px; padding: 8px 14px; }
+  .tpl-btn         { min-height: 40px; }
+  .tpl-color-picker { width: 48px; height: 38px; }
+  .tpl-color-swatch { width: 28px; height: 28px; border-radius: 7px; }
+}
+@media (max-width: 768px) {
+  .tpl-controls .erp-input { font-size: 16px; }
+}
+
+/* Browsers without container queries (pre-2022 WebViews): keep the old viewport-based stacking. */
+@supports not (container-type: inline-size) {
+  @media (max-width: 1180px) {
+    .tpl-layout { flex-direction: column; height: auto; min-height: 0; overflow: visible; }
+    .tpl-controls { width: 100%; border-right: none; border-bottom: 1px solid var(--border); overflow: visible; }
+    .tpl-scroll { overflow: visible; }
+    .tpl-preview-panel { min-height: 0; }
+    .tpl-toolbar { flex-wrap: wrap; gap: 8px; }
+    .tpl-toolbar-actions { flex: 1; }
+    .tpl-toolbar-actions button { flex: 1; justify-content: center; min-height: 40px; }
+  }
 }
 
 /* ── Page header: allow New User / Save button to stack on narrow screens ───

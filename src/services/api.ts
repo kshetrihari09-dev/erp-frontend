@@ -44,11 +44,28 @@ export interface VerifyOTPResponse {
   user?:           User
   company?:        Company
   flow?:           string
+  /** Login-OTP for a user enrolled in role verification: stage 1 only. */
+  requires_role_verification?: boolean
+  auth_session_token?: string
+  expires_in?:     number
+  email?:          string
+}
+
+export interface LoginResult {
+  token?: string; access_token?: string; refresh_token?: string; user?: User; company?: Company
+  requires_role_verification?: boolean; auth_session_token?: string; expires_in?: number; email?: string
 }
 
 export const authAPI = {
+  /** Stage 1. Returns EITHER a full session (user not enrolled for role verification) OR `requires_role_verification` + a pending token. */
   login: (data: { email: string; password: string }) =>
-    http.post<ApiResponse<{ token: string; access_token?: string; refresh_token?: string; user: User; company: Company }>>('/auth/login', data),
+    http.post<ApiResponse<LoginResult>>('/auth/login', data),
+  /** Stage 2. Identity comes from the pending token on the server — only the Role ID and Role Password are sent. */
+  verifyRole: (data: { auth_session_token: string; role_id: string; role_password: string }) =>
+    http.post<ApiResponse<{ token: string; refresh_token: string; user: User; company: Company; role: string; permissions: string[] }>>('/auth/verify-role', data),
+  pendingSession: (auth_session_token: string) =>
+    http.post<ApiResponse<{ email: string; expires_at: string }>>('/auth/pending-session', { auth_session_token }),
+  session: () => http.get<ApiResponse<{ user: User; company: Company; role: string; permissions: string[]; two_stage: boolean }>>('/auth/session'),
   register: (data: Params) =>
     http.post<ApiResponse<{ token: string; refresh_token: string; user: User; company: Company }>>('/auth/register', data),
   // Sends the current refresh token so the server can revoke that specific
