@@ -8,7 +8,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 
 const api = vi.hoisted(() => ({
-  login: vi.fn(), verifyRole: vi.fn(), verifyOTP: vi.fn(), sendOTP: vi.fn(),
+  login: vi.fn(), verifyRole: vi.fn(), enrollRole: vi.fn(), verifyOTP: vi.fn(), sendOTP: vi.fn(),
 }))
 vi.mock('@/services/api', () => ({ authAPI: api }))
 vi.mock('@/components/brand/ZerthixLogo', () => ({ default: () => null }))
@@ -127,6 +127,39 @@ describe('two-stage login page', () => {
     fireEvent.paste(boxes[0], { clipboardData: { getData: () => '123456' } })      // the OTP boxes' own paste path
     await waitFor(() => expect(api.verifyOTP).toHaveBeenCalledWith(expect.objectContaining({ purpose: 'login', destination: 'cashier@a.test' })))
     await screen.findByText('Verify your role')
+    expect(useAuthStore.getState().isAuthenticated).toBe(false)
+  })
+
+  test('first sign-in (no Role ID yet): setup window → validation → shows the new Role ID once → then signs in', async () => {
+    api.login.mockResolvedValue({ data: { data: { ...PENDING.data.data, enrollment_required: true, account_role: 'manager' } } })
+    api.enrollRole.mockResolvedValue({ data: { data: { token: 't', refresh_token: 'r', role: 'manager', role_id: 'MGR-NEW123', enrolled: true,
+      permissions: ['dashboard.view'], user: { id: 'u1', email: 'cashier@a.test', role: 'manager', permissions: ['dashboard.view'] }, company: { id: 'c1' } } } })
+    renderPage(); fillStage1()
+    await screen.findByText('Set up your role')
+    expect(screen.getByText(/for your manager role/i)).toBeTruthy()
+    fireEvent.change(screen.getByPlaceholderText('At least 8 characters'), { target: { value: 'short' } })
+    fireEvent.click(screen.getByRole('button', { name: /create & continue/i }))
+    await screen.findByText(/at least 8 characters/i); expect(api.enrollRole).not.toHaveBeenCalled()
+    fireEvent.change(screen.getByPlaceholderText('At least 8 characters'), { target: { value: 'Role#Secret99' } })
+    fireEvent.change(screen.getByPlaceholderText('Repeat Role Password'), { target: { value: 'Different#99' } })
+    fireEvent.click(screen.getByRole('button', { name: /create & continue/i }))
+    await screen.findByText(/do not match/i); expect(api.enrollRole).not.toHaveBeenCalled()
+    fireEvent.change(screen.getByPlaceholderText('Repeat Role Password'), { target: { value: 'Role#Secret99' } })
+    fireEvent.click(screen.getByRole('button', { name: /create & continue/i }))
+    await screen.findByText('Your Role ID is ready')
+    expect(screen.getByText('MGR-NEW123')).toBeTruthy()
+    expect(api.enrollRole).toHaveBeenCalledWith({ auth_session_token: 'pending-xyz', role_id: undefined, role_password: 'Role#Secret99' })
+    expect(useAuthStore.getState().isAuthenticated).toBe(false)          // not signed in until they continue
+    fireEvent.click(screen.getByRole('button', { name: /continue to dashboard/i }))
+    await screen.findByTestId('landed'); expect(useAuthStore.getState().isAuthenticated).toBe(true)
+  })
+
+  test('a new account handed over from the sign-up page opens straight in the setup window', async () => {
+    render(
+      <MemoryRouter initialEntries={[{ pathname: '/login', state: { pending: { token: 'p2', email: 'new@a.test', expiresIn: 300, enrollment: true, accountRole: 'owner' } } }]}>
+        <Routes><Route path="/login" element={<LoginPage />} /><Route path="*" element={<div data-testid="landed" />} /></Routes>
+      </MemoryRouter>)
+    await screen.findByText('Set up your role'); expect(screen.getByDisplayValue('new@a.test')).toBeTruthy()
     expect(useAuthStore.getState().isAuthenticated).toBe(false)
   })
 })

@@ -252,7 +252,7 @@ function ModeTab({ active, label, icon, onClick }: { active:boolean; label:strin
  * Only the Role ID + Role Password are sent: the server knows who this is from the pending token, so the e-mail below is
  * display-only (and readOnly) — editing it would change nothing server-side. The pending token lives in React state
  * only (never localStorage), so a reload or "Back" discards it. */
-interface PendingLogin { token: string; email: string; expiresIn: number }
+interface PendingLogin { token: string; email: string; expiresIn: number; enrollment?: boolean; accountRole?: string }
 function RoleVerificationCard({ pending, onBack, onExpired, onVerified }: {
   pending: PendingLogin
   onBack: () => void
@@ -265,6 +265,9 @@ function RoleVerificationCard({ pending, onBack, onExpired, onVerified }: {
   const [err, setErr]           = useState('')
   const [busy, setBusy]         = useState(false)
   const [left, setLeft]         = useState(pending.expiresIn)
+  const enrolling = !!pending.enrollment            // first sign-in: create the Role ID + password instead of entering them
+  const [confirmPw, setConfirmPw] = useState('')
+  const [created, setCreated]   = useState<null | { roleId: string; body: any }>(null)
 
   useEffect(() => {
     const id = setInterval(() => setLeft(t => t - 1), 1000)
@@ -274,10 +277,21 @@ function RoleVerificationCard({ pending, onBack, onExpired, onVerified }: {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault(); setErr('')
-    if (!roleId.trim()) { setErr('Enter your Role ID'); return }
-    if (!rolePw)        { setErr('Enter your Role Password'); return }
+    if (enrolling) {
+      if (rolePw.length < 8)  { setErr('Role Password must be at least 8 characters'); return }
+      if (rolePw !== confirmPw) { setErr('Role Passwords do not match'); return }
+    } else {
+      if (!roleId.trim()) { setErr('Enter your Role ID'); return }
+      if (!rolePw)        { setErr('Enter your Role Password'); return }
+    }
     setBusy(true)
     try {
+      if (enrolling) {
+        const res = await authAPI.enrollRole({ auth_session_token: pending.token, role_id: roleId.trim() || undefined, role_password: rolePw })
+        const body = res.data.data as any
+        setCreated({ roleId: body.role_id, body })           // show the Role ID once before entering the app
+        return
+      }
       const res = await authAPI.verifyRole({ auth_session_token: pending.token, role_id: roleId.trim(), role_password: rolePw })
       onVerified(res.data.data as any)
     } catch (ex: any) {
@@ -294,14 +308,32 @@ function RoleVerificationCard({ pending, onBack, onExpired, onVerified }: {
   }
 
   const mm = Math.max(0, Math.floor(left / 60)), ss = String(Math.max(0, left % 60)).padStart(2, '0')
+  if (created) {
+    return (
+      <div style={{ borderRadius:24, overflow:'hidden', background:'rgba(255,255,255,0.03)', border:'1.5px solid rgba(255,255,255,0.08)', backdropFilter:'blur(24px)', boxShadow:'0 24px 64px rgba(0,0,0,0.5)' }}>
+        <div style={{ height:3, background:'linear-gradient(90deg,#4f46e5,#7c3aed,#ec4899)' }}/>
+        <div style={{ padding:'28px 24px 24px', display:'flex', flexDirection:'column', gap:16, textAlign:'center' }}>
+          <div style={{ color:'#34d399', display:'flex', justifyContent:'center' }}><BadgeCheck size={36}/></div>
+          <div>
+            <h2 style={{ color:'#fff', fontSize:18, fontWeight:700, marginBottom:6 }}>Your Role ID is ready</h2>
+            <p style={{ color:'rgba(255,255,255,0.4)', fontSize:13 }}>Save it now. You will need this Role ID and your Role Password every time you sign in.</p>
+          </div>
+          <div style={{ padding:'14px 12px', borderRadius:12, background:'rgba(99,102,241,0.12)', border:'1.5px dashed rgba(165,180,252,0.5)', color:'#c7d2fe', fontSize:20, fontWeight:800, letterSpacing:'1.5px', fontFamily:'monospace', wordBreak:'break-all', userSelect:'all' }}>{created.roleId}</div>
+          <GlowBtn type="button" loading={false} onClick={() => onVerified(created.body)}><ShieldCheck size={16}/> Continue to dashboard</GlowBtn>
+        </div>
+      </div>
+    )
+  }
   return (
     <div style={{ borderRadius:24, overflow:'hidden', background:'rgba(255,255,255,0.03)', border:'1.5px solid rgba(255,255,255,0.08)', backdropFilter:'blur(24px)', boxShadow:'0 24px 64px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05)' }}>
       <div style={{ height:3, background:'linear-gradient(90deg,#4f46e5,#7c3aed,#ec4899)' }}/>
       <form onSubmit={submit} style={{ padding:'24px 24px 20px', display:'flex', flexDirection:'column', gap:16 }} autoComplete="off">
         <div>
           <p style={{ color:'#a5b4fc', fontSize:11, fontWeight:700, letterSpacing:'0.8px', textTransform:'uppercase', marginBottom:6 }}>Step 2 of 2</p>
-          <h2 style={{ color:'#fff', fontSize:18, fontWeight:700, marginBottom:4 }}>Verify your role</h2>
-          <p style={{ color:'rgba(255,255,255,0.32)', fontSize:13 }}>Enter the Role ID and Role Password assigned to you.</p>
+          <h2 style={{ color:'#fff', fontSize:18, fontWeight:700, marginBottom:4 }}>{enrolling ? 'Set up your role' : 'Verify your role'}</h2>
+          <p style={{ color:'rgba(255,255,255,0.32)', fontSize:13 }}>{enrolling
+            ? `Create a Role ID and Role Password${pending.accountRole ? ` for your ${pending.accountRole} role` : ''}. You will enter them after your account password every time you sign in.`
+            : 'Enter the Role ID and Role Password assigned to you.'}</p>
         </div>
 
         {err && <Err msg={err}/>}
@@ -317,19 +349,19 @@ function RoleVerificationCard({ pending, onBack, onExpired, onVerified }: {
         </div>
 
         <div>
-          <FL>Role ID</FL>
+          <FL>{enrolling ? 'Role ID (optional — generated if blank)' : 'Role ID'}</FL>
           <div style={{ position:'relative' }}>
             <span style={{ position:'absolute', left:14, top:'50%', transform:'translateY(-50%)', color:'rgba(165,180,252,0.45)', display:'flex', pointerEvents:'none' }}><KeyRound size={15}/></span>
-            <input type="text" autoFocus autoCapitalize="characters" autoCorrect="off" spellCheck={false} autoComplete="off" placeholder="e.g. MGR-7K2QXA" className="gi"
+            <input type="text" autoFocus autoCapitalize="characters" autoCorrect="off" spellCheck={false} autoComplete="off" placeholder={enrolling ? 'Leave blank to generate' : 'e.g. MGR-7K2QXA'} className="gi"
               value={roleId} onChange={e => setRoleId(e.target.value)} maxLength={40} style={{ ...IS, paddingLeft:42, paddingRight:16 }}/>
           </div>
         </div>
 
         <div>
-          <FL>Role Password</FL>
+          <FL>{enrolling ? 'Create Role Password' : 'Role Password'}</FL>
           <div style={{ position:'relative' }}>
             <span style={{ position:'absolute', left:14, top:'50%', transform:'translateY(-50%)', color:'rgba(165,180,252,0.45)', display:'flex', pointerEvents:'none' }}><Lock size={15}/></span>
-            <input type={showPw ? 'text' : 'password'} autoComplete="new-password" placeholder="••••••••" className="gi"
+            <input type={showPw ? 'text' : 'password'} autoComplete="new-password" placeholder={enrolling ? 'At least 8 characters' : '••••••••'} className="gi"
               value={rolePw} onChange={e => setRolePw(e.target.value)} maxLength={128} style={{ ...IS, paddingLeft:42, paddingRight:48 }}/>
             <button type="button" onClick={() => setShowPw(v => !v)} aria-label={showPw ? 'Hide role password' : 'Show role password'}
               style={{ position:'absolute', right:14, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', color:'rgba(255,255,255,0.32)', display:'flex', padding:0 }}>
@@ -338,7 +370,18 @@ function RoleVerificationCard({ pending, onBack, onExpired, onVerified }: {
           </div>
         </div>
 
-        <GlowBtn type="submit" loading={busy}>{!busy && <><ShieldCheck size={16}/> Verify Role</>}</GlowBtn>
+        {enrolling && (
+          <div>
+            <FL>Confirm Role Password</FL>
+            <div style={{ position:'relative' }}>
+              <span style={{ position:'absolute', left:14, top:'50%', transform:'translateY(-50%)', color:'rgba(165,180,252,0.45)', display:'flex', pointerEvents:'none' }}><Lock size={15}/></span>
+              <input type={showPw ? 'text' : 'password'} autoComplete="new-password" placeholder="Repeat Role Password" className="gi"
+                value={confirmPw} onChange={e => setConfirmPw(e.target.value)} maxLength={128} style={{ ...IS, paddingLeft:42, paddingRight:16 }}/>
+            </div>
+          </div>
+        )}
+
+        <GlowBtn type="submit" loading={busy}>{!busy && <><ShieldCheck size={16}/> {enrolling ? 'Create & Continue' : 'Verify Role'}</>}</GlowBtn>
 
         <button type="button" onClick={onBack} disabled={busy}
           style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:6, height:44, borderRadius:12, background:'rgba(255,255,255,0.04)', border:'1.5px solid rgba(255,255,255,0.1)', color:'rgba(255,255,255,0.6)', fontSize:13, fontWeight:600, cursor:busy?'not-allowed':'pointer' }}>
@@ -369,7 +412,8 @@ export default function LoginPage() {
   const [timer, setTimer]           = useState(0)
   const [toast, setToast]           = useState('')
   const [rememberMe, setRememberMe] = useState(true)
-  const [pending, setPending]       = useState<PendingLogin | null>(null)
+  // A new account arrives from the sign-up page with its pending token in navigation state (memory only, never storage).
+  const [pending, setPending]       = useState<PendingLogin | null>(() => ((location.state as any)?.pending as PendingLogin) || null)
 
   // One place that turns a FULL session response into a signed-in app (password, OTP and role-verified logins).
   const finishLogin = (body: { token: string; refresh_token?: string; user: any; company: any }) => {
@@ -381,8 +425,8 @@ export default function LoginPage() {
     const home = perms.includes('dashboard.view') ? PATHS.DASHBOARD : (landingPathFor(perms) || PATHS.DASHBOARD)
     navigate(from || home, { replace:true })
   }
-  const enterRoleStep = (b: { auth_session_token?: string; email?: string; expires_in?: number }) =>
-    setPending({ token: b.auth_session_token!, email: b.email || '', expiresIn: b.expires_in || 300 })
+  const enterRoleStep = (b: { auth_session_token?: string; email?: string; expires_in?: number; enrollment_required?: boolean; account_role?: string }) =>
+    setPending({ token: b.auth_session_token!, email: b.email || '', expiresIn: b.expires_in || 300, enrollment: !!b.enrollment_required, accountRole: b.account_role })
   useEffect(() => () => setPending(null), [])
   const timerRef = useRef<ReturnType<typeof setInterval>|null>(null)
 

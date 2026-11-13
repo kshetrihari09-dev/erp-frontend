@@ -426,8 +426,17 @@ export default function SignupPage() {
         invoice_prefix:  company.invoice_prefix.trim() || 'INV',
       })
       const body = res.data.data
+      // Two-stage login: a new account has no session yet — hand its pending token to the login page, which opens the
+      // role-setup window (create Role ID + Role Password). Nothing is signed in before that.
+      if (body.requires_role_verification && body.auth_session_token) {
+        navigate(PATHS.LOGIN, { replace: true, state: { pending: {
+          token: body.auth_session_token, email: body.email || '', expiresIn: body.expires_in || 300,
+          enrollment: !!body.enrollment_required, accountRole: body.account_role,
+        } } })
+        return
+      }
       if (body.refresh_token) localStorage.setItem('erp_refresh_token', body.refresh_token)
-      setAuth({ token: body.token, user: body.user, company: body.company })
+      setAuth({ token: body.token!, user: body.user!, company: body.company! })
       navigate(PATHS.DASHBOARD, { replace: true })
     } catch (e: any) { setError(e.message || 'Registration failed') }
     finally { setLoading(false) }

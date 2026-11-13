@@ -49,11 +49,15 @@ export interface VerifyOTPResponse {
   auth_session_token?: string
   expires_in?:     number
   email?:          string
+  enrollment_required?: boolean
+  account_role?:   string
 }
 
 export interface LoginResult {
   token?: string; access_token?: string; refresh_token?: string; user?: User; company?: Company
   requires_role_verification?: boolean; auth_session_token?: string; expires_in?: number; email?: string
+  /** true → the user has no Role ID yet: the second window asks them to create one. */
+  enrollment_required?: boolean; account_role?: string; account_created?: boolean
 }
 
 export const authAPI = {
@@ -63,11 +67,14 @@ export const authAPI = {
   /** Stage 2. Identity comes from the pending token on the server — only the Role ID and Role Password are sent. */
   verifyRole: (data: { auth_session_token: string; role_id: string; role_password: string }) =>
     http.post<ApiResponse<{ token: string; refresh_token: string; user: User; company: Company; role: string; permissions: string[] }>>('/auth/verify-role', data),
+  /** First-time setup (user has no Role ID yet): create Role ID + Role Password; the role itself is the account's, set by the server. */
+  enrollRole: (data: { auth_session_token: string; role_id?: string; role_password: string }) =>
+    http.post<ApiResponse<{ token: string; refresh_token: string; user: User; company: Company; role: string; permissions: string[]; role_id: string; enrolled: boolean }>>('/auth/enroll-role', data),
   pendingSession: (auth_session_token: string) =>
-    http.post<ApiResponse<{ email: string; expires_at: string }>>('/auth/pending-session', { auth_session_token }),
+    http.post<ApiResponse<{ email: string; expires_at: string; enrollment_required: boolean; account_role?: string }>>('/auth/pending-session', { auth_session_token }),
   session: () => http.get<ApiResponse<{ user: User; company: Company; role: string; permissions: string[]; two_stage: boolean }>>('/auth/session'),
   register: (data: Params) =>
-    http.post<ApiResponse<{ token: string; refresh_token: string; user: User; company: Company }>>('/auth/register', data),
+    http.post<ApiResponse<{ token?: string; refresh_token?: string; user?: User; company?: Company } & Partial<LoginResult>>>('/auth/register', data),
   // Sends the current refresh token so the server can revoke that specific
   // session (see routes/auth.js POST /auth/logout) — without this, a copy
   // of the token (already leaked, or retried after this call) would keep
