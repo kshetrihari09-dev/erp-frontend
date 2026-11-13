@@ -7799,3 +7799,14 @@ canvas{
   --rs-shadow: inset 0 1px 0 rgba(255, 255, 255, .04), 0 8px 24px -12px rgba(0, 0, 0, .6);
   --rs-link: #93c5fd;
 }
+
+
+/* Users & Permissions table: the table keeps its minimum width and scrolls sideways on narrower screens, so the action
+   column (Permissions → Edit) is pinned to the right edge and stays reachable without scrolling. */
+.stp-users-table th:last-child,
+.stp-users-table td:last-child {
+  position: sticky; right: 0; z-index: 1;
+  background: var(--surface);
+  box-shadow: -10px 0 8px -8px rgba(15, 23, 42, .14);
+}
+.stp-users-table th:last-child { background: var(--surface-2, var(--surface)); }

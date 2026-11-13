@@ -70,6 +70,12 @@ export const authAPI = {
   /** First-time setup (user has no Role ID yet): create Role ID + Role Password; the role itself is the account's, set by the server. */
   enrollRole: (data: { auth_session_token: string; role_id?: string; role_password: string }) =>
     http.post<ApiResponse<{ token: string; refresh_token: string; user: User; company: Company; role: string; permissions: string[]; role_id: string; enrolled: boolean }>>('/auth/enroll-role', data),
+  /** Admin: create / reset a user's Role ID + Role Password for a role (multi-role). */
+  setUserRoleCredential: (userId: string, data: { role: string; role_id?: string; role_password: string }) =>
+    http.put<ApiResponse<{ id: string; role: string; role_code: string }>>(`/auth/role-credentials/users/${userId}`, data),
+  /** Admin: enable / disable a user's credential for a role (ends that role's live sessions). */
+  setUserRoleCredentialActive: (userId: string, role: string, is_active: boolean) =>
+    http.patch<ApiResponse<unknown>>(`/auth/role-credentials/users/${userId}/${role}`, { is_active }),
   pendingSession: (auth_session_token: string) =>
     http.post<ApiResponse<{ email: string; expires_at: string; enrollment_required: boolean; account_role?: string }>>('/auth/pending-session', { auth_session_token }),
   session: () => http.get<ApiResponse<{ user: User; company: Company; role: string; permissions: string[]; two_stage: boolean }>>('/auth/session'),

@@ -1,14 +1,115 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Plus, ShieldCheck } from 'lucide-react'
+import { Plus, ShieldCheck, Copy, Check, KeyRound } from 'lucide-react'
 import { useUsers } from '@/hooks/useQuery'
-import { settingsAPI } from '@/services/api'
+import { settingsAPI, authAPI } from '@/services/api'
 import useUIStore from '@/store/uiStore'
 import { Button, Modal, SkeletonRows, Empty, ToggleSwitch } from '@/components/ui'
 import { fmtDateTime } from '@/utils'
 import { USER_ROLES, QK } from '@/constants'
 import type { User } from '@/types'
+
+// ── Small display helpers ────────────────────────────────────────────────────
+/** Monospace ID chip with tap-to-copy. `full` is copied; `text` is what is shown. */
+function IdChip({ text, full, title }: { text: string; full?: string; title?: string }) {
+  const [done, setDone] = useState(false)
+  const copy = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    try { await navigator.clipboard.writeText(full ?? text); setDone(true); setTimeout(() => setDone(false), 1200) } catch { /* clipboard unavailable */ }
+  }
+  return (
+    <button type="button" onClick={copy} title={title ?? `Copy ${full ?? text}`}
+      className="inline-flex items-center gap-1.5 max-w-full rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-2 py-0.5 text-[11px] font-mono text-[var(--text-2)] hover:border-[var(--brand)]">
+      <span className="truncate">{text}</span>
+      {done ? <Check size={11} className="text-[var(--green,#16a34a)] shrink-0" /> : <Copy size={11} className="opacity-60 shrink-0" />}
+    </button>
+  )
+}
+/** Role ID chips for a user: one per role credential (a user may hold several), disabled ones struck through. */
+function RoleIds({ user }: { user: User }) {
+  const cr = user.role_credentials || []
+  if (!cr.length) return <span className="text-[11px] text-[var(--text-4)]" title="Not set up yet — the user creates it at their next sign-in">Not set up</span>
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {cr.map(c => (
+        <span key={c.role} className={c.is_active ? '' : 'opacity-50 line-through'} title={`${c.role}${c.is_active ? '' : ' (disabled)'}${c.locked ? ' (locked)' : ''}`}>
+          <IdChip text={c.role_code} />
+        </span>
+      ))}
+    </div>
+  )
+}
+const shortId = (id: string) => (id ? `${id.slice(0, 8)}…` : '—')
+
+// ── Role credentials panel (inside the Permissions dialog) ───────────────────
+function RoleCredentialsPanel({ user }: { user: User }) {
+  const { success, error } = useUIStore()
+  const qc = useQueryClient()
+  const [role, setRole] = useState<string>(user.role)
+  const [roleId, setRoleId] = useState('')
+  const [pw, setPw] = useState('')
+  const [busy, setBusy] = useState(false)
+  const cr = user.role_credentials || []
+  const refresh = () => qc.invalidateQueries({ queryKey: [QK.USERS] })
+
+  async function toggle(r: string, active: boolean) {
+    try { await authAPI.setUserRoleCredentialActive(user.id, r, active); success(active ? 'Role enabled' : 'Role disabled'); refresh() }
+    catch (e: any) { error('Failed', e?.message) }
+  }
+  async function save() {
+    if (pw.length < 8) { error('Role Password must be at least 8 characters'); return }
+    setBusy(true)
+    try {
+      const res = await authAPI.setUserRoleCredential(user.id, { role, role_id: roleId.trim() || undefined, role_password: pw })
+      success('Role credential saved', `Role ID: ${(res.data as any)?.data?.role_code ?? ''}`)
+      setPw(''); setRoleId(''); refresh()
+    } catch (e: any) { error('Failed', e?.message) } finally { setBusy(false) }
+  }
+
+  return (
+    <div className="mt-5 pt-4 border-t border-[var(--border)]">
+      <div className="flex items-center gap-2 mb-2"><KeyRound size={14} /><span className="text-sm font-semibold">Login Role IDs</span></div>
+      <p className="text-[11px] text-[var(--text-4)] mb-3">
+        Used in the second sign-in step. The Role Password is stored hashed and can never be viewed — only reset.
+      </p>
+      {cr.length === 0 ? (
+        <p className="text-xs text-[var(--text-3)] mb-3">No Role ID yet — {user.name} will create one at their next sign-in, or you can set one below.</p>
+      ) : (
+        <div className="flex flex-col divide-y divide-[var(--border)] mb-3">
+          {cr.map(c => (
+            <div key={c.role} className="flex items-center justify-between gap-3 py-2">
+              <div className="min-w-0">
+                <div className="text-sm font-medium capitalize">{c.role}{c.locked && <span className="badge badge-red ml-2">Locked</span>}</div>
+                <IdChip text={c.role_code} />
+              </div>
+              <ToggleSwitch checked={c.is_active} onChange={v => toggle(c.role, v)} />
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="form-grid">
+        <div>
+          <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">Role</label>
+          <select className="erp-input" value={role} onChange={e => setRole(e.target.value)}>
+            {USER_ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">Role ID (optional)</label>
+          <input className="erp-input" value={roleId} onChange={e => setRoleId(e.target.value)} placeholder="Generated if blank" autoComplete="off" />
+        </div>
+        <div className="stp-span2">
+          <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">New Role Password</label>
+          <input type="password" className="erp-input" value={pw} onChange={e => setPw(e.target.value)} placeholder="At least 8 characters" autoComplete="new-password" />
+        </div>
+      </div>
+      <div className="flex justify-end mt-3">
+        <Button variant="secondary" loading={busy} onClick={save}>{cr.some(c => c.role === role) ? 'Reset Role Credential' : 'Add Role Credential'}</Button>
+      </div>
+    </div>
+  )
+}
 
 // ─── Create user form ──────────────────────────────────────────────────────────
 function UserForm({ onClose }: { onClose: () => void }) {
@@ -109,6 +210,7 @@ function PermissionsModal({ user, onClose }: { user: User; onClose: () => void }
         <Button variant="secondary" onClick={onClose}>Cancel</Button>
         <Button variant="primary" loading={saving} onClick={save}>Save Permissions</Button>
       </div>
+      <RoleCredentialsPanel user={user} />
     </Modal>
   )
 }
@@ -176,26 +278,30 @@ export default function UsersPermissionsSection() {
       <div className="table-card">
         {/* Desktop */}
         <div className="overflow-x-auto stp-desktop-table">
-          <table className="erp-table">
-            <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Status</th><th>Last Login</th><th>Permissions</th></tr></thead>
+          <table className="erp-table stp-users-table">
+            <thead><tr><th>Name / User ID</th><th>Email</th><th>Phone</th><th>Role</th><th>Role ID</th><th>Status</th><th>Last Login</th><th>Permissions</th></tr></thead>
             <tbody>
               {isLoading
-                ? <SkeletonRows cols={7} />
+                ? <SkeletonRows cols={8} />
                 : users.length
                   ? users.map(u => (
                       <tr key={u.id}>
-                        <td className="font-semibold">{u.name}</td>
-                        <td className="td-mono">{u.email}</td>
+                        <td>
+                          <div className="font-semibold">{u.name}</div>
+                          <div className="mt-1"><IdChip text={shortId(u.id)} full={u.id} title={`User ID ${u.id} — click to copy`} /></div>
+                        </td>
+                        <td className="td-mono text-[11.5px] whitespace-nowrap">{u.email}</td>
                         <td>{u.phone || '—'}</td>
                         <td><span className="badge badge-purple">{u.role}</span></td>
+                        <td><RoleIds user={u} /></td>
                         <td>{u.is_active ? <span className="badge badge-green">Active</span> : <span className="badge badge-red">Inactive</span>}</td>
-                        <td className="td-mono text-[var(--text-4)]">{u.last_login_at ? fmtDateTime(u.last_login_at) : 'Never'}</td>
+                        <td className="td-mono text-[11px] text-[var(--text-4)]">{u.last_login_at ? fmtDateTime(u.last_login_at) : 'Never'}</td>
                         <td>
                           <Button variant="secondary" size="sm" icon={<ShieldCheck size={13}/>} onClick={() => setPermUser(u)}>Edit</Button>
                         </td>
                       </tr>
                     ))
-                  : <tr><td colSpan={7}><Empty message="No users found"/></td></tr>
+                  : <tr><td colSpan={8}><Empty message="No users found"/></td></tr>
               }
             </tbody>
           </table>
@@ -220,6 +326,10 @@ export default function UsersPermissionsSection() {
                       <span className="badge badge-purple">{u.role}</span>
                       {u.phone && <span className="stp-card-meta">{u.phone}</span>}
                     </div>
+                    <div className="flex flex-col gap-1.5 mt-2">
+                      <div className="flex items-center gap-2 flex-wrap"><span className="text-[10px] uppercase tracking-wide text-[var(--text-4)] w-14">User ID</span><IdChip text={shortId(u.id)} full={u.id} title={`User ID ${u.id} — tap to copy`} /></div>
+                      <div className="flex items-center gap-2 flex-wrap"><span className="text-[10px] uppercase tracking-wide text-[var(--text-4)] w-14">Role ID</span><RoleIds user={u} /></div>
+                    </div>
                     <div className="stp-card-footer">Last login: {u.last_login_at ? fmtDateTime(u.last_login_at) : 'Never'} · Tap to edit permissions</div>
                   </div>
                 ))
@@ -232,7 +342,7 @@ export default function UsersPermissionsSection() {
       <Modal open={modal} onClose={() => setModal(false)} title="Add User" size="md">
         <UserForm onClose={() => setModal(false)} />
       </Modal>
-      {permUser && <PermissionsModal user={permUser} onClose={() => setPermUser(null)} />}
+      {permUser && <PermissionsModal user={users.find(x => x.id === permUser.id) ?? permUser} onClose={() => setPermUser(null)} />}
     </div>
   )
 }

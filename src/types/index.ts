@@ -43,6 +43,8 @@ export interface User {
   hasPin?: boolean
   /** Effective permissions computed by the SERVER (role defaults + per-user switches). The only source for can(). */
   permissions?: string[]
+  /** Two-stage login: the user's Role IDs (public identifiers; the Role Password is never sent). Admin list only. */
+  role_credentials?: { role: string; role_code: string; is_active: boolean; locked?: boolean; last_verified_at?: string | null }[]
   can_backdate_entries?: boolean
 }
 
