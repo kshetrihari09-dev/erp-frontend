@@ -12,17 +12,20 @@ import {
   ToggleLeft, ToggleRight, SlidersHorizontal,
 } from 'lucide-react'
 import useTemplateStore, { DEFAULT_TPL, type TemplateConfig } from '@/store/templateStore'
-import InvoiceTemplate, { type PrintData } from '@/components/print/InvoiceTemplate'
+import { type PrintData } from '@/components/print/InvoiceTemplate'
+import InvoicePaper, { tplSizeToPrintSize, resolvePrintData, salesPreviewCardWidth } from '@/components/print/InvoicePaper'
+import { usePrintResponsive } from '@/components/print/usePrintResponsive'
+import useAuthStore from '@/store/authStore'
 import { usePrint } from '@/components/print/usePrint'
-import { adToBS } from '@/utils/nepaliDate'
 
 /* ── Demo print data for live preview ──────────────────────────────────── */
+// Shaped like what the Sales page hands to the print modal after a sale is saved (see SalesPage → setPrintData): no `company`
+// (merged in from the session by resolvePrintData, exactly as the modal does) and no `dateBS` (Sales does not pass one).
 const DEMO_AD_DATE = new Date().toISOString().split('T')[0]
-const DEMO_DATA: PrintData = {
+export const DEMO_PRINT_DATA: PrintData = {
   voucherNo:    'INV-2081-0042',
   type:         'SALE',
   date:         DEMO_AD_DATE,
-  dateBS:       adToBS(DEMO_AD_DATE), // was hardcoded to a stale '2081-03-15' regardless of the actual current date
   partyName:    'Bishal Prahamic Upchar Kendra',
   partyAddress: 'Badsudawa, Butwal',
   partyPhone:   '071-540123',
@@ -44,19 +47,16 @@ const DEMO_DATA: PrintData = {
 
 
 /* ── Fit-to-width preview ──────────────────────────────────────────────────
- * The invoice is laid out at a fixed "paper" width and then scaled to the width the preview area actually has, using a CSS
- * transform (never scaled UP). `widths` = [comfortable, compact]: the comfortable width is used when it fits; otherwise the
- * paper is laid out at the compact width (the narrowest the invoice table can be without wrapping) and scaled down from
- * there, so a phone gets the largest legible text. MIN_SCALE is a safety floor for very narrow containers — below it the
- * preview scrolls sideways rather than shrinking to unreadable.
- * The transform sits on a wrapper ABOVE the invoice node, so usePrint (which clones only the invoice element) is unaffected.
- * `boxH` keeps the layout height in step with the scaled paper, since transforms do not affect layout. */
-const MIN_SCALE = 0.5
-function useFitScale(widths: readonly [number, number]) {
+ * The invoice is laid out at EXACTLY the width the Sales print modal gives it on this screen (salesPreviewCardWidth), so
+ * columns wrap and align the same as on the Sales page, and is then scaled with a CSS transform to the width this pane
+ * actually has (never scaled up). The transform sits above the invoice node, so printing — which clones only the invoice
+ * element — is unaffected. `boxH` keeps the layout height in step with the scaled paper (transforms do not affect layout). */
+const MIN_SCALE = 0.4
+function useFitScale(naturalW: number) {
   const hostRef  = useRef<HTMLDivElement>(null)
   const paperRef = useRef<HTMLDivElement>(null)
-  const [fit, setFit] = useState({ scale: 1, naturalW: widths[0] })
-  const [boxH, setBoxH] = useState<number | null>(null)
+  const [scale, setScale] = useState(1)
+  const [boxH, setBoxH]   = useState<number | null>(null)
 
   useLayoutEffect(() => {
     const host = hostRef.current, paper = paperRef.current
@@ -64,19 +64,16 @@ function useFitScale(widths: readonly [number, number]) {
     const measure = () => {
       const cs = getComputedStyle(host)
       const avail = host.clientWidth - parseFloat(cs.paddingLeft || '0') - parseFloat(cs.paddingRight || '0')
-      if (avail > 0) {
-        const naturalW = avail >= widths[0] ? widths[0] : widths[1]
-        setFit({ naturalW, scale: Math.max(MIN_SCALE, Math.min(1, avail / naturalW)) })
-      }
+      if (avail > 0) setScale(Math.max(MIN_SCALE, Math.min(1, avail / naturalW)))
       setBoxH(paper.offsetHeight)
     }
     measure()
     const ro = new ResizeObserver(measure)
     ro.observe(host); ro.observe(paper)
     return () => ro.disconnect()
-  }, [widths[0], widths[1]]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [naturalW])
 
-  return { hostRef, paperRef, scale: fit.scale, naturalW: fit.naturalW, boxH }
+  return { hostRef, paperRef, scale, boxH }
 }
 
 /* ── Toggle row ─────────────────────────────────────────────────────────── */
@@ -122,8 +119,13 @@ export default function TemplateTab() {
   const { print } = usePrint()
   // Narrow layouts show ONE pane at a time (Settings | Preview); wide layouts show both and ignore this.
   const [view, setView] = useState<'settings' | 'preview'>('settings')
-  const isThermal = tpl.paperSize === 'thermal'
-  const { hostRef, paperRef, scale, naturalW, boxH } = useFitScale(isThermal ? [340, 340] : [640, 520])
+  const company = useAuthStore(s => s.company)
+  const { width: viewportW, isMobile } = usePrintResponsive()
+  const printSize = tplSizeToPrintSize(tpl.paperSize)
+  const naturalW  = Math.round(salesPreviewCardWidth(printSize, viewportW))
+  const { hostRef, paperRef, scale, boxH } = useFitScale(naturalW)
+  // Same data shape + company merge the print modal applies on the Sales page
+  const previewData = resolvePrintData(DEMO_PRINT_DATA, company)
 
   function set<K extends keyof TemplateConfig>(key: K, val: TemplateConfig[K]) {
     setTemplate({ [key]: val })
@@ -132,12 +134,12 @@ export default function TemplateTab() {
   function handleTestPrint() {
     if (!printRef.current) return
     print(printRef, {
-      size:      tpl.paperSize === 'thermal' ? 'thermal-80' : 'a4',
+      size:      printSize,
       copies:    tpl.copies || 1,
-      voucherNo: DEMO_DATA.voucherNo,
-      type:      DEMO_DATA.type,
-      date:      DEMO_DATA.date,
-      amount:    DEMO_DATA.netTotal,
+      voucherNo: DEMO_PRINT_DATA.voucherNo,
+      type:      DEMO_PRINT_DATA.type,
+      date:      DEMO_PRINT_DATA.date,
+      amount:    DEMO_PRINT_DATA.netTotal,
       marginMM:  tpl.marginMM,
       duplicateLabel: tpl.duplicateLabel,
     })
@@ -355,14 +357,8 @@ export default function TemplateTab() {
         <div className="tpl-preview-scroll" ref={hostRef}>
           <div className="tpl-preview-sizer"
             style={{ width: naturalW * scale, height: boxH != null ? boxH * scale : undefined }}>
-            <div className="tpl-preview-paper" ref={paperRef}
-              style={{ width: naturalW, transform: `scale(${scale})` }}>
-              <InvoiceTemplate
-                ref={printRef}
-                data={DEMO_DATA}
-                size={tpl.paperSize === 'thermal' ? 'thermal-80' : 'a4'}
-                tpl={tpl}
-              />
+            <div className="tpl-preview-paper" ref={paperRef} style={{ width: naturalW, transform: `scale(${scale})` }}>
+              <InvoicePaper ref={printRef} data={previewData} size={printSize} tpl={tpl} isMobile={isMobile} width={naturalW} />
             </div>
           </div>
         </div>

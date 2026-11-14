@@ -2319,14 +2319,9 @@ bsp-row--disabled { cursor: not-allowed; opacity: .55; }
 /* The sizer reserves the SCALED footprint of the paper (width/height set inline by TemplateTab's fit-to-width hook);
    the paper inside is laid out at its natural width and scaled with a transform. */
 .tpl-preview-sizer { margin: 0 auto; position: relative; flex: none; }
-.tpl-preview-paper {
-  background:    #fff;
-  border-radius: 6px;
-  box-shadow:    0 4px 24px rgba(0,0,0,.1), 0 1px 4px rgba(0,0,0,.06);
-  padding:       24px 28px;
-  box-sizing:    border-box;
-  transform-origin: top left;
-}
+/* The paper card itself (white, padding, shadow) is <InvoicePaper>, shared with the Sales print modal; this element only
+   carries the fit-to-width transform. */
+.tpl-preview-paper { transform-origin: top left; }
 
 /* The template editor adapts to the width ITS CONTAINER gets (viewport minus app sidebar, Settings nav and page padding),
    not to the viewport — see the @container rules near the end of this file. */

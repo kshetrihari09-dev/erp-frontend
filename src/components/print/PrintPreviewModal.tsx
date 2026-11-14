@@ -37,7 +37,8 @@ import useAuthStore from '@/store/authStore'
 import useTemplateStore from '@/store/templateStore'
 import { usePrint, type PrintSize } from './usePrint'
 import { usePrintResponsive } from './usePrintResponsive'
-import InvoiceTemplate, { type PrintData } from './InvoiceTemplate'
+import { type PrintData } from './InvoiceTemplate'
+import InvoicePaper, { tplSizeToPrintSize, resolvePrintData } from './InvoicePaper'
 import { ControlsPanel, Kbd, iconBtnStyle } from './PrintPreviewControls'
 import { MobileHeader, MobileBottomBar, MoreSheet } from './PrintPreviewMobile'
 import { Z } from '@/styles/zIndex'
@@ -76,12 +77,6 @@ interface PrintPreviewModalProps {
   autoprint?:  boolean
 }
 
-// Map templateStore paperSize to PrintSize
-function tplSizeToPrintSize(s: 'A4' | 'thermal' | 'A5'): PrintSize {
-  if (s === 'thermal') return 'thermal-80'
-  return 'a4'
-}
-
 export default function PrintPreviewModal({
   data, open, onClose, onNextBill, autoprint = false,
 }: PrintPreviewModalProps) {
@@ -112,7 +107,7 @@ export default function PrintPreviewModal({
   // Mobile is always a fullscreen, app-like modal
   const effectiveFullscreen = isMobile || fullscreen
 
-  const printData: PrintData | null = data ? { ...data, company: data.company ?? company } : null
+  const printData: PrintData | null = data ? resolvePrintData(data, company) : null
 
   useEffect(() => {
     if (open && autoprint && printData) {
@@ -261,16 +256,8 @@ export default function PrintPreviewModal({
                 display: 'flex', justifyContent: 'center', alignItems: 'flex-start',
                 WebkitOverflowScrolling: 'touch',
               }}>
-                <div style={{
-                  background: '#fff', borderRadius: 8, boxShadow: '0 2px 12px rgba(0,0,0,0.1)',
-                  padding: size === 'a4' ? (isMobile ? 10 : 16) : (isMobile ? 6 : 10),
-                  width: '100%',
-                  maxWidth: size === 'a4' ? 'min(210mm,100%)' : size === 'thermal-80' ? '80mm' : '58mm',
-                  overflowX: 'auto', margin: '0 auto', boxSizing: 'border-box' as const,
-                }}>
-                  {/* InvoiceTemplate receives the full tpl config — rendering unchanged */}
-                  <InvoiceTemplate ref={printRef} data={printData} size={size} tpl={tpl} />
-                </div>
+                {/* Shared with Settings → Printing, so the two previews cannot drift apart (see InvoicePaper.tsx) */}
+                <InvoicePaper ref={printRef} data={printData} size={size} tpl={tpl} isMobile={isMobile} />
               </div>
 
               {/* Controls: right sidebar (desktop) or full-width panel (tablet) */}
