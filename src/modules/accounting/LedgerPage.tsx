@@ -476,7 +476,7 @@ function TxBadge({ type }: { type: string }) {
   const key = type?.toUpperCase?.() ?? ''
   const s = TX_BADGE_STYLES[key] ?? TX_BADGE_STYLES[type] ?? TX_BADGE_STYLES.opening
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', padding: '2px 8px', borderRadius: 99, fontSize: 10, fontWeight: 700, background: s.bg, color: s.color, border: `1px solid ${s.border}`, letterSpacing: '0.04em', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
+    <span className="ldg-txbadge" style={{ display: 'inline-flex', alignItems: 'center', padding: '2px 8px', borderRadius: 99, fontSize: 10, fontWeight: 700, background: s.bg, color: s.color, border: `1px solid ${s.border}`, letterSpacing: '0.04em', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
       {s.label}
     </span>
   )
@@ -967,13 +967,15 @@ export default function LedgerPage() {
               </div>
             </div>
 
-            {/* Desktop table */}
+            {/* Ledger table — one table for every screen size; on phones the Description column is hidden and the cells are
+                compacted by CSS (see the ldg-table rules in globals.css), and the table scrolls sideways inside this wrapper when
+                the screen is too narrow. */}
             <div className="ldg-desktop-table-wrap" style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <table className="ldg-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ background: 'var(--surface-2)', borderBottom: '1px solid var(--border)' }}>
                     {['Date', 'Reference', 'Description', 'Type', 'Debit', 'Credit', 'Balance'].map((h, i) => (
-                      <th key={h} style={{ padding: '11px 14px', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text-3)', textAlign: i >= 4 ? 'right' : 'left', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)' }}>
+                      <th key={h} className={h === 'Description' ? 'ldg-col-desc' : h === 'Balance' ? 'ldg-col-bal' : undefined} style={{ padding: '11px 14px', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text-3)', textAlign: i >= 4 ? 'right' : 'left', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)' }}>
                         {h}
                       </th>
                     ))}
@@ -985,7 +987,7 @@ export default function LedgerPage() {
                     const isOpening = e.type === 'opening'
                     const balColor  = bal > 0 ? 'var(--green)' : bal < 0 ? 'var(--red)' : 'var(--text-3)'
                     return (
-                      <tr key={i}
+                      <tr key={i} className={isOpening ? 'ldg-row-opening' : undefined}
                         style={{ borderBottom: '1px solid var(--border)', background: isOpening ? 'var(--surface-2)' : i % 2 === 0 ? 'transparent' : 'var(--surface-2)' }}
                         onMouseEnter={e => { (e.currentTarget as HTMLTableRowElement).style.background = 'var(--surface-3)' }}
                         onMouseLeave={e => { (e.currentTarget as HTMLTableRowElement).style.background = isOpening ? 'var(--surface-2)' : i % 2 === 0 ? 'transparent' : 'var(--surface-2)' }}
@@ -996,7 +998,7 @@ export default function LedgerPage() {
                         <td style={{ padding: '9px 14px', fontFamily: 'var(--font-mono)', fontSize: 12, color: '#3b82f6', fontWeight: 600 }}>
                           {e.reference || '—'}
                         </td>
-                        <td style={{ padding: '9px 14px', fontSize: 13, color: isOpening ? 'var(--text-3)' : 'var(--text-2)', fontWeight: isOpening ? 600 : 400 }}>
+                        <td className="ldg-col-desc" style={{ padding: '9px 14px', fontSize: 13, color: isOpening ? 'var(--text-3)' : 'var(--text-2)', fontWeight: isOpening ? 600 : 400 }}>
                           {e.description || '—'}
                         </td>
                         <td style={{ padding: '9px 14px' }}>
@@ -1008,7 +1010,7 @@ export default function LedgerPage() {
                         <td style={{ padding: '9px 14px', textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 13, color: Number(e.credit) > 0 ? 'var(--green)' : 'var(--text-4)', fontWeight: Number(e.credit) > 0 ? 700 : 400 }}>
                           {Number(e.credit) > 0 ? fmt(e.credit) : '—'}
                         </td>
-                        <td style={{ padding: '9px 14px', textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700, color: balColor }}>
+                        <td className="ldg-col-bal" style={{ padding: '9px 14px', textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700, color: balColor }}>
                           {fmt(bal)}
                         </td>
                       </tr>
@@ -1018,86 +1020,21 @@ export default function LedgerPage() {
                 {!loading && pagedRows.length > 0 && (
                   <tfoot>
                     <tr style={{ borderTop: '2px solid var(--border-2)', background: 'var(--surface-2)' }}>
-                      <td colSpan={4} style={{ padding: '11px 14px', textAlign: 'right', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>
+                      <td colSpan={4} className="ldg-foot-label-desk" style={{ padding: '11px 14px', textAlign: 'right', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>
+                        Period Totals
+                      </td>
+                      <td colSpan={3} className="ldg-foot-label-mob" style={{ padding: '11px 14px', textAlign: 'right', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>
                         Period Totals
                       </td>
                       <td style={{ padding: '11px 14px', textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 800, color: 'var(--red)' }}>{fmt(totalDr)}</td>
                       <td style={{ padding: '11px 14px', textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 800, color: 'var(--green)' }}>{fmt(totalCr)}</td>
-                      <td style={{ padding: '11px 14px', textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 800, color: balColor }}>
+                      <td className="ldg-col-bal" style={{ padding: '11px 14px', textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 800, color: balColor }}>
                         {fmt(closingBal)}
                       </td>
                     </tr>
                   </tfoot>
                 )}
               </table>
-            </div>
-
-            {/* Mobile card list */}
-            <div className="ldg-mobile-list">
-              {loading ? (
-                <div className="ldg-mobile-skel-wrap">
-                  {[1,2,3,4,5].map(i => <div key={i} className="ldg-mobile-card ldg-mobile-card-skel" />)}
-                </div>
-              ) : (
-                pagedRows.map((e: any, i: number) => {
-                  const bal = Number(e.running_balance ?? e.balance ?? 0)
-                  const isOpening = e.type === 'opening'
-                  const rowBalColor = bal > 0 ? 'var(--green)' : bal < 0 ? 'var(--red)' : 'var(--text-3)'
-                  return (
-                    <div key={i} className={`ldg-mobile-card ${isOpening ? 'ldg-mobile-card-opening' : ''}`}>
-                      {/* Top: date + type badge */}
-                      <div className="ldg-mc-top">
-                        <span className="ldg-mc-date">
-                          {isOpening ? 'Opening Balance' : (e.date_ad ? formatDisplayDate(e.date_ad, dateMode) : e.date || '—')}
-                        </span>
-                        {e.type && <TxBadge type={e.type} />}
-                      </div>
-
-                      {/* Reference + description */}
-                      {(e.reference || e.description) && (
-                        <div className="ldg-mc-desc">
-                          {e.reference && <span className="ldg-mc-ref">{e.reference}</span>}
-                          {e.description && <span className="ldg-mc-desc-text">{e.description}</span>}
-                        </div>
-                      )}
-
-                      {/* Debit / Credit / Balance row */}
-                      <div className="ldg-mc-amounts">
-                        <div className="ldg-mc-amount-item">
-                          <span className="ldg-mc-amount-label">Debit</span>
-                          <span className="ldg-mc-amount-value" style={{ color: Number(e.debit) > 0 ? 'var(--red)' : 'var(--text-4)' }}>
-                            {Number(e.debit) > 0 ? fmt(e.debit) : '—'}
-                          </span>
-                        </div>
-                        <div className="ldg-mc-amount-item">
-                          <span className="ldg-mc-amount-label">Credit</span>
-                          <span className="ldg-mc-amount-value" style={{ color: Number(e.credit) > 0 ? 'var(--green)' : 'var(--text-4)' }}>
-                            {Number(e.credit) > 0 ? fmt(e.credit) : '—'}
-                          </span>
-                        </div>
-                        <div className="ldg-mc-amount-item">
-                          <span className="ldg-mc-amount-label">Balance</span>
-                          <span className="ldg-mc-amount-value" style={{ color: rowBalColor, fontWeight: 800 }}>
-                            {fmt(bal)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })
-              )}
-
-              {/* Mobile period totals footer */}
-              {!loading && pagedRows.length > 0 && (
-                <div className="ldg-mc-totals">
-                  <span className="ldg-mc-totals-label">Period Totals</span>
-                  <div className="ldg-mc-totals-row">
-                    <span>Dr <strong style={{ color: 'var(--red)' }}>{fmt(totalDr)}</strong></span>
-                    <span>Cr <strong style={{ color: 'var(--green)' }}>{fmt(totalCr)}</strong></span>
-                    <span>Bal <strong style={{ color: balColor }}>{fmt(closingBal)}</strong></span>
-                  </div>
-                </div>
-              )}
             </div>
 
             {/* Pagination */}
