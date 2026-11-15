@@ -290,22 +290,31 @@ export interface StockRegisterRow {
   /** 1 when the free qty also moves stock (purchases/receipts/entries); 0 for sale bonus (reference only). */
   free_effect?: number
 }
+export interface StockRegisterParty { id: string; code: string; name: string; type: 'customer' | 'supplier' }
 export interface StockRegisterReport {
   product: { id: string; item_code: string; name: string; unit?: string }
-  filters: { from: string | null; to: string | null; store: string; include_adj: boolean }
+  /** Set when the register is filtered to one customer / supplier. */
+  party: StockRegisterParty | null
+  filters: { from: string | null; to: string | null; store: string; party_id: string | null }
   opening_balance: number
   rows: StockRegisterRow[]
   totals: { qty_in: number; qty_out: number; qty_free: number; opening_balance: number; closing_balance: number }
-  reconciliation: { register_closing_all_time: number; current_stock: number; matches: boolean }
+  /** `applicable: false` (party filter on): the live-stock comparison only makes sense for the whole register. */
+  reconciliation: { applicable?: boolean; register_closing_all_time: number | null; current_stock: number; matches: boolean }
 }
 export interface StockRegisterParams {
-  product_id: string; from?: string; to?: string; store?: string; include_adj?: boolean
+  product_id: string; from?: string; to?: string; store?: string
+  /** Only this customer's / supplier's movements. */
+  party_id?: string
   batch?: string; expiry_from?: string; expiry_to?: string
 }
 export const stockRegisterAPI = {
   get:    (params: StockRegisterParams) => http.get<ApiResponse<StockRegisterReport>>('/stock-register', { params }),
   lookup: (code: string)                => http.get<ApiResponse<{ id: string; item_code: string; name: string; unit?: string }>>('/stock-register/lookup', { params: { code } }),
   stores: ()                            => http.get<ApiResponse<{ id: string; name: string }[]>>('/stock-register/stores'),
+  /** Customers + suppliers for the party filter (type-ahead). Needs only stock.view. */
+  parties: (params: { search?: string; type?: 'customer' | 'supplier'; limit?: number } = {}) =>
+    http.get<ApiResponse<StockRegisterParty[]>>('/stock-register/parties', { params }),
   exportCsv: (params: StockRegisterParams) => http.get('/stock-register/export', { params, responseType: 'blob' }),
 }
 

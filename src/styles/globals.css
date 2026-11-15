@@ -7664,7 +7664,25 @@ canvas{
 .sr-combo-list li.on { background: var(--brand-light); color: var(--text); }
 .sr-combo-code { min-width: 64px; font-family: var(--font-mono, ui-monospace, monospace); color: var(--text-3); }
 .sr-combo-empty { color: var(--text-3) !important; cursor: default !important; }
-.sr-check { display: flex; align-items: center; gap: 6px; height: 32px; font-size: 12px; font-weight: 600; color: var(--text-2); cursor: pointer; user-select: none; }
+.sr-f-party { flex: 1 1 300px; min-width: 260px; max-width: 420px; }
+.sr-f-party em { font-style: normal; font-weight: 500; color: var(--text-4); }
+.sr-party { display: flex; gap: 6px; align-items: stretch; }
+.sr-party .sr-party-type { width: 108px; flex: none; padding-left: 8px; padding-right: 4px; }
+.sr-party-combo { flex: 1 1 auto; min-width: 0; }
+.sr-party-combo .erp-input { padding-right: 30px; }
+.sr-combo-clear { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); display: flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; border: 0; border-radius: 5px; background: transparent; color: var(--text-3); cursor: pointer; }
+.sr-combo-clear:hover { background: var(--surface-2); color: var(--text); }
+/* the party list is wider than its (narrow) input so full names fit; it opens leftwards because the field sits at the right edge */
+.sr-party-combo .sr-combo-list { left: auto; right: 0; width: max(100%, 340px); max-width: min(420px, 92vw); }
+.sr-party-combo .sr-combo-code { min-width: 44px; }
+.sr-combo-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sr-party-tag { flex: none; align-self: center; padding: 1px 7px; border-radius: 999px; font-size: 10px; font-weight: 700; letter-spacing: .02em; }
+.sr-party-tag-customer { background: rgba(22,163,74,.12); color: #15803d; }
+.sr-party-tag-supplier { background: rgba(37,99,235,.12); color: #1d4ed8; }
+.dark .sr-party-tag-customer { color: #4ade80; } .dark .sr-party-tag-supplier { color: #93c5fd; }
+.sr-msg-info { background: rgba(37,99,235,.08); border: 1px solid rgba(37,99,235,.28); color: var(--text-2); }
+@media (max-width: 640px) { .sr-f-party { flex: 1 1 100%; max-width: none; } .sr-party .sr-party-type { width: 96px; } .sr-party-combo .sr-combo-list { left: 0; right: auto; width: 100%; } }
 .sr-actions { display: flex; gap: 6px; margin-left: auto; }
 .sr-msg { padding: 6px 10px; border-radius: 8px; font-size: 12px; margin-bottom: 8px; }
 .sr-msg-warn { background: rgba(245,158,11,.12); border: 1px solid rgba(245,158,11,.38); color: var(--text-2); }

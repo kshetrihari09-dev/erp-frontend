@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Printer, Download, LogOut, Search, Loader2, ClipboardList } from 'lucide-react'
-import { productsAPI, stockRegisterAPI, type StockRegisterReport, type StockRegisterRow } from '@/services/api'
+import { Printer, Download, LogOut, Search, Loader2, ClipboardList, X } from 'lucide-react'
+import { productsAPI, stockRegisterAPI, type StockRegisterReport, type StockRegisterRow, type StockRegisterParty } from '@/services/api'
 import { useDebounce } from '@/hooks/useDebounce'
 import useUIStore from '@/store/uiStore'
 import { formatDisplayDate } from '@/utils/dateSystem'
@@ -13,6 +13,8 @@ import { DateRangeFilter } from '@/components/ui/DateRangePopup'
    balance and every running balance); this page only displays them. */
 
 type ProductOpt = { id: string; item_code: string; name: string; unit?: string }
+type PartyOpt = StockRegisterParty
+const PARTY_LABEL: Record<PartyOpt['type'], string> = { customer: 'Customer', supplier: 'Supplier' }
 
 const todayISO = () => new Date().toISOString().slice(0, 10)
 const daysAgoISO = (n: number) => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10) }
@@ -46,7 +48,17 @@ export default function StockRegisterPage() {
   const [to, setTo]             = useState(todayISO())
   const [store, setStore]       = useState('all')
   const [stores, setStores]     = useState<{ id: string; name: string }[]>([])
-  const [includeAdj, setIncludeAdj] = useState(true)
+
+  // party filter (customers and suppliers): optional; when set, every figure below is that party's movements only
+  const [party, setParty]           = useState<PartyOpt | null>(null)
+  const [partyType, setPartyType]   = useState<'' | PartyOpt['type']>('')
+  const [partyInput, setPartyInput] = useState('')
+  const [partyOpen, setPartyOpen]   = useState(false)
+  const [partyOpts, setPartyOpts]   = useState<PartyOpt[]>([])
+  const [partyLoading, setPartyLoading] = useState(false)
+  const [partyHl, setPartyHl]       = useState(0)
+  const debouncedParty = useDebounce(partyInput, 300)
+  const partyBoxRef = useRef<HTMLDivElement>(null)
 
   // ── product dropdown ───────────────────────────────────────────────────────
   const [open, setOpen]         = useState(false)
@@ -82,6 +94,30 @@ export default function StockRegisterPage() {
     document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h)
   }, [])
 
+  // party search (customers + suppliers; only while the list is open)
+  useEffect(() => {
+    if (!partyOpen) return
+    let live = true
+    setPartyLoading(true)
+    stockRegisterAPI.parties({ search: debouncedParty || undefined, type: partyType || undefined, limit: 20 })
+      .then(r => { if (live) { setPartyOpts(r.data.data || []); setPartyHl(0) } })
+      .catch(() => { if (live) setPartyOpts([]) })
+      .finally(() => { if (live) setPartyLoading(false) })
+    return () => { live = false }
+  }, [debouncedParty, partyType, partyOpen])
+
+  useEffect(() => {
+    const h = (e: MouseEvent) => { if (partyBoxRef.current && !partyBoxRef.current.contains(e.target as Node)) setPartyOpen(false) }
+    document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h)
+  }, [])
+
+  const pickParty = (p: PartyOpt) => { setParty(p); setPartyInput(p.name); setPartyOpen(false); setSelKey(null) }
+  const clearParty = () => { setParty(null); setPartyInput(''); setPartyOpen(false); setSelKey(null) }
+  const changePartyType = (t: '' | PartyOpt['type']) => {
+    setPartyType(t)
+    if (party && t && party.type !== t) clearParty()          // a selected customer is dropped when switching to Suppliers (and vice versa)
+  }
+
   const pick = (p: ProductOpt) => {
     setProduct(p); setCodeInput(p.item_code || ''); setNameInput(p.name); setOpen(false); setSelKey(null)
   }
@@ -104,14 +140,14 @@ export default function StockRegisterPage() {
     const seq = ++loadSeq.current
     setLoading(true); setErr(null)
     try {
-      const r = await stockRegisterAPI.get({ product_id: product.id, from, to, store, include_adj: includeAdj })
+      const r = await stockRegisterAPI.get({ product_id: product.id, from, to, store, party_id: party?.id })
       if (seq !== loadSeq.current) return
       setReport(r.data.data as StockRegisterReport); setSelKey(null)
     } catch (e: any) {
       if (seq !== loadSeq.current) return
       setReport(null); setErr(e?.response?.data?.message || e?.message || 'Failed to load stock register')
     } finally { if (seq === loadSeq.current) setLoading(false) }
-  }, [product, from, to, store, includeAdj, dateError])
+  }, [product, from, to, store, party?.id, dateError])
 
   useEffect(() => { void load() }, [load])
 
@@ -124,17 +160,17 @@ export default function StockRegisterPage() {
     if (e.key === 'ArrowUp')   { e.preventDefault(); setSelKey(rows[Math.max(0, i - 1)].key) }
   }
   useEffect(() => {
-    const h = (e: KeyboardEvent) => { if (e.key === 'Escape' && !open) navigate(PATHS.PRODUCTS) }
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape' && !open && !partyOpen) navigate(PATHS.PRODUCTS) }
     window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h)
-  }, [navigate, open])
+  }, [navigate, open, partyOpen])
 
   // ── export / print ────────────────────────────────────────────────────────
   const exportCsv = async () => {
     if (!product || dateError) return
     try {
-      const r = await stockRegisterAPI.exportCsv({ product_id: product.id, from, to, store, include_adj: includeAdj })
+      const r = await stockRegisterAPI.exportCsv({ product_id: product.id, from, to, store, party_id: party?.id })
       const url = URL.createObjectURL(new Blob([r.data], { type: 'text/csv;charset=utf-8' }))
-      const a = document.createElement('a'); a.href = url; a.download = `stock-register-${(product.item_code || 'product').replace(/[^\w.-]+/g, '_')}.csv`
+      const a = document.createElement('a'); a.href = url; a.download = `stock-register-${(product.item_code || 'product').replace(/[^\w.-]+/g, '_')}${party ? '-' + party.name.replace(/[^\w.-]+/g, '_') : ''}.csv`
       document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url)
       toastSuccess('Exported', 'Stock register CSV downloaded')
     } catch (e: any) { toastError('Export failed', e?.response?.data?.message || e?.message) }
@@ -154,7 +190,7 @@ export default function StockRegisterPage() {
       .n{text-align:right;font-variant-numeric:tabular-nums}.b{font-weight:bold}tfoot td{font-weight:bold;background:#f3f3f3}
       @media print{@page{size:landscape;margin:8mm}}</style></head><body>
       <h1>Stock Register</h1>
-      <p class="meta"><b>${esc(report.product.item_code)}</b> — ${esc(report.product.name)}<br>
+      <p class="meta">${report.party ? `<b>Party:</b> ${esc(report.party.name)} (${PARTY_LABEL[report.party.type]})<br>` : ''}<b>${esc(report.product.item_code)}</b> — ${esc(report.product.name)}<br>
       Period: ${esc(d(report.filters.from))} to ${esc(d(report.filters.to))} &nbsp;|&nbsp; Store: ${report.filters.store === 'all' ? 'All Stores' : esc(report.filters.store)}
       &nbsp;|&nbsp; Opening Balance: <b>${num(report.opening_balance)}</b></p>
       <table><thead><tr>${COLS.map(c => `<th>${c.label}</th>`).join('')}</tr></thead>
@@ -222,10 +258,44 @@ export default function StockRegisterPage() {
           </select>
         </label>
 
-        <label className="sr-check" title="Include opening-stock, stock adjustment and batch-edit entries">
-          <input type="checkbox" checked={includeAdj} onChange={e => setIncludeAdj(e.target.checked)} />
-          <span>Batch Edit Include</span>
-        </label>
+        <div className="sr-f sr-f-party" ref={partyBoxRef}>
+          <span>Party <em>(customers &amp; suppliers)</em></span>
+          <div className="sr-party">
+            <select className="erp-input sr-party-type" value={partyType} aria-label="Party type"
+              onChange={e => changePartyType(e.target.value as '' | PartyOpt['type'])}>
+              <option value="">All</option>
+              <option value="customer">Customers</option>
+              <option value="supplier">Suppliers</option>
+            </select>
+            <div className="sr-combo sr-party-combo">
+              <Search size={13} className="sr-combo-ic" />
+              <input className="erp-input" value={partyInput} placeholder="All parties" aria-label="Party"
+                onFocus={() => setPartyOpen(true)} onClick={() => setPartyOpen(true)}   // click re-opens it: the input keeps focus after a pick
+                onChange={e => { setPartyInput(e.target.value); setPartyOpen(true); if (party) setParty(null) }}   // editing the text drops the selection
+                onKeyDown={e => {
+                  if (e.key === 'ArrowDown') { e.preventDefault(); setPartyHl(h => Math.min(partyOpts.length - 1, h + 1)) }
+                  else if (e.key === 'ArrowUp') { e.preventDefault(); setPartyHl(h => Math.max(0, h - 1)) }
+                  else if (e.key === 'Enter' && partyOpen && partyOpts[partyHl]) { e.preventDefault(); pickParty(partyOpts[partyHl]) }
+                  else if (e.key === 'Escape') setPartyOpen(false)
+                }} />
+              {partyLoading && <Loader2 size={13} className="sr-combo-spin" />}
+              {!partyLoading && (party || partyInput) && (
+                <button type="button" className="sr-combo-clear" title="Clear party filter" aria-label="Clear party filter" onClick={clearParty}><X size={13} /></button>
+              )}
+              {partyOpen && (
+                <ul className="sr-combo-list">
+                  {!partyLoading && partyOpts.length === 0 && <li className="sr-combo-empty">No customers or suppliers found</li>}
+                  {partyOpts.map((p, i) => (
+                    <li key={p.id} className={i === partyHl ? 'on' : ''} onMouseEnter={() => setPartyHl(i)} onMouseDown={e => { e.preventDefault(); pickParty(p) }}>
+                      <span className="sr-combo-code">{p.code}</span><span className="sr-combo-name">{p.name}</span>
+                      <span className={`sr-party-tag sr-party-tag-${p.type}`}>{PARTY_LABEL[p.type]}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
 
         <div className="sr-actions">
           <button className="btn btn-primary btn-sm" onClick={printReport} disabled={!report || loading}><Printer size={14} /> Report</button>
@@ -235,6 +305,12 @@ export default function StockRegisterPage() {
       </div>
 
       {dateError && <div className="sr-msg sr-msg-warn">{dateError}</div>}
+      {party && product && !dateError && (
+        <div className="sr-msg sr-msg-info">
+          Showing only this product's movements with <b>{party.name}</b> ({PARTY_LABEL[party.type]}). Opening balance, running balance and totals
+          cover this party only; stock receipts and adjustments (no party) are not listed.
+        </div>
+      )}
 
       {/* ── register table ──────────────────────────────────────────────── */}
       <div className="sr-sheet-wrap">
@@ -270,7 +346,7 @@ export default function StockRegisterPage() {
               {loading && <tr><td colSpan={14} className="sr-state"><Loader2 size={16} className="sr-spin" /> Loading stock register…</td></tr>}
               {!loading && err && <tr><td colSpan={14} className="sr-state sr-state-err">{err} <button className="btn btn-secondary btn-sm" onClick={() => void load()}>Retry</button></td></tr>}
               {!loading && !err && !product && <tr><td colSpan={14} className="sr-state"><ClipboardList size={18} /> Select a product (code or name) to view its stock register.</td></tr>}
-              {!loading && !err && product && report && rows.length === 0 && <tr><td colSpan={14} className="sr-state">No transactions for this product in the selected period.</td></tr>}
+              {!loading && !err && product && report && rows.length === 0 && <tr><td colSpan={14} className="sr-state">{party ? `No transactions for this product with ${party.name} in the selected period.` : 'No transactions for this product in the selected period.'}</td></tr>}
             </tbody>
           </table>
         </div>
@@ -278,9 +354,9 @@ export default function StockRegisterPage() {
           <div className="sr-foot-info">
             {report ? <>
               <b>{report.product.item_code}</b> · {report.product.name} · {rows.length} transaction{rows.length === 1 ? '' : 's'}
-              {!report.reconciliation.matches && (
+              {report.reconciliation.applicable !== false && !report.reconciliation.matches && (
                 <span className="sr-warn" title="The register's all-time closing differs from live batch stock (e.g. sales returns made before this feature was installed).">
-                  {' '}· live stock {num(report.reconciliation.current_stock)} vs register {num(report.reconciliation.register_closing_all_time)}
+                  {' '}· live stock {num(report.reconciliation.current_stock)} vs register {num(report.reconciliation.register_closing_all_time ?? 0)}
                 </span>
               )}
             </> : '—'}
