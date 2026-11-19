@@ -417,8 +417,8 @@ export default function LoginPage() {
 
   // One place that turns a FULL session response into a signed-in app (password, OTP and role-verified logins).
   const finishLogin = (body: { token: string; refresh_token?: string; user: any; company: any }) => {
-    if (body.refresh_token) localStorage.setItem('erp_refresh_token', body.refresh_token)
-    setAuth({ token: body.token, user: body.user, company: body.company })
+    // Memory only: neither token is ever written to browser storage (store/authStore.ts), so a reload / reopen starts at login.
+    setAuth({ token: body.token, refreshToken: body.refresh_token ?? null, user: body.user, company: body.company })
     const perms: string[] = body.user?.permissions || []
     const from = (location.state as any)?.from?.pathname
     // Each verified role lands on a screen it may open (Admin/Manager → dashboard, Cashier → billing, …).

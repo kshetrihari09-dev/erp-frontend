@@ -435,8 +435,8 @@ export default function SignupPage() {
         } } })
         return
       }
-      if (body.refresh_token) localStorage.setItem('erp_refresh_token', body.refresh_token)
-      setAuth({ token: body.token!, user: body.user!, company: body.company! })
+      // (unreachable with the current server — registration always returns a pending session above — kept memory-only for safety)
+      setAuth({ token: body.token!, refreshToken: body.refresh_token ?? null, user: body.user!, company: body.company! })
       navigate(PATHS.DASHBOARD, { replace: true })
     } catch (e: any) { setError(e.message || 'Registration failed') }
     finally { setLoading(false) }

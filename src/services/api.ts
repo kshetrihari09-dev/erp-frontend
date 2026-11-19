@@ -1,4 +1,5 @@
-import http, { REFRESH_TOKEN_KEY } from '@/services/http'
+import http from '@/services/http'
+import useAuthStore from '@/store/authStore'
 import type { ApiResponse, Company, User, Sale, SaleItem, Purchase, PurchaseItem,
   Product, Party, Account, AccountDefault, Voucher, VoucherLine,
   VoucherPosting, PostingStatus, DashboardStats, DashboardTrend, PnLReport,
@@ -85,7 +86,7 @@ export const authAPI = {
   // session (see routes/auth.js POST /auth/logout) — without this, a copy
   // of the token (already leaked, or retried after this call) would keep
   // working until it naturally expired.
-  logout: () => http.post('/auth/logout', { refresh_token: localStorage.getItem(REFRESH_TOKEN_KEY) || undefined }),
+  logout: () => http.post('/auth/logout', { refresh_token: useAuthStore.getState().refreshToken || undefined }),
   /** "Log out everywhere" — revokes every refresh-token session for this user. */
   revokeAllSessions: () => http.post('/auth/revoke-sessions'),
   me:             () => http.get<ApiResponse<{ user: User; company: Company }>>('/auth/me'),

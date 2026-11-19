@@ -1,5 +1,8 @@
-import { lazy, Suspense } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { lazy, Suspense, useEffect } from 'react'
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
+import useAuthStore from '@/store/authStore'
+import { registerNavigator } from '@/services/navigation'
+import { useSessionLifecycle } from '@/hooks/useSessionLifecycle'
 import { RequireAuth, RequireGuest, RequireRoute, HomeRedirect } from '@/router/guards'
 import AppLayout from '@/layouts/AppLayout'
 import { PATHS } from '@/constants'
@@ -44,11 +47,25 @@ function PageLoader() {
   )
 }
 
+/** Lets non-React code (HTTP client, company switch) navigate inside the SPA — a page load would drop the in-memory session. */
+function NavigatorBridge() {
+  const navigate = useNavigate()
+  useEffect(() => {
+    registerNavigator((to, opts) => navigate(to, opts))
+    return () => registerNavigator(null)
+  }, [navigate])
+  return null
+}
+
 export default function Router() {
+  // Bumps on a company switch: remounting every route is what guarantees nothing from the previous company survives in the UI.
+  const sessionEpoch = useAuthStore((s) => s.sessionEpoch)
+  useSessionLifecycle()       // best-effort "app closing" → end the server session
   return (
     <BrowserRouter>
+      <NavigatorBridge />
       <Suspense fallback={<PageLoader />}>
-        <Routes>
+        <Routes key={sessionEpoch}>
           {/* Public */}
           <Route path={PATHS.LOGIN}  element={<RequireGuest><LoginPage /></RequireGuest>} />
           <Route path={PATHS.SIGNUP} element={<RequireGuest><SignupPage /></RequireGuest>} />

@@ -72,7 +72,9 @@ describe('two-stage login page', () => {
     expect(api.verifyRole).toHaveBeenCalledWith({ auth_session_token: 'pending-xyz', role_id: 'CSH-AAAA1', role_password: 'Role#Secret99' })
     expect(useAuthStore.getState().isAuthenticated).toBe(true)
     expect(useAuthStore.getState().user?.role).toBe('cashier')
-    expect(localStorage.getItem('erp_refresh_token')).toBe('r')
+    // memory only: nothing that grants access is ever written to browser storage
+    expect(useAuthStore.getState().refreshToken).toBe('r'); expect(useAuthStore.getState().token).toBe('t')
+    expect(localStorage.getItem('erp_refresh_token')).toBeNull(); expect(localStorage.getItem('erp_raw_token')).toBeNull(); expect(localStorage.getItem('erp_auth_state')).toBeNull()
   })
 
   test('wrong role credentials: generic error shown, password cleared, still on the role window, not signed in', async () => {

@@ -13,14 +13,14 @@ import axios, {
 import { config }      from '@/config/env'
 import { getSelectedFiscalYearId } from './fiscalYearSelection'
 import { getEffectiveApiBaseUrl } from '@/config/serverConnection'
-import { RAW_TOKEN_KEY, REFRESH_TOKEN_KEY as AUTH_REFRESH_KEY } from '@/store/authStore'
+import useAuthStore from '@/store/authStore'
+import { getAppInstanceId } from './appInstance'
+import { navigateTo } from './navigation'
 import { getValidStepUpToken, clearStepUpToken } from './stepUpToken'
 import useUIStore from '@/store/uiStore'
 import { noteRateLimited, parseRetryAfterMs, readHeader, classifyRateLimit, scopeForLimiter } from './rateLimitState'
 import { createRequestGuard } from './requestGuard'
 
-// REFRESH_TOKEN_KEY is exported from authStore.ts
-export { AUTH_REFRESH_KEY as REFRESH_TOKEN_KEY }
 
 // ─── Axios instance ────────────────────────────────────────────────────────────
 const http = axios.create({
@@ -73,15 +73,14 @@ function notifyRateLimited(waitMs: number | null) {
   )
 }
 
+/** The session is over (revoked, expired, wrong instance, refresh rejected): drop the in-memory session and show the login screen. */
 function clearAuthAndRedirect() {
-  localStorage.removeItem(RAW_TOKEN_KEY)
-  localStorage.removeItem(AUTH_REFRESH_KEY)
-  localStorage.removeItem('erp_auth_state')
-  clearStepUpToken()
-  if (!window.location.pathname.startsWith('/login')) {
-    window.location.href = '/login'
-  }
+  useAuthStore.getState().logout()          // memory only — there is nothing in browser storage to clean up (see store/authStore.ts)
+  if (!window.location.pathname.startsWith('/login')) navigateTo('/login', { replace: true })
 }
+
+/** 401 codes that mean "this session is finished": no silent refresh can bring it back — sign in again. */
+const DEAD_SESSION_CODES = new Set(['SESSION_REVOKED', 'SESSION_EXPIRED', 'SESSION_INSTANCE_MISMATCH', 'ROLE_REVOKED', 'ROLE_VERIFICATION_REQUIRED'])
 
 // ─── Request interceptor — attach JWT ─────────────────────────────────────────
 http.interceptors.request.use(
@@ -94,11 +93,12 @@ http.interceptors.request.use(
     // without needing to reload the app.
     config_.baseURL = getEffectiveApiBaseUrl(config.apiBaseUrl)
 
-    const token = localStorage.getItem(RAW_TOKEN_KEY)
-
-    if (token && token !== 'null' && token !== 'undefined' && token.includes('.')) {
+    // The access token lives in memory only (store/authStore.ts); this run's random app-instance id binds the session to it.
+    const token = useAuthStore.getState().token
+    if (token && token.includes('.')) {
       config_.headers.Authorization = `Bearer ${token}`
     }
+    config_.headers['X-App-Instance'] = getAppInstanceId()
 
     // Step-up token — see services/stepUpToken.ts. In-memory only (never
     // localStorage), and simply absent/expired most of the time, in which
@@ -184,9 +184,14 @@ http.interceptors.response.use(
     // ── 401: attempt silent token refresh ──────────────────────────────────
     // Credential endpoints answer 401 for "wrong credentials" (e.g. a wrong Role Password in the second login window).
     // That is an ordinary form error, never a dead session: no silent refresh, no redirect that would wipe the pending login.
-    const isCredentialCall = /\/auth\/(login|verify-role|pending-session)\/?$/.test(String(originalRequest?.url || ''))
+    const isCredentialCall = /\/auth\/(login|verify-role|enroll-role|pending-session|end-session)\/?$/.test(String(originalRequest?.url || ''))
     if (status === 401 && !originalRequest._retry && !isCredentialCall) {
-      const refreshToken = localStorage.getItem(AUTH_REFRESH_KEY)
+      // A finished session (revoked, expired, another app instance, role disabled) cannot be revived by refreshing: go to login.
+      if (code && DEAD_SESSION_CODES.has(String(code))) {
+        clearAuthAndRedirect()
+        return Promise.reject({ message: rawMessage, status, code, errors, original: error })
+      }
+      const refreshToken = useAuthStore.getState().refreshToken      // memory only
 
       if (!refreshToken) {
         clearAuthAndRedirect()
@@ -209,15 +214,15 @@ http.interceptors.response.use(
       isRefreshing = true
 
       try {
-        const res      = await axios.post(`${config.apiBaseUrl}/auth/refresh`, { refresh_token: refreshToken })
+        const res      = await axios.post(`${getEffectiveApiBaseUrl(config.apiBaseUrl)}/auth/refresh`, { refresh_token: refreshToken },
+          { headers: { 'X-App-Instance': getAppInstanceId() } })
         const newToken        = res.data?.data?.token
         const newRefreshToken = res.data?.data?.refresh_token
         if (!newToken || !newRefreshToken) throw new Error('No token in refresh response')
-        localStorage.setItem(RAW_TOKEN_KEY, newToken)
-        // Refresh tokens now rotate server-side on every use — the old one
-        // is revoked the instant this response comes back, so the client
-        // MUST store the new one or the next refresh attempt will fail.
-        localStorage.setItem(AUTH_REFRESH_KEY, newRefreshToken)
+        // Refresh tokens rotate server-side on every use (the old one is revoked the instant this response comes back), so the
+        // new one MUST replace it. Both stay in memory: a refresh token is never persisted, so it cannot restore a session
+        // after the app is closed.
+        useAuthStore.getState().setTokens({ token: newToken, refreshToken: newRefreshToken })
         onRefreshDone(newToken)
         originalRequest.headers.Authorization = `Bearer ${newToken}`
         return http(originalRequest)

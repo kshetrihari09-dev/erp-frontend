@@ -1,35 +1,38 @@
 /**
  * useCompanySwitch.ts
  *
- * Switching companies re-issues a JWT scoped to the new company_id, so
- * every existing API call (unchanged) is automatically scoped correctly
- * from the very next request. On top of that we:
+ * Switching companies re-issues the access token scoped to the new company_id — for the SAME role-verified auth session (the
+ * server keeps the session id, the verified role and the app-instance binding; a company switch can never change or skip role
+ * verification). So every existing API call is automatically scoped to the new company from the very next request. On top of that:
  *
- *   1. Swap the stored token/refresh-token/user/company into authStore.
- *   2. Clear the React Query cache, so nothing already-fetched under the
- *      previous company can render under the new one.
- *   3. Hard-reload to the dashboard.
+ *   1. The new tokens + user + company replace the in-memory session (authStore.replaceSession).
+ *   2. In-flight queries are cancelled and the React Query cache cleared; per-session module state (step-up token, selected
+ *      fiscal year) is reset.
+ *   3. The whole signed-in UI tree is REMOUNTED (sessionEpoch → <Routes key>, see app/Router.tsx) and the app navigates to the
+ *      dashboard — a clean slate, with no page load.
  *
- * Step 3 is deliberate, not laziness: several pages in this app fetch data
- * via plain axios + useEffect (not React Query), and may hold component
- * state or in-flight requests tied to the previous company. A full reload
- * is the only way to guarantee zero cross-company leakage everywhere,
- * which is the explicit, non-negotiable requirement here — "never show
- * transactions or balances from another company".
+ * Step 3 used to be a hard page reload, to guarantee zero cross-company leakage from component state or in-flight requests of
+ * pages that fetch with plain axios + useEffect. The session now lives in memory only (it must not survive a reload — see
+ * store/authStore.ts), so a reload would sign the user out; remounting everything gives the same guarantee: no component
+ * from the previous company survives, and a response that arrives for an unmounted component is discarded.
+ * ("Never show transactions or balances from another company" remains the non-negotiable requirement.)
  */
 import { queryClient } from '@/app/queryClient'
 import { companiesAPI } from '@/services/api'
-import useAuthStore, { RAW_TOKEN_KEY, REFRESH_TOKEN_KEY } from '@/store/authStore'
+import useAuthStore from '@/store/authStore'
+import { clearStepUpToken } from '@/services/stepUpToken'
+import { setSelectedFiscalYearId } from '@/services/fiscalYearSelection'
+import { navigateTo } from '@/services/navigation'
 import { PATHS } from '@/constants'
 
 export async function switchCompany(companyId: string): Promise<void> {
   const res = await companiesAPI.switchTo(companyId)
   const { token, refresh_token, user, company } = res.data.data
 
-  localStorage.setItem(RAW_TOKEN_KEY, token)
-  localStorage.setItem(REFRESH_TOKEN_KEY, refresh_token)
-  useAuthStore.getState().setAuth({ token, user, company })
-
+  await queryClient.cancelQueries()
+  clearStepUpToken()
+  setSelectedFiscalYearId(null)
+  useAuthStore.getState().replaceSession({ token, refreshToken: refresh_token, user, company })   // bumps sessionEpoch → UI remounts
   queryClient.clear()
-  window.location.href = PATHS.DASHBOARD
+  navigateTo(PATHS.DASHBOARD, { replace: true })
 }
