@@ -7744,3 +7744,465 @@ canvas{
   box-shadow: -10px 0 8px -8px rgba(15, 23, 42, .14);
 }
 .stp-users-table th:last-child { background: var(--surface-2, var(--surface)); }
+
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   SALES / POS — PRESENTATION POLISH  (CSS ONLY — no markup, logic or API change)
+   ────────────────────────────────────────────────────────────────────────────
+   Every selector below is scoped to `.pos-theme.sales-two-step`, which only
+   SalesPage.tsx's root element carries. PurchasePage (also `.pos-theme`) and
+   the global topbar / page-header are NOT matched by anything in this block.
+
+   Goals: flat navy surfaces, ONE blue accent (--pdt-accent), consistent control
+   heights (38px) and corner radii (cards 14px / controls 8-10px), compact
+   balanced grids, readable invoice table, no decorative glow / shimmer.
+
+   Layering (this block is intentionally last so it wins on equal specificity):
+     A. all widths      — colour/surface unification only (no sizing)
+     B. ≥ 768px colour, ≥ 1200px sizing — invoice table polish
+     C. ≥ 1025px        — summary cards + bottom action bar
+     D. ≥ 1200px        — desktop/laptop customer + toolbar layout
+     E. safety guards   — no stray horizontal page scroll
+   Phones (≤767px) and the existing tablet two-step flow keep their sizing.
+══════════════════════════════════════════════════════════════════════════════ */
+
+/* ── A. Surfaces & single accent (colour only — safe at every width) ───────── */
+/* (:not(.pos-step1-subtotal) — that mobile strip already has its own flat styling) */
+.pos-theme.sales-two-step .pos-card:not(.pos-step1-subtotal) {
+  background: var(--pdt-surface);            /* was a vertical gradient */
+  backdrop-filter: none;
+  box-shadow: 0 1px 2px rgba(2, 6, 23, .10);
+  border-color: var(--pdt-border);
+}
+.pos-theme.sales-two-step .pos-summary-block {
+  background: var(--pdt-overlay-025);
+  border-color: var(--pdt-border);
+}
+
+/* Total Payable: flat surface, static 2px accent edge, no glow / shimmer */
+.pos-theme.sales-two-step .pos-total-card {
+  background: var(--pdt-surface);
+  border: 1px solid var(--pdt-border);
+  border-top: 2px solid var(--pdt-accent);
+  box-shadow: 0 1px 2px rgba(2, 6, 23, .10);
+}
+.pos-theme.sales-two-step .pos-total-card::before { display: none; animation: none; }
+.pos-theme.sales-two-step .pos-total-amount { text-shadow: none; }
+.pos-theme.sales-two-step .pos-total-card .text-brand\/80,
+.pos-theme.sales-two-step.dark .pos-total-card .text-brand\/80 {
+  color: var(--pdt-text-3) !important;
+  opacity: 1;
+}
+
+/* Payment / discount-scope pills: readable hover in light mode too
+   (existing hover forced white text on a pale tint) */
+.pos-theme.sales-two-step .pos-mode-pill:hover { color: var(--pdt-text); }
+.pos-theme.sales-two-step .pos-mode-pill--active:hover { color: #fff !important; }
+.pos-theme.sales-two-step .pos-mode-pill--active { box-shadow: 0 1px 6px var(--pdt-accent-glow); }
+
+/* Billing summary: amber / green chips + figures → the one blue accent */
+/* (React serialises the inline hex as rgb(), so match the chip itself rather
+   than a [style*="hex"] attribute — !important beats the inline background) */
+.pos-theme.sales-two-step .pos-summary-block-icon {
+  background: var(--pdt-accent-dim) !important;
+}
+.pos-theme.sales-two-step .pos-summary-block-icon svg path[stroke="#d97706"],
+.pos-theme.sales-two-step .pos-summary-block-icon svg path[stroke="#16a34a"],
+.pos-theme.sales-two-step .pos-summary-block-icon svg circle[stroke="#16a34a"] { stroke: var(--pdt-accent) !important; }
+.pos-theme.sales-two-step .pos-summary-block-icon svg circle[fill="#d97706"]   { fill:   var(--pdt-accent) !important; }
+.pos-theme.sales-two-step .pos-summary-block .text-amber-600 { color: var(--pdt-text) !important; }   /* Discount Amount */
+.pos-theme.sales-two-step .pos-summary-block .text-green-600 { color: var(--pdt-accent) !important; } /* Change > 0 */
+
+/* Scan Barcode / Scan QR + search field: identical neutral controls,
+   blue accent only (QR was emerald) */
+.pos-theme.sales-two-step .upi-scan-btn,
+.pos-theme.sales-two-step .upi-scan-btn-barcode,
+.pos-theme.sales-two-step .upi-scan-btn-qr {
+  background: var(--pdt-overlay-03) !important;
+  border-color: var(--pdt-border-2) !important;
+}
+.pos-theme.sales-two-step .upi-scan-btn:hover,
+.pos-theme.sales-two-step .upi-scan-btn-barcode:hover,
+.pos-theme.sales-two-step .upi-scan-btn-qr:hover {
+  background: var(--pdt-accent-dim) !important;
+  border-color: var(--pdt-accent) !important;
+}
+.pos-theme.sales-two-step .upi-scan-btn .bg-blue-100,
+.pos-theme.sales-two-step .upi-scan-btn .bg-emerald-100 {
+  background: var(--pdt-accent-dim) !important;
+  color: var(--pdt-accent) !important;
+}
+.pos-theme.sales-two-step .upi-search {
+  background: var(--pdt-overlay-03);
+  border-color: var(--pdt-border-2);
+  border-radius: 10px;
+}
+.pos-theme.sales-two-step .upi-search:focus-within {
+  background: var(--pdt-overlay-05);
+  border-color: var(--pdt-accent);
+  box-shadow: 0 0 0 3px var(--pdt-accent-dim);
+}
+
+/* Bottom action bar: Clear becomes a quiet ghost (red only on hover) */
+.pos-theme.sales-two-step .pos-action-btn--clear {
+  background: transparent;
+  color: var(--pdt-text-3);
+  border: 1px solid var(--pdt-border-2);
+}
+.pos-theme.sales-two-step .pos-action-btn--clear:hover {
+  background: var(--pdt-danger-dim);
+  color: var(--pdt-danger);
+  border-color: transparent;
+}
+.pos-theme.sales-two-step .pos-action-btn--draft {
+  background: var(--pdt-overlay-04);
+  color: var(--pdt-text-2);
+  border: 1px solid var(--pdt-border-2);
+}
+.pos-theme.sales-two-step .pos-action-btn--draft:hover {
+  background: var(--pdt-overlay-08);
+  border-color: var(--pdt-border-2);
+}
+.pos-theme.sales-two-step .pos-action-btn--post {
+  background: var(--pdt-accent);
+  border: 1px solid var(--pdt-accent);
+  box-shadow: 0 1px 6px var(--pdt-accent-glow);
+}
+.pos-theme.sales-two-step .pos-action-btn--post:hover:not(:disabled) {
+  background: var(--pdt-accent);
+  filter: brightness(1.1);
+  transform: none;
+  box-shadow: 0 2px 10px var(--pdt-accent-glow);
+}
+
+
+/* Card titles ≥ 769px: icon and text sit together at the left.
+   (Mobile keeps its existing space-between layout for the accordion chevron.) */
+@media (min-width: 769px) {
+  .pos-theme.sales-two-step .pos-card-title.pos-accordion-header { justify-content: flex-start; }
+}
+
+/* ── B1. Invoice items table — colour / border only (≥ 768px) ────────────────
+   Sizing is deliberately NOT set here: 768–1199px keeps the existing compact
+   fixed-layout tablet table (see "GENUINE TABLET LAYOUT" above). */
+@media (min-width: 768px) {
+  .pos-theme.sales-two-step .pos-table-wrap {
+    border: 1px solid var(--pdt-border);
+    border-radius: 12px;
+    background: transparent;
+    -webkit-overflow-scrolling: touch;          /* controlled scroll when narrow */
+  }
+  .pos-theme.sales-two-step .pos-table thead tr {
+    background: var(--pdt-surface-2);
+    border-bottom: 1px solid var(--pdt-border-2);
+  }
+  .pos-theme.sales-two-step .pos-table thead th { color: var(--pdt-text-3); }
+  /* numeric headers line up with their right-aligned inputs
+     (Qty · Bonus · Rate · C.C % · C.C Amount · Amount = last 7 minus delete) */
+  .pos-theme.sales-two-step .pos-table thead th:nth-last-child(-n+7):not(:last-child) { text-align: right; }
+  .pos-theme.sales-two-step .pos-table tbody tr { border-bottom: 1px solid var(--pdt-border); }
+
+  /* Inputs: visible field boxes (were borderless until hovered) */
+  .pos-theme.sales-two-step .pos-table .pos-cell-input,
+  .pos-theme.sales-two-step .pos-table .psc-input {
+    border: 1px solid var(--pdt-border-2);
+    border-radius: 8px;
+    background: var(--pdt-overlay-03);
+  }
+  .pos-theme.sales-two-step .pos-table .pos-cell-input:hover,
+  .pos-theme.sales-two-step .pos-table .psc-input:hover {
+    border-color: var(--pdt-text-4);
+    background: var(--pdt-overlay-04);
+  }
+  .pos-theme.sales-two-step .pos-table .pos-cell-input:focus,
+  .pos-theme.sales-two-step .pos-table .psc-input:focus {
+    border-color: var(--pdt-accent);
+    background: var(--pdt-overlay-05);
+    box-shadow: 0 0 0 3px var(--pdt-accent-dim);
+  }
+
+  .pos-theme.sales-two-step .pos-add-row-btn {
+    border: 1px dashed var(--pdt-border-2);
+    border-radius: 8px;
+    color: var(--pdt-text-2);
+  }
+  .pos-theme.sales-two-step .pos-add-row-btn:hover {
+    border-color: var(--pdt-accent); color: var(--pdt-accent); background: var(--pdt-accent-dim);
+  }
+}
+
+/* ── B2. Invoice items table — sizing (≥ 1200px desktop / laptop) ──────────── */
+@media (min-width: 1200px) {
+  .pos-theme.sales-two-step .pos-table { min-width: 900px; }
+  .pos-theme.sales-two-step .pos-table thead th {
+    padding: 11px 12px;
+    font-size: 11px;
+    letter-spacing: .06em;
+  }
+
+  /* Column widths. Inline `width` on <th> is only a hint, so !important here.
+     Positions are counted from the right; Batch/Expiry rules are guarded to
+     the 10-column layout Sales renders (showBatch + showExpiry + showBonus +
+     showCC, showDiscount=false). Product keeps all the free width. */
+  .pos-theme.sales-two-step .pos-table thead th:nth-last-child(7) { width: 80px  !important; } /* Qty        */
+  .pos-theme.sales-two-step .pos-table thead th:nth-last-child(6) { width: 80px  !important; } /* Bonus      */
+  .pos-theme.sales-two-step .pos-table thead th:nth-last-child(5) { width: 100px !important; } /* Rate       */
+  .pos-theme.sales-two-step .pos-table thead th:nth-last-child(4) { width: 84px  !important; } /* C.C %      */
+  .pos-theme.sales-two-step .pos-table thead th:nth-last-child(3) { width: 112px !important; } /* C.C Amount */
+  .pos-theme.sales-two-step .pos-table thead th:nth-last-child(2) { width: 128px !important; } /* Amount     */
+  .pos-theme.sales-two-step .pos-table thead th:last-child        { width: 48px  !important; } /* Delete     */
+  .pos-theme.sales-two-step .pos-table thead th:nth-child(2):nth-last-child(9) { width: 120px !important; } /* Batch  */
+  .pos-theme.sales-two-step .pos-table thead th:nth-child(3):nth-last-child(8) { width: 96px  !important; } /* Expiry */
+  .pos-theme.sales-two-step .pos-table thead th:first-child { min-width: 240px !important; }
+
+  /* Rows */
+  .pos-theme.sales-two-step .pos-table tbody td { padding: 7px 8px; height: 50px; }
+  .pos-theme.sales-two-step .pos-table tbody td.pos-cell-display { padding: 7px 14px; font-size: 12.5px; }
+
+  /* Inputs */
+  .pos-theme.sales-two-step .pos-table .pos-cell-input,
+  .pos-theme.sales-two-step .pos-table .psc-input { height: 36px; font-size: 13px; }
+  .pos-theme.sales-two-step .pos-table .pos-cell-input { padding: 0 10px; }
+  .pos-theme.sales-two-step .pos-table .pos-cell-num   { font-size: 12.5px; }
+  .pos-theme.sales-two-step .pos-table .pos-row-delete {
+    width: 32px; height: 32px; margin: 0 auto; border-radius: 8px;
+  }
+
+  /* Footer: Add Row + running Sub Total */
+  .pos-theme.sales-two-step .pos-add-row-btn { height: 36px; padding: 0 16px; }
+  .pos-theme.sales-two-step .pos-subtotal { align-items: center; gap: 12px; padding-right: 14px; }
+  .pos-theme.sales-two-step .pos-subtotal-value { font-size: 18px; font-weight: 700; letter-spacing: -.01em; }
+}
+
+
+/* ── C. Desktop / laptop summary cards + action bar (≥ 1025px) ─────────────── */
+@media (min-width: 1025px) {
+
+  /* Total Payable */
+  .pos-theme.sales-two-step .pos-grid-main { gap: 16px; align-items: stretch; }
+  .pos-theme.sales-two-step .pos-total-card {
+    border-radius: 14px;
+    padding: 18px 20px;
+    align-items: stretch;
+    text-align: left;
+  }
+  .pos-theme.sales-two-step .pos-total-card > div:first-child {
+    font-size: 11px; font-weight: 700; letter-spacing: .08em; margin-bottom: 6px;
+  }
+  .pos-theme.sales-two-step .pos-total-amount {
+    font-size: clamp(26px, 2.3vw, 34px);
+    font-weight: 700;
+    letter-spacing: -.02em;
+    line-height: 1.15;
+    margin-bottom: 0;
+    overflow-wrap: anywhere;
+  }
+  .pos-theme.sales-two-step .pos-total-card > .w-full { margin-top: 14px; }
+  .pos-theme.sales-two-step .pos-total-card > .w-full > div {
+    padding: 8px 0;
+    border-top: 0;
+    margin-top: 0;
+  }
+  .pos-theme.sales-two-step .pos-total-card > .w-full > div:not(:last-child) {
+    border-bottom: 1px solid var(--pdt-border);
+  }
+  .pos-theme.sales-two-step .pos-total-card > .w-full > div > span:first-child {
+    font-size: 11px; letter-spacing: .05em;
+  }
+  .pos-theme.sales-two-step .pos-total-card > .w-full > div > span:last-child {
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+  }
+  /* closing "Total Payable" row — the one accent figure */
+  .pos-theme.sales-two-step .pos-total-card > .w-full > div:last-child {
+    border-top: 0 none;           /* the row above already draws the divider */
+    padding-top: 12px;
+    margin-top: 0;
+  }
+  .pos-theme.sales-two-step .pos-total-card > .w-full > div:last-child > span:last-child {
+    font-size: 18px;
+    color: var(--pdt-accent) !important;
+  }
+
+  /* Billing Summary — balanced two-column, aligned rows, compact */
+  .pos-theme.sales-two-step .pos-card-title.mb-4 { margin-bottom: 12px; }
+  .pos-theme.sales-two-step .pos-billing-grid { gap: 14px; align-items: stretch; }
+  .pos-theme.sales-two-step .pos-summary-block {
+    border-radius: 12px;
+    padding: 14px 16px;
+    gap: 14px;
+  }
+  .pos-theme.sales-two-step .pos-summary-block-icon { width: 34px; height: 34px; border-radius: 9px; }
+  .pos-theme.sales-two-step .pos-summary-block > div:last-child {
+    flex: 1 1 0;
+    min-width: 0;
+    width: auto;
+    display: grid;
+    grid-template-rows: auto auto;
+    row-gap: 12px;
+    align-content: start;
+  }
+  .pos-theme.sales-two-step .pos-summary-block > div:last-child > * + * { margin-top: 0 !important; }
+  .pos-theme.sales-two-step .pos-summary-block > div:last-child > div:first-child { min-height: 62px; }
+  .pos-theme.sales-two-step .pos-summary-block .pmic-billing-input,
+  .pos-theme.sales-two-step .pos-summary-block input[type="number"] {
+    width: 100%;
+    height: 38px;
+    border-radius: 8px;
+  }
+  .pos-theme.sales-two-step .pos-summary-block .text-lg { font-size: 18px; line-height: 1.2; font-variant-numeric: tabular-nums; }
+
+  /* Bottom action bar — one aligned strip, equal-height buttons */
+  .pos-theme.sales-two-step .pos-desktop-actions {
+    padding: 12px 16px;
+    background: var(--pdt-surface);
+    border: 1px solid var(--pdt-border);
+    border-radius: 14px;
+    gap: 12px;
+  }
+  .pos-theme.sales-two-step .pos-desktop-actions .pos-action-btn {
+    height: 40px;
+    padding: 0 18px;
+    border-radius: 9px;
+    font-size: 13px;
+    justify-content: center;
+    min-width: 116px;
+  }
+  .pos-theme.sales-two-step .pos-desktop-actions .pos-action-btn--post { min-width: 148px; }
+}
+
+
+/* ── D. Desktop / laptop customer + toolbar layout (≥ 1200px) ──────────────── */
+@media (min-width: 1200px) {
+
+  .pos-theme.sales-two-step .pos-grid-main { grid-template-columns: minmax(0, 1fr) 300px; }
+  .pos-theme.sales-two-step .pos-card { border-radius: 14px; padding: 18px 20px; }
+  .pos-theme.sales-two-step .pos-card-title { font-size: 13.5px; }
+  .pos-theme.sales-two-step .pos-card-title.pos-accordion-header { margin-bottom: 14px; }
+
+  /* Customer grid: Party row · identity row · payment row.
+     Container query lets the identity row use 4 columns only when the card
+     is wide enough, otherwise Address takes a full row above PAN/Tel/Date. */
+  .pos-theme.sales-two-step .pos-customer-grid {
+    container-type: inline-size;
+    container-name: pcg;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+  }
+  .pos-theme.sales-two-step .pos-customer-grid > .pos-span2 { grid-column: 1 / -1; }
+  .pos-theme.sales-two-step .pos-cf-quad {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+    align-items: start;
+  }
+  .pos-theme.sales-two-step .pos-cf-quad .pos-cf-address { grid-column: 1 / -1; }
+  @container pcg (min-width: 720px) {
+    .pos-theme.sales-two-step .pos-cf-quad {
+      grid-template-columns: minmax(0, 2.2fr) minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1.35fr);
+    }
+    .pos-theme.sales-two-step .pos-cf-quad .pos-cf-address { grid-column: auto; }
+  }
+
+  /* Labels: aligned, even rhythm */
+  .pos-theme.sales-two-step .pos-customer-grid label {
+    margin-bottom: 6px;
+    font-size: 10.5px;
+    letter-spacing: .07em;
+  }
+
+  /* Consistent 38px controls */
+  .pos-theme.sales-two-step .pos-customer-grid .erp-input:not(.pos-readonly) {
+    height: 38px;
+    padding-top: 0;
+    padding-bottom: 0;
+    font-size: 13px;
+  }
+  .pos-theme.sales-two-step .pos-customer-grid .pos-readonly {
+    min-height: 38px;
+    height: auto;                 /* long addresses wrap instead of clipping */
+    padding: 8px 12px;
+    font-size: 13px;
+    line-height: 1.35;
+  }
+  .pos-theme.sales-two-step .pos-cf-party-row { gap: 10px; }
+  .pos-theme.sales-two-step .pos-party-add-btn {
+    width: 38px; height: 38px;
+    border-radius: 10px;
+    background: var(--pdt-accent-dim);
+    color: var(--pdt-accent);
+    border: 1px solid transparent;
+  }
+  .pos-theme.sales-two-step .pos-party-add-btn:hover {
+    background: var(--pdt-accent); color: #fff;
+  }
+
+  /* Payment mode: one even row, pills share the width (wraps cleanly if tight) */
+  .pos-theme.sales-two-step .pos-customer-grid > .pos-mt-hide > .flex { gap: 8px; }
+  .pos-theme.sales-two-step .pos-customer-grid > .pos-mt-hide .pos-mode-pill {
+    flex: 1 1 auto;
+    min-height: 38px;
+    padding: 0 14px;
+    border-width: 1px;
+    border-radius: 9px;
+    font-size: 12.5px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Billing Summary discount-scope pills share the same sizing */
+  .pos-theme.sales-two-step .pos-summary-block .pos-mode-pill {
+    min-height: 36px;
+    padding: 0 12px;
+    border-width: 1px;
+    border-radius: 9px;
+    font-size: 12.5px;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  /* Invoice Items toolbar: title left · search + scanners + hints right,
+     everything on a shared 38px height */
+  .pos-theme.sales-two-step .pos-invoice-header {
+    flex-wrap: wrap;
+    gap: 12px 20px;
+    margin-bottom: 14px;
+  }
+  .pos-theme.sales-two-step .pos-invoice-actions {
+    flex: 1 1 560px;
+    min-width: 0;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 10px 18px;
+  }
+  .pos-theme.sales-two-step .pos-invoice-actions > :not(.pos-kbd-hints) {
+    flex: 1 1 440px;
+    width: auto;
+    max-width: 720px;
+    min-width: 0;
+  }
+  .pos-theme.sales-two-step .pos-invoice-actions .upi-search { height: 38px; min-width: 200px; }
+  .pos-theme.sales-two-step .pos-invoice-actions .upi-scan-btn {
+    height: 38px !important;
+    padding: 0 12px !important;
+    border-radius: 10px !important;
+  }
+  .pos-theme.sales-two-step .pos-kbd-hints {
+    flex: 0 0 auto;
+    gap: 12px;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+}
+
+
+/* ── E. Safety guards — never let the page itself scroll sideways ──────────── */
+.pos-theme.sales-two-step { overflow-x: clip; }
+.pos-theme.sales-two-step .pos-grid-main > *,
+.pos-theme.sales-two-step .pos-customer-grid > *,
+.pos-theme.sales-two-step .pos-billing-grid > *,
+.pos-theme.sales-two-step .pos-cf-quad > *,
+.pos-theme.sales-two-step .pos-summary-block > * { min-width: 0; }
+.pos-theme.sales-two-step .pos-table-wrap { max-width: 100%; }
+/* the table scrolls inside its own card, the page does not */
+.pos-theme.sales-two-step .pos-card { min-width: 0; max-width: 100%; }
