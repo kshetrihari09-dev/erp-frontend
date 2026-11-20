@@ -20,6 +20,15 @@ import { resolveEnterNav } from './invoiceRowKeyNav'
 
 /* ── Public types ─────────────────────────────────────────────────────────── */
 
+/** Sales Rate limit: at most 5 digits before the decimal point (99999.99). */
+export const MAX_SALE_RATE = 99999.99
+/** True when the typed/pasted text is a number that would be 100,000 or more (or not a finite number). */
+export function exceedsMaxSaleRate(raw: string): boolean {
+  if (raw === '') return false
+  const n = Number(raw)
+  return !Number.isFinite(n) || n >= 100000
+}
+
 export interface InvoiceRow {
   _id:          number
   /** Client-only marker: true if this row was added by the barcode
@@ -443,8 +452,14 @@ const InvoiceRowsTable = forwardRef<InvoiceRowsTableHandle, Props>(function Invo
                     className="pos-cell-input pos-cell-num"
                     value={row.rate ?? ''}
                     min={0}
+                    max={mode === 'purchase' ? undefined : MAX_SALE_RATE}
                     step="0.01"
-                    onChange={e => update(idx, 'rate', e.target.value === '' ? '' : Number(e.target.value))}
+                    onChange={e => {
+                      // Sales: Rate is limited to 5 digits before the decimal point (max 99999.99).
+                      // Ignoring the change leaves the controlled input showing its previous value.
+                      if (mode !== 'purchase' && exceedsMaxSaleRate(e.target.value)) return
+                      update(idx, 'rate', e.target.value === '' ? '' : Number(e.target.value))
+                    }}
                   />
                 </td>
 
