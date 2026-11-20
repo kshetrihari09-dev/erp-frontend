@@ -150,6 +150,7 @@ const ProductSearchCell = forwardRef<ProductSearchCellHandle, Props>(function Pr
   const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null)
 
   const inputRef     = useRef<HTMLInputElement>(null)
+  const triggerRef   = useRef<HTMLButtonElement>(null) // the closed-state button (the input below only exists while open)
   const listRef      = useRef<HTMLUListElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const dropdownRef  = useRef<HTMLDivElement>(null) // the portaled dropdown — lives outside containerRef in the DOM
@@ -157,7 +158,11 @@ const ProductSearchCell = forwardRef<ProductSearchCellHandle, Props>(function Pr
   const abortRef     = useRef<AbortController | null>(null)
 
   useImperativeHandle(ref, () => ({
-    focus: () => inputRef.current?.focus(),
+    // The search <input> only exists while the dropdown is open. A row that is not open
+    // renders the trigger button instead, so focusing only the input did nothing — e.g. the
+    // Product field of a row just added by Enter never received focus. Fall back to the
+    // trigger: its onFocus opens the dropdown, which then focuses the input (openDropdown).
+    focus: () => (inputRef.current ?? triggerRef.current)?.focus(),
     // Bypass the dropdown entirely — same seeding fix as the click/Enter
     // paths above, just triggered externally (e.g. the F5 shortcut).
     openCreate: () => { setCreateSeed(query.trim()); setShowCreate(true) },
@@ -448,6 +453,7 @@ const ProductSearchCell = forwardRef<ProductSearchCellHandle, Props>(function Pr
         </div>
       ) : (
         <button
+          ref={triggerRef}
           type="button"
           className={`psc-trigger ${value ? 'psc-trigger--selected' : 'psc-trigger--empty'}`}
           onClick={openDropdown}
