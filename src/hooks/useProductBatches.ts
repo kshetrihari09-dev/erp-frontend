@@ -99,8 +99,24 @@ export function invalidateBatchCache(productId?: string) {
 }
 
 export default function useProductBatches(productId: string | undefined | null) {
-  const [batches, setBatches] = useState<StockBatch[]>([])
-  const [loading, setLoading] = useState(false)
+  // Seed from a fresh cache hit. The render-time fast path below only runs when `productId`
+  // CHANGES, and the effect skips fetching on a fresh hit ("already applied above") — so a
+  // consumer that MOUNTS with an already-cached product (e.g. the phone product sheet, which
+  // mounts after the product was picked) would otherwise stay empty, wrongly reading as
+  // "No batches available" / "No stock". Row components mount blank and change later, so they
+  // were never affected; nothing changes for them.
+  const [batches, setBatches] = useState<StockBatch[]>(() => {
+    const cached = productId ? cache.get(productId) : undefined
+    return isFresh(cached) ? cached.data : []
+  })
+  // Same mount-time gap, loading side: a consumer that MOUNTS already holding an uncached
+  // product (a row created by the main search / scanner is a brand-new component) must start
+  // in `loading`. Starting at `false` with an empty list reads — to BatchSelect's one-shot
+  // auto-open — as "fetched: zero batches", so it marked the product processed and then
+  // ignored the real batches when they arrived: the batch popup never opened for the main
+  // search / barcode path on the table layout. Rows that merely CHANGE product were fine
+  // (the render-phase reset below already sets loading).
+  const [loading, setLoading] = useState(() => !!productId && !isFresh(cache.get(productId)))
   const mountedRef  = useRef(true)
   const { isOnline } = useOffline()
   const companyId = useAuthStore(s => s.company?.id)

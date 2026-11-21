@@ -38,8 +38,9 @@ import {
   SkeletonRows, Empty, SearchInput, ConfirmDialog, Kbd, Alert,
 } from '@/components/ui'
 import TransactionSuccessAlert, { type TransactionSuccessInfo } from '@/components/shared/TransactionSuccessAlert'
-import InvoiceRowsTable, { newRow, exceedsMaxSaleRate, type InvoiceRow, type InvoiceRowsTableHandle } from '@/components/forms/InvoiceRowsTable'
-import ProductSearchCell from '@/components/forms/ProductSearchCell'
+import InvoiceRowsTable, { newRow, exceedsMaxRate, type InvoiceRow, type InvoiceRowsTableHandle } from '@/components/forms/InvoiceRowsTable'
+import ProductSearchCell, { type ProductSearchCellHandle } from '@/components/forms/ProductSearchCell'
+import MobileProductSheet, { SheetBatchField } from '@/components/forms/MobileProductSheet'
 import BatchSelect from '@/components/forms/BatchSelect'
 import QtyGate from '@/components/forms/QtyGate'
 import QuickAddPartyModal from '@/components/forms/QuickAddPartyModal'
@@ -288,6 +289,68 @@ export default function SalesPage() {
       info('Loaded from Retail Sale', `${built.length} item${built.length > 1 ? 's' : ''} added. Choose batches and confirm as usual.`)
     } catch { /* malformed hand-off: ignore, invoice stays as it was */ }
   }, [])
+
+  // ── Phone-only product sheet (≤767px) ───────────────────────────────────
+  // The compact mobile row only SUMMARISES an item; its existing fields (Product, Qty,
+  // Bonus, Rate, CC%) are edited in one reusable bottom sheet bound live to that very
+  // row — so editing updates the row in place (never a duplicate) and every figure is
+  // still calculated by the same calcRowAmount call as the inline fields were.
+  // Desktop/tablet never render the sheet or the summary row (isPhoneWidth gate).
+  const [sheetRowId, setSheetRowId] = useState<number | null>(null)
+  const sheetIdx = sheetRowId == null ? -1 : rows.findIndex(r => r._id === sheetRowId)
+  const sheetProductRef = useRef<ProductSearchCellHandle>(null)
+
+  const updateRowAt = (idx: number, patch: Partial<InvoiceRow>) =>
+    setRows(prev => prev.map((r, i) => i === idx ? { ...r, ...patch } : r))
+
+  const recalcRow = (row: InvoiceRow, o: Partial<{ qty: number; rate: number; bonus: number; cc_pct: number }>) =>
+    calcRowAmount({
+      qty:          Number(o.qty   ?? row.qty),
+      rate:         Number(o.rate  ?? row.rate),
+      bonus:        Number(o.bonus ?? row.bonus) || 0,
+      discount_pct: Number(row.discount_pct) || 0,
+      cc_pct:       Number(o.cc_pct ?? row.cc_pct) || 0,
+    })
+
+  // A product picked inside a row (mobile card / sheet). CC% comes from the NEW product;
+  // batch_no / batch_id / expiry are cleared because they belonged to whatever product was
+  // there before — leaving the old batch_id behind would post the wrong batch.
+  const applyProductToRow = (idx: number, p: Product) => {
+    const row = rows[idx]
+    if (!row) return
+    const cc_pct = productCcPct(p)
+    const { amount, cc_amount } = recalcRow(row, { rate: Number(p.sales_rate), cc_pct })
+    updateRowAt(idx, { product_id: p.id, product_name: p.name, rate: p.sales_rate, cc_pct, amount, cc_amount, batch_no: '', batch_id: undefined, expiry: '' })
+    setProducts(prev => prev.some(x => x.id === p.id) ? prev : [...prev, p])
+  }
+
+  const closeSheet = () => {
+    setSheetRowId(null)
+    requestAnimationFrame(() => unifiedInputRef.current?.focusSilently())
+  }
+
+  // Blank row → put the cursor in the sheet's Product field.
+  useEffect(() => {
+    if (sheetIdx < 0 || rows[sheetIdx]?.product_id) return
+    const t = setTimeout(() => sheetProductRef.current?.focus(), 80)
+    return () => clearTimeout(t)
+  }, [sheetRowId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // A batch just got picked while the sheet is open → continue at Qty (the mobile card has
+  // no inline Qty for BatchSelect's own focus hop to find).
+  const sheetBatchNo = sheetIdx >= 0 ? rows[sheetIdx]?.batch_no : undefined
+  const prevSheetBatch = useRef<string | undefined>(undefined)
+  useEffect(() => {
+    if (sheetRowId == null) { prevSheetBatch.current = undefined; return }
+    const prev = prevSheetBatch.current
+    prevSheetBatch.current = sheetBatchNo
+    if (prev !== undefined && sheetBatchNo && sheetBatchNo !== prev) {
+      requestAnimationFrame(() => {
+        const q = document.querySelector<HTMLInputElement>('.mps-sheet .pos-qty-input')
+        if (q && !q.disabled) { q.focus(); q.select?.() }
+      })
+    }
+  }, [sheetRowId, sheetBatchNo])
 
   const handleProductSelected = useCallback((p: Product) => {
     playSuccessBeep()
@@ -1089,6 +1152,7 @@ export default function SalesPage() {
             <div className="pos-table-wrap pos-desktop-only">
               <InvoiceRowsTable
                 ref={tableRef}
+                limitRate
                 rows={rows}
                 products={products}
                 onChange={setRows}
@@ -1109,7 +1173,7 @@ export default function SalesPage() {
                 below a legible/tappable size to fit narrow phones.
                 Hidden on desktop/tablet ≥1200px (see pos-mobile-items'
                 display rules in globals.css). */}
-            <div className="pos-mobile-items pmic-table">
+            <div className={`pos-mobile-items pmic-table${isPhoneWidth ? ' pmic-table--summary' : ''}`}>
               {rows.length > 0 && (
                 <div className="pmic-thead" aria-hidden="true">
                   <div className="pmic-th pmic-th-product">Product</div>
@@ -1136,32 +1200,75 @@ export default function SalesPage() {
                   return { amount, cc_amount }
                 }
 
+                const batchSelectEl = (
+                  <div className="pmic-batch-hidden" data-batch-row={row._id}>
+                    <BatchSelect
+                      productId={row.product_id}
+                      productName={row.product_name}
+                      value={row.batch_no}
+                      onSelect={batch => updateRow({
+                        batch_no: batch.batch_no || '',
+                        batch_id: batch.id || undefined,     // same three fields the desktop table saves
+                        expiry:   batch.expiry_date || batch.expiry || '',
+                      })}
+                      hideTrigger
+                      // Same barcode/QR-scanned-row behavior the desktop table has: a
+                      // scanned/searched product with exactly one batch is auto-selected.
+                      // `_scanned` is set by handleProductSelected for the main search
+                      // and the scanner. On a phone, once the batch is resolved (auto,
+                      // popup pick, or no batches at all) the product sheet opens.
+                      autoSelectSingle={!!row._scanned}
+                      onAutoResolved={row._scanned
+                        ? () => { if (isPhoneWidth) setSheetRowId(row._id); else unifiedInputRef.current?.focusSilently() }
+                        : undefined}
+                      onNoBatches={isPhoneWidth && row._scanned ? () => setSheetRowId(row._id) : undefined}
+                      tapToSelect={isPhoneWidth}
+                    />
+                  </div>
+                )
+
+                if (isPhoneWidth) {
+                  return (
+                    <div
+                      key={idx}
+                      className="pmic-row2 pmic-row2--summary"
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setSheetRowId(row._id)}
+                      onKeyDown={e => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); setSheetRowId(row._id) } }}
+                    >
+                      <div className="pmic-row2-product">
+                        <span className={`pmic-sum-name${row.product_id ? '' : ' pmic-sum-name--empty'}`}>
+                          {row.product_name || 'Select product…'}
+                        </span>
+                        {row.product_id ? <span className="pmic-sum-cc">CC% {row.cc_pct || 0}</span> : null}
+                        {batchSelectEl}
+                      </div>
+                      <button
+                        type="button"
+                        className="pmic-row2-remove"
+                        onClick={e => { e.stopPropagation(); setRows(prev => prev.filter((_, i) => i !== idx)) }}
+                        aria-label="Remove item"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                      <div className="pmic-sum-metrics">
+                        <div className="pmic-sum-m"><span>Qty</span><b>{row.qty || 0}</b></div>
+                        <div className="pmic-sum-m"><span>Bonus</span><b>{row.bonus || 0}</b></div>
+                        <div className="pmic-sum-m"><span>Rate</span><b>{row.rate || 0}</b></div>
+                        <div className="pmic-sum-m pmic-sum-m--amount"><span>Amount</span><b>{fmt(row.amount)}</b></div>
+                      </div>
+                    </div>
+                  )
+                }
+
                 return (
                   <div key={idx} className="pmic-row2" onFocusCapture={scrollFocusedIntoView}>
                     <div className="pmic-row2-product">
                       <ProductSearchCell
                         value={row.product_id}
                         products={products}
-                        onChange={p => {
-                          // CC% is taken from the newly selected product (not the
-                          // row's previous one) and drives cc_amount below.
-                          const cc_pct = productCcPct(p)
-                          const { amount, cc_amount } = reCalc({ rate: Number(p.sales_rate), cc_pct })
-                          // batch_no/expiry cleared: they belonged to whatever
-                          // product was previously in this row, if any.
-                          updateRow({ product_id: p.id, product_name: p.name, rate: p.sales_rate, cc_pct, amount, cc_amount, batch_no: '', expiry: '' })
-                          // Keep `products` in sync with whatever the live search
-                          // just resolved — same merge every other product-
-                          // resolution path in this file already does (camera
-                          // scanner, barcode input, quick-create below). Without
-                          // it, a product outside the initial 500-item snapshot
-                          // (e.g. anything alphabetically past it, most visibly
-                          // "Z..." names) selects correctly but company-scope/
-                          // product-scope discount grouping (discountUtils.ts's
-                          // rowCompanyName, which looks products up in this same
-                          // array) silently falls back to "Unassigned" for it.
-                          setProducts(prev => prev.some(x => x.id === p.id) ? prev : [...prev, p])
-                        }}
+                        onChange={p => applyProductToRow(idx, p)}
                         onCreated={p => setProducts(prev => prev.some(x => x.id === p.id) ? prev : [...prev, p])}
                       />
 
@@ -1191,28 +1298,7 @@ export default function SalesPage() {
                           selection still happens through that exact same
                           popup, just without a tappable field to trigger it
                           manually here. */}
-                      <div className="pmic-batch-hidden">
-                        <BatchSelect
-                          productId={row.product_id}
-                          productName={row.product_name}
-                          value={row.batch_no}
-                          onSelect={batch => updateRow({
-                            batch_no: batch.batch_no || '',
-                            expiry:   batch.expiry_date || batch.expiry || '',
-                          })}
-                          hideTrigger
-                          // Same barcode/QR-scanned-row behavior the desktop
-                          // table already has (see InvoiceRowsTable.tsx) —
-                          // this was missing here, so a scanned product with
-                          // exactly one batch still opened the popup on
-                          // mobile instead of auto-selecting it. `_scanned`
-                          // is set by handleProductSelected above when the
-                          // row was added via a scan rather than manual
-                          // product search.
-                          autoSelectSingle={!!row._scanned}
-                          onAutoResolved={row._scanned ? () => unifiedInputRef.current?.focusSilently() : undefined}
-                        />
-                      </div>
+                      {batchSelectEl}
                     </div>
 
                     {/* Qty — QtyGate directly (skips QtyStepper's ±
@@ -1250,7 +1336,7 @@ export default function SalesPage() {
                       value={row.rate === 0 ? '' : row.rate}
                       placeholder="0.00"
                       onChange={e => {
-                        if (exceedsMaxSaleRate(e.target.value)) return   // Rate: max 5 digits before the decimal point
+                        if (exceedsMaxRate(e.target.value)) return   // Rate: max 5 digits before the decimal point
                         const rate = e.target.value === '' ? 0 : Number(e.target.value)
                         updateRow({ rate, ...reCalc({ rate }) })
                       }}
@@ -1274,10 +1360,106 @@ export default function SalesPage() {
               <button
                 type="button"
                 className="pmic-add-btn"
-                onClick={() => setRows(prev => [...prev, newRow()])}
+                onClick={() => {
+                  if (!isPhoneWidth) { setRows(prev => [...prev, newRow()]); return }
+                  // Phone: open the product sheet — on the trailing blank row if there is one
+                  // (so repeated taps don't pile up empty rows), otherwise on a fresh row.
+                  const last = rows[rows.length - 1]
+                  if (last && !last.product_id) { setSheetRowId(last._id); return }
+                  const r = newRow()
+                  setRows(prev => [...prev, r])
+                  setSheetRowId(r._id)
+                }}
               >
                 <Plus size={15}/> Add Product
               </button>
+
+              {/* Phone-only product sheet — one reusable popup for adding AND editing.
+                  Same fields, same labels, same handlers as the inline fields. */}
+              {isPhoneWidth && sheetIdx >= 0 && (() => {
+                const idx = sheetIdx
+                const row = rows[idx]
+                return (
+                  <MobileProductSheet
+                    open
+                    title={row.product_name || 'Add Product'}
+                    onClose={closeSheet}
+                  >
+                    <div className="mps-field">
+                      <span className="mps-label">Product</span>
+                      <ProductSearchCell
+                        ref={sheetProductRef}
+                        value={row.product_id}
+                        products={products}
+                        onChange={p => applyProductToRow(idx, p)}
+                        onCreated={p => setProducts(prev => prev.some(x => x.id === p.id) ? prev : [...prev, p])}
+                      />
+                    </div>
+                    <div className="mps-field">
+                      <span className="mps-label">Batch</span>
+                      <SheetBatchField rowId={row._id} productId={row.product_id} batchNo={row.batch_no} expiry={row.expiry} />
+                    </div>
+                    <div className="mps-grid">
+                      <label className="mps-field">
+                        <span className="mps-label">Qty</span>
+                        <QtyGate
+                          productId={row.product_id}
+                          value={row.qty === 0 ? '' : row.qty}
+                          className="mps-input"
+                          onChange={v => {
+                            const qty = v === '' ? 0 : v
+                            updateRowAt(idx, { qty, ...recalcRow(row, { qty }) })
+                          }}
+                        />
+                      </label>
+                      <label className="mps-field">
+                        <span className="mps-label">Bonus</span>
+                        <input
+                          type="number" inputMode="numeric" min={0} step="1"
+                          className="mps-input"
+                          value={row.bonus === 0 ? '' : row.bonus}
+                          placeholder="0"
+                          onChange={e => {
+                            const bonus = e.target.value === '' ? 0 : Number(e.target.value)
+                            updateRowAt(idx, { bonus, ...recalcRow(row, { bonus }) })
+                          }}
+                        />
+                      </label>
+                      <label className="mps-field">
+                        <span className="mps-label">Rate</span>
+                        <input
+                          type="number" inputMode="decimal" min={0} step="0.01"
+                          className="mps-input"
+                          value={row.rate === 0 ? '' : row.rate}
+                          placeholder="0.00"
+                          onChange={e => {
+                            if (exceedsMaxRate(e.target.value)) return   // Rate: max 5 digits before the decimal point
+                            const rate = e.target.value === '' ? 0 : Number(e.target.value)
+                            updateRowAt(idx, { rate, ...recalcRow(row, { rate }) })
+                          }}
+                        />
+                      </label>
+                      <label className="mps-field">
+                        <span className="mps-label">CC%</span>
+                        <input
+                          type="number" inputMode="decimal" min={0} step="0.01"
+                          className="mps-input"
+                          value={row.cc_pct === 0 ? '' : row.cc_pct}
+                          placeholder="0"
+                          onChange={e => {
+                            const cc_pct = e.target.value === '' ? 0 : Number(e.target.value)
+                            updateRowAt(idx, { cc_pct, ...recalcRow(row, { cc_pct }) })
+                          }}
+                        />
+                      </label>
+                    </div>
+                    <div className="mps-amount">
+                      <span className="mps-label">Amount</span>
+                      <strong>{fmt(row.amount)}</strong>
+                    </div>
+                  </MobileProductSheet>
+                )
+              })()}
             </div>
           </div>
 

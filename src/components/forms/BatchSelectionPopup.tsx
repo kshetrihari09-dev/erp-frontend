@@ -66,10 +66,20 @@ interface Props {
    *  Batch trigger, Purchase's "browse existing" button) keeps
    *  auto-focusing the search box exactly as it always has. */
   avoidAutoFocus?:  boolean
+  /** Touch/phone mode (Sales mobile only — default false leaves desktop, tablet and
+   *  Purchase exactly as before). One tap on a selectable batch confirms it.
+   *
+   *  Why the default needed two taps: a single click only moved the highlight and the
+   *  confirm lived on `onDoubleClick`, which is awkward to hit on a phone. On top of
+   *  that, the row's `onMouseEnter` re-rendered the list on touch — iOS Safari
+   *  emulates a hover first and swallows the first tap when hover changes the page.
+   *  With this prop on, the hover handler is skipped, a tap selects immediately and
+   *  the keyboard-hint footer (Enter/Tab/double-click) is not shown. */
+  tapToSelect?:     boolean
 }
 
 export default function BatchSelectionPopup({
-  open, productName, batches, selectedBatchNo, onSelect, onClose, avoidAutoFocus,
+  open, productName, batches, selectedBatchNo, onSelect, onClose, avoidAutoFocus, tapToSelect,
 }: Props) {
   const [query, setQuery] = useState('')
   const [hl,    setHL]    = useState(0)
@@ -128,7 +138,8 @@ export default function BatchSelectionPopup({
       const isTouchOnly = typeof window !== 'undefined'
         && typeof window.matchMedia === 'function'
         && window.matchMedia('(pointer: coarse)').matches
-      if (avoidAutoFocus && isTouchOnly) return
+      // tapToSelect (phone): never auto-open the keyboard over the batch list — a tap picks.
+      if ((avoidAutoFocus || tapToSelect) && isTouchOnly) return
       inputRef.current?.focus()
     })
   }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -187,7 +198,7 @@ export default function BatchSelectionPopup({
       className="bsp-overlay"
       onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div className="bsp-panel" role="dialog" aria-modal="true" aria-label="Select batch">
+      <div className={`bsp-panel${tapToSelect ? ' bsp-panel--tap' : ''}`} role="dialog" aria-modal="true" aria-label="Select batch">
         {/* Header */}
         <div className="bsp-header">
           <div>
@@ -249,12 +260,13 @@ export default function BatchSelectionPopup({
                         b.batch_no === selectedBatchNo ? 'bsp-row--current' : '',
                         !selectable ? 'bsp-row--disabled' : '',
                       ].filter(Boolean).join(' ')}
-                      onMouseEnter={() => setHL(i)}
+                      onMouseEnter={tapToSelect ? undefined : () => setHL(i)}
                       // Single click only moves the highlight (same as
                       // hover/arrow keys) — double-click confirms, same
                       // as pressing Enter on the highlighted row.
-                      onClick={() => setHL(i)}
-                      onDoubleClick={() => choose(b)}
+                      // tapToSelect (phone): one tap confirms immediately.
+                      onClick={tapToSelect ? () => choose(b) : () => setHL(i)}
+                      onDoubleClick={tapToSelect ? undefined : () => choose(b)}
                     >
                       <span className="bsp-col bsp-col-batch">
                         {b.batch_no || '—'}
@@ -274,14 +286,14 @@ export default function BatchSelectionPopup({
           )}
         </div>
 
-        {/* Keyboard hints */}
-        <div className="bsp-footer">
+        {/* Keyboard hints (not relevant — and misleading — in tap mode) */}
+        {!tapToSelect && <div className="bsp-footer">
           <span><kbd className="bsp-kbd">↑↓</kbd> Navigate</span>
           <span><kbd className="bsp-kbd">Enter</kbd> Select</span>
           <span><kbd className="bsp-kbd">Tab</kbd> Select + Next</span>
           <span>Double-click Select</span>
           <span><kbd className="bsp-kbd">Esc</kbd> Close</span>
-        </div>
+        </div>}
       </div>
     </div>,
     document.body,

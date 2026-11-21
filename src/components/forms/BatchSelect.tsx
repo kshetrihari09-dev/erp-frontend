@@ -87,6 +87,12 @@ interface Props {
    *  has. Default false: every existing caller (desktop/tablet Sales,
    *  Purchase in both modes) is completely unchanged. */
   hideTrigger?: boolean
+  /** Sales mobile only — one-tap batch picking in the popup (see BatchSelectionPopup). */
+  tapToSelect?: boolean
+  /** Sales mobile only. Fired once per fresh product pick when the visible instance finds
+   *  the product has NO batches, so the page can still continue its flow (nothing else
+   *  signals this case — there is no popup and no selection). Default: not called. */
+  onNoBatches?: () => void
 }
 
 /** Find the Quantity input in this same invoice row — desktop rows are
@@ -129,7 +135,7 @@ function isRootVisible(el: HTMLElement | null): boolean {
 
 export default function BatchSelect({
   productId, productName, value, onSelect, onTextChange, className, tabIndex, mode = 'sale',
-  autoSelectSingle, onAutoResolved, hideTrigger,
+  autoSelectSingle, onAutoResolved, hideTrigger, tapToSelect, onNoBatches,
 }: Props) {
   const { batches, loading } = useProductBatches(productId)
 
@@ -200,6 +206,8 @@ export default function BatchSelect({
     // "No batches available" state and stays disabled.
     if (saleBatches.length >= 1) {
       setPopupOpen(true)
+    } else {
+      onNoBatches?.()
     }
   }, [mode, productId, loading, saleBatches, autoSelectSingle]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -303,6 +311,7 @@ export default function BatchSelect({
         // can auto-open mid-scan with zero user tap, so it's the only
         // one that needs it.
         avoidAutoFocus={!!autoSelectSingle}
+        tapToSelect={tapToSelect}
       />
     </div>
   )
