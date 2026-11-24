@@ -191,7 +191,7 @@ export default function BatchSelect({
   /* ── Sale: auto-open the popup the moment a product resolves batches ───── */
   useEffect(() => {
     if (mode !== 'sale') return
-    if (!productId) { processedRef.current = undefined; return }
+    if (!productId) { processedRef.current = undefined; setHistoryOpen(false); return }   // product cleared → drop the history window
     if (loading) return
     if (processedRef.current === productId) return
 
@@ -229,9 +229,6 @@ export default function BatchSelect({
       onNoBatches?.()
     }
   }, [mode, productId, loading, saleBatches, autoSelectSingle]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // The row's product changed (or was cleared) while the history window was up → drop it.
-  useEffect(() => { setHistoryOpen(false) }, [productId])
 
   /* ── Purchase: freely-typeable batch number + optional "browse existing" ── */
   if (mode === 'purchase') {
