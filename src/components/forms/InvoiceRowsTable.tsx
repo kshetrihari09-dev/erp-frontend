@@ -100,6 +100,9 @@ interface Props {
    *  for ~600ms right after a scan adds or increments a row, purely as
    *  visual confirmation. No effect on data/validation. */
   flashRowId?: number
+  /** Sales page only: open the Product History window before Batch Selection (see
+   *  BatchSelect's `showHistory`). Default false — Purchase / Receive are unaffected. */
+  showProductHistory?: boolean
 }
 
 /* ── Component ───────────────────────────────────────────────────────────── */
@@ -108,7 +111,7 @@ const InvoiceRowsTable = forwardRef<InvoiceRowsTableHandle, Props>(function Invo
   rows, products, onChange, onProductsChange,
   showBonus = true, showCC = true, showDiscount = false,
   showExpiry = true, showBatch = true, mode = 'sale',
-  onBarcodeRowResolved, flashRowId,
+  onBarcodeRowResolved, flashRowId, showProductHistory = false,
 }, ref) {
   const firstRowRef = useRef<boolean>(true)
   const rowElsRef = useRef<Map<number, HTMLTableRowElement>>(new Map())
@@ -404,6 +407,7 @@ const InvoiceRowsTable = forwardRef<InvoiceRowsTableHandle, Props>(function Invo
                       mode={mode}
                       autoSelectSingle={!!row._scanned}
                       onAutoResolved={row._scanned ? () => onBarcodeRowResolved?.(idx) : undefined}
+                      showHistory={mode === 'sale' && showProductHistory}
                     />
                   </td>
                 )}

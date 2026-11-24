@@ -277,10 +277,28 @@ export const purchaseReturnsAPI = {
 }
 
 // ─── Stock ────────────────────────────────────────────────────────────────────
+/** One line of the Sales-page "Product History" popup (GET /stock/product-history). */
+export interface ProductHistoryRow {
+  id: string
+  type: 'Sales' | 'Purchase'
+  date_ad: string          // YYYY-MM-DD
+  date_bs: string          // as stored on the document; may be '' (the popup derives it from date_ad)
+  invoice_no: string
+  batch: string
+  expiry: string
+  qty: number
+  free: number
+  rate: number
+  mrp: number
+  disc_pct: number
+}
 export const stockAPI = {
   list:    (params?: Params) => http.get('/stock', { params }),
   batches: (params?: Params) => http.get<ApiResponse<StockBatch[]>>('/stock/batches', { params }),
   summary: ()                => http.get('/stock/summary'),
+  /** Most recent sale + purchase lines of one product, newest first (read-only). */
+  productHistory: (params: { product_id: string; limit?: number }) =>
+    http.get<ApiResponse<ProductHistoryRow[]>>('/stock/product-history', { params }),
 }
 
 // ─── Stock Register ───────────────────────────────────────────────────────────

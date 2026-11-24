@@ -32,6 +32,12 @@
  *   - You can't sell a batch that doesn't exist yet, so typing a batch
  *     number freely isn't offered in this mode.
  *
+ * Sales page only (`showHistory`): right after a product is picked, the Product History
+ * window (ProductHistoryPopup) opens FIRST; closing it (Enter / Esc / Exit) opens the batch
+ * popup described above. Scanned rows skip it so continuous scanning is never interrupted, and
+ * so does the phone layout. Opening the batch popup by hand (trigger click / F4) goes straight
+ * to batches, as before.
+ *
  * Purchase (`mode="purchase"`) — freely enterable, since a purchase very
  * often introduces a brand-new batch number that has no existing stock
  * record at all (the normal case, not an edge case):
@@ -50,6 +56,7 @@ import { Search } from 'lucide-react'
 import useProductBatches from '@/hooks/useProductBatches'
 import type { StockBatch } from '@/types'
 import BatchSelectionPopup from './BatchSelectionPopup'
+import ProductHistoryPopup from './ProductHistoryPopup'
 
 interface Props {
   productId?:   string
@@ -93,6 +100,11 @@ interface Props {
    *  the product has NO batches, so the page can still continue its flow (nothing else
    *  signals this case — there is no popup and no selection). Default: not called. */
   onNoBatches?: () => void
+  /** Sales page (desktop / tablet layouts) only. When true, a fresh product pick first opens the
+   *  Product History window and the batch popup follows once it is closed. Ignored for scanned
+   *  rows (`autoSelectSingle`), phone tap-to-select, and Purchase mode. Default false: every
+   *  other caller behaves exactly as before. */
+  showHistory?: boolean
 }
 
 /** Find the Quantity input in this same invoice row — desktop rows are
@@ -135,7 +147,7 @@ function isRootVisible(el: HTMLElement | null): boolean {
 
 export default function BatchSelect({
   productId, productName, value, onSelect, onTextChange, className, tabIndex, mode = 'sale',
-  autoSelectSingle, onAutoResolved, hideTrigger, tapToSelect, onNoBatches,
+  autoSelectSingle, onAutoResolved, hideTrigger, tapToSelect, onNoBatches, showHistory,
 }: Props) {
   const { batches, loading } = useProductBatches(productId)
 
@@ -152,6 +164,7 @@ export default function BatchSelect({
   )
 
   const [popupOpen, setPopupOpen] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
 
   const rootRef      = useRef<HTMLDivElement>(null)
   // Tracks which product_id this row has already auto-processed, so the
@@ -205,11 +218,17 @@ export default function BatchSelect({
     // 0 batches: nothing to auto-do — the trigger below shows the
     // "No batches available" state and stays disabled.
     if (saleBatches.length >= 1) {
-      setPopupOpen(true)
+      // Product History first (Sales desktop/tablet, manual picks only); its onClose opens the
+      // batch popup. Everything else opens the batch popup immediately, as before.
+      if (showHistory && !autoSelectSingle && !tapToSelect) setHistoryOpen(true)
+      else setPopupOpen(true)
     } else {
       onNoBatches?.()
     }
   }, [mode, productId, loading, saleBatches, autoSelectSingle]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The row's product changed (or was cleared) while the history window was up → drop it.
+  useEffect(() => { setHistoryOpen(false) }, [productId])
 
   /* ── Purchase: freely-typeable batch number + optional "browse existing" ── */
   if (mode === 'purchase') {
@@ -297,6 +316,15 @@ export default function BatchSelect({
               ? selected.batch_no || '—'
               : 'Select batch…'}
       </button>
+
+      {showHistory && (
+        <ProductHistoryPopup
+          open={historyOpen}
+          productId={productId}
+          productName={productName}
+          onClose={() => { setHistoryOpen(false); setPopupOpen(true) }}
+        />
+      )}
 
       <BatchSelectionPopup
         open={popupOpen}

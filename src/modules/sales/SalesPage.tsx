@@ -1162,6 +1162,7 @@ export default function SalesPage() {
                 showDiscount={false}
                 onBarcodeRowResolved={() => unifiedInputRef.current?.focus()}
                 flashRowId={flashRowId}
+                showProductHistory
               />
             </div>
 
@@ -1223,6 +1224,7 @@ export default function SalesPage() {
                         : undefined}
                       onNoBatches={isPhoneWidth && row._scanned ? () => setSheetRowId(row._id) : undefined}
                       tapToSelect={isPhoneWidth}
+                      showHistory={!isPhoneWidth}
                     />
                   </div>
                 )
