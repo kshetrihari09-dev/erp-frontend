@@ -44,6 +44,7 @@ import MobileProductSheet, { SheetBatchField } from '@/components/forms/MobilePr
 import BatchSelect from '@/components/forms/BatchSelect'
 import QtyGate from '@/components/forms/QtyGate'
 import QuickAddPartyModal from '@/components/forms/QuickAddPartyModal'
+import CustomerSelect from '@/components/forms/CustomerSelect'
 import { fmt, calcRowAmount, productCcPct } from '@/utils'
 import { formatDisplayDate } from '@/utils/dateSystem'
 import DateSystemInput from '@/components/shared/DateSystemInput'
@@ -513,6 +514,8 @@ export default function SalesPage() {
 
   // ── Calculations ─────────────────────────────────────────────────────
   const customerId       = watch('customer_id')
+  // customer_id is now written by <CustomerSelect> via setValue; keep it registered with the form.
+  useEffect(() => { register('customer_id') }, [register])
   const currentPayMode   = watch('payment_mode')
   const selectedCustomer = customers.find(c => c.id === customerId)
   const subtotal         = rows.reduce((s, r) => s + r.amount, 0)
@@ -977,14 +980,14 @@ export default function SalesPage() {
                     <div className="flex gap-2 items-stretch pos-cf-party-row">
                       <div className="relative flex-1 pos-cf-select-wrap">
                         <User size={16} className="pos-cf-lead-icon" aria-hidden="true" />
-                        <select id="pos-customer-select" className="erp-input pos-select pos-cf-select" required {...register('customer_id')}>
-                          <option value="">Select a customer…</option>
-                          {customers.map(c => (
-                            <option key={c.id} value={c.id}>
-                              {c.code ? `${c.code} - ` : ''}{c.name}
-                            </option>
-                          ))}
-                        </select>
+                        <CustomerSelect
+                          id="pos-customer-select"
+                          className="erp-input pos-select pos-cf-select"
+                          required
+                          customers={customers}
+                          value={customerId || ''}
+                          onChange={id => setValue('customer_id', id, { shouldDirty: true })}
+                        />
                         <ChevronDown size={13} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-4)] pos-cf-chevron" />
                       </div>
                       <button
