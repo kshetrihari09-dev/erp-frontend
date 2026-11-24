@@ -38,7 +38,7 @@ import {
   SkeletonRows, Empty, SearchInput, ConfirmDialog, Kbd, Alert,
 } from '@/components/ui'
 import TransactionSuccessAlert, { type TransactionSuccessInfo } from '@/components/shared/TransactionSuccessAlert'
-import InvoiceRowsTable, { newRow, exceedsMaxRate, type InvoiceRow, type InvoiceRowsTableHandle } from '@/components/forms/InvoiceRowsTable'
+import InvoiceRowsTable, { newRow, exceedsMaxSaleRate, type InvoiceRow, type InvoiceRowsTableHandle } from '@/components/forms/InvoiceRowsTable'
 import ProductSearchCell, { type ProductSearchCellHandle } from '@/components/forms/ProductSearchCell'
 import MobileProductSheet, { SheetBatchField } from '@/components/forms/MobileProductSheet'
 import BatchSelect from '@/components/forms/BatchSelect'
@@ -1336,7 +1336,7 @@ export default function SalesPage() {
                       value={row.rate === 0 ? '' : row.rate}
                       placeholder="0.00"
                       onChange={e => {
-                        if (exceedsMaxRate(e.target.value)) return   // Rate: max 5 digits before the decimal point
+                        if (exceedsMaxSaleRate(e.target.value)) return   // Rate: max 5 digits before the decimal point
                         const rate = e.target.value === '' ? 0 : Number(e.target.value)
                         updateRow({ rate, ...reCalc({ rate }) })
                       }}
@@ -1433,7 +1433,7 @@ export default function SalesPage() {
                           value={row.rate === 0 ? '' : row.rate}
                           placeholder="0.00"
                           onChange={e => {
-                            if (exceedsMaxRate(e.target.value)) return   // Rate: max 5 digits before the decimal point
+                            if (exceedsMaxSaleRate(e.target.value)) return   // Rate: max 5 digits before the decimal point
                             const rate = e.target.value === '' ? 0 : Number(e.target.value)
                             updateRowAt(idx, { rate, ...recalcRow(row, { rate }) })
                           }}
