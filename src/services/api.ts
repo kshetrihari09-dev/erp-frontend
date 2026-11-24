@@ -468,6 +468,44 @@ export const purchaseScansAPI = {
    *  just centralizes the path so it's written in one place. */
   pagePath: (scanId: string, pageNo: number) => `/purchase-scans/${scanId}/pages/${pageNo}/file`,
 }
+// ─── Staff Salary ─────────────────────────────────────────────────────────────
+// Thin client over backend routes/salary.js. All accounting happens server-side (voucher + posting engine); the UI only
+// sends intent (generate / edit / approve / pay / reverse) and renders what comes back.
+export const salaryAPI = {
+  paymentAccounts: () => http.get<ApiResponse<{ id: string; code: string; name: string; sub_type: string }[]>>('/salary/payment-accounts'),
+  // components
+  components:      (params?: Params) => http.get<ApiResponse<any[]>>('/salary/components', { params }),
+  createComponent: (data: Record<string, unknown>) => http.post<ApiResponse<any>>('/salary/components', data),
+  updateComponent: (id: string, data: Record<string, unknown>) => http.put<ApiResponse<any>>(`/salary/components/${id}`, data),
+  // employees
+  employees:       (params?: Params) => http.get<ApiResponse<any[]>>('/salary/employees', { params }),
+  employee:        (id: string) => http.get<ApiResponse<any>>(`/salary/employees/${id}`),
+  createEmployee:  (data: Record<string, unknown>) => http.post<ApiResponse<any>>('/salary/employees', data),
+  updateEmployee:  (id: string, data: Record<string, unknown>) => http.put<ApiResponse<any>>(`/salary/employees/${id}`, data),
+  employeeLedger:  (id: string, params?: Params) => http.get<ApiResponse<any>>(`/salary/employees/${id}/ledger`, { params }),
+  // slips
+  slips:           (params?: Params) => http.get<ApiResponse<any[]>>('/salary/slips', { params }),
+  slip:            (id: string) => http.get<ApiResponse<any>>(`/salary/slips/${id}`),
+  generate:        (data: { salary_month: string; employee_ids?: string[] }) => http.post<ApiResponse<any>>('/salary/generate', data),
+  updateSlip:      (id: string, data: Record<string, unknown>) => http.put<ApiResponse<any>>(`/salary/slips/${id}`, data),
+  cancelSlip:      (id: string, reason: string) => http.post<ApiResponse<any>>(`/salary/slips/${id}/cancel`, { reason }),
+  approve:         (id: string, data?: Record<string, unknown>) => http.post<ApiResponse<any>>(`/salary/slips/${id}/approve`, data || {}),
+  pay:             (id: string, data: Record<string, unknown>) => http.post<ApiResponse<any>>(`/salary/slips/${id}/pay`, data),
+  reverseApproval: (id: string, reason: string) => http.post<ApiResponse<any>>(`/salary/slips/${id}/reverse-approval`, { reason }),
+  reversePayment:  (paymentId: string, reason: string) => http.post<ApiResponse<any>>(`/salary/payments/${paymentId}/reverse`, { reason }),
+  // advances
+  advances:        (params?: Params) => http.get<ApiResponse<any[]>>('/salary/advances', { params }),
+  advanceStatement:(employeeId: string) => http.get<ApiResponse<any>>(`/salary/employees/${employeeId}/advances`),
+  issueAdvance:    (data: Record<string, unknown>) => http.post<ApiResponse<any>>('/salary/advances', data),
+  reverseAdvance:  (id: string, reason: string) => http.post<ApiResponse<any>>(`/salary/advances/${id}/reverse`, { reason }),
+  // reports
+  reportMonthly:    (params?: Params) => http.get<ApiResponse<any>>('/salary/reports/monthly-expense', { params }),
+  reportOutstanding:(params?: Params) => http.get<ApiResponse<any>>('/salary/reports/outstanding', { params }),
+  reportPayments:   (params?: Params) => http.get<ApiResponse<any[]>>('/salary/reports/payments', { params }),
+  reportDeductions: (params?: Params) => http.get<ApiResponse<any>>('/salary/reports/deductions', { params }),
+  reportPayable:    (params?: Params) => http.get<ApiResponse<any>>('/salary/reports/payable-balance', { params }),
+}
+
 // ─── Reminders ────────────────────────────────────────────────────────────────
 export const remindersAPI = {
   list:    (params?: Params) => http.get<ApiResponse<any[]>>('/reminders', { params }),

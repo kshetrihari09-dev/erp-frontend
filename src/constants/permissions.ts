@@ -31,6 +31,7 @@ export const ROUTE_PERMISSIONS: Record<string, readonly string[]> = {
   [PATHS.CREDIT_RISK]:          ['sales.view', 'accounting.view'],
   [PATHS.ACCOUNTING]:           ['accounting.view'],
   [PATHS.LEDGER]:               ['accounting.view'],
+  [PATHS.SALARY]:               ['salary.view'],      // never granted by a wildcard — see backend rbac/permissions.js
   [PATHS.REPORTS]:              ['reports.view'],
   [PATHS.COMPANY_CUSTOMER_REPORT]: ['reports.view'],
   [PATHS.CUSTOMER_COMPANY_REPORT]: ['reports.view'],

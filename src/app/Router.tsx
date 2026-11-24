@@ -36,6 +36,7 @@ const CompanyCustomerReportPage = lazy(() => import('@/modules/reports/CompanyCu
 const CustomerCompanyReportPage = lazy(() => import('@/modules/reports/CustomerCompanyReportPage'))
 const SettingsPage = lazy(() => import('@/modules/settings/SettingsPage'))
 const RemindersPage = lazy(() => import('@/modules/reminders/RemindersPage'))
+const SalaryPage    = lazy(() => import('@/modules/salary/SalaryPage'))
 
 
 
@@ -98,6 +99,7 @@ export default function Router() {
             <Route path="purchase-suggestions" element={<RequireRoute to="/purchase-suggestions"><PurchaseSuggestionsPage /></RequireRoute>} />
             <Route path="credit-risk" element={<RequireRoute to="/credit-risk"><CreditRiskDashboardPage /></RequireRoute>} />
             <Route path="reminders" element={<RequireRoute to="/reminders"><RemindersPage /></RequireRoute>} />
+            <Route path="salary" element={<RequireRoute to="/salary"><SalaryPage /></RequireRoute>} />
 
             {/* Parties */}
             <Route path="customers"    element={<RequireRoute to="/customers"><CustomersPage /></RequireRoute>} />

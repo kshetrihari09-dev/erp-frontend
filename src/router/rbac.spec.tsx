@@ -36,15 +36,15 @@ const EVERYTHING = Object.values(PATHS).filter((p) => !['/login', '/signup'].inc
 const EXPECT_OPEN: Record<string, string[]> = {
   owner: EVERYTHING,
   admin: EVERYTHING,
-  manager: EVERYTHING,
+  manager: EVERYTHING.filter((p) => p !== '/salary'),   // salaries are confidential: no wildcard grants salary.view (owner/admin only, plus accountant & auditor by name)
   accountant: ['/dashboard', '/reminders', '/sales', '/sales-returns', '/customers', '/purchase', '/purchase-returns', '/suppliers', '/products', '/barcode-print',
     '/qrcode-print', '/manufacturers', '/stock', '/stock-register', '/stock-summary', '/purchase-suggestions', '/credit-risk', '/accounting', '/ledger',
-    '/reports', '/company-vs-customer', '/customer-vs-company', '/settings'],
+    '/reports', '/company-vs-customer', '/customer-vs-company', '/settings', '/salary'],
   cashier: ['/dashboard', '/reminders', '/sales', '/retail-sale', '/sales-returns', '/purchase-returns', '/customers', '/products', '/barcode-print', '/qrcode-print',
     '/manufacturers', '/stock', '/stock-register', '/stock-summary', '/credit-risk', '/suppliers'],   // parties.view covers customers AND suppliers (as on the server)
   auditor: ['/dashboard', '/reminders', '/sales', '/sales-returns', '/customers', '/purchase', '/purchase-returns', '/suppliers', '/products', '/barcode-print', '/qrcode-print',
     '/manufacturers', '/stock', '/stock-register', '/stock-summary', '/purchase-suggestions', '/credit-risk', '/accounting', '/ledger', '/reports',
-    '/company-vs-customer', '/customer-vs-company', '/settings'],
+    '/company-vs-customer', '/customer-vs-company', '/settings', '/salary'],
   viewer: ['/dashboard', '/reminders', '/sales', '/sales-returns', '/customers', '/purchase', '/purchase-returns', '/suppliers', '/products', '/barcode-print', '/qrcode-print',
     '/manufacturers', '/stock', '/stock-register', '/stock-summary', '/purchase-suggestions', '/credit-risk', '/accounting', '/ledger', '/reports',
     '/company-vs-customer', '/customer-vs-company'],

@@ -8,7 +8,7 @@ import {
   FileBarChart, Settings, LogOut, Building2, CalendarDays, Moon,
   Sun, Menu, X, AlertTriangle, Bell, Search, ChevronRight, Home,
   PackageX, CalendarClock, Sparkles, ShieldAlert, ClipboardList, Building, ArrowLeftRight, BarChart3,
-  Scissors,
+  Scissors, Banknote,
 } from 'lucide-react'
 import useAuthStore from '@/store/authStore'
 import { filterNavByPermission } from '@/constants/permissions'
@@ -57,6 +57,7 @@ const NAV = [
   { section: 'ACCOUNTING' },
   { to: PATHS.ACCOUNTING,    label: 'Accounting',     icon: <BookOpen           size={20} strokeWidth={1.8}/> },
   { to: PATHS.LEDGER,        label: 'Ledger',         icon: <BookCopy           size={20} strokeWidth={1.8}/> },
+  { to: PATHS.SALARY,        label: 'Staff Salary',   icon: <Banknote           size={20} strokeWidth={1.8}/> },
   { to: PATHS.CREDIT_RISK,   label: 'Credit Risk',    icon: <ShieldAlert        size={20} strokeWidth={1.8}/> },
 
   { section: 'REPORTS' },

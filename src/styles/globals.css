@@ -8365,3 +8365,13 @@ canvas{
   .bsp-panel--tap .bsp-close { width: 44px; height: 44px; }
   .bsp-panel--tap .bsp-search-input { font-size: 16px; }
 }
+
+
+/* ── Staff Salary dialogs ────────────────────────────────────────────────────
+   The shared .erp-table has a 900px minimum width, which is right for full-page lists but wider than the ~620px slip dialog:
+   the table scrolled sideways and, once focus had moved, opened with its first column scrolled out of view. Inside a salary
+   dialog the table simply fits (scoped to .salary-compact — every other table in the app is unchanged). */
+.salary-compact .erp-table { min-width: 0; }
+.salary-compact .erp-table th.text-right { text-align: right; }          /* headers line up with their right-aligned figures */
+.salary-compact .erp-table th, .salary-compact .erp-table td { padding-left: 10px; padding-right: 10px; }
+@media (max-width: 520px) { .salary-compact .erp-table th, .salary-compact .erp-table td { padding-left: 6px; padding-right: 6px; font-size: 12px; } }
