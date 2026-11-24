@@ -105,6 +105,9 @@ interface Props {
    *  rows (`autoSelectSingle`), phone tap-to-select, and Purchase mode. Default false: every
    *  other caller behaves exactly as before. */
   showHistory?: boolean
+  /** Customer selected on the invoice; the history window shows only this party's sales.
+   *  No party → the window is skipped. */
+  historyPartyId?: string
 }
 
 /** Find the Quantity input in this same invoice row — desktop rows are
@@ -147,7 +150,7 @@ function isRootVisible(el: HTMLElement | null): boolean {
 
 export default function BatchSelect({
   productId, productName, value, onSelect, onTextChange, className, tabIndex, mode = 'sale',
-  autoSelectSingle, onAutoResolved, hideTrigger, tapToSelect, onNoBatches, showHistory,
+  autoSelectSingle, onAutoResolved, hideTrigger, tapToSelect, onNoBatches, showHistory, historyPartyId,
 }: Props) {
   const { batches, loading } = useProductBatches(productId)
 
@@ -220,7 +223,7 @@ export default function BatchSelect({
     if (saleBatches.length >= 1) {
       // Product History first (Sales desktop/tablet, manual picks only); its onClose opens the
       // batch popup. Everything else opens the batch popup immediately, as before.
-      if (showHistory && !autoSelectSingle && !tapToSelect) setHistoryOpen(true)
+      if (showHistory && historyPartyId && !autoSelectSingle && !tapToSelect) setHistoryOpen(true)
       else setPopupOpen(true)
     } else {
       onNoBatches?.()
@@ -322,6 +325,7 @@ export default function BatchSelect({
           open={historyOpen}
           productId={productId}
           productName={productName}
+          partyId={historyPartyId}
           onClose={() => { setHistoryOpen(false); setPopupOpen(true) }}
         />
       )}

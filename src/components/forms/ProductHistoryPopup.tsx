@@ -5,10 +5,10 @@
  * BEFORE the Batch Selection popup (BatchSelect.tsx opens this first, then the batch popup
  * once this one is closed).
  *
- * Shows the product's most recent sale / purchase lines (newest first):
+ * Shows the SELECTED CUSTOMER's previous sales of this product (newest first):
  *   Ad Date · Bs Date · Invoice No. · Batch · Expiry · Qty · Free · Rate · MRP · Disc % · Type
- * so the cashier can see what it was last sold for, to whom-ever, in which batch, at what
- * rate and discount, before choosing a batch.
+ * so the cashier can see what this customer was last charged, in which batch, at what rate
+ * and discount, before choosing a batch.
  *
  * Read-only: nothing here changes the invoice row, pricing, stock or any validation.
  *
@@ -16,7 +16,7 @@
  *             Enter or Esc                      close → the batch popup opens next
  * Mouse:      click a line to highlight it · "Exit" button or a click outside closes
  *
- * Never blocks the sale: no history for the product, being offline, or a failed request all
+ * Never blocks the sale: no history for this customer, being offline, or a failed request all
  * just close this popup straight away (same `onClose`), so the flow continues to batch
  * selection exactly as it did before this window existed.
  */
@@ -31,6 +31,8 @@ interface Props {
   open:         boolean
   productId?:   string
   productName?: string
+  /** The customer selected on the invoice — only this party's previous sales are shown. */
+  partyId?:     string
   /** Called when the user closes the window — and also when there is nothing to show
    *  (no history / offline / error). The caller continues to batch selection from here. */
   onClose:      () => void
@@ -42,7 +44,7 @@ const slashDate = (s?: string) => (s ? String(s).slice(0, 10).replace(/-/g, '/')
 const qtyText = (n: number) => String(Math.round((Number(n) || 0) * 100) / 100)
 const money = (n: number) => (Number(n) || 0).toFixed(2)
 
-export default function ProductHistoryPopup({ open, productId, productName, onClose }: Props) {
+export default function ProductHistoryPopup({ open, productId, productName, partyId, onClose }: Props) {
   const { isOnline } = useOffline()
   const [rows, setRows]       = useState<ProductHistoryRow[] | null>(null)   // null = loading
   const [hl, setHL]           = useState(0)
@@ -61,10 +63,10 @@ export default function ProductHistoryPopup({ open, productId, productName, onCl
     if (!open) return
     setRows(null)
     setHL(0)
-    if (!productId || !isOnline) { close(); return }
+    if (!productId || !partyId || !isOnline) { close(); return }
 
     let cancelled = false
-    stockAPI.productHistory({ product_id: productId })
+    stockAPI.productHistory({ product_id: productId, party_id: partyId })
       .then(res => {
         if (cancelled) return
         const data = ((res.data as any)?.data as ProductHistoryRow[]) || []
@@ -73,7 +75,7 @@ export default function ProductHistoryPopup({ open, productId, productName, onCl
       })
       .catch(() => { if (!cancelled) close() })          // never block the sale on a history failure
     return () => { cancelled = true }
-  }, [open, productId]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, productId, partyId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── Keyboard (window, capture phase) ───────────────────────────────────────
    * The product search box behind this popup may still hold focus for a moment after the
@@ -146,7 +148,7 @@ export default function ProductHistoryPopup({ open, productId, productName, onCl
                     <td className="phx-num">{money(r.rate)}</td>
                     <td className="phx-num">{money(r.mrp)}</td>
                     <td className="phx-num">{qtyText(r.disc_pct)}</td>
-                    <td className={r.type === 'Purchase' ? 'phx-type phx-type--pu' : 'phx-type'}>{r.type}</td>
+                    <td>{r.type}</td>
                   </tr>
                 ))}
               </tbody>

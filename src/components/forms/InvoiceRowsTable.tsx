@@ -103,6 +103,8 @@ interface Props {
   /** Sales page only: open the Product History window before Batch Selection (see
    *  BatchSelect's `showHistory`). Default false — Purchase / Receive are unaffected. */
   showProductHistory?: boolean
+  /** Customer selected on the Sales page — scopes the Product History window to that party. */
+  historyPartyId?: string
 }
 
 /* ── Component ───────────────────────────────────────────────────────────── */
@@ -111,7 +113,7 @@ const InvoiceRowsTable = forwardRef<InvoiceRowsTableHandle, Props>(function Invo
   rows, products, onChange, onProductsChange,
   showBonus = true, showCC = true, showDiscount = false,
   showExpiry = true, showBatch = true, mode = 'sale',
-  onBarcodeRowResolved, flashRowId, showProductHistory = false,
+  onBarcodeRowResolved, flashRowId, showProductHistory = false, historyPartyId,
 }, ref) {
   const firstRowRef = useRef<boolean>(true)
   const rowElsRef = useRef<Map<number, HTMLTableRowElement>>(new Map())
@@ -408,6 +410,7 @@ const InvoiceRowsTable = forwardRef<InvoiceRowsTableHandle, Props>(function Invo
                       autoSelectSingle={!!row._scanned}
                       onAutoResolved={row._scanned ? () => onBarcodeRowResolved?.(idx) : undefined}
                       showHistory={mode === 'sale' && showProductHistory}
+                      historyPartyId={historyPartyId}
                     />
                   </td>
                 )}
