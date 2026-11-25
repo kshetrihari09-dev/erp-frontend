@@ -128,7 +128,7 @@ export default function AutoCloudBackup({ data, enabled = true }: Props) {
   // lands ON the screen as a white panel covering the page. Give those layouts a real paper width (the
   // standard layout keeps its natural width, exactly as before).
   const size = toInvoiceTemplateSize(tpl.paperSize)
-  const fixedWidth = size === 'a4' && (tpl.layout === 'pharma' || tpl.layout === 'boxed') ? '210mm' : undefined
+  const fixedWidth = size === 'a4' && (tpl.layout && tpl.layout !== 'standard') ? '210mm' : undefined
 
   return (
     <div style={{ position: 'fixed', left: -99999, top: 0, width: fixedWidth, maxWidth: '100vw', overflow: 'hidden', pointerEvents: 'none' }} aria-hidden="true">

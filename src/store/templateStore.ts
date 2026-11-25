@@ -24,7 +24,7 @@ export interface TemplateConfig {
   thankYouMessage: string 
   // Style
   /** Which invoice layout prints: 'standard' (original), 'pharma' or 'boxed' (extra A4 sale-invoice layouts). */
-  layout:          'standard' | 'pharma' | 'boxed'
+  layout:          'standard' | 'pharma' | 'boxed' | 'soldto' | 'commercial'
   fontSize:        'small' | 'medium' | 'large'
   primaryColor:    string
   paperSize:       'A4' | 'thermal' | 'A5'

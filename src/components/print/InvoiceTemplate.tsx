@@ -17,6 +17,8 @@ import type { Company } from '@/types'
 import { DEFAULT_TPL, type TemplateConfig } from '@/store/templateStore'
 import PharmaInvoiceTemplate from './PharmaInvoiceTemplate'
 import BoxedInvoiceTemplate from './BoxedInvoiceTemplate'
+import SoldToInvoiceTemplate from './SoldToInvoiceTemplate'
+import CommercialInvoiceTemplate from './CommercialInvoiceTemplate'
 
 export interface PrintData {
   voucherNo:    string
@@ -70,7 +72,9 @@ export interface PrintExtra {
   issuedAt?:     string
   /** n in "*RE-PRINT[n]"; omitted/0 on the first print. */
   reprintCount?: number
-  /** Boxed (distributor) layout only — printed blank when absent. */
+  /** Boxed / Sold-To layouts only — printed blank when absent. */
+  division?:     string
+  dueDate?:      string
   msoName?:      string
   transport?:    string
   challanNo?:    string
@@ -509,6 +513,8 @@ const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>((props,
     && props.data.type === 'SALE'
     && (props.data.items?.length ?? 0) > 0
   if (eligible && layout === 'pharma') return <PharmaInvoiceTemplate ref={ref} data={props.data} copyLabel={props.copyLabel} tpl={props.tpl} />
+  if (eligible && layout === 'commercial') return <CommercialInvoiceTemplate ref={ref} data={props.data} copyLabel={props.copyLabel} tpl={props.tpl} />
+  if (eligible && layout === 'soldto') return <SoldToInvoiceTemplate ref={ref} data={props.data} copyLabel={props.copyLabel} tpl={props.tpl} />
   if (eligible && layout === 'boxed')  return <BoxedInvoiceTemplate  ref={ref} data={props.data} copyLabel={props.copyLabel} tpl={props.tpl} />
   return <StandardInvoiceTemplate ref={ref} {...props} />
 })

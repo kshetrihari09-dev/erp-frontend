@@ -262,6 +262,8 @@ export default function TemplateTab() {
                   { v: 'standard', l: 'Standard' },
                   { v: 'pharma',   l: 'Pharma (detailed)' },
                   { v: 'boxed',    l: 'Distributor (boxed)' },
+                  { v: 'soldto',   l: 'Manufacturer (Sold To)' },
+                  { v: 'commercial', l: 'Commercial (Formulation)' },
                 ] as const).map(({ v, l }) => (
                   <button
                     key={v}
@@ -273,7 +275,7 @@ export default function TemplateTab() {
                   </button>
                 ))}
               </div>
-              <p className="tpl-hint">Pharma and Distributor (boxed) print A4 sales invoices in their own formats (Pharma: HS code, pack, M.R.P.; Distributor: ruled boxes with unit, free and discount columns). Other documents and thermal paper keep the standard layout.</p>
+              <p className="tpl-hint">Pharma and Distributor (boxed) print A4 sales invoices in their own formats (Pharma: HS code, pack, M.R.P.; Distributor: ruled boxes with unit, free and discount columns; Manufacturer: SOLD TO box with MRP, packing and payment-due lines; Commercial: boxed-PAN header, tinted grid, Terms & Conditions and tagline band). Other documents and thermal paper keep the standard layout.</p>
             </div>
 
             {/* Paper size */}
