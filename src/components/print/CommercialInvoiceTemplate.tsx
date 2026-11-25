@@ -41,8 +41,13 @@ const expiryMY = (s?: string) => {
 const COLS = [5, 20, 12, 9, 12, 7, 8, 6, 9, 12]
 const FILL_ROWS = 22
 
-const Icon = ({ d }: { d: string }) => (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill={NAVY} style={{ marginRight: 8, verticalAlign: '-2px' }}><path d={d} /></svg>
+/** One header line: icon + text on the SAME row. Flex (not inline flow) because the app's CSS reset makes
+ *  <svg> display:block, which would otherwise drop the text onto the line below its icon. */
+const IconLine = ({ d, children }: { d: string; children: React.ReactNode }) => (
+  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+    <svg width="13" height="13" viewBox="0 0 24 24" fill={NAVY} style={{ display: 'block', flexShrink: 0 }}><path d={d} /></svg>
+    <span>{children}</span>
+  </div>
 )
 const PIN   = 'M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z'
 const PHONE = 'M6.6 10.8a15 15 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.6 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.6 3.6a1 1 0 0 1-.25 1z'
@@ -96,17 +101,22 @@ const CommercialInvoiceTemplate = forwardRef<HTMLDivElement, Props>(({ data, tpl
     <div ref={ref} style={{ fontFamily: SANS, color: '#111', background: '#fff', width: '100%', border: LINE, boxSizing: 'border-box' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', padding: '10px 14px 6px', gap: 14 }}>
-        <div style={{ width: 96, height: 96, flexShrink: 0 }}>
-          {tpl.showLogo && co?.logo_url && <img src={co.logo_url} alt="" style={{ width: 96, height: 96, objectFit: 'contain', borderRadius: '50%' }} />}
-        </div>
+        {tpl.showLogo && co?.logo_url && (
+          <div style={{ width: 96, height: 96, flexShrink: 0 }}>
+            <img src={co.logo_url} alt="" style={{ display: 'block', width: 96, height: 96, objectFit: 'contain', borderRadius: '50%' }} />
+          </div>
+        )}
         <div style={{ flex: 1, minWidth: 0 }}>
           {tpl.showCompanyName && co?.name && (
-            <div style={{ fontFamily: SERIF, fontWeight: 700, fontSize: '28px', color: NAVY, lineHeight: 1.1, letterSpacing: '0.3px' }}>{co.name}</div>
+            <div style={{
+              fontFamily: SERIF, fontWeight: 700, color: NAVY, lineHeight: 1.15, letterSpacing: '0.3px', whiteSpace: 'nowrap',
+              fontSize: String(co.name).length > 34 ? '19px' : String(co.name).length > 26 ? '23px' : '27px',
+            }}>{co.name}</div>
           )}
           <div style={{ fontFamily: SERIF, fontWeight: 700, fontSize: '13.5px', color: NAVY, marginTop: 4, lineHeight: 1.55 }}>
-            {tpl.showAddress && co?.address && <div><Icon d={PIN} />{co.address}</div>}
-            {tpl.showPhone && co?.phone && <div><Icon d={PHONE} />{co.phone}</div>}
-            {co?.email && <div><Icon d={MAIL} />{co.email}</div>}
+            {tpl.showAddress && co?.address && <IconLine d={PIN}>{co.address}</IconLine>}
+            {tpl.showPhone && co?.phone && <IconLine d={PHONE}>{co.phone}</IconLine>}
+            {co?.email && <IconLine d={MAIL}>{co.email}</IconLine>}
           </div>
           {tpl.showPAN && co?.pan_no && (
             <div style={{ fontFamily: SANS, fontWeight: 700, fontSize: '12.5px', color: NAVY, marginTop: 3, display: 'flex', alignItems: 'center' }}>
@@ -117,7 +127,7 @@ const CommercialInvoiceTemplate = forwardRef<HTMLDivElement, Props>(({ data, tpl
             </div>
           )}
         </div>
-        <div style={{ width: '27%', flexShrink: 0, textAlign: 'right' }}>
+        <div style={{ flexShrink: 0, textAlign: 'right', marginLeft: 'auto' }}>
           {co?.registration_no && <div style={{ fontFamily: SANS, fontWeight: 700, fontSize: '11.5px', color: NAVY }}>Com. Regd No. {co.registration_no}</div>}
           <div style={{ marginTop: 34, display: 'inline-block', color: ORANGE, fontWeight: 700, fontSize: '16px', borderBottom: `3px double ${ORANGE}`, padding: '0 2px 1px', whiteSpace: 'nowrap' }}>
             {!title || title.toUpperCase() === 'INVOICE' ? 'COMMERCIAL INVOICE' : title}
