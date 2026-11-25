@@ -3,11 +3,11 @@
  *
  * Reproduces the supplied manufacturer "COMMERCIAL INVOICE": a full-page border; round logo +
  * large serif company name with address / phone / e-mail icons and a boxed-digit PAN No., the
- * "Com. Regd No." and an orange COMMERCIAL INVOICE title at the right; a Party / M/S / Add / Tel No. /
- * PAN box beside Invoice No. / Mitti Date / C.N. No. / No.of Packages / Sent Through; a tinted-header
+ * "Com. Regd No." and an orange COMMERCIAL INVOICE title at the right; a Party / Add / Tel No. / PAN box
+ * beside Invoice No. / Mitti Date / C.N. No. / No.of Packages; a tinted-header
  * item grid (S.N. · Product Name · Packing · Batch No. · Exp Date · MRP · Quantity · Free · Rate ·
- * Amount) in a typewriter face; Remarks beside Total / Discount / Rounded Off / Grand Total (orange
- * label); Previous Balance / Total Present Balance / Rupees in words; Terms & Conditions (one line
+ * Amount) in a typewriter face that stretches to fill the A4 sheet; Remarks beside Total / Discount /
+ * CC Charge / Rounded Off / Grand Total (orange label); Previous Balance / Total Present Balance / Rupees in words; Terms & Conditions (one line
  * per row of the Footer Text setting); Prepared by / Received by / Authorised Signatory; and a blue
  * tagline band (the Thank-you message setting).
  *
@@ -38,8 +38,8 @@ const expiryMY = (s?: string) => {
 }
 
 // S.N. · Product · Packing · Batch · Exp · MRP · Qty · Free · Rate · Amount  (%)
-const COLS = [5, 20, 12, 9, 12, 7, 8, 6, 9, 12]
-const FILL_ROWS = 22
+const COLS = [5, 25, 10, 9, 10, 7, 8, 6, 9, 11]
+const ROW_H = 19   // fixed row height so the per-column lists line up across the grid
 
 /** One header line: icon + text on the SAME row. Flex (not inline flow) because the app's CSS reset makes
  *  <svg> display:block, which would otherwise drop the text onto the line below its icon. */
@@ -66,14 +66,27 @@ const CommercialInvoiceTemplate = forwardRef<HTMLDivElement, Props>(({ data, tpl
   const round = data.roundOff ?? 0
   const terms = (tpl.footerText || '').split('\n').map(l => l.trim()).filter(Boolean)
   const title = (tpl.docTitle || '').trim()
-  const fillerH = Math.max(0, FILL_ROWS - items.length) * 19
+  const GRID: { h: string; align: 'left' | 'right' | 'center'; val: (it: NonNullable<PrintData['items']>[number], i: number) => React.ReactNode }[] = [
+    { h: 'S.N.',         align: 'left',   val: (_, i) => i + 1 },
+    { h: 'Product Name', align: 'left',   val: it => it.product_name },
+    { h: 'Packing',      align: 'left',   val: it => it.pack ?? '' },
+    { h: 'Batch No.',    align: 'left',   val: it => (tpl.showBatch ? (it.batch_no || '') : '') },
+    { h: 'Exp Date',     align: 'center', val: it => (tpl.showExpiry ? expiryMY(it.expiry) : '') },
+    { h: 'MRP',          align: 'right',  val: it => (it.mrp != null ? qtyText(it.mrp) : '') },
+    { h: 'Quantity',     align: 'right',  val: it => qtyText(it.qty) },
+    { h: 'Free',         align: 'right',  val: it => ((Number(it.bonus) || 0) > 0 ? qtyText(it.bonus) : '') },
+    { h: 'Rate',         align: 'right',  val: it => money(it.rate) },
+    { h: 'Amount',       align: 'right',  val: it => money(it.amount) },
+  ]
+  const marginMM = Number(tpl.marginMM ?? 10)
+  const cc = data.ccAmount ?? 0
 
   const th: React.CSSProperties = {
     background: '#dbe6f7', fontFamily: SANS, fontWeight: 700, fontSize: '12px', color: NAVY, textAlign: 'center',
-    padding: '6px 2px', borderLeft: THIN, borderRight: THIN, borderTop: THIN, borderBottom: THIN,
+    padding: '6px 2px', border: THIN, boxSizing: 'border-box', flexShrink: 0, whiteSpace: 'nowrap', overflow: 'hidden',
   }
   const td = (align: 'left' | 'right' | 'center' = 'left'): React.CSSProperties =>
-    ({ fontFamily: MONO, fontWeight: 700, fontSize: '12.5px', textAlign: align, padding: '2px 4px', borderLeft: THIN, borderRight: THIN, verticalAlign: 'top', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' })
+    ({ fontFamily: MONO, fontWeight: 700, fontSize: '12.5px', textAlign: align, padding: '0 4px', height: ROW_H, lineHeight: `${ROW_H}px`, boxSizing: 'border-box', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' })
 
   const kv = (label: string, value: React.ReactNode) => (
     <div style={{ display: 'flex', fontFamily: SANS, fontSize: '13px', lineHeight: 1.7 }}>
@@ -92,13 +105,18 @@ const CommercialInvoiceTemplate = forwardRef<HTMLDivElement, Props>(({ data, tpl
     <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 10, padding: '3px 0' }}>
       <span style={box
         ? { background: ORANGE, color: '#fff', fontFamily: SANS, fontWeight: 700, fontSize: '13px', padding: '4px 12px', borderRadius: 3 }
-        : { fontFamily: SANS, fontSize: '12.5px', fontStyle: label && String(label).startsWith('Less') ? 'italic' : 'normal', fontWeight: String(label).startsWith('Less') ? 400 : 700 }}>{label}</span>
+        : { fontFamily: SANS, fontSize: '12.5px', fontStyle: /^(Less|Add)/.test(String(label)) ? 'italic' : 'normal', fontWeight: /^(Less|Add)/.test(String(label)) ? 400 : 700 }}>{label}</span>
       <span style={{ width: '14%', minWidth: 96, textAlign: 'right', fontFamily: MONO, fontWeight: 700, fontSize: '13px' }}>{value}</span>
     </div>
   )
 
   return (
-    <div ref={ref} style={{ fontFamily: SANS, color: '#111', background: '#fff', width: '100%', border: LINE, boxSizing: 'border-box' }}>
+    <div ref={ref} style={{
+      fontFamily: SANS, color: '#111', background: '#fff', width: '100%', border: LINE, boxSizing: 'border-box',
+      display: 'flex', flexDirection: 'column',
+      // One A4 sheet: the item grid stretches so totals / terms / signatures / tagline sit at the bottom.
+      minHeight: `calc(297mm - ${2 * marginMM + 4}mm)`,
+    }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', padding: '10px 14px 6px', gap: 14 }}>
         {tpl.showLogo && co?.logo_url && (
@@ -139,7 +157,6 @@ const CommercialInvoiceTemplate = forwardRef<HTMLDivElement, Props>(({ data, tpl
       <div style={{ display: 'flex', borderTop: LINE, borderBottom: LINE }}>
         <div style={{ flex: '1 1 62%', padding: '6px 12px', borderRight: '4px double #222' }}>
           {pLine('Party:', data.partyName || '')}
-          {pLine('M/S:', '')}
           {pLine('Add:', x.partyAddress || '')}
           {pLine('Tel No.', x.partyPhone || '')}
           {pLine('PAN:', x.partyPan || '')}
@@ -149,40 +166,22 @@ const CommercialInvoiceTemplate = forwardRef<HTMLDivElement, Props>(({ data, tpl
           {kv('Mitti Date', slashDate(bs))}
           {kv('C.N. No.', x.cnNo || '')}
           {kv('No.of Packages', x.cases || '')}
-          {kv('Sent Through', x.transport || '')}
         </div>
       </div>
 
-      {/* Item grid */}
-      <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
-        <colgroup>{COLS.map((w, i) => <col key={i} style={{ width: `${w}%` }} />)}</colgroup>
-        <thead>
-          <tr>
-            <th style={th}>S.N.</th><th style={th}>Product Name</th><th style={th}>Packing</th>
-            <th style={th}>Batch No.</th><th style={th}>Exp Date</th><th style={th}>MRP</th>
-            <th style={th}>Quantity</th><th style={th}>Free</th><th style={th}>Rate</th><th style={th}>Amount</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((it, i) => (
-            <tr key={i}>
-              <td style={td('left')}>{i + 1}</td>
-              <td style={td()}>{it.product_name}</td>
-              <td style={td()}>{it.pack ?? ''}</td>
-              <td style={td()}>{tpl.showBatch ? (it.batch_no || '') : ''}</td>
-              <td style={td('center')}>{tpl.showExpiry ? expiryMY(it.expiry) : ''}</td>
-              <td style={td('right')}>{it.mrp != null ? qtyText(it.mrp) : ''}</td>
-              <td style={td('right')}>{qtyText(it.qty)}</td>
-              <td style={td('right')}>{(Number(it.bonus) || 0) > 0 ? qtyText(it.bonus) : ''}</td>
-              <td style={td('right')}>{money(it.rate)}</td>
-              <td style={td('right')}>{money(it.amount)}</td>
-            </tr>
+      {/* Item grid — column containers stretch to fill the sheet, so the ruled columns run down to the totals */}
+      <div style={{ flex: '1 1 auto', display: 'flex', flexDirection: 'column', minHeight: ROW_H * 6 }}>
+        <div style={{ display: 'flex' }}>
+          {GRID.map((c, ci) => <div key={c.h} style={{ ...th, ...(ci === GRID.length - 1 ? { flex: '1 1 0' } : { width: `${COLS[ci]}%` }), marginLeft: ci ? -1 : 0 }}>{c.h}</div>)}
+        </div>
+        <div style={{ display: 'flex', flex: '1 1 auto' }}>
+          {GRID.map((c, ci) => (
+            <div key={c.h} style={{ ...(ci === GRID.length - 1 ? { flex: '1 1 0' } : { width: `${COLS[ci]}%`, flexShrink: 0 }), boxSizing: 'border-box', borderLeft: THIN, borderRight: THIN, marginLeft: ci ? -1 : 0, minWidth: 0 }}>
+              {items.map((it, i) => <div key={i} style={td(c.align)}>{c.val(it, i)}</div>)}
+            </div>
           ))}
-          {fillerH > 0 && (
-            <tr style={{ height: fillerH }}>{COLS.map((_, i) => <td key={i} style={{ borderLeft: THIN, borderRight: THIN, padding: 0 }} />)}</tr>
-          )}
-        </tbody>
-      </table>
+        </div>
+      </div>
 
       {/* Remarks + totals */}
       <div style={{ display: 'flex', borderTop: LINE }}>
@@ -192,7 +191,8 @@ const CommercialInvoiceTemplate = forwardRef<HTMLDivElement, Props>(({ data, tpl
         <div style={{ flex: '1 1 45%', padding: '4px 8px 4px 0', borderLeft: THIN, borderLeftWidth: 0 }}>
           {sumRow('Total', money(total))}
           {sumRow('Less : Discount', disc ? money(disc) : '')}
-          {sumRow('Total', money(total - disc))}
+          {sumRow('Add : CC Charge', cc ? money(cc) : '')}
+          {sumRow('Total', money(total - disc + cc))}
           {sumRow(round ? `Less : Rounded Off (${round < 0 ? '-' : '+'})` : 'Less : Rounded Off (-)', round ? money(Math.abs(round)) : '')}
           {sumRow('Grand Total', money(data.netTotal), true)}
         </div>
