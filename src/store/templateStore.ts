@@ -23,6 +23,8 @@ export interface TemplateConfig {
   showThankYou:    boolean
   thankYouMessage: string 
   // Style
+  /** Which invoice layout prints: 'standard' (original), 'pharma' or 'boxed' (extra A4 sale-invoice layouts). */
+  layout:          'standard' | 'pharma' | 'boxed'
   fontSize:        'small' | 'medium' | 'large'
   primaryColor:    string
   paperSize:       'A4' | 'thermal' | 'A5'
@@ -49,6 +51,7 @@ export const DEFAULT_TPL: TemplateConfig = {
   showSignature:   true,
   showThankYou:    true,
   thankYouMessage: 'Thank you for your business!',
+  layout:          'standard',
   fontSize:        'medium',
   primaryColor:    '#1d4ed8',
   paperSize:       'A4',

@@ -45,6 +45,8 @@ import BatchSelect from '@/components/forms/BatchSelect'
 import QtyGate from '@/components/forms/QtyGate'
 import QuickAddPartyModal from '@/components/forms/QuickAddPartyModal'
 import CustomerSelect from '@/components/forms/CustomerSelect'
+import { bumpReprintCount } from '@/utils/reprintCounter'
+import type { PrintExtra } from '@/components/print/InvoiceTemplate'
 import { fmt, calcRowAmount, productCcPct } from '@/utils'
 import { formatDisplayDate } from '@/utils/dateSystem'
 import DateSystemInput from '@/components/shared/DateSystemInput'
@@ -516,6 +518,22 @@ export default function SalesPage() {
   const customerId       = watch('customer_id')
   // customer_id is now written by <CustomerSelect> via setValue; keep it registered with the form.
   useEffect(() => { register('customer_id') }, [register])
+
+  // ── Extra details for the Pharma invoice layout (ignored by the standard layout) ──
+  const mrpOf = (productId?: string) => {
+    const p = products.find(x => x.id === productId)
+    return p ? Number(p.mrp) || 0 : undefined
+  }
+  const unitOf = (productId?: string) => products.find(x => x.id === productId)?.unit || undefined
+  const partyExtra = (partyId?: string, d?: any): PrintExtra => {
+    const c = customers.find(x => x.id === partyId)
+    return {
+      partyCode:    c?.code,
+      partyAddress: c?.address || d?.party_address || undefined,
+      partyPhone:   c?.phone   || d?.party_phone   || undefined,
+      partyPan:     c?.pan_no  || d?.party_pan     || undefined,
+    }
+  }
   const currentPayMode   = watch('payment_mode')
   const selectedCustomer = customers.find(c => c.id === customerId)
   const subtotal         = rows.reduce((s, r) => s + r.amount, 0)
@@ -622,11 +640,14 @@ export default function SalesPage() {
           date: saved.date_ad || saved.date_bs || data.date,
           paymentMode: saved.payment_mode,
           partyName: customers.find(c => c.id === data.customer_id)?.name,
+          extra: { ...partyExtra(data.customer_id), issuedAt: saved.created_at || new Date().toISOString() },
           items: savedItems.map((it: any) => ({
             product_name: it.product_name, batch_no: it.batch_no, expiry: it.expiry,
             qty: Number(it.qty), bonus: Number(it.bonus) || 0, rate: Number(it.rate),
             discount_pct: Number(it.discount_pct) || 0, cc_pct: Number(it.cc_pct) || 0,
             cc_amount: Number(it.cc_amount) || 0, amount: grossItemAmount(it.qty, it.rate),
+                      mrp: it.mrp != null ? Number(it.mrp) : mrpOf(it.product_id),
+                      unit: it.unit || unitOf(it.product_id),
           })),
           subtotal: grossSubtotal, discountAmt: printDiscount, ccAmount: saved.cc_amount,
           roundOff: Number(saved.round_off) || 0,
@@ -682,11 +703,14 @@ export default function SalesPage() {
         voucherNo: txn.temp_ref, type: 'SALE',
         date: data.date, paymentMode: data.payment_mode,
         partyName: customers.find(c => c.id === data.customer_id)?.name,
+        extra: partyExtra(data.customer_id),
         items: validRows.map(r => ({
           product_name: r.product_name, batch_no: r.batch_no, expiry: r.expiry,
           qty: Number(r.qty), bonus: Number(r.bonus) || 0, rate: Number(r.rate),
           discount_pct: pctById[r._id] || 0, cc_pct: Number(r.cc_pct) || 0,
           cc_amount: Number(r.cc_amount) || 0, amount: Number(r.amount),
+          mrp: mrpOf(r.product_id),
+          unit: unitOf(r.product_id),
         })),
         // Client-computed — the same figures already on screen (see
         // subtotal/discountAmt/roundOff/grandTotal above), since there's no
@@ -1887,10 +1911,13 @@ export default function SalesPage() {
                                       qty: Number(it.qty), bonus: Number(it.bonus)||0, rate: Number(it.rate),
                                       discount_pct: Number(it.discount_pct)||0, cc_pct: Number(it.cc_pct)||0,
                                       cc_amount: Number(it.cc_amount)||0, amount: grossItemAmount(it.qty, it.rate),
+                      mrp: it.mrp != null ? Number(it.mrp) : mrpOf(it.product_id),
+                      unit: it.unit || unitOf(it.product_id),
                                     }))
                                     setPrintData({
                                       voucherNo: d.invoice_no, type: 'SALE', date: d.date_ad,
                                       paymentMode: d.payment_mode, partyName: d.party_name,
+                                      extra: { ...partyExtra(d.party_id, d), issuedAt: d.created_at, reprintCount: bumpReprintCount(d.invoice_no) },
                                       items: printItems,
                                       subtotal: grossSubtotal, discountAmt, ccAmount: Number(d.cc_amount||0),
                                       roundOff: Number(d.round_off) || 0,
@@ -1981,10 +2008,13 @@ export default function SalesPage() {
                             qty: Number(it.qty), bonus: Number(it.bonus)||0, rate: Number(it.rate),
                             discount_pct: Number(it.discount_pct)||0, cc_pct: Number(it.cc_pct)||0,
                             cc_amount: Number(it.cc_amount)||0, amount: grossItemAmount(it.qty, it.rate),
+                      mrp: it.mrp != null ? Number(it.mrp) : mrpOf(it.product_id),
+                      unit: it.unit || unitOf(it.product_id),
                           }))
                           setPrintData({
                             voucherNo: d.invoice_no, type: 'SALE', date: d.date_ad,
                             paymentMode: d.payment_mode, partyName: d.party_name,
+                                      extra: { ...partyExtra(d.party_id, d), issuedAt: d.created_at, reprintCount: bumpReprintCount(d.invoice_no) },
                             items: printItems,
                             subtotal: grossSubtotal, discountAmt, ccAmount: Number(d.cc_amount||0),
                             roundOff: Number(d.round_off) || 0,
@@ -2031,10 +2061,13 @@ export default function SalesPage() {
                 qty: Number(it.qty), bonus: Number(it.bonus)||0, rate: Number(it.rate),
                 discount_pct: Number(it.discount_pct)||0, cc_pct: Number(it.cc_pct)||0,
                 cc_amount: Number(it.cc_amount)||0, amount: grossItemAmount(it.qty, it.rate),
+                      mrp: it.mrp != null ? Number(it.mrp) : mrpOf(it.product_id),
+                      unit: it.unit || unitOf(it.product_id),
               }))
               setTimeout(() => setPrintData({
                 voucherNo: d.invoice_no, type: 'SALE', date: d.date_ad,
                 paymentMode: d.payment_mode, partyName: d.party_name,
+                                      extra: { ...partyExtra(d.party_id, d), issuedAt: d.created_at, reprintCount: bumpReprintCount(d.invoice_no) },
                 items: printItems,
                 subtotal: grossSubtotal, discountAmt, ccAmount: Number(d.cc_amount||0),
                 netTotal: Number(d.net_total), paidAmount: Number(d.paid_amount), dueAmount: Number(d.due_amount),

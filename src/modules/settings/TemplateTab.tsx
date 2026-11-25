@@ -32,10 +32,11 @@ export const DEMO_PRINT_DATA: PrintData = {
   partyPan:     '608980061',
   paymentMode:  'cash',
   narration:    'Regular monthly supply',
+  extra:        { partyCode: '1144', partyAddress: 'Badsudawa, Butwal', partyPhone: '071-540123', partyPan: '608980061' },
   items: [
-    { product_name: 'Paracetamol 500mg', batch_no: 'B001', expiry: '06/26', qty: 10, bonus: 1, rate: 12, cc_pct: 2, cc_amount: 2.4, amount: 120 },
-    { product_name: 'Amoxicillin 250mg', batch_no: 'B002', expiry: '12/26', qty: 5,  bonus: 0, rate: 45, cc_pct: 0, cc_amount: 0,   amount: 225 },
-    { product_name: 'Cetirizine 10mg',   batch_no: 'B003', expiry: '03/27', qty: 20, bonus: 2, rate: 8,  cc_pct: 1, cc_amount: 1.6, amount: 160 },
+    { product_name: 'Paracetamol 500mg', batch_no: 'B001', expiry: '06/26', qty: 10, bonus: 1, rate: 12, cc_pct: 2, cc_amount: 2.4, amount: 120, mrp: 15 },
+    { product_name: 'Amoxicillin 250mg', batch_no: 'B002', expiry: '12/26', qty: 5,  bonus: 0, rate: 45, cc_pct: 0, cc_amount: 0,   amount: 225, mrp: 55 },
+    { product_name: 'Cetirizine 10mg',   batch_no: 'B003', expiry: '03/27', qty: 20, bonus: 2, rate: 8,  cc_pct: 1, cc_amount: 1.6, amount: 160, mrp: 10 },
   ],
   subtotal:   505,
   discountAmt:  5,
@@ -253,6 +254,28 @@ export default function TemplateTab() {
               </div>
             </div>
 
+            {/* Invoice layout */}
+            <div className="tpl-field">
+              <label className="tpl-label">Invoice Layout</label>
+              <div className="tpl-radio-group">
+                {([
+                  { v: 'standard', l: 'Standard' },
+                  { v: 'pharma',   l: 'Pharma (detailed)' },
+                  { v: 'boxed',    l: 'Distributor (boxed)' },
+                ] as const).map(({ v, l }) => (
+                  <button
+                    key={v}
+                    type="button"
+                    className={`tpl-radio-btn ${(tpl.layout || 'standard') === v ? 'tpl-radio-btn--active' : ''}`}
+                    onClick={() => set('layout', v)}
+                  >
+                    {l}
+                  </button>
+                ))}
+              </div>
+              <p className="tpl-hint">Pharma and Distributor (boxed) print A4 sales invoices in their own formats (Pharma: HS code, pack, M.R.P.; Distributor: ruled boxes with unit, free and discount columns). Other documents and thermal paper keep the standard layout.</p>
+            </div>
+
             {/* Paper size */}
             <div className="tpl-field">
               <label className="tpl-label">Default Paper Size</label>
@@ -334,13 +357,14 @@ export default function TemplateTab() {
             </div>
             <div className="tpl-field">
               <label className="tpl-label">Invoice Footer Text</label>
-              <input
+              <textarea
                 className="erp-input"
+                rows={3}
                 value={tpl.footerText}
                 placeholder="e.g. Goods once sold will not be taken back"
                 onChange={e => set('footerText', e.target.value)}
               />
-              <p className="tpl-hint">Printed below the thank-you message, on every copy.</p>
+              <p className="tpl-hint">Printed below the thank-you message, on every copy (one line per row — the Pharma layout prints each line in its terms block).</p>
             </div>
           </div>
 

@@ -15,6 +15,8 @@ import { formatDisplayDate } from '@/utils/dateSystem'
 import useUIStore from '@/store/uiStore'
 import type { Company } from '@/types'
 import { DEFAULT_TPL, type TemplateConfig } from '@/store/templateStore'
+import PharmaInvoiceTemplate from './PharmaInvoiceTemplate'
+import BoxedInvoiceTemplate from './BoxedInvoiceTemplate'
 
 export interface PrintData {
   voucherNo:    string
@@ -52,6 +54,31 @@ export interface PrintData {
    *  tax invoice (requirement #9). Once synced, re-printing from the
    *  Sales list uses the server's real record and this is simply absent. */
   offlinePending?: boolean
+  /** Extra document details used ONLY by the Pharma invoice layout (PharmaInvoiceTemplate). The standard
+   *  layout ignores all of it, so filling these in never changes how the standard invoice prints. */
+  extra?: PrintExtra
+}
+
+export interface PrintExtra {
+  partyCode?:    string
+  partyAddress?: string
+  partyPhone?:   string
+  partyPan?:     string
+  /** Who issued the invoice (printed under "For: <company>"); defaults to the signed-in user. */
+  preparedBy?:   string
+  /** ISO timestamp the invoice was created — drives the "Invoice Issue Date" time; defaults to now. */
+  issuedAt?:     string
+  /** n in "*RE-PRINT[n]"; omitted/0 on the first print. */
+  reprintCount?: number
+  /** Boxed (distributor) layout only — printed blank when absent. */
+  msoName?:      string
+  transport?:    string
+  challanNo?:    string
+  challanDate?:  string
+  cases?:        string
+  cnNo?:         string
+  cnDate?:       string
+  outstanding?:  number
 }
 
 export interface PrintItem {
@@ -65,6 +92,12 @@ export interface PrintItem {
   cc_pct?:      number
   cc_amount?:   number
   amount:       number
+  /** Pharma layout only: product's printed M.R.P., pack size (default 1) and HS code (blank if unset). */
+  mrp?:         number
+  pack?:        number | string
+  hs_code?:     string
+  /** Boxed layout only: unit shown in the "Unit" column (e.g. Str., Pcs). */
+  unit?:        string
 }
 
 const TYPE_LABELS: Record<string, string> = {
@@ -81,13 +114,16 @@ const TYPE_LABELS: Record<string, string> = {
 const FONT_SIZES = { small: '11px', medium: '13px', large: '15px' }
 const FONT_SIZES_TH = { small: '9px',  medium: '10px', large: '11px' }
 
-// eslint-disable-next-line react/display-name
-const InvoiceTemplate = forwardRef<HTMLDivElement, {
+interface InvoiceTemplateProps {
   data:        PrintData
   size?:       'a4' | 'thermal-80' | 'thermal-58'
   copyLabel?:  string
   tpl?:        TemplateConfig
-}>(({ data, size = 'a4', copyLabel = 'ORIGINAL', tpl = DEFAULT_TPL }, ref) => {
+}
+
+/** The original (standard) layout — unchanged. */
+// eslint-disable-next-line react/display-name
+const StandardInvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(({ data, size = 'a4', copyLabel = 'ORIGINAL', tpl = DEFAULT_TPL }, ref) => {
   // Print/preview dates follow the same app-wide AD/BS toggle as the
   // Sales/Purchase/Voucher lists and forms — this is the one place that
   // formatting is applied for every printed document, regardless of module.
@@ -458,6 +494,23 @@ const InvoiceTemplate = forwardRef<HTMLDivElement, {
       </div>
     </div>
   )
+})
+
+/**
+ * Public entry point (used by the print preview, Settings preview and cloud backup).
+ * Picks the layout chosen in Settings → Printing: the Pharma / Boxed layout for A4 SALE invoices when
+ * `tpl.layout` is 'pharma' / 'boxed'; everything else (default, thermal, vouchers, purchases…) renders the
+ * standard layout exactly as before.
+ */
+// eslint-disable-next-line react/display-name
+const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>((props, ref) => {
+  const layout = props.tpl?.layout
+  const eligible = (props.size ?? 'a4') === 'a4'
+    && props.data.type === 'SALE'
+    && (props.data.items?.length ?? 0) > 0
+  if (eligible && layout === 'pharma') return <PharmaInvoiceTemplate ref={ref} data={props.data} copyLabel={props.copyLabel} tpl={props.tpl} />
+  if (eligible && layout === 'boxed')  return <BoxedInvoiceTemplate  ref={ref} data={props.data} copyLabel={props.copyLabel} tpl={props.tpl} />
+  return <StandardInvoiceTemplate ref={ref} {...props} />
 })
 
 export default InvoiceTemplate
