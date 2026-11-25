@@ -123,9 +123,16 @@ export default function AutoCloudBackup({ data, enabled = true }: Props) {
 
   if (!renderData) return null
 
+  // The Pharma / Boxed layouts size themselves to 100% of their container. This wrapper has no width of its
+  // own and sits at left:-99999, so without a fixed width it shrink-to-fits to ~100,000px — its right end then
+  // lands ON the screen as a white panel covering the page. Give those layouts a real paper width (the
+  // standard layout keeps its natural width, exactly as before).
+  const size = toInvoiceTemplateSize(tpl.paperSize)
+  const fixedWidth = size === 'a4' && (tpl.layout === 'pharma' || tpl.layout === 'boxed') ? '210mm' : undefined
+
   return (
-    <div style={{ position: 'fixed', left: -99999, top: 0, pointerEvents: 'none' }} aria-hidden="true">
-      <InvoiceTemplate ref={ref} data={renderData} size={toInvoiceTemplateSize(tpl.paperSize)} tpl={tpl} />
+    <div style={{ position: 'fixed', left: -99999, top: 0, width: fixedWidth, maxWidth: '100vw', overflow: 'hidden', pointerEvents: 'none' }} aria-hidden="true">
+      <InvoiceTemplate ref={ref} data={renderData} size={size} tpl={tpl} />
     </div>
   )
 }
