@@ -5,15 +5,15 @@
  * large serif company name with address / phone / e-mail icons and a boxed-digit PAN No., the
  * "Com. Regd No." and an orange COMMERCIAL INVOICE title at the right; a Party / Add / Tel No. / PAN box
  * beside Invoice No. / Mitti Date / C.N. No. / No.of Packages; a tinted-header
- * item grid (S.N. · Product Name · Packing · Batch No. · Exp Date · MRP · Quantity · Free · Rate ·
- * Amount) in a typewriter face that stretches to fill the A4 sheet; Remarks beside Total / Discount /
- * CC Charge / Rounded Off / Grand Total (orange label); Previous Balance / Total Present Balance / Rupees in words; Terms & Conditions (one line
- * per row of the Footer Text setting); Prepared by / Received by / Authorised Signatory; and a blue
- * tagline band (the Thank-you message setting).
+ * item grid (S.N. · Product Name · Packing · Batch No. · Exp Date · Quantity · Free · Rate ·
+ * Amount · MRP) in a typewriter face that stretches to fill the A4 sheet; Remarks beside Total / Discount /
+ * CC Charge / Rounded Off / Grand Total (accent-coloured label); Previous Balance / Total Present Balance / Rupees in words; Terms & Conditions (one line
+ * per row of the Footer Text setting); Prepared by / Received by / Authorised Signatory. Accent colours follow
+ * the Settings → Printing primary colour; there is no thank-you band.
  *
  * Selected in Settings → Printing → "Invoice Layout". Other layouts are untouched.
  * Print-safe: inline styles, literal colours, no CSS variables. Details the system doesn't store
- * (C.N. No., packages, sent-through, balances) come from `PrintData.extra`; blank when absent.
+ * (C.N. No., packages, balances) come from `PrintData.extra`; blank when absent.
  */
 import { forwardRef } from 'react'
 import { adToBS } from '@/utils/nepaliDate'
@@ -24,8 +24,16 @@ import type { PrintData } from './InvoiceTemplate'
 const SANS  = "Arial, Helvetica, sans-serif"
 const SERIF = "Georgia, 'Times New Roman', Times, serif"
 const MONO  = "'Courier New', Courier, monospace"
-const NAVY  = '#1b2a5a'
-const ORANGE = '#c8501a'
+
+/** Mix a #rgb / #rrggbb colour with white: amount 0 → the colour, 1 → white. Used for the grid-header tint. */
+function tint(hex: string, amount: number): string {
+  let h = hex.replace('#', '')
+  if (h.length === 3) h = h.split('').map(c => c + c).join('')
+  const n = parseInt(h.slice(0, 6), 16)
+  if (!/^[0-9a-f]{6}/i.test(h) || Number.isNaN(n)) return '#dbe6f7'
+  const mix = (c: number) => Math.round(c + (255 - c) * amount)
+  return `rgb(${mix((n >> 16) & 255)}, ${mix((n >> 8) & 255)}, ${mix(n & 255)})`
+}
 const LINE  = '1.5px solid #222'
 const THIN  = '1px solid #444'
 
@@ -37,15 +45,15 @@ const expiryMY = (s?: string) => {
   return m ? `${m[2].padStart(2, '0')}/${m[1]}` : (s || '')
 }
 
-// S.N. · Product · Packing · Batch · Exp · MRP · Qty · Free · Rate · Amount  (%)
-const COLS = [5, 25, 10, 9, 10, 7, 8, 6, 9, 11]
+// S.N. · Product · Packing · Batch · Exp · Qty · Free · Rate · Amount · MRP  (%)
+const COLS = [5, 25, 10, 9, 10, 8, 6, 9, 12, 6]
 const ROW_H = 19   // fixed row height so the per-column lists line up across the grid
 
 /** One header line: icon + text on the SAME row. Flex (not inline flow) because the app's CSS reset makes
  *  <svg> display:block, which would otherwise drop the text onto the line below its icon. */
-const IconLine = ({ d, children }: { d: string; children: React.ReactNode }) => (
+const IconLine = ({ d, color, children }: { d: string; color: string; children: React.ReactNode }) => (
   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-    <svg width="13" height="13" viewBox="0 0 24 24" fill={NAVY} style={{ display: 'block', flexShrink: 0 }}><path d={d} /></svg>
+    <svg width="13" height="13" viewBox="0 0 24 24" fill={color} style={{ display: 'block', flexShrink: 0 }}><path d={d} /></svg>
     <span>{children}</span>
   </div>
 )
@@ -72,17 +80,20 @@ const CommercialInvoiceTemplate = forwardRef<HTMLDivElement, Props>(({ data, tpl
     { h: 'Packing',      align: 'left',   val: it => it.pack ?? '' },
     { h: 'Batch No.',    align: 'left',   val: it => (tpl.showBatch ? (it.batch_no || '') : '') },
     { h: 'Exp Date',     align: 'center', val: it => (tpl.showExpiry ? expiryMY(it.expiry) : '') },
-    { h: 'MRP',          align: 'right',  val: it => (it.mrp != null ? qtyText(it.mrp) : '') },
     { h: 'Quantity',     align: 'right',  val: it => qtyText(it.qty) },
     { h: 'Free',         align: 'right',  val: it => ((Number(it.bonus) || 0) > 0 ? qtyText(it.bonus) : '') },
     { h: 'Rate',         align: 'right',  val: it => money(it.rate) },
     { h: 'Amount',       align: 'right',  val: it => money(it.amount) },
+    { h: 'MRP',          align: 'right',  val: it => (it.mrp != null ? qtyText(it.mrp) : '') },
   ]
   const marginMM = Number(tpl.marginMM ?? 10)
+  // Accent colour follows Settings → Printing → Primary colour (default blue when unset/invalid)
+  const accent   = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(tpl.primaryColor || '') ? tpl.primaryColor : '#1d4ed8'
+  const headTint = tint(accent, 0.86)
   const cc = data.ccAmount ?? 0
 
   const th: React.CSSProperties = {
-    background: '#dbe6f7', fontFamily: SANS, fontWeight: 700, fontSize: '12px', color: NAVY, textAlign: 'center',
+    background: headTint, fontFamily: SANS, fontWeight: 700, fontSize: '12px', color: accent, textAlign: 'center',
     padding: '6px 2px', border: THIN, boxSizing: 'border-box', flexShrink: 0, whiteSpace: 'nowrap', overflow: 'hidden',
   }
   const td = (align: 'left' | 'right' | 'center' = 'left'): React.CSSProperties =>
@@ -104,7 +115,7 @@ const CommercialInvoiceTemplate = forwardRef<HTMLDivElement, Props>(({ data, tpl
   const sumRow = (label: React.ReactNode, value: string, box = false) => (
     <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 10, padding: '3px 0' }}>
       <span style={box
-        ? { background: ORANGE, color: '#fff', fontFamily: SANS, fontWeight: 700, fontSize: '13px', padding: '4px 12px', borderRadius: 3 }
+        ? { background: accent, color: '#fff', fontFamily: SANS, fontWeight: 700, fontSize: '13px', padding: '4px 12px', borderRadius: 3 }
         : { fontFamily: SANS, fontSize: '12.5px', fontStyle: /^(Less|Add)/.test(String(label)) ? 'italic' : 'normal', fontWeight: /^(Less|Add)/.test(String(label)) ? 400 : 700 }}>{label}</span>
       <span style={{ width: '14%', minWidth: 96, textAlign: 'right', fontFamily: MONO, fontWeight: 700, fontSize: '13px' }}>{value}</span>
     </div>
@@ -114,7 +125,7 @@ const CommercialInvoiceTemplate = forwardRef<HTMLDivElement, Props>(({ data, tpl
     <div ref={ref} style={{
       fontFamily: SANS, color: '#111', background: '#fff', width: '100%', border: LINE, boxSizing: 'border-box',
       display: 'flex', flexDirection: 'column',
-      // One A4 sheet: the item grid stretches so totals / terms / signatures / tagline sit at the bottom.
+      // One A4 sheet: the item grid stretches so totals / terms / signatures sit at the bottom.
       minHeight: `calc(297mm - ${2 * marginMM + 4}mm)`,
     }}>
       {/* Header */}
@@ -127,27 +138,27 @@ const CommercialInvoiceTemplate = forwardRef<HTMLDivElement, Props>(({ data, tpl
         <div style={{ flex: 1, minWidth: 0 }}>
           {tpl.showCompanyName && co?.name && (
             <div style={{
-              fontFamily: SERIF, fontWeight: 700, color: NAVY, lineHeight: 1.15, letterSpacing: '0.3px', whiteSpace: 'nowrap',
+              fontFamily: SERIF, fontWeight: 700, color: accent, lineHeight: 1.15, letterSpacing: '0.3px', whiteSpace: 'nowrap',
               fontSize: String(co.name).length > 34 ? '19px' : String(co.name).length > 26 ? '23px' : '27px',
             }}>{co.name}</div>
           )}
-          <div style={{ fontFamily: SERIF, fontWeight: 700, fontSize: '13.5px', color: NAVY, marginTop: 4, lineHeight: 1.55 }}>
-            {tpl.showAddress && co?.address && <IconLine d={PIN}>{co.address}</IconLine>}
-            {tpl.showPhone && co?.phone && <IconLine d={PHONE}>{co.phone}</IconLine>}
-            {co?.email && <IconLine d={MAIL}>{co.email}</IconLine>}
+          <div style={{ fontFamily: SERIF, fontWeight: 700, fontSize: '13.5px', color: accent, marginTop: 4, lineHeight: 1.55 }}>
+            {tpl.showAddress && co?.address && <IconLine d={PIN} color={accent}>{co.address}</IconLine>}
+            {tpl.showPhone && co?.phone && <IconLine d={PHONE} color={accent}>{co.phone}</IconLine>}
+            {co?.email && <IconLine d={MAIL} color={accent}>{co.email}</IconLine>}
           </div>
           {tpl.showPAN && co?.pan_no && (
-            <div style={{ fontFamily: SANS, fontWeight: 700, fontSize: '12.5px', color: NAVY, marginTop: 3, display: 'flex', alignItems: 'center' }}>
+            <div style={{ fontFamily: SANS, fontWeight: 700, fontSize: '12.5px', color: accent, marginTop: 3, display: 'flex', alignItems: 'center' }}>
               PAN No.:
               {String(co.pan_no).split('').map((c, i) => (
-                <span key={i} style={{ border: '1.5px solid ' + NAVY, minWidth: 13, textAlign: 'center', marginLeft: i ? 1 : 3, padding: '0 1px', lineHeight: 1.25 }}>{c}</span>
+                <span key={i} style={{ border: '1.5px solid ' + accent, minWidth: 13, textAlign: 'center', marginLeft: i ? 1 : 3, padding: '0 1px', lineHeight: 1.25 }}>{c}</span>
               ))}
             </div>
           )}
         </div>
         <div style={{ flexShrink: 0, textAlign: 'right', marginLeft: 'auto' }}>
-          {co?.registration_no && <div style={{ fontFamily: SANS, fontWeight: 700, fontSize: '11.5px', color: NAVY }}>Com. Regd No. {co.registration_no}</div>}
-          <div style={{ marginTop: 34, display: 'inline-block', color: ORANGE, fontWeight: 700, fontSize: '16px', borderBottom: `3px double ${ORANGE}`, padding: '0 2px 1px', whiteSpace: 'nowrap' }}>
+          {co?.registration_no && <div style={{ fontFamily: SANS, fontWeight: 700, fontSize: '11.5px', color: accent }}>Com. Regd No. {co.registration_no}</div>}
+          <div style={{ marginTop: 34, display: 'inline-block', color: accent, fontWeight: 700, fontSize: '16px', borderBottom: `3px double ${accent}`, padding: '0 2px 1px', whiteSpace: 'nowrap' }}>
             {!title || title.toUpperCase() === 'INVOICE' ? 'COMMERCIAL INVOICE' : title}
           </div>
         </div>
@@ -207,13 +218,13 @@ const CommercialInvoiceTemplate = forwardRef<HTMLDivElement, Props>(({ data, tpl
 
       {/* Terms */}
       <div style={{ borderTop: LINE, padding: '6px 10px', minHeight: 70 }}>
-        {terms.length > 0 && <div style={{ color: ORANGE, fontWeight: 700, fontSize: '13px' }}>Terms &amp; Conditions</div>}
+        {terms.length > 0 && <div style={{ color: accent, fontWeight: 700, fontSize: '13px' }}>Terms &amp; Conditions</div>}
         {terms.map((l, i) => <div key={i} style={{ fontSize: '12px', lineHeight: 1.45 }}>{l}</div>)}
       </div>
 
       {/* Signatures */}
       {tpl.showSignature && (
-        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '34px 26px 6px', fontFamily: SANS, fontWeight: 700, fontSize: '13.5px', color: NAVY }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '34px 26px 6px', fontFamily: SANS, fontWeight: 700, fontSize: '13.5px', color: accent }}>
           {['Prepared by', 'Received by', 'Authorised Signatory'].map(l => (
             <div key={l} style={{ width: '27%', textAlign: 'center' }}>
               <div style={{ borderTop: '1px solid #444', marginBottom: 8 }} />{l}
@@ -221,11 +232,6 @@ const CommercialInvoiceTemplate = forwardRef<HTMLDivElement, Props>(({ data, tpl
           ))}
         </div>
       )}
-
-      {/* Tagline band */}
-      <div style={{ marginTop: 8, background: 'linear-gradient(180deg,#3a63b8,#1b2f6e)', color: '#fff', textAlign: 'center', fontFamily: SERIF, fontWeight: 700, fontSize: '15px', padding: '9px 8px', minHeight: 20 }}>
-        {tpl.showThankYou ? tpl.thankYouMessage : '\u00a0'}
-      </div>
     </div>
   )
 })
