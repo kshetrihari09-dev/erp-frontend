@@ -3,9 +3,9 @@
  *
  * A faithful reproduction of the supplied reference invoice: serif company header block, Invoice
  * No. / Transaction Date / Invoice Issue Date (BS + AD + time) on the right, "Page 1 of 1",
- * centred INVOICE + "Copy of Original-1", Pay Mode, Party Name / Address / PAN / Tel, a borderless
+ * centred INVOICE, Pay Mode, Party Name / Address / PAN / Tel, an
  * item grid (SN · HS CODE · ITEM DESCRIPTION · PACK · BATCH · EXPIRY · QTY · CC/RATE · AMOUNT ·
- * M.R.P.) with free goods on a "-- do --" row marked "n F", "*RE-PRINT[n]" + TOTAL / DISCOUNT /
+ * M.R.P.) with free goods on a "-- do --" row marked "n F" (its CC/RATE cell shows the line's CC amount), "*RE-PRINT[n]" + TOTAL / DISCOUNT /
  * ROUNDING / NET TOTAL, "Inwords Rs. … Only.", the terms lines, Note, and the
  * (Checked By) / (Received By) / For: <company> + user footer.
  *
@@ -45,7 +45,7 @@ interface Props {
 }
 
 // eslint-disable-next-line react/display-name
-const PharmaInvoiceTemplate = forwardRef<HTMLDivElement, Props>(({ data, copyLabel = 'ORIGINAL', tpl = DEFAULT_TPL }, ref) => {
+const PharmaInvoiceTemplate = forwardRef<HTMLDivElement, Props>(({ data, tpl = DEFAULT_TPL }, ref) => {
   const sessionUser = useAuthStore(s => s.user?.name)
   const co     = data.company as any
   const x      = data.extra || {}
@@ -58,14 +58,13 @@ const PharmaInvoiceTemplate = forwardRef<HTMLDivElement, Props>(({ data, copyLab
   const discount = data.discountAmt ?? 0
   const rounding = data.roundOff ?? 0
   const payMode  = data.paymentMode ? data.paymentMode.charAt(0).toUpperCase() + data.paymentMode.slice(1) : ''
-  const copyText = copyLabel === 'ORIGINAL' ? 'Copy of Original-1' : `Copy of ${copyLabel}`
   const terms    = (tpl.footerText || '').split('\n').map(l => l.trim()).filter(Boolean)
   const accent   = '#000'
 
   const cell = (align: 'left' | 'right' | 'center' = 'left'): React.CSSProperties =>
     ({ padding: '2px 3px', textAlign: align, verticalAlign: 'top', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' })
   const head = (align: 'left' | 'right' | 'center' = 'left'): React.CSSProperties =>
-    ({ ...cell(align), padding: '3px 3px', fontWeight: 400, borderTop: `1px solid ${accent}`, borderBottom: `1px solid ${accent}` })
+    ({ ...cell(align), padding: '3px 3px', fontWeight: 400, borderBottom: `1px solid ${accent}` })
 
   const rows: React.ReactNode[] = []
   items.forEach((it, i) => {
@@ -93,7 +92,7 @@ const PharmaInvoiceTemplate = forwardRef<HTMLDivElement, Props>(({ data, copyLab
           <td style={cell()}>{tpl.showBatch ? (it.batch_no || '') : ''}</td>
           <td style={cell()}>{tpl.showExpiry ? expiryYM(it.expiry) : ''}</td>
           <td style={cell('right')}>{qtyText(it.bonus!)} F</td>
-          <td style={cell('right')}>{fmt2(0)}</td>
+          <td style={cell('right')}>{fmt2(it.cc_amount ?? 0)}</td>
           <td style={cell('right')}>{fmt2(0)}</td>
           <td style={cell('right')}>{mrp}</td>
         </tr>,
@@ -134,7 +133,6 @@ const PharmaInvoiceTemplate = forwardRef<HTMLDivElement, Props>(({ data, copyLab
         <div style={{ flex: 1, fontSize: '9px', fontWeight: 700 }}>{payMode && `Pay Mode: ${payMode}`}</div>
         <div style={{ flex: 2, textAlign: 'center' }}>
           <div style={{ fontSize: '13px', fontWeight: 700 }}>{(tpl.docTitle || '').trim() || 'INVOICE'}</div>
-          <div style={{ fontSize: '12px' }}>{copyText}</div>
         </div>
         <div style={{ flex: 1 }} />
       </div>
