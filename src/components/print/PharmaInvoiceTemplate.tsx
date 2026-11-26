@@ -129,7 +129,7 @@ const PharmaInvoiceTemplate = forwardRef<HTMLDivElement, Props>(({ data, tpl = D
       </div>
 
       {/* Title + copy label; Pay Mode on the left */}
-      <div style={{ display: 'flex', alignItems: 'flex-end', marginTop: -6 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-end', marginTop: -6, borderBottom: `1px solid ${accent}`, paddingBottom: 3 }}>
         <div style={{ flex: 1, fontSize: '9px', fontWeight: 700 }}>{payMode && `Pay Mode: ${payMode}`}</div>
         <div style={{ flex: 2, textAlign: 'center' }}>
           <div style={{ fontSize: '13px', fontWeight: 700 }}>{(tpl.docTitle || '').trim() || 'INVOICE'}</div>
@@ -138,7 +138,7 @@ const PharmaInvoiceTemplate = forwardRef<HTMLDivElement, Props>(({ data, tpl = D
       </div>
 
       {/* Party block */}
-      <div style={{ fontSize: '9px', marginTop: 8 }}>
+      <div style={{ fontSize: '9px', marginTop: 4, borderBottom: `1px solid ${accent}`, paddingBottom: 3 }}>
         <div>Party Name: {[x.partyCode, data.partyName].filter(Boolean).join(' ')}</div>
         <div style={{ display: 'flex' }}>
           <div style={{ width: '48%' }}>Address &nbsp;: {x.partyAddress || ''}</div>
