@@ -3,17 +3,17 @@
  *
  * Reproduces the supplied manufacturer "COMMERCIAL INVOICE": a full-page border; round logo +
  * large serif company name with address / phone / e-mail icons and a boxed-digit PAN No., the
- * "Com. Regd No." and an orange COMMERCIAL INVOICE title at the right; a Party / Add / Tel No. / PAN box
- * beside Invoice No. / Mitti Date / C.N. No. / No.of Packages; a tinted-header
+ * "Com. Regd No." and an accent-coloured INVOICE title at the right; a Party / Add / Tel No. / PAN box
+ * beside Invoice No. / Mitti Date / Payment Mode; a tinted-header
  * item grid (S.N. · Product Name · Packing · Batch No. · Exp Date · Quantity · Free · Rate ·
  * Amount · MRP) in a typewriter face that stretches to fill the A4 sheet; Remarks beside Total / Discount /
- * CC Charge / Rounded Off / Grand Total (accent-coloured label); Previous Balance / Total Present Balance / Rupees in words; Terms & Conditions (one line
+ * CC Charge / Rounded Off / Grand Total (accent-coloured text); Previous Balance / Total Present Balance / Rupees in words; Terms & Conditions (one line
  * per row of the Footer Text setting); Prepared by / Received by / Authorised Signatory. Accent colours follow
  * the Settings → Printing primary colour; there is no thank-you band.
  *
  * Selected in Settings → Printing → "Invoice Layout". Other layouts are untouched.
  * Print-safe: inline styles, literal colours, no CSS variables. Details the system doesn't store
- * (C.N. No., packages, balances) come from `PrintData.extra`; blank when absent.
+ * (balances) come from `PrintData.extra`; blank when absent.
  */
 import { forwardRef } from 'react'
 import { adToBS } from '@/utils/nepaliDate'
@@ -72,6 +72,7 @@ const CommercialInvoiceTemplate = forwardRef<HTMLDivElement, Props>(({ data, tpl
   const total = data.subtotal ?? items.reduce((s, it) => s + (Number(it.amount) || 0), 0)
   const disc  = data.discountAmt ?? 0
   const round = data.roundOff ?? 0
+  const payMode = data.paymentMode ? data.paymentMode.charAt(0).toUpperCase() + data.paymentMode.slice(1) : ''
   const terms = (tpl.footerText || '').split('\n').map(l => l.trim()).filter(Boolean)
   const title = (tpl.docTitle || '').trim()
   const GRID: { h: string; align: 'left' | 'right' | 'center'; val: (it: NonNullable<PrintData['items']>[number], i: number) => React.ReactNode }[] = [
@@ -115,7 +116,7 @@ const CommercialInvoiceTemplate = forwardRef<HTMLDivElement, Props>(({ data, tpl
   const sumRow = (label: React.ReactNode, value: string, box = false) => (
     <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 10, padding: '3px 0' }}>
       <span style={box
-        ? { background: accent, color: '#fff', fontFamily: SANS, fontWeight: 700, fontSize: '13px', padding: '4px 12px', borderRadius: 3 }
+        ? { color: accent, fontFamily: SANS, fontWeight: 700, fontSize: '13.5px' }
         : { fontFamily: SANS, fontSize: '12.5px', fontStyle: /^(Less|Add)/.test(String(label)) ? 'italic' : 'normal', fontWeight: /^(Less|Add)/.test(String(label)) ? 400 : 700 }}>{label}</span>
       <span style={{ width: '14%', minWidth: 96, textAlign: 'right', fontFamily: MONO, fontWeight: 700, fontSize: '13px' }}>{value}</span>
     </div>
@@ -159,7 +160,7 @@ const CommercialInvoiceTemplate = forwardRef<HTMLDivElement, Props>(({ data, tpl
         <div style={{ flexShrink: 0, textAlign: 'right', marginLeft: 'auto' }}>
           {co?.registration_no && <div style={{ fontFamily: SANS, fontWeight: 700, fontSize: '11.5px', color: accent }}>Com. Regd No. {co.registration_no}</div>}
           <div style={{ marginTop: 34, display: 'inline-block', color: accent, fontWeight: 700, fontSize: '16px', borderBottom: `3px double ${accent}`, padding: '0 2px 1px', whiteSpace: 'nowrap' }}>
-            {!title || title.toUpperCase() === 'INVOICE' ? 'COMMERCIAL INVOICE' : title}
+            {title || 'INVOICE'}
           </div>
         </div>
       </div>
@@ -175,8 +176,7 @@ const CommercialInvoiceTemplate = forwardRef<HTMLDivElement, Props>(({ data, tpl
         <div style={{ flex: '1 1 38%', padding: '10px 12px' }}>
           {kv('Invoice No.', data.voucherNo)}
           {kv('Mitti Date', slashDate(bs))}
-          {kv('C.N. No.', x.cnNo || '')}
-          {kv('No.of Packages', x.cases || '')}
+          {kv('Payment Mode', payMode)}
         </div>
       </div>
 

@@ -275,7 +275,7 @@ export default function TemplateTab() {
                   </button>
                 ))}
               </div>
-              <p className="tpl-hint">Pharma and Distributor (boxed) print A4 sales invoices in their own formats (Pharma: HS code, pack, M.R.P.; Distributor: ruled boxes with unit, free and discount columns; Manufacturer: SOLD TO box with MRP, packing and payment-due lines; Commercial: boxed-PAN header, tinted grid, Terms & Conditions and tagline band). Other documents and thermal paper keep the standard layout.</p>
+              <p className="tpl-hint">Pharma and Distributor (boxed) print A4 sales invoices in their own formats (Pharma: HS code, pack, M.R.P.; Distributor: ruled boxes with unit, free and discount columns; Manufacturer: SOLD TO box with MRP, packing and payment-due lines; Commercial: boxed-PAN header, grid and Terms & Conditions in your primary colour). Other documents and thermal paper keep the standard layout.</p>
             </div>
 
             {/* Paper size */}
