@@ -3,17 +3,15 @@
  *
  * Reproduces the supplied distributor invoice: large company header (logo · name · Address /
  * Phone / PAN No), centred INVOICE, a ruled box with Customer Code / Name / Address / PAN / Phone
- * on the left and Invoice No / Invoice Miti / Invoice Date + Time / Challan No / Miti-Date on the
- * right, a second row (MSO Name · Transport · MOP | Cases · CN No · CN Date), a fully ruled item
- * grid (S. No · Description · Unit · Batch No. · Expiry · Qty. · Free · Rate · Amount · Dis. Amt)
+ * on the left and Invoice No / Invoice Miti / Invoice Date + Time / MOP on the right, a fully
+ * ruled item grid (S. No · Description · Unit · Batch No. · Expiry · Qty. · Free · Rate · Amount · MRP)
  * with free goods in their own column, Remarks / Outstanding Balance beside Sub Total · Discount ·
- * Gross Total · Special Discount · Net Amount, "In Words :", "Printed Date & Time" and the
+ * CC Charge · Net Amount, "In Words :", "Printed Date & Time" and the
  * Prepared By / Verified By / For <company> footer.
  *
  * Selected in Settings → Printing → "Invoice Layout". The standard and Pharma layouts are untouched.
  * Print-safe rules (same as the other layouts): inline styles, literal colours, no CSS variables.
- * Details the system doesn't store (MSO, transport, challan, cases, CN, outstanding balance) come
- * from `PrintData.extra` and print blank when absent — the labels stay, as on the paper form.
+ * Outstanding Balance comes from `PrintData.extra` and prints blank when absent.
  */
 import { forwardRef } from 'react'
 import { adToBS } from '@/utils/nepaliDate'
@@ -43,7 +41,7 @@ const clock = (d: Date) => d.toLocaleTimeString('en-US', { hour: 'numeric', minu
 /** "Twenty-two" → "Twenty-Two" */
 const titleHyphen = (w: string) => w.replace(/-([a-z])/g, (_, c: string) => `-${c.toUpperCase()}`)
 
-// S.No · Description · Unit · Batch · Expiry · Qty · Free · Rate · Amount · Dis. Amt  (%)
+// S.No · Description · Unit · Batch · Expiry · Qty · Free · Rate · Amount · MRP  (%)
 const COLS = [5, 28, 5.5, 9.5, 8, 9, 7.5, 7, 13, 7.5]
 const FILL_ROWS = 22   // body is padded to about this many rows so the column rules run down the sheet
 
@@ -64,6 +62,7 @@ const BoxedInvoiceTemplate = forwardRef<HTMLDivElement, Props>(({ data, tpl = DE
   const printed  = new Date()
   const subtotal = data.subtotal ?? items.reduce((s, it) => s + (Number(it.amount) || 0), 0)
   const discount = data.discountAmt ?? 0
+  const cc       = data.ccAmount ?? 0
   const discPct  = subtotal > 0 ? Math.round((discount / subtotal) * 10000) / 100 : 0
   const payMode  = data.paymentMode ? data.paymentMode.charAt(0).toUpperCase() + data.paymentMode.slice(1) : ''
 
@@ -127,20 +126,7 @@ const BoxedInvoiceTemplate = forwardRef<HTMLDivElement, Props>(({ data, tpl = DE
             {row('Invoice No', data.voucherNo, 84, true)}
             {row('Invoice Miti', dmy(bs), 84)}
             {row('Invoice Date', <span style={{ whiteSpace: 'nowrap' }}>{dmy(data.date)} <b>Time : {clock(issuedAt)}</b></span>, 84)}
-            {row('Challan No', x.challanNo || '', 84)}
-            {row('Miti / Date', x.challanDate || '', 84)}
-          </div>
-        </div>
-        <div style={{ display: 'flex', borderTop: LINE }}>
-          <div style={{ flex: '1 1 61%', padding: '3px 6px' }}>
-            {row('MSO Name', x.msoName || '')}
-            {row('Transport', x.transport || '')}
-            {row('MOP', payMode)}
-          </div>
-          <div style={{ flex: '1 1 39%', borderLeft: LINE, padding: '3px 6px' }}>
-            {row('Cases', x.cases || '', 84)}
-            {row('CN No', x.cnNo || '', 84)}
-            {row('CN Date', x.cnDate || '', 84)}
+            {row('MOP', payMode, 84)}
           </div>
         </div>
       </div>
@@ -152,12 +138,11 @@ const BoxedInvoiceTemplate = forwardRef<HTMLDivElement, Props>(({ data, tpl = DE
           <tr>
             <th style={th}>S. No</th><th style={th}>Description</th><th style={th}>Unit</th>
             <th style={th}>Batch No.</th><th style={th}>Expiry</th><th style={th}>Qty.</th>
-            <th style={th}>Free</th><th style={th}>Rate</th><th style={th}>Amount</th><th style={th}>Dis. Amt</th>
+            <th style={th}>Free</th><th style={th}>Rate</th><th style={th}>Amount</th><th style={th}>MRP</th>
           </tr>
         </thead>
         <tbody>
           {items.map((it, i) => {
-            const disAmt = (Number(it.amount) || 0) * (Number(it.discount_pct) || 0) / 100
             return (
               <tr key={i}>
                 <td style={td('center')}>{i + 1}</td>
@@ -169,7 +154,7 @@ const BoxedInvoiceTemplate = forwardRef<HTMLDivElement, Props>(({ data, tpl = DE
                 <td style={td('right')}>{fmt2(it.bonus)}</td>
                 <td style={td('right')}>{fmt2(it.rate)}</td>
                 <td style={td('right')}>{fmt2(it.amount)}</td>
-                <td style={td('right')}>{fmt2(disAmt)}</td>
+                <td style={td('right')}>{it.mrp != null ? fmt2(it.mrp) : ''}</td>
               </tr>
             )
           })}
@@ -197,8 +182,7 @@ const BoxedInvoiceTemplate = forwardRef<HTMLDivElement, Props>(({ data, tpl = DE
                 <tbody>
                   {totRow('Sub Total', fmt2(subtotal))}
                   {totRow(`Discount${discPct ? ` ${discPct} %` : ''}`, discount ? `-${fmt2(discount)}` : fmt2(0), false)}
-                  {totRow('Gross Total', fmt2(subtotal))}
-                  {totRow('Special Discount', fmt2(0))}
+                  {totRow('CC Charge', fmt2(cc))}
                   {totRow('Net Amount', fmt2(data.netTotal), true, true)}
                 </tbody>
               </table>
