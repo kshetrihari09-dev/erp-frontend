@@ -1,10 +1,10 @@
-import { useState, useEffect, useRef, lazy, Suspense } from 'react'
+import { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import type { UseFormRegister, FieldErrors } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Plus, Package, ScanLine, Boxes, Download, Upload, Printer, QrCode, Filter, Pencil, Trash2 } from 'lucide-react'
-import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct, useProductOpeningBatches, useAddOpeningInventory, useNextBarcode, useSuppliers } from '@/hooks/useQuery'
+import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct, useProductOpeningBatches, useAddOpeningInventory, useNextBarcode, useSuppliers, useManufacturers } from '@/hooks/useQuery'
 import { usePermission } from '@/hooks/usePermission'
 import { RetailProfileSection, emptyRetailProfile, retailProfileToPayload, retailProfileError } from './RetailProfileFields'
 import { Button, Modal, Badge, Pagination, SkeletonRows, Empty, SearchInput, ConfirmDialog, Select, ToggleSwitch } from '@/components/ui'
@@ -14,7 +14,7 @@ import ImportProductsModal from './ImportProductsModal'
 import { useDebounce } from '@/hooks/useDebounce'
 import { fmt } from '@/utils'
 import { PRODUCT_UNITS } from '@/constants'
-import { productSchema, PRODUCT_VAT_OPTIONS, type ProductFormInput } from '@/services/productCreation'
+import { productSchema, createProductSchema, PRODUCT_VAT_OPTIONS, type ProductFormInput } from '@/services/productCreation'
 import type { Product, OpeningInventoryBatch } from '@/types'
 
 const ProductScanModal = lazy(() => import('@/components/scanner/ProductScanModal'))
@@ -289,8 +289,12 @@ function InventoryPlanningSection({ value, onChange }: { value: PlanningState; o
 function ProductForm({ initial, onClose }: { initial?: Product | null; onClose: () => void }) {
   const create = useCreateProduct()
   const update = useUpdateProduct()
+  // Creating a product requires a valid, active manufacturer from the directory; editing keeps the original rules
+  // so legacy products (blank / free-text company_name) remain editable.
+  const { data: manufacturerList } = useManufacturers()
+  const formSchema = useMemo(() => (initial ? productSchema : createProductSchema(manufacturerList)), [initial, manufacturerList])
   const { register, handleSubmit, setValue, watch, formState: { errors, isSubmitting, dirtyFields } } = useForm<Form>({
-    resolver: zodResolver(productSchema),
+    resolver: zodResolver(formSchema as any),
     defaultValues: initial ? {
       name: initial.name, generic_name: initial.generic_name || '', company_name: initial.company_name || '',
       category: initial.category || '', barcode: initial.barcode || '', unit: initial.unit, mrp: initial.mrp,
@@ -382,7 +386,7 @@ function ProductForm({ initial, onClose }: { initial?: Product | null; onClose: 
         <div className="span2"><Field label="Product Name *" name="name" register={register} errors={errors} /></div>
         <Field label="Generic Name" name="generic_name" register={register} errors={errors} />
         <div>
-          <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">Manufacturer</label>
+          <label className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wide block mb-1.5">Manufacturer{!initial && ' *'}</label>
           <ManufacturerSelect
             value={watch('company_name') || ''}
             onChange={(name, manufacturer) => {
@@ -403,6 +407,7 @@ function ProductForm({ initial, onClose }: { initial?: Product | null; onClose: 
               })
             }}
           />
+          {errors.company_name && <p className="text-xs text-red-500 mt-1">{errors.company_name.message}</p>}
         </div>
         <Field label="Category" name="category" register={register} errors={errors} />
         <div>

@@ -22,6 +22,7 @@ import { X, Package, Loader2, AlertCircle } from 'lucide-react'
 import ManufacturerSelect from './ManufacturerSelect'
 import type { Product } from '@/types'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
+import { useManufacturers } from '@/hooks/useQuery'
 import { validateProductInput, createProductWithOpeningStock, PRODUCT_VAT_OPTIONS } from '@/services/productCreation'
 
 interface Props {
@@ -49,6 +50,7 @@ interface FormState {
 }
 
 export default function QuickAddModal({ initialName, onSave, onClose }: Props) {
+  const { data: manufacturerList } = useManufacturers()
   const [form, setForm] = useState<FormState>({
     name:          initialName,
     generic_name:  '',
@@ -90,9 +92,10 @@ export default function QuickAddModal({ initialName, onSave, onClose }: Props) {
   async function handleSave() {
     setError('')
 
+    // Same rule as the Products page: a new product needs a valid, active manufacturer.
     const validationError = validateProductInput({
-      name: form.name, sales_rate: form.sales_rate,
-    } as any)
+      name: form.name, sales_rate: form.sales_rate, company_name: form.company_name,
+    } as any, { requireManufacturer: true, manufacturers: manufacturerList })
     if (validationError) { setError(validationError); return }
 
     setSaving(true)
@@ -179,7 +182,7 @@ export default function QuickAddModal({ initialName, onSave, onClose }: Props) {
           {/* Row 2 — Company + Category + Unit */}
           <div className="qam-row">
             <div className="qam-field">
-              <label className="qam-label">Company / Manufacturer</label>
+              <label className="qam-label">Company / Manufacturer <span className="qam-required">*</span></label>
               <ManufacturerSelect
                 value={form.company_name}
                 onChange={name => set('company_name', name)}

@@ -16,7 +16,7 @@
 
 import { z } from 'zod'
 import { productsAPI } from './api'
-import type { Product } from '@/types'
+import type { Product, Manufacturer } from '@/types'
 
 // ── Shared field values ─────────────────────────────────────────────────────
 // Quick Add's UI/options are intentionally left exactly as they are; Product
@@ -87,6 +87,42 @@ export const productSchema = z.object({
 export type ProductFormInput = z.input<typeof productSchema>
 export type ProductFormValues = z.output<typeof productSchema>
 
+// ── Manufacturer is REQUIRED when creating a product, and must be a real one ──
+// Manufacturers are master data (services/manufacturers.ts); a product stores the manufacturer's NAME in
+// `company_name`. For a NEW product that name must (1) be present and (2) match an ACTIVE manufacturer in
+// the company's directory. Editing an existing product keeps the plain `productSchema` above, so legacy
+// products with a blank or free-text company_name can still be edited and saved as before.
+export type ManufacturerCheck =
+  | { ok: true; manufacturer: Manufacturer }
+  | { ok: false; reason: 'required' | 'loading' | 'unknown' | 'inactive'; message: string }
+
+/** Case/whitespace-insensitive lookup of `name` in the directory. `manufacturers` undefined = still loading. */
+export function checkManufacturer(manufacturers: Manufacturer[] | undefined, name: string | undefined | null): ManufacturerCheck {
+  const wanted = (name ?? '').trim()
+  if (!wanted) return { ok: false, reason: 'required', message: 'Manufacturer is required' }
+  if (!manufacturers) return { ok: false, reason: 'loading', message: 'Manufacturers are still loading — please try again' }
+  const m = manufacturers.find(x => x.name.trim().toLowerCase() === wanted.toLowerCase())
+  if (!m) return { ok: false, reason: 'unknown', message: `"${wanted}" is not a registered manufacturer — select one from the list or add it with +` }
+  if (m.is_active === false) return { ok: false, reason: 'inactive', message: `Manufacturer "${m.name}" is inactive — choose an active manufacturer` }
+  return { ok: true, manufacturer: m }
+}
+
+/**
+ * Schema for CREATING a product: everything in `productSchema`, plus a required, valid, active manufacturer.
+ * The saved `company_name` is normalised to the directory's exact spelling.
+ */
+export function createProductSchema(manufacturers: Manufacturer[] | undefined) {
+  return productSchema
+    .superRefine((v, ctx) => {
+      const r = checkManufacturer(manufacturers, v.company_name)
+      if (!r.ok) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['company_name'], message: r.message })
+    })
+    .transform(v => {
+      const r = checkManufacturer(manufacturers, v.company_name)
+      return r.ok ? { ...v, company_name: r.manufacturer.name } : v
+    })
+}
+
 /**
  * Validate a raw product form payload. Returns the first human-readable
  * error message, or null if the payload is valid. Used by Quick Add's
@@ -94,8 +130,9 @@ export type ProductFormValues = z.output<typeof productSchema>
  * `productSchema` directly via react-hook-form's zodResolver, so both
  * ultimately run the exact same rules.
  */
-export function validateProductInput(input: ProductFormInput): string | null {
-  const result = productSchema.safeParse(input)
+export function validateProductInput(input: ProductFormInput, opts?: { requireManufacturer?: boolean; manufacturers?: Manufacturer[] }): string | null {
+  const schema = opts?.requireManufacturer ? createProductSchema(opts.manufacturers) : productSchema
+  const result = schema.safeParse(input)
   if (result.success) return null
   return result.error.issues[0]?.message || 'Please check the form for errors'
 }
