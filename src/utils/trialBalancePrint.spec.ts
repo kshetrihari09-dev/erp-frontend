@@ -26,24 +26,37 @@ describe('buildTrialBalancePrintHtml', () => {
 })
 
 describe('printHtmlDocument', () => {
-  afterEach(() => { document.body.innerHTML = ''; vi.restoreAllMocks() })
-  it('loads the document into a hidden iframe, prints it, then removes it', async () => {
+  afterEach(() => { document.body.innerHTML = ''; vi.restoreAllMocks(); vi.useRealTimers() })
+
+  it('writes the document into a REAL-sized, rendered (not hidden) frame, prints it once, and keeps it until printing ends', async () => {
     vi.useFakeTimers()
     const printed = vi.fn()
     const orig = document.body.appendChild.bind(document.body)
     vi.spyOn(document.body, 'appendChild').mockImplementation((n: any) => {
-      const r = orig(n)
-      if (n.tagName === 'IFRAME') {
-        Object.defineProperty(n, 'contentWindow', { value: { focus: () => {}, print: printed } })
-        queueMicrotask(() => n.onload?.(new Event('load')))
-      }
-      return r
+      const r = orig(n); if (n.tagName === 'IFRAME') n.contentWindow.print = printed; return r
     })
-    const p = printHtmlDocument('<p>hi</p>')
-    await vi.advanceTimersByTimeAsync(0); await p
+    const p = printHtmlDocument('<html><body><p id="x">hello</p></body></html>')
+    const frame = document.querySelector('iframe') as HTMLIFrameElement
+    // a hidden / zero-size frame prints blank — guard against regressing to one
+    const css = frame.style
+    expect(css.visibility).not.toBe('hidden'); expect(css.display).not.toBe('none')
+    expect(css.width).not.toBe('0px'); expect(css.height).not.toBe('0px')
+    expect(frame.contentDocument!.getElementById('x')?.textContent).toBe('hello')   // content is really in the frame
+    await vi.advanceTimersByTimeAsync(500); await p
     expect(printed).toHaveBeenCalledTimes(1)
-    await vi.advanceTimersByTimeAsync(1100)
-    expect(document.querySelector('iframe')).toBeNull()
-    vi.useRealTimers()
+    expect(document.querySelector('iframe')).not.toBeNull()                          // still there right after print()
+    frame.contentWindow!.dispatchEvent(new Event('afterprint'))
+    await vi.advanceTimersByTimeAsync(600)
+    expect(document.querySelector('iframe')).toBeNull()                              // cleaned up afterwards
+  })
+
+  it('rejects (so the UI can tell the user) when printing throws', async () => {
+    vi.useFakeTimers()
+    const orig = document.body.appendChild.bind(document.body)
+    vi.spyOn(document.body, 'appendChild').mockImplementation((n: any) => {
+      const r = orig(n); if (n.tagName === 'IFRAME') n.contentWindow.print = () => { throw new Error('nope') }; return r
+    })
+    const p = printHtmlDocument('<p>x</p>'); const assertion = expect(p).rejects.toThrow('nope')
+    await vi.advanceTimersByTimeAsync(500); await assertion
   })
 })

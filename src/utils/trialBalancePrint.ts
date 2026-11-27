@@ -57,21 +57,43 @@ export function buildTrialBalancePrintHtml(i: TrialBalancePrintInput): string {
   <div class="foot">Generated ${escapeHtml(when)}</div></body></html>`
 }
 
-/** Print an HTML document from a hidden iframe (no popup, so popup blockers and WebViews can't swallow it). */
+/**
+ * Print an HTML document from an off-screen iframe.
+ *
+ * The frame must have a REAL size and be rendered: browsers print a `visibility:hidden` / `display:none` /
+ * 0×0 frame as a blank page. So it is laid out at A4 size and simply parked off-screen. The document is
+ * written directly (no srcdoc/onload race), given a moment to lay out, printed, and removed only after
+ * printing has finished (afterprint, or a long fallback) — removing it earlier blanks the preview in some
+ * browsers. If the frame cannot be used, falls back to a popup window.
+ */
 export function printHtmlDocument(html: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const frame = document.createElement('iframe')
     frame.setAttribute('aria-hidden', 'true')
-    frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden'
-    const cleanup = () => setTimeout(() => frame.remove(), 1000)
-    frame.onload = () => {
-      try {
-        const w = frame.contentWindow
-        if (!w) throw new Error('Print frame unavailable')
-        w.focus(); w.print(); resolve()
-      } catch (e) { reject(e) } finally { cleanup() }
-    }
+    frame.tabIndex = -1
+    frame.style.cssText = 'position:fixed;top:0;left:-10000px;width:210mm;height:297mm;border:0;background:#fff;pointer-events:none'
     document.body.appendChild(frame)
-    frame.srcdoc = html
+
+    const win = frame.contentWindow
+    const doc = frame.contentDocument
+    if (!win || !doc) {
+      frame.remove()
+      const popup = window.open('', '_blank', 'width=900,height=700')
+      if (!popup) return reject(new Error('Print is blocked by the browser'))
+      popup.document.open(); popup.document.write(html); popup.document.close()
+      setTimeout(() => { try { popup.focus(); popup.print(); resolve() } catch (e) { reject(e) } }, 400)
+      return
+    }
+
+    let removed = false
+    const remove = () => { if (!removed) { removed = true; frame.remove() } }
+    setTimeout(remove, 120000)
+
+    doc.open(); doc.write(html); doc.close()
+    // Added AFTER document.open(): open() discards every listener on the frame's window.
+    win.addEventListener('afterprint', () => setTimeout(remove, 500))
+    setTimeout(() => {
+      try { win.focus(); win.print(); resolve() } catch (e) { remove(); reject(e) }
+    }, 400)
   })
 }
