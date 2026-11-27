@@ -8,7 +8,7 @@ import {
   FileBarChart, Settings, LogOut, Building2, CalendarDays, Moon,
   Sun, Menu, X, AlertTriangle, Bell, Search, ChevronRight, Home,
   PackageX, CalendarClock, Sparkles, ShieldAlert, ClipboardList, Building, ArrowLeftRight, BarChart3,
-  Scissors, Banknote,
+  Scissors, Banknote, Factory,
 } from 'lucide-react'
 import useAuthStore from '@/store/authStore'
 import { filterNavByPermission } from '@/constants/permissions'
@@ -50,6 +50,7 @@ const NAV = [
 
   { section: 'INVENTORY' },
   { to: PATHS.PRODUCTS,   label: 'Products',       icon: <Package         size={20} strokeWidth={1.8}/>, alertKey: 'lowStock' },
+  { to: PATHS.MANUFACTURERS, label: 'Manufacturers', icon: <Factory         size={20} strokeWidth={1.8}/> },
   { to: PATHS.STOCK_REGISTER, label: 'Stock Register', icon: <ClipboardList size={20} strokeWidth={1.8}/> },
   { to: PATHS.STOCK_SUMMARY,  label: 'Stock & Sales Summary', icon: <BarChart3 size={20} strokeWidth={1.8}/> },
   { to: PATHS.PURCHASE_SUGGESTIONS, label: 'Smart Purchase Suggestions', icon: <Sparkles size={20} strokeWidth={1.8}/> },
@@ -204,6 +205,7 @@ export default function AppLayout() {
     [PATHS.SALES_RETURNS]:    'Sales Returns',
     [PATHS.PURCHASE_RETURNS]: 'Purchase Returns',
     [PATHS.PRODUCTS]:   'Products',
+    [PATHS.MANUFACTURERS]: 'Manufacturers',
     [PATHS.BARCODE_PRINT]: 'Barcode Print',
     [PATHS.QR_CODE_PRINT]: 'QR Code Print',
     [PATHS.STOCK_REGISTER]: 'Stock Register',   // must stay above STOCK ('/stock' is a prefix of it)
