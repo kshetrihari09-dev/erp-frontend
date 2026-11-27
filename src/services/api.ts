@@ -402,11 +402,28 @@ export interface CustomerCompanyReport {
   ledger: { opening_balance: number; receipts: number; closing_balance: number }
 }
 export interface CustomerCompanyParams { from: string; to: string; customer_id: string }
+/** One product of a company, for the Customer vs Company double-click drill-down. */
+export interface CustomerCompanyProductRow {
+  product_id: string | null; product: string; m_code: string
+  sales_qty: number; sales_amt: number; free_qty: number; free_value: number
+  return_qty: number; return_amt: number; total_qty: number; total_amt: number
+}
+export interface CustomerCompanyProductsReport {
+  title: string
+  customer: { id: string; code: string; name: string }
+  company: string
+  filters: { from: string; to: string; customer_id: string; company: string; discount_excluded: boolean }
+  rows: CustomerCompanyProductRow[]
+  totals: Omit<CustomerCompanyProductRow, 'product_id' | 'product' | 'm_code'>
+}
+export interface CustomerCompanyProductsParams extends CustomerCompanyParams { company: string; discount_excluded?: boolean }
 export interface CustomerLookup { id: string; code: string; name: string }
 export const customerCompanyAPI = {
   get:       (params: CustomerCompanyParams) => http.get<ApiResponse<CustomerCompanyReport>>('/reports/customer-vs-company', { params }),
   customers: (search?: string)               => http.get<ApiResponse<CustomerLookup[]>>('/reports/customer-vs-company/customers', { params: { search: search || undefined, limit: 30 } }),
   exportCsv: (params: CustomerCompanyParams) => http.get('/reports/customer-vs-company/export', { params, responseType: 'blob' }),
+  products:  (params: CustomerCompanyProductsParams, signal?: AbortSignal) =>
+    http.get<ApiResponse<CustomerCompanyProductsReport>>('/reports/customer-vs-company/products', { params, signal }),
 }
 
 // ─── Smart Purchase Suggestions ─────────────────────────────────────────────────

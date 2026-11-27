@@ -7,6 +7,7 @@ import useUIStore from '@/store/uiStore'
 import { formatDisplayDate } from '@/utils/dateSystem'
 import { PATHS } from '@/constants'
 import { DateRangeFilter, type DateRangeApply } from '@/components/ui/DateRangePopup'
+import CustomerCompanyProductsModal from './CustomerCompanyProductsModal'
 
 /* Customer vs Company — pick ONE customer; rows are the companies (manufacturers) they
    bought from / returned to in the selected range. All maths is done by
@@ -38,6 +39,8 @@ export default function CustomerCompanyReportPage() {
   const [loading, setLoading] = useState(false)
   const [err, setErr]         = useState<string | null>(null)
   const [selKey, setSelKey]   = useState<string | null>(null)
+  // Company whose product-wise detail is open (double-click). The detail uses the customer / dates of the report ON SCREEN.
+  const [detailCompany, setDetailCompany] = useState<string | null>(null)
   const seq = useRef(0)
 
   useEffect(() => {
@@ -65,7 +68,7 @@ export default function CustomerCompanyReportPage() {
     try {
       const r = await customerCompanyAPI.get({ customer_id: c.id, from: f, to: t })
       if (my !== seq.current) return
-      setReport(r.data.data as CustomerCompanyReport); setSelKey(null)
+      setReport(r.data.data as CustomerCompanyReport); setSelKey(null); setDetailCompany(null)
     } catch (e: any) {
       if (my !== seq.current) return
       setReport(null); setErr(e?.response?.data?.message || e?.message || 'Failed to load report')
@@ -91,7 +94,7 @@ export default function CustomerCompanyReportPage() {
 
   const exit = () => (window.history.length > 1 ? navigate(-1) : navigate(PATHS.REPORTS))
   useEffect(() => {
-    const h = (e: KeyboardEvent) => { if (e.key === 'Escape' && !open) exit() }
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape' && !open && detailCompany === null) exit() }
     window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h)
   })
 
@@ -194,7 +197,10 @@ export default function CustomerCompanyReportPage() {
             </tr></thead>
             <tbody>
               {rows.map(r => (
-                <tr key={r.company} className={`sr-row ${selKey === r.company ? 'sel' : ''}`} onClick={() => setSelKey(r.company)}>
+                <tr key={r.company} className={`sr-row ${selKey === r.company ? 'sel' : ''}`} onClick={() => setSelKey(r.company)}
+                    onDoubleClick={() => { setSelKey(r.company); setDetailCompany(r.company) }}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); setSelKey(r.company); setDetailCompany(r.company) } }}
+                    tabIndex={0} title="Double-click for product-wise details">
                   <td className="sr-c-part" style={{ maxWidth: 360 }}>{r.company}</td>
                   <td className="sr-num">{money(r.sales)}</td><td className="sr-num">{money(r.discount)}</td>
                   <td className="sr-num">{money(r.sales_return)}</td><td className="sr-num">{money(r.sales_return_expiry)}</td>
@@ -223,6 +229,10 @@ export default function CustomerCompanyReportPage() {
           </div>
         </div>
       </div>
+      {detailCompany !== null && report && (
+        <CustomerCompanyProductsModal customer={report.customer} company={detailCompany} from={report.filters.from} to={report.filters.to}
+          onClose={() => setDetailCompany(null)} />
+      )}
       <div className="sr-legend">Sales are shown before discount. Net = Sales − Discount − Sales Return − Sales Return Expiry. Opening / Receipts / Closing in the footer are the customer's full ledger figures (all companies). Products without a company appear as “No Company”.</div>
     </div>
   )
