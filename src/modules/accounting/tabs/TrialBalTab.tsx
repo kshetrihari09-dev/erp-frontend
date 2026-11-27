@@ -8,6 +8,7 @@ import { useState, useMemo, useCallback, memo, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTrialBalance, usePeriods } from '@/hooks/useQuery'
 import { useSelectedFiscalYear } from '@/hooks/useSelectedFiscalYear'
+import { buildTrialBalancePrintHtml, printHtmlDocument, escapeHtml } from '@/utils/trialBalancePrint'
 import { trialBalanceRangeFor, periodsOfFiscalYear, num } from '@/utils/accountBalance'
 import { fmt, downloadCSV, fmtDate } from '@/utils'
 import useAuthStore from '@/store/authStore'
@@ -81,20 +82,6 @@ function useTokens() {
 type SortKey = 'account_code' | 'name' | 'account_type' | 'closing_debit' | 'closing_credit'
 type SortDir = 'asc' | 'desc'
 type Density = 'compact' | 'comfortable'
-
-// ── Print CSS ─────────────────────────────────────────────────────────────────
-const PRINT_CSS = `
-@media print {
-  body * { visibility: hidden !important; }
-  #tb-print-area, #tb-print-area * { visibility: visible !important; }
-  #tb-print-area { position: fixed; inset: 0; padding: 24px; background: white; color: black; }
-  #tb-no-print { display: none !important; }
-  table { page-break-inside: auto; }
-  tr { page-break-inside: avoid; page-break-after: auto; }
-  thead { display: table-header-group; }
-  tfoot { display: table-footer-group; }
-}
-`
 
 // ── Skeleton ──────────────────────────────────────────────────────────────────
 function SkeletonTBRows({ n = 8, skBg }: { n?: number; skBg: string }) {
@@ -382,13 +369,23 @@ export default function TrialBalTab() {
   function handleExportCSV() { downloadCSV(filtered as any, `trial-balance-${dateFrom || 'start'}-${dateTo}`) }
   function handleExportExcel() {
     const headers = ['Code','Account Name','Type','Closing Dr','Closing Cr']
-    const rowsHtml = filtered.map(r => `<tr><td>${r.account_code}</td><td>${r.name}</td><td>${r.account_type}</td><td>${r.closing_debit||0}</td><td>${r.closing_credit||0}</td></tr>`).join('')
+    const rowsHtml = filtered.map(r => `<tr><td>${escapeHtml(r.account_code)}</td><td>${escapeHtml(r.name)}</td><td>${escapeHtml(r.account_type)}</td><td>${num(r.closing_debit)}</td><td>${num(r.closing_credit)}</td></tr>`).join('')
     const html = `<table><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rowsHtml}</tbody></table>`
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([html], { type: 'application/vnd.ms-excel' })); a.download = `trial-balance-${dateFrom || 'start'}-${dateTo}.xls`; a.click()
   }
   function handlePrint() {
-    const s = document.createElement('style'); s.innerHTML = PRINT_CSS; document.head.appendChild(s)
-    window.print(); setTimeout(() => document.head.removeChild(s), 2000)
+    if (!query) return
+    const filters = [
+      search && `Search: "${search}"`, typeFilter && `Type: ${typeFilter}`, !showZero && 'Zero balances hidden',
+    ].filter(Boolean).join(' · ')
+    const html = buildTrialBalancePrintHtml({
+      rows: filtered,
+      subtitle: [fy ? `FY ${fy.name.replace(/^FY\s*/i, '')}` : '', query.date_from ? `${fmtDate(query.date_from)} — ${fmtDate(query.as_of_date)}` : `Up to ${fmtDate(query.as_of_date)}`,
+        periods.find(p => p.id === query.period_id)?.name].filter(Boolean).join(' · '),
+      note: filters || undefined,
+      reportTotalDebit: totalDr, reportTotalCredit: totalCr,
+    })
+    printHtmlDocument(html).catch(() => alert('Could not open the print dialog. Please try the PDF/Excel export instead.'))
   }
 
   function SortIcon({ col }: { col: SortKey }) {
@@ -461,7 +458,7 @@ export default function TrialBalTab() {
             </button>
             {hasData && (
               <>
-                <button onClick={handlePrint}        className="btn btn-secondary" style={{ height: 35 }}><Printer size={13} /> Print</button>
+                <button onClick={handlePrint} disabled={!hasData} className="btn btn-secondary" style={{ height: 35 }}><Printer size={13} /> Print</button>
                 <button onClick={handleExportExcel}  className="btn btn-secondary" style={{ height: 35 }}><FileSpreadsheet size={13} /> Excel</button>
                 <button onClick={handleExportCSV}    className="btn btn-secondary" style={{ height: 35 }}><Download size={13} /> CSV</button>
               </>
