@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Plus } from 'lucide-react'
 import { useAccounts, useCreateAccount } from '@/hooks/useQuery'
 import { Button, Modal, Empty, SkeletonRows } from '@/components/ui'
-import { fmt } from '@/utils'
+import { formatAccountBalance } from '@/utils/accountBalance'
 import { ACCOUNT_TYPES } from '@/constants'
 import type { Account } from '@/types'
 
@@ -77,8 +77,12 @@ function AccountForm({ onClose }: { onClose: () => void }) {
 export default function AccountsTab({ onCount }: { onCount?: (count: number) => void } = {}) {
   const [typeFilter, setTypeFilter] = useState('')
   const [modal, setModal] = useState(false)
-  const { data, isLoading } = useAccounts({ type: typeFilter || undefined })
+  // include_balance: the server derives every balance from POSTED journal lines in ONE aggregate query
+  // (as of the selected fiscal year's end). Desktop table and mobile cards both render the same
+  // `balances` value below, so they cannot disagree.
+  const { data, isLoading } = useAccounts({ type: typeFilter || undefined, include_balance: true })
   const accounts = (data as Account[]) || []
+  const balances = useMemo(() => new Map(accounts.map(a => [a.id, formatAccountBalance(a)])), [accounts])
 
   // Report the current row count up to the parent (purely informational — no fetch/logic change).
   useEffect(() => { onCount?.(accounts.length) }, [accounts.length, onCount])
@@ -117,7 +121,10 @@ export default function AccountsTab({ onCount }: { onCount?: (count: number) => 
                             : <span className="badge badge-muted">Ledger</span>
                           }
                         </td>
-                        <td className="td-right font-mono">{fmt(a.balance ?? 0)}</td>
+                        <td className="td-right font-mono">
+                          {balances.get(a.id)!.amount}
+                          {balances.get(a.id)!.side && <span className="text-[var(--text-3)] text-[11px] ml-1">{balances.get(a.id)!.side}</span>}
+                        </td>
                       </tr>
                     ))
                   : <tr><td colSpan={6}><Empty message="No accounts found — create one to get started"/></td></tr>
@@ -140,7 +147,7 @@ export default function AccountsTab({ onCount }: { onCount?: (count: number) => 
                   <span className="acc-mc-no">{a.code}</span>
                   <span className="acc-mc-party" style={{ fontWeight: 600, color: 'var(--text)' }}>{a.name}</span>
                 </div>
-                <span className="acc-mc-amount">{fmt(a.balance ?? 0)}</span>
+                <span className="acc-mc-amount">{balances.get(a.id)!.text}</span>
               </div>
               <div className="acc-mc-sub">
                 <div className="acc-mc-chips">

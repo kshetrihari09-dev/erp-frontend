@@ -505,7 +505,15 @@ export interface Account {
   sub_type?:    string
   is_group:     boolean
   parent_id?:   string
+  /** Closing balance magnitude (always >= 0); the side is in `balance_side`. Present when requested with include_balance. */
   balance:      number
+  balance_side?: 'Dr' | 'Cr' | null
+  /** Signed Dr − Cr. */
+  net_balance?: number
+  total_debit?: number
+  total_credit?: number
+  closing_debit?: number
+  closing_credit?: number
   is_active:    boolean
 }
 
@@ -569,6 +577,10 @@ export interface TrialBalanceRow {
   period_credit:  number
   closing_debit:  number
   closing_credit: number
+  /** Signed (Dr − Cr) companions. opening_balance + period_balance = closing_balance. */
+  opening_balance?: number
+  period_balance?:  number
+  closing_balance?: number
 }
 
 // ─── Reports ──────────────────────────────────────────────────────────────────

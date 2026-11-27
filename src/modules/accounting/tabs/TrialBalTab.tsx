@@ -4,9 +4,11 @@
  * All accounting logic, hook, API endpoint, and TrialBalanceRow calculations unchanged.
  */
 import { DateRangeFilter } from '@/components/ui/DateRangePopup'
-import { useState, useMemo, useCallback, memo } from 'react'
+import { useState, useMemo, useCallback, memo, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useTrialBalance } from '@/hooks/useQuery'
+import { useTrialBalance, usePeriods } from '@/hooks/useQuery'
+import { useSelectedFiscalYear } from '@/hooks/useSelectedFiscalYear'
+import { trialBalanceRangeFor, periodsOfFiscalYear, num } from '@/utils/accountBalance'
 import { fmt, downloadCSV, fmtDate } from '@/utils'
 import useAuthStore from '@/store/authStore'
 import useUIStore from '@/store/uiStore'
@@ -16,7 +18,7 @@ import {
   AlertTriangle, CheckCircle2, RefreshCw, Eye, EyeOff,
   ArrowUpDown, ArrowUp, ArrowDown, LayoutList, AlignJustify,
 } from 'lucide-react'
-import type { TrialBalanceRow } from '@/types'
+import type { TrialBalanceRow, AccountingPeriod } from '@/types'
 
 // ── Theme tokens ──────────────────────────────────────────────────────────────
 function useTokens() {
@@ -277,9 +279,16 @@ export default function TrialBalTab() {
   const { user, company } = useAuthStore()
   const tk = useTokens()
 
-  const [dateFrom, setDateFrom] = useState(new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0])
-  const [dateTo,   setDateTo  ] = useState(new Date().toISOString().split('T')[0])
-  const [query,    setQuery   ] = useState<{ date_from: string; as_of_date: string } | null>(null)
+  // The range starts from the user's SELECTED fiscal year (the app's own fiscal-year setting — never a
+  // Gregorian January 1) and the report is generated automatically. Switching fiscal year re-initialises it.
+  const { selected: fy, selectedId: fyId, isLoading: fyLoading } = useSelectedFiscalYear()
+  const { data: periodsData } = usePeriods()
+  const periods = useMemo(() => periodsOfFiscalYear(periodsData as AccountingPeriod[] | undefined, fyId), [periodsData, fyId])
+
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo,   setDateTo  ] = useState('')
+  const [periodId, setPeriodId] = useState('')
+  const [query,    setQuery   ] = useState<{ date_from?: string; as_of_date: string; period_id?: string } | null>(null)
 
   const [search,         setSearch        ] = useState('')
   const [typeFilter,     setTypeFilter    ] = useState('')
@@ -292,12 +301,13 @@ export default function TrialBalTab() {
   const [generatedAt,    setGeneratedAt   ] = useState<Date | null>(null)
 
   const { data: rows, isLoading, isFetching } = useTrialBalance(
-    query ? { date_from: query.date_from, as_of_date: query.as_of_date } : undefined
+    query ? { date_from: query.date_from || undefined, as_of_date: query.as_of_date, period_id: query.period_id || undefined } : undefined
   )
   const data = (rows as TrialBalanceRow[]) || []
 
-  const totalDr = useMemo(() => data.reduce((s, r) => s + (r.closing_debit  || 0), 0), [data])
-  const totalCr = useMemo(() => data.reduce((s, r) => s + (r.closing_credit || 0), 0), [data])
+  // Σ in whole cents (and tolerant of NUMERIC strings from older servers) so a long column cannot drift or concatenate.
+  const totalDr = useMemo(() => data.reduce((s, r) => s + Math.round(num(r.closing_debit)  * 100), 0) / 100, [data])
+  const totalCr = useMemo(() => data.reduce((s, r) => s + Math.round(num(r.closing_credit) * 100), 0) / 100, [data])
   const diff    = Math.abs(totalDr - totalCr)
   const balanced = diff < 0.01
 
@@ -340,13 +350,41 @@ export default function TrialBalTab() {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
     else { setSortKey(key); setSortDir('asc') }
   }
-  function generate() { setQuery({ date_from: dateFrom, as_of_date: dateTo }); setGeneratedAt(new Date()); setExpandedGroups({}) }
-  function handleExportCSV() { downloadCSV(filtered as any, `trial-balance-${dateFrom}-${dateTo}`) }
+  function run(from: string, to: string, period: string) {
+    setQuery({ date_from: from || undefined, as_of_date: to, period_id: period || undefined })
+    setGeneratedAt(new Date()); setExpandedGroups({})
+  }
+  function generate() { run(dateFrom, dateTo, periodId) }
+
+  // Initialise (and re-initialise on fiscal-year switch) from the selected fiscal year, then generate.
+  // Keyed on the year's id, so a manual date change is never overwritten by a background refetch.
+  const initFor = useRef<string | null>(null)
+  useEffect(() => {
+    if (fyLoading) return
+    const key = fy?.id ?? 'none'
+    if (initFor.current === key) return
+    initFor.current = key
+    const range = trialBalanceRangeFor(fy)
+    // No fiscal year configured (legacy company): everything up to today — still not a calendar-year guess.
+    const from = range?.from ?? '', to = range?.to ?? new Date().toISOString().split('T')[0]
+    setDateFrom(from); setDateTo(to); setPeriodId('')
+    run(from, to, '')
+  }, [fy, fyLoading])
+
+  // Choosing a period sets the dates to that period (what the server will report); "All periods" restores the year.
+  function choosePeriod(id: string) {
+    setPeriodId(id)
+    const p = periods.find(x => x.id === id)
+    const range = trialBalanceRangeFor(fy)
+    if (p) { setDateFrom(p.start_date); setDateTo(p.end_date) }
+    else if (range) { setDateFrom(range.from); setDateTo(range.to) }
+  }
+  function handleExportCSV() { downloadCSV(filtered as any, `trial-balance-${dateFrom || 'start'}-${dateTo}`) }
   function handleExportExcel() {
     const headers = ['Code','Account Name','Type','Closing Dr','Closing Cr']
     const rowsHtml = filtered.map(r => `<tr><td>${r.account_code}</td><td>${r.name}</td><td>${r.account_type}</td><td>${r.closing_debit||0}</td><td>${r.closing_credit||0}</td></tr>`).join('')
     const html = `<table><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rowsHtml}</tbody></table>`
-    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([html], { type: 'application/vnd.ms-excel' })); a.download = `trial-balance-${dateFrom}-${dateTo}.xls`; a.click()
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([html], { type: 'application/vnd.ms-excel' })); a.download = `trial-balance-${dateFrom || 'start'}-${dateTo}.xls`; a.click()
   }
   function handlePrint() {
     const s = document.createElement('style'); s.innerHTML = PRINT_CSS; document.head.appendChild(s)
@@ -395,8 +433,17 @@ export default function TrialBalTab() {
         <div className="acc-tb-filter-row" style={{ display: 'flex', alignItems: 'flex-end', gap: 12, flexWrap: 'wrap' }}>
           <div className="acc-tb-filter-field">
             <label style={{ fontSize: 10, fontWeight: 700, color: tk.textMuted, textTransform: 'uppercase', letterSpacing: '0.1em', display: 'block', marginBottom: 6, fontFamily: 'var(--font-mono)' }}>Date Range (From – As of)</label>
-            <DateRangeFilter fromAD={dateFrom} toAD={dateTo} onApply={r => { setDateFrom(r.fromAD); setDateTo(r.toAD) }} />
+            <DateRangeFilter fromAD={dateFrom} toAD={dateTo} onApply={r => { setDateFrom(r.fromAD); setDateTo(r.toAD); setPeriodId('') }} />
           </div>
+          {periods.length > 0 && (
+            <div className="acc-tb-filter-field">
+              <label style={{ fontSize: 10, fontWeight: 700, color: tk.textMuted, textTransform: 'uppercase', letterSpacing: '0.1em', display: 'block', marginBottom: 6, fontFamily: 'var(--font-mono)' }}>Period</label>
+              <select className="erp-input" style={{ width: 160 }} value={periodId} onChange={e => choosePeriod(e.target.value)}>
+                <option value="">{fy ? 'Whole fiscal year' : 'All periods'}</option>
+                {periods.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+          )}
           <div className="acc-tb-filter-field">
             <label style={{ fontSize: 10, fontWeight: 700, color: tk.textMuted, textTransform: 'uppercase', letterSpacing: '0.1em', display: 'block', marginBottom: 6, fontFamily: 'var(--font-mono)' }}>Account Type</label>
             <select className="erp-input" style={{ width: 148 }} value={typeFilter} onChange={e => setTypeFilter(e.target.value)}>
@@ -443,7 +490,9 @@ export default function TrialBalTab() {
               {company?.name && <div style={{ fontSize: 16, fontWeight: 800, color: tk.text }}>{company.name}</div>}
               <div style={{ fontSize: 18, fontWeight: 800, color: tk.reportTitle, letterSpacing: '-0.02em', marginTop: 2 }}>Trial Balance</div>
               <div style={{ fontSize: 13, color: tk.textMuted, marginTop: 4 }}>
-                {query?.date_from && query?.as_of_date ? `Period: ${fmtDate(query.date_from)} — ${fmtDate(query.as_of_date)}` : 'All Periods'}
+                {query?.date_from && query?.as_of_date
+                  ? `${fy ? `FY ${fy.name.replace(/^FY\s*/i, '')} · ` : ''}${fmtDate(query.date_from)} — ${fmtDate(query.as_of_date)}`
+                  : query?.as_of_date ? `Up to ${fmtDate(query.as_of_date)}` : 'All Periods'}
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10, paddingTop: 10, borderTop: `1px solid ${tk.innerBorder}`, fontSize: 11, color: tk.textFaint }}>
                 <span>Generated: {generatedAt?.toLocaleString('en-NP') ?? '—'}</span>
