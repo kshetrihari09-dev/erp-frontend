@@ -5,6 +5,7 @@ import { useSales } from '@/hooks/useQuery'
 import { fmt } from '@/utils'
 import { PATHS } from '@/constants'
 import { dateLabel, paymentColor, paymentName } from './dashboardUtils'
+import RecentSaleBillPreview from './RecentSaleBillPreview'
 
 const STATUS_TONE: Record<string, string> = {
   active: 'bg-emerald-100 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-300', returned: 'bg-amber-100 dark:bg-amber-500/10 text-amber-800 dark:text-amber-300', cancelled: 'bg-rose-100 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300',
@@ -33,6 +34,8 @@ export default function RecentSales() {
   const navigate = useNavigate()
   const [q, setQ] = useState(''), [status, setStatus] = useState(''), [page, setPage] = useState(1)
   const search = useDebounced(q.trim())
+  // Sale whose invoice preview is open. Search / status / page live above and are untouched by it.
+  const [previewId, setPreviewId] = useState<string | null>(null)
   useEffect(() => { setPage(1) }, [search, status])
 
   const { data, isLoading, isError } = useSales({ page, limit: PAGE_SIZE, ...(search && { search }), ...(status && { status }) })
@@ -83,7 +86,7 @@ export default function RecentSales() {
             {isLoading ? Array.from({ length: 5 }).map((_, i) => (
               <tr key={i} className="border-b border-[var(--border)]"><td colSpan={6} className="px-5 py-3"><div className="h-5 animate-pulse rounded bg-[var(--surface-3)]" /></td></tr>
             )) : rows.map(s => (
-              <tr key={s.id} onClick={open} className="cursor-pointer border-b border-[var(--border)] transition-colors last:border-0 hover:bg-[var(--surface-2)]">
+              <tr key={s.id} onClick={() => setPreviewId(s.id)} onKeyDown={e => { if (e.key === 'Enter') setPreviewId(s.id) }} tabIndex={0} className="cursor-pointer border-b border-[var(--border)] transition-colors last:border-0 hover:bg-[var(--surface-2)]">
                 <td className="truncate py-3 pl-5 pr-2 font-mono text-[12px] font-semibold text-[var(--brand)] dark:text-[#93c5fd]">{s.invoice_no}</td>
                 <td className="truncate py-3 pr-2 font-medium text-[var(--text)]" title={s.party_name || 'Walk-in'}>{s.party_name || <span className="text-[var(--text-3)]">Walk-in</span>}</td>
                 <td className="hidden whitespace-nowrap py-3 pr-2 text-[var(--text-3)] lg:table-cell">{dateLabel(s.date_ad)}</td>
@@ -100,7 +103,7 @@ export default function RecentSales() {
       <ul className="grid gap-2 px-4 pb-1 md:hidden">
         {isLoading ? [1, 2, 3].map(i => <li key={i} className="h-[78px] animate-pulse rounded-xl bg-[var(--surface-2)]" />) : rows.map(s => (
           <li key={s.id}>
-            <button type="button" onClick={open} className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface-2)] p-3 text-left transition-colors active:bg-[var(--surface-3)]">
+            <button type="button" onClick={() => setPreviewId(s.id)} className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface-2)] p-3 text-left transition-colors active:bg-[var(--surface-3)]">
               <div className="flex items-center justify-between gap-3">
                 <span className="font-mono text-[12px] font-semibold text-[var(--brand)] dark:text-[#93c5fd]">{s.invoice_no}</span>
                 <b className="tabular-nums text-[var(--text)]">{fmt(s.net_total ?? s.total)}</b>
@@ -131,6 +134,7 @@ export default function RecentSales() {
           </div>
         </div>
       )}
+      {previewId && <RecentSaleBillPreview saleId={previewId} onClose={() => setPreviewId(null)} />}
     </section>
   )
 }
