@@ -1,21 +1,25 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X, Printer, Loader2, FileBarChart } from 'lucide-react'
-import { customerCompanyAPI, type CustomerCompanyProductsReport } from '@/services/api'
+import type { CustomerCompanyProductsReport } from '@/services/api'
 import { useManufacturers } from '@/hooks/useQuery'
 import useUIStore from '@/store/uiStore'
 import { formatDisplayDate } from '@/utils/dateSystem'
 
-/* Product-wise detail of ONE company row of "Customer vs Company" (opened by double-clicking the row).
-   The customer, company and date range are the ones of the report that is on screen, passed in by the page —
-   nothing is re-derived here. All figures come from GET /reports/customer-vs-company/products; this component
-   only displays them (and re-requests when "Discount Excluded" is toggled). */
+/* Product-wise detail window, opened by double-clicking a row of "Customer vs Company" (a company row) or of
+   "Company vs Customer" (a customer row). The customer, company and dates are those of the report that is on
+   screen, passed in by the page — nothing is re-derived here. All figures come from the server through
+   `fetchProducts` (which the page builds for its own endpoint); this component only displays them, and asks again
+   when "Discount Excluded" is toggled. */
 
 interface Props {
-  customer: { id: string; code: string; name: string }
+  title?: string
+  customer: { id?: string | null; code: string; name: string }
+  /** A company name, or 'all' for every company. */
   company: string
   from: string
   to: string
+  fetchProducts: (discountExcluded: boolean) => Promise<CustomerCompanyProductsReport>
   onClose: () => void
 }
 
@@ -23,7 +27,9 @@ const money = (n: number) => (Number(n) || 0).toLocaleString('en-IN', { minimumF
 const qty = (n: number) => (Number(n) || 0).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 4 })
 const neg = (n: number) => (Number(n) < 0 ? 'ccp-neg' : '')
 
-export default function CustomerCompanyProductsModal({ customer, company, from, to, onClose }: Props) {
+export default function CustomerCompanyProductsModal({ title = 'Customer vs Company — Product-wise', customer, company, from, to, fetchProducts, onClose }: Props) {
+  const allCompanies = company === 'all'
+  const companyLabel = allCompanies ? 'All Companies' : company
   const { error: toastError, dateMode } = useUIStore()
   const { data: manufacturers } = useManufacturers()
   const [discountExcluded, setDiscountExcluded] = useState(true)       // the parent report shows Sales before discount
@@ -32,25 +38,27 @@ export default function CustomerCompanyProductsModal({ customer, company, from, 
   const [err, setErr] = useState<string | null>(null)
   const panel = useRef<HTMLDivElement>(null)
   const seq = useRef(0)
+  const fetchRef = useRef(fetchProducts); fetchRef.current = fetchProducts
 
   // S.Code = the company's short code from the Manufacturers directory (blank if it has none / is "No Company")
-  const sCode = useMemo(() => {
-    const m = (manufacturers || []).find(x => x.name.trim().toLowerCase() === company.trim().toLowerCase())
-    return m?.short_name || ''
-  }, [manufacturers, company])
+  const codeOf = useMemo(() => {
+    const map = new Map((manufacturers || []).map(m => [m.name.trim().toLowerCase(), m.short_name || '']))
+    return (name: string) => map.get(name.trim().toLowerCase()) || ''
+  }, [manufacturers])
+  const sCode = allCompanies ? '' : codeOf(company)
 
   const load = useCallback(async () => {
     const my = ++seq.current
     setLoading(true); setErr(null)
     try {
-      const r = await customerCompanyAPI.products({ customer_id: customer.id, company, from, to, discount_excluded: discountExcluded })
+      const r = await fetchRef.current(discountExcluded)
       if (my !== seq.current) return
-      setReport(r.data.data)
+      setReport(r)
     } catch (e: any) {
       if (my !== seq.current) return
       setReport(null); setErr(e?.response?.data?.message || e?.message || 'Failed to load the product-wise report')
     } finally { if (my === seq.current) setLoading(false) }
-  }, [customer.id, company, from, to, discountExcluded])
+  }, [discountExcluded])
 
   useEffect(() => { void load() }, [load])
   useEffect(() => () => { seq.current++ }, [])                      // ignore a response that arrives after closing
@@ -67,17 +75,17 @@ export default function CustomerCompanyProductsModal({ customer, company, from, 
   const printIt = () => {
     if (!report) return
     const esc = (s: unknown) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' } as any)[c])
-    const body = report.rows.map(r => `<tr><td>${esc(sCode)}</td><td>${esc(report.company)}</td><td>${esc(r.m_code)}</td><td>${esc(r.product)}</td>
+    const body = report.rows.map(r => `<tr><td>${esc(codeOf(r.company ?? company))}</td><td>${esc(r.company ?? company)}</td><td>${esc(r.m_code)}</td><td>${esc(r.product)}</td>
       <td class="n">${qty(r.sales_qty)}</td><td class="n">${money(r.sales_amt)}</td><td class="n">${qty(r.free_qty)}</td><td class="n">${money(r.free_value)}</td>
       <td class="n">${qty(r.return_qty)}</td><td class="n">${money(r.return_amt)}</td><td class="n">${qty(r.total_qty)}</td><td class="n">${money(r.total_amt)}</td></tr>`).join('')
     const tt = report.totals
-    const html = `<!doctype html><html><head><meta charset="utf-8"><title>Customer vs Company — ${esc(report.company)}</title><style>
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)} — ${esc(companyLabel)}</title><style>
       body{font:10px Arial,sans-serif;margin:10mm;color:#000}h1{font-size:14px;margin:0 0 2px}.meta{margin:0 0 8px;color:#333;line-height:1.5}
       table{border-collapse:collapse;width:100%}th,td{border:1px solid #777;padding:2px 4px;text-align:left}th{background:#eee}
       .n{text-align:right;font-variant-numeric:tabular-nums}tfoot td{font-weight:bold;background:#f3f3f3}thead{display:table-header-group}tr{page-break-inside:avoid}
       @media print{@page{size:landscape;margin:8mm}}</style></head><body>
-      <h1>Customer vs Company — Product-wise</h1>
-      <p class="meta"><b>Customer:</b> ${esc(report.customer.code)} — ${esc(report.customer.name)} &nbsp;|&nbsp; <b>Company:</b> ${esc(report.company)}${sCode ? ` (${esc(sCode)})` : ''}<br>
+      <h1>${esc(title)}</h1>
+      <p class="meta"><b>Customer:</b> ${esc(report.customer.code)} — ${esc(report.customer.name)} &nbsp;|&nbsp; <b>Company:</b> ${esc(companyLabel)}${sCode ? ` (${esc(sCode)})` : ''}<br>
       <b>From:</b> ${esc(formatDisplayDate(report.filters.from, dateMode))} &nbsp; <b>To:</b> ${esc(formatDisplayDate(report.filters.to, dateMode))}
       &nbsp;|&nbsp; Discount Excluded: ${report.filters.discount_excluded ? 'Yes' : 'No'}</p>
       <table><thead><tr><th>S.Code</th><th>Company</th><th>M.Code</th><th>Product</th><th>Sales Qty</th><th>Sales Amt</th><th>F Qty</th><th>F. Value</th><th>Retu. Qty</th><th>Return Amt</th><th>Tot Qty</th><th>Tot Amt</th></tr></thead>
@@ -91,9 +99,9 @@ export default function CustomerCompanyProductsModal({ customer, company, from, 
 
   return createPortal(
     <div className="ccp-overlay">
-      <div ref={panel} className="ccp-panel" role="dialog" aria-modal="true" aria-label={`Product-wise details — ${company}`} tabIndex={-1}>
+      <div ref={panel} className="ccp-panel" role="dialog" aria-modal="true" aria-label={`Product-wise details — ${companyLabel}`} tabIndex={-1}>
         <div className="ccp-head">
-          <h2 className="ccp-title">Customer vs Company — Product-wise</h2>
+          <h2 className="ccp-title">{title}</h2>
           <div className="ccp-head-actions">
             <button className="btn btn-secondary btn-sm" onClick={printIt} disabled={!report || loading}><Printer size={14} /> Print</button>
             <button className="btn btn-secondary btn-sm" onClick={onClose} aria-label="Close"><X size={14} /> Close</button>
@@ -102,7 +110,7 @@ export default function CustomerCompanyProductsModal({ customer, company, from, 
 
         <div className="ccp-info">
           <div><span>Customer</span><b>{customer.code ? `${customer.code} — ` : ''}{customer.name}</b></div>
-          <div><span>Company</span><b>{company}</b>{sCode && <em> ({sCode})</em>}</div>
+          <div><span>Company</span><b>{companyLabel}</b>{sCode && <em> ({sCode})</em>}</div>
           <div><span>From</span><b>{formatDisplayDate(from, dateMode)}</b></div>
           <div><span>To</span><b>{formatDisplayDate(to, dateMode)}</b></div>
           <label className="ccp-check" title="On: Sales Amt is before discount (as in the Sales column of the report). Off: Sales Amt is after discount.">
@@ -120,7 +128,7 @@ export default function CustomerCompanyProductsModal({ customer, company, from, 
             <tbody>
               {!loading && rows.map(r => (
                 <tr key={r.product_id ?? r.product} className="sr-row">
-                  <td>{sCode}</td><td>{company}</td><td>{r.m_code}</td><td className="sr-c-part" style={{ maxWidth: 320 }}>{r.product}</td>
+                  <td>{codeOf(r.company ?? company)}</td><td>{r.company ?? company}</td><td>{r.m_code}</td><td className="sr-c-part" style={{ maxWidth: 320 }}>{r.product}</td>
                   <td className={`sr-num ${neg(r.sales_qty)}`}>{qty(r.sales_qty)}</td><td className={`sr-num ${neg(r.sales_amt)}`}>{money(r.sales_amt)}</td>
                   <td className="sr-num">{qty(r.free_qty)}</td><td className="sr-num">{money(r.free_value)}</td>
                   <td className="sr-num">{qty(r.return_qty)}</td><td className="sr-num">{money(r.return_amt)}</td>

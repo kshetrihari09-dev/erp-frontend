@@ -389,6 +389,9 @@ export const companyCustomerAPI = {
   get:       (params: CompanyCustomerParams) => http.get<ApiResponse<CompanyCustomerReport>>('/reports/company-vs-customer', { params }),
   companies: ()                              => http.get<ApiResponse<string[]>>('/reports/company-vs-customer/companies'),
   exportCsv: (params: CompanyCustomerParams) => http.get('/reports/company-vs-customer/export', { params, responseType: 'blob' }),
+  /** Product-wise detail of one customer row (double-click). customer_id = the row's customer_id, or 'walkin'. */
+  products:  (params: { from: string; to: string; customer_id: string; company?: string; discount_excluded?: boolean }) =>
+    http.get<ApiResponse<CustomerCompanyProductsReport>>('/reports/company-vs-customer/products', { params }),
 }
 
 // ─── Customer vs Company report ────────────────────────────────────────────────
@@ -405,16 +408,20 @@ export interface CustomerCompanyParams { from: string; to: string; customer_id: 
 /** One product of a company, for the Customer vs Company double-click drill-down. */
 export interface CustomerCompanyProductRow {
   product_id: string | null; product: string; m_code: string
+  /** The product's company (always set by the server). */
+  company?: string
   sales_qty: number; sales_amt: number; free_qty: number; free_value: number
   return_qty: number; return_amt: number; total_qty: number; total_amt: number
 }
 export interface CustomerCompanyProductsReport {
   title: string
-  customer: { id: string; code: string; name: string }
+  /** id is null for the Cash / Walk-in row of Company vs Customer. */
+  customer: { id: string | null; code: string; name: string }
+  /** A company name, or 'all' (Company vs Customer with no company filter). */
   company: string
   filters: { from: string; to: string; customer_id: string; company: string; discount_excluded: boolean }
   rows: CustomerCompanyProductRow[]
-  totals: Omit<CustomerCompanyProductRow, 'product_id' | 'product' | 'm_code'>
+  totals: Omit<CustomerCompanyProductRow, 'product_id' | 'product' | 'm_code' | 'company'>
 }
 export interface CustomerCompanyProductsParams extends CustomerCompanyParams { company: string; discount_excluded?: boolean }
 export interface CustomerLookup { id: string; code: string; name: string }

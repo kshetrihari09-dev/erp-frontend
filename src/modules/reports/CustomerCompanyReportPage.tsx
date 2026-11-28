@@ -231,6 +231,7 @@ export default function CustomerCompanyReportPage() {
       </div>
       {detailCompany !== null && report && (
         <CustomerCompanyProductsModal customer={report.customer} company={detailCompany} from={report.filters.from} to={report.filters.to}
+          fetchProducts={async de => (await customerCompanyAPI.products({ customer_id: report.customer.id, company: detailCompany, from: report.filters.from, to: report.filters.to, discount_excluded: de })).data.data}
           onClose={() => setDetailCompany(null)} />
       )}
       <div className="sr-legend">Sales are shown before discount. Net = Sales − Discount − Sales Return − Sales Return Expiry. Opening / Receipts / Closing in the footer are the customer's full ledger figures (all companies). Products without a company appear as “No Company”.</div>

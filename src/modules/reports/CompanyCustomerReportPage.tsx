@@ -6,6 +6,7 @@ import useUIStore from '@/store/uiStore'
 import { formatDisplayDate } from '@/utils/dateSystem'
 import { DateRangeFilter, type DateRangeApply } from '@/components/ui/DateRangePopup'
 import { PATHS } from '@/constants'
+import CustomerCompanyProductsModal from './CustomerCompanyProductsModal'
 
 /* Company vs Customer — per-customer Sales, Discount, Sales Return, Sales Return
    Expiry and Net for one date range / manufacturer. All maths is done by
@@ -30,6 +31,8 @@ export default function CompanyCustomerReportPage() {
   const [loading, setLoading] = useState(false)
   const [err, setErr]         = useState<string | null>(null)
   const [selId, setSelId]     = useState<string | null>(null)
+  // Customer row whose product-wise detail is open (double-click). Uses the dates / company of the report ON SCREEN.
+  const [detailRow, setDetailRow] = useState<{ customer_id: string | null; customer_code: string; customer_name: string } | null>(null)
   const seq = useRef(0)
   const applied = useRef<{ from: string; to: string; company: string; customerType: string } | null>(null)
 
@@ -44,10 +47,10 @@ export default function CompanyCustomerReportPage() {
       const params: CompanyCustomerParams = { from: f.from, to: f.to, company: f.company, customer_type: f.customerType }
       const r = await companyCustomerAPI.get(params)
       if (my !== seq.current) return
-      applied.current = f; setReport(r.data.data as CompanyCustomerReport); setSelId(null)
+      applied.current = f; setReport(r.data.data as CompanyCustomerReport); setSelId(null); setDetailRow(null)
     } catch (e: any) {
       if (my !== seq.current) return
-      setReport(null); setErr(e?.response?.data?.message || e?.message || 'Failed to load report')
+      setReport(null); setDetailRow(null); setErr(e?.response?.data?.message || e?.message || 'Failed to load report')
     } finally { if (my === seq.current) setLoading(false) }
   }, [])
 
@@ -68,7 +71,7 @@ export default function CompanyCustomerReportPage() {
 
   const exit = () => (window.history.length > 1 ? navigate(-1) : navigate(PATHS.REPORTS))
   useEffect(() => {
-    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') exit() }
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape' && detailRow === null) exit() }
     window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h)
   })
 
@@ -160,7 +163,10 @@ export default function CompanyCustomerReportPage() {
               {rows.map((r, i) => {
                 const id = r.customer_id || `_walkin${i}`
                 return (
-                  <tr key={id} className={`sr-row ${selId === id ? 'sel' : ''}`} onClick={() => setSelId(id)}>
+                  <tr key={id} className={`sr-row ${selId === id ? 'sel' : ''}`} onClick={() => setSelId(id)}
+                    onDoubleClick={() => { setSelId(id); setDetailRow(r) }}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); setSelId(id); setDetailRow(r) } }}
+                    tabIndex={0} title="Double-click for product-wise details">
                     <td>{r.customer_code}</td><td className="sr-c-part" style={{ maxWidth: 320 }}>{r.customer_name}</td>
                     <td className="sr-num">{money(r.opening_balance)}</td>
                     <td className="sr-num">{money(r.sales)}</td><td className="sr-num">{money(r.discount)}</td>
@@ -193,6 +199,13 @@ export default function CompanyCustomerReportPage() {
           </div>
         </div>
       </div>
+      {detailRow !== null && report && (
+        <CustomerCompanyProductsModal title="Company vs Customer — Product-wise"
+          customer={{ id: detailRow.customer_id, code: detailRow.customer_code, name: detailRow.customer_name }}
+          company={report.filters.company} from={report.filters.from} to={report.filters.to}
+          fetchProducts={async de => (await companyCustomerAPI.products({ customer_id: detailRow.customer_id || 'walkin', company: report.filters.company, from: report.filters.from, to: report.filters.to, discount_excluded: de })).data.data}
+          onClose={() => setDetailRow(null)} />
+      )}
       <div className="sr-legend">
         Opening Balance = the customer's original opening balance + all ledger movements before the From date (movements ON the From date belong to the period).
         Closing Balance = Opening + the period's ledger movement. Opening, Receipts and Closing are the customer's full ledger figures (they do not change with the Company filter);
