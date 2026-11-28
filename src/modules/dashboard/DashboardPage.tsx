@@ -51,9 +51,10 @@ export default function DashboardPage() {
       </div>
 
       {/* sales + sidebar */}
-      <div className={`grid items-start gap-4 md:gap-5 ${COLS}`}>
+      <div className={`grid gap-4 md:gap-5 xl:items-stretch ${COLS}`}>
         <RecentSales />
-        <div className="grid gap-4 md:gap-5">
+        {/* xl:content-start keeps the side cards at their natural height; only Recent Sales stretches to the row */}
+        <div className="grid gap-4 md:gap-5 xl:content-start">
           <QuickActions />
           <LowStockPanel count={lowStock} />
           <ExpiryAlert count={Number(stats?.expiry_alerts) || 0} />

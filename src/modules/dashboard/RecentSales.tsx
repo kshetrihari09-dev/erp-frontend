@@ -45,9 +45,10 @@ export default function RecentSales() {
   const from = total ? (page - 1) * PAGE_SIZE + 1 : 0, to = Math.min(page * PAGE_SIZE, total)
   const filtered = !!(search || status)
   const open = () => navigate(PATHS.SALES)
+  const showEmpty = !isLoading && rows.length === 0
 
   return (
-    <section className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-sm)]" aria-label="Recent sales">
+    <section className="flex flex-col rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-sm)]" aria-label="Recent sales">
       <div className="flex flex-wrap items-center justify-between gap-3 p-4 pb-3 md:px-5 md:pt-5">
         <h2 className="flex items-center gap-2 text-[15px] font-bold text-[var(--text)]"><ShoppingCart size={16} className="text-[#3b82f6]" aria-hidden />Recent sales</h2>
         <button type="button" onClick={open} className="inline-flex h-9 items-center gap-1 rounded-lg px-3 text-xs font-semibold text-[var(--brand)] dark:text-[#93c5fd] transition-colors hover:bg-[var(--brand-light)]">View all<ArrowUpRight size={13} aria-hidden /></button>
@@ -70,7 +71,7 @@ export default function RecentSales() {
       </div>
 
       {/* table — md and up */}
-      <div className="hidden md:block">
+      <div className={`hidden md:block ${showEmpty ? '' : 'md:flex-1'}`}>
         <table className="w-full table-fixed text-[13px]">
           <thead>
             <tr className="border-y border-[var(--border)] text-left text-[11px] font-semibold uppercase tracking-wider text-[var(--text-3)]">
@@ -117,8 +118,8 @@ export default function RecentSales() {
         ))}
       </ul>
 
-      {!isLoading && rows.length === 0 && (
-        <div className="px-4 py-10 text-center md:px-5">
+      {showEmpty && (
+        <div className="flex flex-1 flex-col justify-center px-4 py-10 text-center md:px-5">
           <div className="text-sm font-semibold text-[var(--text-2)]">{isError ? 'Couldn’t load sales' : filtered ? 'No invoices match your search' : 'No sales yet'}</div>
           <div className="mt-1 text-xs text-[var(--text-3)]">{isError ? 'Check your connection and try again.' : filtered ? 'Try a different invoice number, customer or status.' : 'Create your first invoice to see it here.'}</div>
         </div>
